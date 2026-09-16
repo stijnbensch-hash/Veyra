@@ -12,11 +12,25 @@
 
 /* Begin PBXFileReference section */
 		B3B65AC5305A5A6C003B5F07 /* Veyra.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Veyra.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B3B65B05305AAB69003B5F07 /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		B3B65B0A305AB56E003B5F07 /* Exceptions for "Veyra" folder in "Veyra" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Resources/Info.plist,
+			);
+			target = B3B65AC4305A5A6C003B5F07 /* Veyra */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		B3B65AC7305A5A6C003B5F07 /* Veyra */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				B3B65B0A305AB56E003B5F07 /* Exceptions for "Veyra" folder in "Veyra" target */,
+			);
 			path = Veyra;
 			sourceTree = "<group>";
 		};
@@ -35,6 +49,7 @@
 		B3B65ABC305A5A6C003B5F07 = {
 			isa = PBXGroup;
 			children = (
+				B3B65B05305AAB69003B5F07 /* Secrets.xcconfig */,
 				B3B65AC7305A5A6C003B5F07 /* Veyra */,
 				B3B65AC6305A5A6C003B5F07 /* Products */,
 			);
@@ -128,6 +143,7 @@
 /* Begin XCBuildConfiguration section */
 		B3B65ACE305A5A70003B5F07 /* Debug configuration for PBXProject "Veyra" */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = B3B65B05305AAB69003B5F07 /* Secrets.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -192,6 +208,7 @@
 		};
 		B3B65ACF305A5A70003B5F07 /* Release configuration for PBXProject "Veyra" */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = B3B65B05305AAB69003B5F07 /* Secrets.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -256,7 +273,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = SGMLZ564HT;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Veyra/Resources/Info.plist;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIUserInterfaceStyle = Automatic;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -285,7 +303,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = SGMLZ564HT;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Veyra/Resources/Info.plist;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIUserInterfaceStyle = Automatic;
 				LD_RUNPATH_SEARCH_PATHS = (

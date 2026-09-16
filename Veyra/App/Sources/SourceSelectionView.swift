@@ -7,8 +7,6 @@ struct SourceSelectionView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
 
-    private let provider = MockMediaSourceProvider()
-
     var body: some View {
         ZStack {
             LinearGradient(
@@ -69,7 +67,7 @@ struct SourceSelectionView: View {
             }
             .padding(70)
         }
-        .task {
+        .task(id: item.id) {
             await loadSources()
         }
     }
@@ -78,11 +76,22 @@ struct SourceSelectionView: View {
     private func loadSources() async {
         isLoading = true
         errorMessage = nil
+        sources = []
+
+        guard let baseURL = AppConfiguration.aioStreamsBaseURL else {
+            errorMessage = "No media source provider is configured."
+            isLoading = false
+            return
+        }
+
+        let provider: any MediaSourceProvider = AIOStreamsProvider(
+            baseURL: baseURL
+        )
 
         do {
             sources = try await provider.sources(for: item)
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = "Unable to load sources from the configured provider."
         }
 
         isLoading = false
@@ -94,7 +103,8 @@ struct SourceSelectionView: View {
         SourceSelectionView(
             item: MediaItem(
                 title: "Test Movie",
-                type: .movie
+                type: .movie,
+                imdbID: "tt0000000"
             )
         )
     }
