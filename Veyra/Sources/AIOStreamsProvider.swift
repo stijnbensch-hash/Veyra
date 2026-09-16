@@ -78,6 +78,7 @@ struct AIOStreamsProvider: MediaSourceProvider {
 
             return PlayableSource(
                 name: stream.displayName,
+                description: stream.normalizedDescription,
                 url: url,
                 kind: .direct
             )
@@ -92,6 +93,7 @@ private struct AIOStreamsStreamResponse: Decodable {
 private struct AIOStreamsStream: Decodable {
     let name: String?
     let title: String?
+    let description: String?
     let url: String?
 
     var displayName: String {
@@ -104,6 +106,10 @@ private struct AIOStreamsStream: Decodable {
         }
 
         return "Media Source"
+    }
+
+    var normalizedDescription: String? {
+        normalized(description)
     }
 
     private func normalized(_ value: String?) -> String? {

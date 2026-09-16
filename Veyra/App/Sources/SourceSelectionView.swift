@@ -108,17 +108,25 @@ struct SourceSelectionView: View {
             }
             .frame(width: 72, height: 72)
 
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 10) {
                 Text(source.name)
                     .font(.system(size: 21, weight: .medium))
                     .foregroundStyle(.white)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
 
+                if let description = source.description {
+                    Text(description)
+                        .font(.system(size: 16))
+                        .foregroundStyle(.white.opacity(0.62))
+                        .lineLimit(4)
+                        .multilineTextAlignment(.leading)
+                }
+
                 Text(source.kind.rawValue.uppercased())
                     .font(.caption)
                     .tracking(2)
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(.cyan.opacity(0.7))
             }
 
             Spacer()
