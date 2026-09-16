@@ -14,22 +14,16 @@ struct ContentView: View {
                 )
                 .ignoresSafeArea()
 
-                VStack(spacing: 28) {
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 70, weight: .medium))
-                        .foregroundStyle(.cyan)
+                VStack(spacing: 36) {
+                    Spacer()
 
-                    Text("VEYRA")
-                        .font(.system(size: 72, weight: .light))
-                        .tracking(18)
-                        .foregroundStyle(.white)
+                    Image("VeyraPrimaryLogo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: 900, maxHeight: 560)
+                        .accessibilityLabel("Veyra")
 
-                    Text("ALL YOUR MEDIA. ONE PLACE.")
-                        .font(.system(size: 20, weight: .light))
-                        .tracking(7)
-                        .foregroundStyle(.white.opacity(0.65))
-
-                    HStack(spacing: 48) {
+                    HStack(spacing: 60) {
                         NavigationLink("MOVIES") {
                             MoviesView()
                         }
@@ -38,11 +32,14 @@ struct ContentView: View {
                         Text("LIVE TV")
                         Text("BEYOND")
                     }
-                    .font(.system(size: 17, weight: .medium))
-                    .tracking(4)
-                    .foregroundStyle(.cyan.opacity(0.8))
-                    .padding(.top, 15)
+                    .font(.system(size: 19, weight: .medium))
+                    .tracking(5)
+                    .foregroundStyle(.cyan.opacity(0.85))
+
+                    Spacer()
                 }
+                .padding(.horizontal, 70)
+                .padding(.vertical, 35)
             }
         }
     }
