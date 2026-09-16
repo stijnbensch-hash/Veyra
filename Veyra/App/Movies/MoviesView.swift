@@ -27,8 +27,8 @@ struct MoviesView: View {
 
                 HStack(spacing: 35) {
                     ForEach(movies) { movie in
-                        Button {
-                            print("Selected:", movie.title)
+                        NavigationLink {
+                            MovieDetailView(movie: movie)
                         } label: {
                             VStack {
                                 Image(systemName: "film")
@@ -50,5 +50,7 @@ struct MoviesView: View {
 }
 
 #Preview {
-    MoviesView()
+    NavigationStack {
+        MoviesView()
+    }
 }
