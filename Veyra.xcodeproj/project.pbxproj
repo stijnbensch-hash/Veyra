@@ -6,6 +6,10 @@
 	objectVersion = 110;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		B3B65AF2305A984B003B5F07 /* AetherEngine in Frameworks */ = {isa = PBXBuildFile; productRef = B3B65AF1305A984B003B5F07 /* AetherEngine */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		B3B65AC5305A5A6C003B5F07 /* Veyra.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Veyra.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -22,6 +26,7 @@
 		B3B65AC2305A5A6C003B5F07 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
+				B3B65AF2305A984B003B5F07 /* AetherEngine in Frameworks */,
 			);
 		};
 /* End PBXFrameworksBuildPhase section */
@@ -60,6 +65,9 @@
 				B3B65AC7305A5A6C003B5F07 /* Veyra */,
 			);
 			name = Veyra;
+			packageProductDependencies = (
+				B3B65AF1305A984B003B5F07 /* AetherEngine */,
+			);
 			productName = Veyra;
 			productReference = B3B65AC5305A5A6C003B5F07 /* Veyra.app */;
 			productType = "com.apple.product-type.application";
@@ -88,6 +96,9 @@
 			);
 			mainGroup = B3B65ABC305A5A6C003B5F07;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				B3B65AF0305A984B003B5F07 /* XCRemoteSwiftPackageReference "AetherEngine" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = B3B65AC6305A5A6C003B5F07 /* Products */;
 			projectDirPath = "";
@@ -314,6 +325,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		B3B65AF0305A984B003B5F07 /* XCRemoteSwiftPackageReference "AetherEngine" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/superuser404notfound/AetherEngine";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 6.89.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		B3B65AF1305A984B003B5F07 /* AetherEngine */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B3B65AF0305A984B003B5F07 /* XCRemoteSwiftPackageReference "AetherEngine" */;
+			productName = AetherEngine;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = B3B65ABD305A5A6C003B5F07 /* Project object */;
 	validationLevel = 1;
