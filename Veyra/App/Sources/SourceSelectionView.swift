@@ -108,25 +108,58 @@ struct SourceSelectionView: View {
             }
             .frame(width: 72, height: 72)
 
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 12) {
                 Text(source.name)
                     .font(.system(size: 21, weight: .medium))
                     .foregroundStyle(.white)
-                    .lineLimit(2)
+                    .lineLimit(1)
                     .multilineTextAlignment(.leading)
 
-                if let description = source.description {
-                    Text(description)
-                        .font(.system(size: 16))
-                        .foregroundStyle(.white.opacity(0.62))
-                        .lineLimit(4)
-                        .multilineTextAlignment(.leading)
-                }
+                if let metadata = source.metadata {
+                    metadataBadges(metadata)
 
-                Text(source.kind.rawValue.uppercased())
-                    .font(.caption)
-                    .tracking(2)
-                    .foregroundStyle(.cyan.opacity(0.7))
+                    if let releaseName = metadata.releaseName {
+                        Text(releaseName)
+                            .font(.system(size: 15))
+                            .foregroundStyle(.white.opacity(0.48))
+                            .lineLimit(1)
+                    }
+
+                    HStack(spacing: 18) {
+                        if !metadata.languages.isEmpty {
+                            Label(
+                                metadata.languages.joined(
+                                    separator: " · "
+                                ),
+                                systemImage: "captions.bubble"
+                            )
+                        }
+
+                        if !metadata.audio.isEmpty {
+                            Label(
+                                metadata.audio.joined(
+                                    separator: " · "
+                                ),
+                                systemImage: "speaker.wave.2"
+                            )
+                        }
+
+                        if let providerName = metadata.providerName {
+                            Label(
+                                providerName,
+                                systemImage: "server.rack"
+                            )
+                        }
+                    }
+                    .font(.system(size: 14))
+                    .foregroundStyle(.white.opacity(0.55))
+                    .lineLimit(1)
+                } else if let description = source.description {
+                    Text(description)
+                        .font(.system(size: 15))
+                        .foregroundStyle(.white.opacity(0.55))
+                        .lineLimit(2)
+                }
             }
 
             Spacer()
@@ -142,6 +175,54 @@ struct SourceSelectionView: View {
             RoundedRectangle(cornerRadius: 20)
                 .fill(.white.opacity(0.06))
         )
+    }
+
+    @ViewBuilder
+    private func metadataBadges(
+        _ metadata: SourceMetadata
+    ) -> some View {
+        HStack(spacing: 10) {
+            if let resolution = metadata.resolution {
+                metadataBadge(resolution)
+            }
+
+            if let quality = metadata.quality {
+                metadataBadge(quality)
+            }
+
+            if let videoCodec = metadata.videoCodec {
+                metadataBadge(videoCodec)
+            }
+
+            ForEach(
+                metadata.dynamicRange,
+                id: \.self
+            ) { value in
+                metadataBadge(value)
+            }
+
+            if let size = metadata.size {
+                metadataBadge(size)
+            }
+
+            if let bitrate = metadata.bitrate {
+                metadataBadge(bitrate)
+            }
+        }
+    }
+
+    private func metadataBadge(
+        _ text: String
+    ) -> some View {
+        Text(text)
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(.cyan)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(
+                Capsule()
+                    .fill(.cyan.opacity(0.12))
+            )
     }
 
     @MainActor

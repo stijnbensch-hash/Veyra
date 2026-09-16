@@ -79,6 +79,10 @@ struct AIOStreamsProvider: MediaSourceProvider {
             return PlayableSource(
                 name: stream.displayName,
                 description: stream.normalizedDescription,
+                metadata: AIOStreamsMetadataParser.parse(
+                    name: stream.displayName,
+                    description: stream.normalizedDescription
+                ),
                 url: url,
                 kind: .direct
             )
