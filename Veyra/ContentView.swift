@@ -31,7 +31,7 @@ struct ContentView: View {
 
                     HStack(spacing: 48) {
                         NavigationLink("MOVIES") {
-                            PlaybackTestView()
+                            MoviesView()
                         }
 
                         Text("SERIES")
