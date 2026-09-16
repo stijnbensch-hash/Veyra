@@ -3,6 +3,7 @@ import SwiftUI
 struct MoviesView: View {
     @State private var movies: [TMDBMovie] = []
     @State private var selectedMediaItem: MediaItem?
+    @State private var searchText = ""
     @State private var isLoading = true
     @State private var isOpeningMovie = false
     @State private var errorMessage: String?
@@ -23,49 +24,28 @@ struct MoviesView: View {
             )
             .ignoresSafeArea()
 
-            VStack(alignment: .leading, spacing: 40) {
-                Text("MOVIES")
-                    .font(.system(size: 54, weight: .light))
-                    .tracking(12)
-                    .foregroundStyle(.white)
+            VStack(alignment: .leading, spacing: 32) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("MOVIES")
+                            .font(.system(size: 54, weight: .light))
+                            .tracking(12)
+                            .foregroundStyle(.white)
 
-                if isLoading {
-                    ProgressView("Loading movies…")
-                        .font(.title3)
-
-                    Spacer()
-                } else if let errorMessage {
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text("Unable to load movies")
-                            .font(.title2)
-
-                        Text(errorMessage)
-                            .foregroundStyle(.secondary)
+                        Text(
+                            searchText.isEmpty
+                                ? "POPULAR"
+                                : "SEARCH RESULTS"
+                        )
+                        .font(.caption)
+                        .tracking(3)
+                        .foregroundStyle(.cyan.opacity(0.75))
                     }
 
                     Spacer()
-                } else if movies.isEmpty {
-                    Text("No movies available")
-                        .foregroundStyle(.secondary)
-
-                    Spacer()
-                } else {
-                    ScrollView(.horizontal) {
-                        LazyHStack(spacing: 35) {
-                            ForEach(movies) { movie in
-                                Button {
-                                    Task {
-                                        await openMovie(movie)
-                                    }
-                                } label: {
-                                    movieCard(movie)
-                                }
-                                .buttonStyle(.card)
-                                .disabled(isOpeningMovie)
-                            }
-                        }
-                    }
                 }
+
+                content
             }
             .padding(70)
 
@@ -79,8 +59,15 @@ struct MoviesView: View {
                 }
             }
         }
+        .searchable(
+            text: $searchText,
+            prompt: "Search movies"
+        )
         .task {
-            await loadMovies()
+            await loadPopularMovies()
+        }
+        .task(id: searchText) {
+            await updateMovies()
         }
         .navigationDestination(
             item: $selectedMediaItem
@@ -89,7 +76,62 @@ struct MoviesView: View {
         }
     }
 
-    private func movieCard(_ movie: TMDBMovie) -> some View {
+    @ViewBuilder
+    private var content: some View {
+        if isLoading {
+            ProgressView(
+                searchText.isEmpty
+                    ? "Loading movies…"
+                    : "Searching…"
+            )
+            .font(.title3)
+
+            Spacer()
+        } else if let errorMessage {
+            VStack(alignment: .leading, spacing: 16) {
+                Text(
+                    searchText.isEmpty
+                        ? "Unable to load movies"
+                        : "Unable to search movies"
+                )
+                .font(.title2)
+
+                Text(errorMessage)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+        } else if movies.isEmpty {
+            Text(
+                searchText.isEmpty
+                    ? "No movies available"
+                    : "No movies found"
+            )
+            .foregroundStyle(.secondary)
+
+            Spacer()
+        } else {
+            ScrollView(.horizontal) {
+                LazyHStack(spacing: 35) {
+                    ForEach(movies) { movie in
+                        Button {
+                            Task {
+                                await openMovie(movie)
+                            }
+                        } label: {
+                            movieCard(movie)
+                        }
+                        .buttonStyle(.card)
+                        .disabled(isOpeningMovie)
+                    }
+                }
+            }
+        }
+    }
+
+    private func movieCard(
+        _ movie: TMDBMovie
+    ) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             AsyncImage(url: posterURL(for: movie)) { phase in
                 switch phase {
@@ -122,7 +164,10 @@ struct MoviesView: View {
                 .font(.headline)
                 .foregroundStyle(.white)
                 .lineLimit(1)
-                .frame(width: 260, alignment: .leading)
+                .frame(
+                    width: 260,
+                    alignment: .leading
+                )
         }
     }
 
@@ -136,7 +181,9 @@ struct MoviesView: View {
         }
     }
 
-    private func posterURL(for movie: TMDBMovie) -> URL? {
+    private func posterURL(
+        for movie: TMDBMovie
+    ) -> URL? {
         guard let posterPath = movie.posterPath else {
             return nil
         }
@@ -149,7 +196,33 @@ struct MoviesView: View {
     }
 
     @MainActor
-    private func loadMovies() async {
+    private func updateMovies() async {
+        let query = searchText.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+
+        if query.isEmpty {
+            await loadPopularMovies()
+            return
+        }
+
+        do {
+            try await Task.sleep(
+                for: .milliseconds(350)
+            )
+        } catch {
+            return
+        }
+
+        guard !Task.isCancelled else {
+            return
+        }
+
+        await searchMovies(query: query)
+    }
+
+    @MainActor
+    private func loadPopularMovies() async {
         isLoading = true
         errorMessage = nil
 
@@ -169,7 +242,33 @@ struct MoviesView: View {
     }
 
     @MainActor
-    private func openMovie(_ movie: TMDBMovie) async {
+    private func searchMovies(
+        query: String
+    ) async {
+        isLoading = true
+        errorMessage = nil
+
+        guard let service = TMDBService() else {
+            errorMessage = "The metadata service is not configured."
+            isLoading = false
+            return
+        }
+
+        do {
+            movies = try await service.searchMovies(
+                query: query
+            )
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
+        isLoading = false
+    }
+
+    @MainActor
+    private func openMovie(
+        _ movie: TMDBMovie
+    ) async {
         guard !isOpeningMovie else {
             return
         }

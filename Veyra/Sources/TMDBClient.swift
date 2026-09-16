@@ -3,12 +3,15 @@ import Foundation
 struct TMDBClient {
     private let session: URLSession
     private let readAccessToken: String
+    private let language: String
 
     init(
         readAccessToken: String,
+        language: String = "nl-NL",
         session: URLSession = .shared
     ) {
         self.readAccessToken = readAccessToken
+        self.language = language
         self.session = session
     }
 
@@ -21,14 +24,19 @@ struct TMDBClient {
     }
 
     func searchMovies(query: String) async throws -> [TMDBMovie] {
-        guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        guard !query.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        ).isEmpty else {
             return []
         }
 
         let response: TMDBMoviePage = try await request(
             path: "/3/search/movie",
             queryItems: [
-                URLQueryItem(name: "query", value: query)
+                URLQueryItem(
+                    name: "query",
+                    value: query
+                )
             ]
         )
 
@@ -52,7 +60,16 @@ struct TMDBClient {
         components.scheme = "https"
         components.host = "api.themoviedb.org"
         components.path = path
-        components.queryItems = queryItems
+
+        var localizedQueryItems = queryItems
+        localizedQueryItems.append(
+            URLQueryItem(
+                name: "language",
+                value: language
+            )
+        )
+
+        components.queryItems = localizedQueryItems
 
         guard let url = components.url else {
             throw TMDBError.invalidURL
@@ -71,7 +88,9 @@ struct TMDBClient {
             forHTTPHeaderField: "Accept"
         )
 
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await session.data(
+            for: request
+        )
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw TMDBError.invalidResponse
@@ -134,16 +153,16 @@ enum TMDBError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidURL:
-            return "The metadata request could not be created."
+            return "Het metadata-verzoek kon niet worden aangemaakt."
 
         case .invalidResponse:
-            return "The metadata service returned an invalid response."
+            return "De metadataservice gaf een ongeldig antwoord."
 
         case .httpError:
-            return "The metadata service could not complete the request."
+            return "De metadataservice kon het verzoek niet uitvoeren."
 
         case .decodingFailed:
-            return "The metadata response could not be processed."
+            return "De metadata konden niet worden verwerkt."
         }
     }
 }
