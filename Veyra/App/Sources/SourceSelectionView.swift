@@ -9,13 +9,16 @@ struct SourceSelectionView: View {
 
     var body: some View {
         ZStack {
+            background
+
             LinearGradient(
                 colors: [
-                    Color(red: 0.01, green: 0.04, blue: 0.07),
-                    Color(red: 0.02, green: 0.10, blue: 0.16)
+                    .black.opacity(0.35),
+                    Color(red: 0.01, green: 0.04, blue: 0.07).opacity(0.88),
+                    Color(red: 0.01, green: 0.04, blue: 0.07)
                 ],
-                startPoint: .top,
-                endPoint: .bottom
+                startPoint: .topTrailing,
+                endPoint: .bottomLeading
             )
             .ignoresSafeArea()
 
@@ -28,7 +31,7 @@ struct SourceSelectionView: View {
 
                     Text(item.title)
                         .font(.title2)
-                        .foregroundStyle(.white.opacity(0.65))
+                        .foregroundStyle(.white.opacity(0.72))
                 }
 
                 if isLoading {
@@ -94,6 +97,44 @@ struct SourceSelectionView: View {
         }
     }
 
+    @ViewBuilder
+    private var background: some View {
+        if let backdropURL = item.backdropURL {
+            AsyncImage(url: backdropURL) { phase in
+                switch phase {
+                case .empty:
+                    baseBackground
+
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                        .ignoresSafeArea()
+
+                case .failure:
+                    baseBackground
+
+                @unknown default:
+                    baseBackground
+                }
+            }
+        } else {
+            baseBackground
+        }
+    }
+
+    private var baseBackground: some View {
+        LinearGradient(
+            colors: [
+                Color(red: 0.01, green: 0.04, blue: 0.07),
+                Color(red: 0.02, green: 0.10, blue: 0.16)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .ignoresSafeArea()
+    }
+
     private func sourceCard(
         _ source: PlayableSource
     ) -> some View {
@@ -128,18 +169,14 @@ struct SourceSelectionView: View {
                     HStack(spacing: 18) {
                         if !metadata.languages.isEmpty {
                             Label(
-                                metadata.languages.joined(
-                                    separator: " · "
-                                ),
+                                metadata.languages.joined(separator: " · "),
                                 systemImage: "captions.bubble"
                             )
                         }
 
                         if !metadata.audio.isEmpty {
                             Label(
-                                metadata.audio.joined(
-                                    separator: " · "
-                                ),
+                                metadata.audio.joined(separator: " · "),
                                 systemImage: "speaker.wave.2"
                             )
                         }
@@ -173,7 +210,7 @@ struct SourceSelectionView: View {
         .frame(maxWidth: 1050, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 20)
-                .fill(.white.opacity(0.06))
+                .fill(.black.opacity(0.38))
         )
     }
 
@@ -194,10 +231,7 @@ struct SourceSelectionView: View {
                 metadataBadge(videoCodec)
             }
 
-            ForEach(
-                metadata.dynamicRange,
-                id: \.self
-            ) { value in
+            ForEach(metadata.dynamicRange, id: \.self) { value in
                 metadataBadge(value)
             }
 

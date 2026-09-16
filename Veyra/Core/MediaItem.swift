@@ -6,16 +6,29 @@ struct MediaItem: Identifiable, Hashable {
     let type: MediaType
     let imdbID: String?
 
+    let overview: String?
+    let releaseDate: String?
+    let posterURL: URL?
+    let backdropURL: URL?
+
     init(
         id: UUID = UUID(),
         title: String,
         type: MediaType,
-        imdbID: String? = nil
+        imdbID: String? = nil,
+        overview: String? = nil,
+        releaseDate: String? = nil,
+        posterURL: URL? = nil,
+        backdropURL: URL? = nil
     ) {
         self.id = id
         self.title = title
         self.type = type
         self.imdbID = imdbID
+        self.overview = overview
+        self.releaseDate = releaseDate
+        self.posterURL = posterURL
+        self.backdropURL = backdropURL
     }
 }
 

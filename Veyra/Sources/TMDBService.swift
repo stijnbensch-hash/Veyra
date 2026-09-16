@@ -3,6 +3,10 @@ import Foundation
 struct TMDBService {
     private let client: TMDBClient
 
+    private let imageBaseURL = URL(
+        string: "https://image.tmdb.org/t/p/"
+    )!
+
     init?() {
         guard let token = AppConfiguration.tmdbReadAccessToken else {
             return nil
@@ -29,7 +33,51 @@ struct TMDBService {
         return MediaItem(
             title: movie.title,
             type: .movie,
-            imdbID: externalIDs.imdbID
+            imdbID: externalIDs.imdbID,
+            overview: normalized(movie.overview),
+            releaseDate: normalized(movie.releaseDate),
+            posterURL: imageURL(
+                path: movie.posterPath,
+                size: "w500"
+            ),
+            backdropURL: imageURL(
+                path: movie.backdropPath,
+                size: "w1280"
+            )
         )
+    }
+
+    private func imageURL(
+        path: String?,
+        size: String
+    ) -> URL? {
+        guard
+            let path,
+            !path.isEmpty
+        else {
+            return nil
+        }
+
+        return imageBaseURL
+            .appendingPathComponent(size)
+            .appendingPathComponent(
+                path.trimmingCharacters(
+                    in: CharacterSet(charactersIn: "/")
+                )
+            )
+    }
+
+    private func normalized(
+        _ value: String?
+    ) -> String? {
+        guard let value else {
+            return nil
+        }
+
+        let trimmed = value.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+
+        return trimmed.isEmpty ? nil : trimmed
     }
 }
