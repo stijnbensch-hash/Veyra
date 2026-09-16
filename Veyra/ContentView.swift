@@ -24,7 +24,7 @@ struct ContentView: View {
                         .accessibilityLabel("Veyra")
 
                     HStack(spacing: 60) {
-                        NavigationLink("MOVIES") {
+                        NavigationLink("FILMS") {
                             MoviesView()
                         }
 

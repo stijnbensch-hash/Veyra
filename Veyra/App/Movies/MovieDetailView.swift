@@ -49,7 +49,7 @@ struct MovieDetailView: View {
                         SourceSelectionView(item: movie)
                     } label: {
                         Label(
-                            "PLAY",
+                            "AFSPELEN",
                             systemImage: "play.fill"
                         )
                         .font(.system(size: 20, weight: .bold))
@@ -168,10 +168,10 @@ struct MovieDetailView: View {
     NavigationStack {
         MovieDetailView(
             movie: MediaItem(
-                title: "Test Movie",
+                title: "Testfilm",
                 type: .movie,
                 imdbID: "tt0000000",
-                overview: "A preview of the Veyra movie detail experience.",
+                overview: "Een voorbeeld van de filmdetailpagina van Veyra.",
                 releaseDate: "2026-09-16"
             )
         )

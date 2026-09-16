@@ -27,15 +27,15 @@ struct MoviesView: View {
             VStack(alignment: .leading, spacing: 32) {
                 HStack {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("MOVIES")
+                        Text("FILMS")
                             .font(.system(size: 54, weight: .light))
                             .tracking(12)
                             .foregroundStyle(.white)
 
                         Text(
                             searchText.isEmpty
-                                ? "POPULAR"
-                                : "SEARCH RESULTS"
+                                ? "POPULAIR"
+                                : "ZOEKRESULTATEN"
                         )
                         .font(.caption)
                         .tracking(3)
@@ -54,14 +54,14 @@ struct MoviesView: View {
                     Color.black.opacity(0.55)
                         .ignoresSafeArea()
 
-                    ProgressView("Opening movie…")
+                    ProgressView("Film openen…")
                         .font(.title3)
                 }
             }
         }
         .searchable(
             text: $searchText,
-            prompt: "Search movies"
+            prompt: "Zoek films"
         )
         .task {
             await loadPopularMovies()
@@ -81,8 +81,8 @@ struct MoviesView: View {
         if isLoading {
             ProgressView(
                 searchText.isEmpty
-                    ? "Loading movies…"
-                    : "Searching…"
+                    ? "Films laden…"
+                    : "Zoeken…"
             )
             .font(.title3)
 
@@ -91,8 +91,8 @@ struct MoviesView: View {
             VStack(alignment: .leading, spacing: 16) {
                 Text(
                     searchText.isEmpty
-                        ? "Unable to load movies"
-                        : "Unable to search movies"
+                        ? "Films konden niet worden geladen"
+                        : "Zoeken is mislukt"
                 )
                 .font(.title2)
 
@@ -104,8 +104,8 @@ struct MoviesView: View {
         } else if movies.isEmpty {
             Text(
                 searchText.isEmpty
-                    ? "No movies available"
-                    : "No movies found"
+                    ? "Geen films beschikbaar"
+                    : "Geen films gevonden"
             )
             .foregroundStyle(.secondary)
 
@@ -227,7 +227,7 @@ struct MoviesView: View {
         errorMessage = nil
 
         guard let service = TMDBService() else {
-            errorMessage = "The metadata service is not configured."
+            errorMessage = "De metadataservice is niet geconfigureerd."
             isLoading = false
             return
         }
@@ -249,7 +249,7 @@ struct MoviesView: View {
         errorMessage = nil
 
         guard let service = TMDBService() else {
-            errorMessage = "The metadata service is not configured."
+            errorMessage = "De metadataservice is niet geconfigureerd."
             isLoading = false
             return
         }
@@ -281,7 +281,7 @@ struct MoviesView: View {
         }
 
         guard let service = TMDBService() else {
-            errorMessage = "The metadata service is not configured."
+            errorMessage = "De metadataservice is niet geconfigureerd."
             return
         }
 

@@ -24,7 +24,7 @@ struct SourceSelectionView: View {
 
             VStack(alignment: .leading, spacing: 26) {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("SELECT SOURCE")
+                    Text("KIES BRON")
                         .font(.system(size: 42, weight: .light))
                         .tracking(9)
                         .foregroundStyle(.white)
@@ -40,7 +40,7 @@ struct SourceSelectionView: View {
                     HStack {
                         Spacer()
 
-                        ProgressView("Finding sources…")
+                        ProgressView("Bronnen zoeken…")
                             .font(.title3)
 
                         Spacer()
@@ -51,7 +51,7 @@ struct SourceSelectionView: View {
                     Spacer()
 
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Unable to load sources")
+                        Text("Bronnen konden niet worden geladen")
                             .font(.title2)
                             .foregroundStyle(.white)
 
@@ -63,13 +63,13 @@ struct SourceSelectionView: View {
                 } else if sources.isEmpty {
                     Spacer()
 
-                    Text("No sources available")
+                    Text("Geen bronnen beschikbaar")
                         .font(.title3)
                         .foregroundStyle(.secondary)
 
                     Spacer()
                 } else {
-                    Text("\(sources.count) SOURCES")
+                    Text("\(sources.count) BRONNEN")
                         .font(.caption)
                         .tracking(3)
                         .foregroundStyle(.cyan.opacity(0.75))
@@ -265,7 +265,7 @@ struct SourceSelectionView: View {
         errorMessage = nil
 
         guard let baseURL = AppConfiguration.aioStreamsBaseURL else {
-            errorMessage = "No media provider is configured."
+            errorMessage = "Er is geen mediabron geconfigureerd."
             isLoading = false
             return
         }
@@ -290,7 +290,7 @@ struct SourceSelectionView: View {
     NavigationStack {
         SourceSelectionView(
             item: MediaItem(
-                title: "Test Movie",
+                title: "Testfilm",
                 type: .movie,
                 imdbID: "tt0000000"
             )

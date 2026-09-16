@@ -20,7 +20,7 @@ struct PlayerView: View {
                     Image(systemName: "exclamationmark.triangle")
                         .font(.system(size: 60))
 
-                    Text("Unable to play")
+                    Text("Afspelen niet mogelijk")
                         .font(.title)
 
                     Text(playbackError)
@@ -28,7 +28,7 @@ struct PlayerView: View {
                         .foregroundStyle(.secondary)
                 }
             } else {
-                ProgressView("Starting Veyra Player…")
+                ProgressView("Veyra Player starten…")
             }
         }
         .task {

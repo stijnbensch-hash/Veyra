@@ -109,7 +109,7 @@ private struct AIOStreamsStream: Decodable {
             return name
         }
 
-        return "Media Source"
+        return "Mediabron"
     }
 
     var normalizedDescription: String? {
@@ -137,13 +137,13 @@ enum AIOStreamsError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidResponse:
-            return "The configured media provider returned an invalid response."
+            return "De geconfigureerde mediabron gaf een ongeldig antwoord."
 
         case .httpError:
-            return "The configured media provider could not complete the request."
+            return "De geconfigureerde mediabron kon het verzoek niet uitvoeren."
 
         case .decodingFailed:
-            return "The media provider response could not be processed."
+            return "Het antwoord van de mediabron kon niet worden verwerkt."
         }
     }
 }
