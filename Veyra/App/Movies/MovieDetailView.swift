@@ -3,16 +3,6 @@ import SwiftUI
 struct MovieDetailView: View {
     let movie: MediaItem
 
-    private var testSource: PlayableSource {
-        PlayableSource(
-            name: movie.title,
-            url: URL(
-                string: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8"
-            )!,
-            kind: .direct
-        )
-    }
-
     var body: some View {
         ZStack {
             LinearGradient(
@@ -41,7 +31,7 @@ struct MovieDetailView: View {
                         .foregroundStyle(.secondary)
 
                     NavigationLink {
-                        PlayerView(source: testSource)
+                        SourceSelectionView(item: movie)
                     } label: {
                         Label("PLAY", systemImage: "play.fill")
                             .font(.title3.bold())
