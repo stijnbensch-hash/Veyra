@@ -7,6 +7,7 @@ struct PlayableSource: Identifiable, Hashable {
     let metadata: SourceMetadata?
     let url: URL
     let kind: SourceKind
+    let requiresSoftwareVideo: Bool
 
     init(
         id: UUID = UUID(),
@@ -14,7 +15,8 @@ struct PlayableSource: Identifiable, Hashable {
         description: String? = nil,
         metadata: SourceMetadata? = nil,
         url: URL,
-        kind: SourceKind
+        kind: SourceKind,
+        requiresSoftwareVideo: Bool = false
     ) {
         self.id = id
         self.name = name
@@ -22,6 +24,7 @@ struct PlayableSource: Identifiable, Hashable {
         self.metadata = metadata
         self.url = url
         self.kind = kind
+        self.requiresSoftwareVideo = requiresSoftwareVideo
     }
 }
 

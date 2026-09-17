@@ -21,7 +21,7 @@ struct MovieDetailView: View {
             HStack(alignment: .center, spacing: 60) {
                 poster
 
-                VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 26) {
                     Text(movie.title)
                         .font(.system(size: 54, weight: .semibold))
                         .foregroundStyle(.white)
@@ -29,18 +29,18 @@ struct MovieDetailView: View {
 
                     if let year = releaseYear {
                         Text(year)
-                            .font(.title3)
+                            .font(.system(size: 32, weight: .medium))
                             .foregroundStyle(.cyan.opacity(0.85))
                     }
 
                     if let overview = movie.overview {
                         Text(overview)
-                            .font(.system(size: 20))
-                            .foregroundStyle(.white.opacity(0.78))
-                            .lineSpacing(5)
+                            .font(.system(size: 26, weight: .regular))
+                            .foregroundStyle(.white.opacity(0.82))
+                            .lineSpacing(7)
                             .lineLimit(7)
                             .frame(
-                                maxWidth: 820,
+                                maxWidth: 900,
                                 alignment: .leading
                             )
                     }
@@ -52,8 +52,8 @@ struct MovieDetailView: View {
                             "AFSPELEN",
                             systemImage: "play.fill"
                         )
-                        .font(.system(size: 20, weight: .bold))
-                        .padding(.horizontal, 10)
+                        .font(.system(size: 22, weight: .bold))
+                        .padding(.horizontal, 12)
                     }
 
                     Spacer()

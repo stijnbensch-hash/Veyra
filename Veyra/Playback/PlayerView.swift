@@ -13,8 +13,10 @@ struct PlayerView: View {
                 .ignoresSafeArea()
 
             if let playbackEngine {
-                AetherPlayerSurface(engine: playbackEngine.engine)
-                    .ignoresSafeArea()
+                AetherPlayerSurface(
+                    engine: playbackEngine.engine
+                )
+                .ignoresSafeArea()
             } else if let playbackError {
                 VStack(spacing: 20) {
                     Image(systemName: "exclamationmark.triangle")
@@ -26,9 +28,16 @@ struct PlayerView: View {
                     Text(playbackError)
                         .font(.body)
                         .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 40)
                 }
             } else {
-                ProgressView("Veyra Player starten…")
+                VStack(spacing: 16) {
+                    ProgressView()
+
+                    Text("Veyra Player starten…")
+                        .font(.title3)
+                }
             }
         }
         .task {

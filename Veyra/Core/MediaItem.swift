@@ -6,6 +6,9 @@ struct MediaItem: Identifiable, Hashable {
     let type: MediaType
     let imdbID: String?
 
+    let seasonNumber: Int?
+    let episodeNumber: Int?
+
     let overview: String?
     let releaseDate: String?
     let posterURL: URL?
@@ -16,6 +19,8 @@ struct MediaItem: Identifiable, Hashable {
         title: String,
         type: MediaType,
         imdbID: String? = nil,
+        seasonNumber: Int? = nil,
+        episodeNumber: Int? = nil,
         overview: String? = nil,
         releaseDate: String? = nil,
         posterURL: URL? = nil,
@@ -25,6 +30,8 @@ struct MediaItem: Identifiable, Hashable {
         self.title = title
         self.type = type
         self.imdbID = imdbID
+        self.seasonNumber = seasonNumber
+        self.episodeNumber = episodeNumber
         self.overview = overview
         self.releaseDate = releaseDate
         self.posterURL = posterURL

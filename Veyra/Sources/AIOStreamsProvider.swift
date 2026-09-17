@@ -24,13 +24,23 @@ struct AIOStreamsProvider: MediaSourceProvider {
         }
 
         let mediaType: String
+        let mediaID: String
 
         switch item.type {
         case .movie:
             mediaType = "movie"
+            mediaID = imdbID
 
         case .series:
+            guard
+                let seasonNumber = item.seasonNumber,
+                let episodeNumber = item.episodeNumber
+            else {
+                return []
+            }
+
             mediaType = "series"
+            mediaID = "\(imdbID):\(seasonNumber):\(episodeNumber)"
 
         case .liveTV:
             return []
@@ -39,7 +49,7 @@ struct AIOStreamsProvider: MediaSourceProvider {
         let streamURL = baseURL
             .appendingPathComponent("stream")
             .appendingPathComponent(mediaType)
-            .appendingPathComponent("\(imdbID).json")
+            .appendingPathComponent("\(mediaID).json")
 
         let (data, response) = try await session.data(
             from: streamURL
@@ -84,7 +94,8 @@ struct AIOStreamsProvider: MediaSourceProvider {
                     description: stream.normalizedDescription
                 ),
                 url: url,
-                kind: .direct
+                kind: .direct,
+                requiresSoftwareVideo: false
             )
         }
     }

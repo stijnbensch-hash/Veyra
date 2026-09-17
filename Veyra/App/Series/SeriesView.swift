@@ -1,10 +1,9 @@
 import SwiftUI
 
-struct MoviesView: View {
-    @State private var movies: [TMDBMovie] = []
-    @State private var selectedMediaItem: MediaItem?
+struct SeriesView: View {
+    @State private var series: [TMDBSeries] = []
+    @State private var selectedSeries: TMDBSeries?
     @State private var isLoading = true
-    @State private var isOpeningMovie = false
     @State private var errorMessage: String?
 
     private let posterBaseURL = URL(
@@ -39,25 +38,15 @@ struct MoviesView: View {
                 content
             }
             .padding(70)
-
-            if isOpeningMovie {
-                ZStack {
-                    Color.black.opacity(0.55)
-                        .ignoresSafeArea()
-
-                    ProgressView("Film openen…")
-                        .font(.title3)
-                }
-            }
         }
         .task {
-            await loadPopularMovies()
+            await loadPopularSeries()
         }
         .navigationDestination(
-            item: $selectedMediaItem
-        ) { movie in
-            MovieDetailView(
-                movie: movie
+            item: $selectedSeries
+        ) { series in
+            SeriesDetailView(
+                series: series
             )
         }
     }
@@ -67,7 +56,7 @@ struct MoviesView: View {
             alignment: .leading,
             spacing: 8
         ) {
-            Text("FILMS")
+            Text("SERIES")
                 .font(
                     .system(
                         size: 54,
@@ -89,7 +78,7 @@ struct MoviesView: View {
     @ViewBuilder
     private var content: some View {
         if isLoading {
-            ProgressView("Films laden…")
+            ProgressView("Series laden…")
                 .font(.title3)
 
             Spacer()
@@ -99,7 +88,7 @@ struct MoviesView: View {
                 spacing: 16
             ) {
                 Text(
-                    "Films konden niet worden geladen"
+                    "Series konden niet worden geladen"
                 )
                 .font(.title2)
 
@@ -108,8 +97,8 @@ struct MoviesView: View {
             }
 
             Spacer()
-        } else if movies.isEmpty {
-            Text("Geen films beschikbaar")
+        } else if series.isEmpty {
+            Text("Geen series beschikbaar")
                 .foregroundStyle(.secondary)
 
             Spacer()
@@ -119,8 +108,8 @@ struct MoviesView: View {
                     alignment: .top,
                     spacing: 35
                 ) {
-                    ForEach(movies) { movie in
-                        movieCard(movie)
+                    ForEach(series) { item in
+                        seriesCard(item)
                     }
                 }
                 .padding(.top, 20)
@@ -130,24 +119,21 @@ struct MoviesView: View {
         }
     }
 
-    private func movieCard(
-        _ movie: TMDBMovie
+    private func seriesCard(
+        _ item: TMDBSeries
     ) -> some View {
         VStack(
             alignment: .leading,
             spacing: 14
         ) {
             Button {
-                Task {
-                    await openMovie(movie)
-                }
+                selectedSeries = item
             } label: {
-                poster(for: movie)
+                poster(for: item)
             }
             .buttonStyle(.card)
-            .disabled(isOpeningMovie)
 
-            Text(movie.title)
+            Text(item.name)
                 .font(
                     .system(
                         size: 26,
@@ -177,10 +163,10 @@ struct MoviesView: View {
 
     @ViewBuilder
     private func poster(
-        for movie: TMDBMovie
+        for item: TMDBSeries
     ) -> some View {
         AsyncImage(
-            url: posterURL(for: movie)
+            url: posterURL(for: item)
         ) { phase in
             switch phase {
             case .empty:
@@ -217,17 +203,17 @@ struct MoviesView: View {
         ZStack {
             Color.white.opacity(0.08)
 
-            Image(systemName: "film")
+            Image(systemName: "tv")
                 .font(.system(size: 55))
                 .foregroundStyle(.secondary)
         }
     }
 
     private func posterURL(
-        for movie: TMDBMovie
+        for series: TMDBSeries
     ) -> URL? {
         guard
-            let posterPath = movie.posterPath
+            let posterPath = series.posterPath
         else {
             return nil
         }
@@ -243,11 +229,11 @@ struct MoviesView: View {
     }
 
     @MainActor
-    private func loadPopularMovies() async {
+    private func loadPopularSeries() async {
         isLoading = true
         errorMessage = nil
 
-        guard let service = TMDBService() else {
+        guard let service = SeriesService() else {
             errorMessage =
                 "De metadataservice is niet geconfigureerd."
             isLoading = false
@@ -255,7 +241,7 @@ struct MoviesView: View {
         }
 
         do {
-            movies = try await service.popularMovies()
+            series = try await service.popularSeries()
         } catch {
             errorMessage =
                 error.localizedDescription
@@ -263,42 +249,10 @@ struct MoviesView: View {
 
         isLoading = false
     }
-
-    @MainActor
-    private func openMovie(
-        _ movie: TMDBMovie
-    ) async {
-        guard !isOpeningMovie else {
-            return
-        }
-
-        isOpeningMovie = true
-        errorMessage = nil
-
-        defer {
-            isOpeningMovie = false
-        }
-
-        guard let service = TMDBService() else {
-            errorMessage =
-                "De metadataservice is niet geconfigureerd."
-            return
-        }
-
-        do {
-            selectedMediaItem =
-                try await service.mediaItem(
-                    for: movie
-                )
-        } catch {
-            errorMessage =
-                error.localizedDescription
-        }
-    }
 }
 
 #Preview {
     NavigationStack {
-        MoviesView()
+        SeriesView()
     }
 }
