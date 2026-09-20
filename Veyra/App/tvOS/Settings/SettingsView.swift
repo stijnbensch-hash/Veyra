@@ -41,7 +41,7 @@ struct SettingsView: View {
                 settingsRow(destination: .mediaServers, icon: "server.rack", title: "Mediaservers",
                             subtitle: "Jellyfin en andere eigen servers", status: mediaServersStatus, statusColor: VeyraColors.cyan)
             } header: {
-                Text("Bronnen")
+                VeyraSectionHeader(title: "Bronnen").textCase(nil).padding(.bottom, 4)
             }
 
             Section {
@@ -56,7 +56,7 @@ struct SettingsView: View {
                 settingsRow(destination: .shelves, icon: "rectangle.grid.1x2", title: "Planken",
                             subtitle: "Eigen rijen op het hoofdmenu", status: "", statusColor: VeyraColors.secondary)
             } header: {
-                Text("Weergave")
+                VeyraSectionHeader(title: "Weergave").textCase(nil).padding(.bottom, 4)
             }
 
             Section {
@@ -69,7 +69,7 @@ struct SettingsView: View {
                             status: cloudSync.isEnabled ? "Aan" : "Uit",
                             statusColor: cloudSync.isEnabled ? VeyraColors.cyan : VeyraColors.secondary)
             } header: {
-                Text("Account")
+                VeyraSectionHeader(title: "Account").textCase(nil).padding(.bottom, 4)
             }
 
             if let errorMessage {
