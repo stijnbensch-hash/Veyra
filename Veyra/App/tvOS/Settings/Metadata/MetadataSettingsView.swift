@@ -51,6 +51,16 @@ struct MetadataSettingsView: View {
                         Text(option.title).tag(option.rawValue)
                     }
                 }
+                // .menu i.p.v. de standaard push-stijl: deze rij wordt
+                // direct gevolgd door secties die in-/uitklappen zodra de
+                // keuze verandert (voorbeeldposter, toggles). Met de
+                // standaard stijl duwt tvOS een apart kiesscherm open en
+                // moet het bij het teruggaan tegelijk de lijst herbouwen
+                // — die combinatie liet de focus-engine soms vastlopen
+                // (de app viel dan terug naar het beginscherm). Een
+                // menu-stijl kiezer verandert de selectie zonder te
+                // navigeren, dus die botsing kan niet meer optreden.
+                .pickerStyle(.menu)
 
                 if posterEnrichmentSource != .off {
                     HStack {
@@ -75,6 +85,7 @@ struct MetadataSettingsView: View {
                                 Text(option.title).tag(option.rawValue)
                             }
                         }
+                        .pickerStyle(.menu)
                     }
                     Toggle("Leeftijdsclassificatie", isOn: $posterShowAgeRating)
                     Toggle("Kwaliteitslabels", isOn: $posterShowQuality)
