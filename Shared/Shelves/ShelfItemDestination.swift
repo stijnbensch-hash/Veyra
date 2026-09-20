@@ -55,7 +55,8 @@ struct ShelfItemDestination: View {
                 posterPath: details.posterPath,
                 backdropPath: details.backdropPath,
                 firstAirDate: details.firstAirDate,
-                voteAverage: details.voteAverage
+                voteAverage: details.voteAverage,
+                genreIDs: nil
             )
         } catch {
             errorMessage = error.localizedDescription

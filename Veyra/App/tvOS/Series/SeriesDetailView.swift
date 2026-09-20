@@ -831,7 +831,9 @@ private struct VeyraSeasonButtonStyle:
                     firstAirDate:
                         "2011-04-17",
                     voteAverage:
-                        8.4
+                        8.4,
+                    genreIDs:
+                        nil
                 )
         )
     }

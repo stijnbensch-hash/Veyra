@@ -202,6 +202,10 @@ struct TMDBMovie: Decodable, Identifiable, Hashable {
     let backdropPath: String?
     let releaseDate: String?
     let voteAverage: Double?
+    /// Alleen aanwezig op lijst-/ontdek-eindpunten (bv. "populair"); TMDB's
+    /// detail-eindpunt geeft in plaats daarvan volledige `genres`-objecten.
+    /// Gebruikt voor de genre-badge op de poster (zie Shared/Theme/PosterEnrichmentSettings.swift).
+    let genreIDs: [Int]?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -211,6 +215,7 @@ struct TMDBMovie: Decodable, Identifiable, Hashable {
         case backdropPath = "backdrop_path"
         case releaseDate = "release_date"
         case voteAverage = "vote_average"
+        case genreIDs = "genre_ids"
     }
 }
 

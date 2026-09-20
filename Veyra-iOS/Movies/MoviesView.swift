@@ -146,7 +146,13 @@ struct MoviesView: View {
                     Button {
                         Task { await openMovie(movie) }
                     } label: {
-                        VeyraPosterCard(title: movie.title, url: posterURL(for: movie), width: 112)
+                        VeyraPosterCard(
+                            title: movie.title,
+                            url: posterURL(for: movie),
+                            width: 112,
+                            genre: TMDBGenreNames.firstMovieName(for: movie.genreIDs ?? []),
+                            rating: movie.voteAverage
+                        )
                     }
                     .buttonStyle(.plain)
                     .disabled(isOpeningMovie)

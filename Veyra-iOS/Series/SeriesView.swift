@@ -139,7 +139,14 @@ struct SeriesView: View {
                     Button {
                         selectedSeries = item
                     } label: {
-                        VeyraPosterCard(title: item.name, url: posterURL(for: item), symbol: "tv", width: 112)
+                        VeyraPosterCard(
+                            title: item.name,
+                            url: posterURL(for: item),
+                            symbol: "tv",
+                            width: 112,
+                            genre: TMDBGenreNames.firstTVName(for: item.genreIDs ?? []),
+                            rating: item.voteAverage
+                        )
                     }
                     .buttonStyle(.plain)
                 }

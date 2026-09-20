@@ -86,7 +86,8 @@ struct ContinueWatchingRow: View {
                         posterPath: nil,
                         backdropPath: nil,
                         firstAirDate: nil,
-                        voteAverage: nil
+                        voteAverage: nil,
+                        genreIDs: nil
                     )
                 )
             }

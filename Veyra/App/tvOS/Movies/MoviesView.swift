@@ -225,7 +225,9 @@ struct MoviesView: View {
                 url: posterURL(
                     for: movie
                 ),
-                width: width
+                width: width,
+                genre: TMDBGenreNames.firstMovieName(for: movie.genreIDs ?? []),
+                rating: movie.voteAverage
             )
             .traktWatched(
                 .movie(

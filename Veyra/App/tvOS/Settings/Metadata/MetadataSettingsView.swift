@@ -22,8 +22,74 @@ struct MetadataSettingsView: View {
     @AppStorage("metadata.rating.popcornmeter")
     private var popcornmeter = true
 
+    @AppStorage(PosterEnrichmentDefaults.modeKey)
+    private var posterEnrichmentSourceRaw = PosterEnrichmentMode.off.rawValue
+    @AppStorage(PosterEnrichmentDefaults.showGenreKey)
+    private var posterShowGenre = true
+    @AppStorage(PosterEnrichmentDefaults.showRatingKey)
+    private var posterShowRating = true
+    @AppStorage(PosterEnrichmentDefaults.ratingSourceKey)
+    private var posterRatingSourceRaw = PosterRatingSource.tmdb.rawValue
+    @AppStorage(PosterEnrichmentDefaults.showAgeRatingKey)
+    private var posterShowAgeRating = false
+    @AppStorage(PosterEnrichmentDefaults.showQualityLabelsKey)
+    private var posterShowQuality = false
+    @AppStorage(PosterEnrichmentDefaults.showTrendLabelsKey)
+    private var posterShowTrending = false
+    @AppStorage(PosterEnrichmentDefaults.showEpisodesRemainingKey)
+    private var posterShowEpisodesRemaining = false
+
+    private var posterEnrichmentSource: PosterEnrichmentMode {
+        PosterEnrichmentMode(rawValue: posterEnrichmentSourceRaw) ?? .off
+    }
+
     var body: some View {
         Form {
+            Section {
+                Picker("Bron", selection: $posterEnrichmentSourceRaw) {
+                    ForEach(PosterEnrichmentMode.allCases) { option in
+                        Text(option.title).tag(option.rawValue)
+                    }
+                }
+
+                if posterEnrichmentSource != .off {
+                    HStack {
+                        Spacer()
+                        VeyraPosterCard(
+                            title: "Voorbeeldfilm",
+                            url: nil,
+                            width: 220,
+                            genre: "Actie",
+                            rating: 7.8
+                        )
+                        Spacer()
+                    }
+                }
+
+                if posterEnrichmentSource == .betterPosters {
+                    Toggle("Genre", isOn: $posterShowGenre)
+                    Toggle("Beoordeling", isOn: $posterShowRating)
+                    if posterShowRating {
+                        Picker("Bron beoordeling", selection: $posterRatingSourceRaw) {
+                            ForEach(PosterRatingSource.allCases) { option in
+                                Text(option.title).tag(option.rawValue)
+                            }
+                        }
+                    }
+                    Toggle("Leeftijdsclassificatie", isOn: $posterShowAgeRating)
+                    Toggle("Kwaliteitslabels", isOn: $posterShowQuality)
+                    Toggle("Trendlabels", isOn: $posterShowTrending)
+                    Toggle("Resterende afleveringen", isOn: $posterShowEpisodesRemaining)
+                } else if posterEnrichmentSource == .rpdb {
+                    Text("RPDB (ratingposterdb.com) is een externe dienst waarvoor nog geen integratie bestaat — deze keuze doet nog niets. Kies Better Posters voor werkende genre-/beoordelingslabels.")
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Posterverrijking")
+            } footer: {
+                Text("Toont een badge met genre en/of beoordeling op de posters in Films, Series en het startscherm. Genre en Beoordeling via Better Posters werken al echt; Leeftijdsclassificatie, Kwaliteitslabels, Trendlabels en Resterende afleveringen staan klaar maar Veyra haalt die gegevens nog niet op.")
+            }
+
             Section {
                 Picker(
                     "Metadatabron",

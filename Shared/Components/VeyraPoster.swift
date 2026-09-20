@@ -5,6 +5,32 @@ struct VeyraPosterCard: View {
     let url: URL?
     var symbol = "film"
     var width: CGFloat = 220
+    /// Eerste/belangrijkste genre voor deze titel, bv. "Actie" — via
+    /// `TMDBGenreNames.firstMovieName(for:)`/`firstTVName(for:)`. `nil` als onbekend.
+    var genre: String? = nil
+    /// TMDB-score (0-10), bv. 7.2. `nil` als onbekend.
+    var rating: Double? = nil
+
+    @AppStorage(PosterEnrichmentDefaults.modeKey)
+    private var enrichmentSourceRaw = PosterEnrichmentMode.off.rawValue
+    @AppStorage(PosterEnrichmentDefaults.showGenreKey)
+    private var showGenre = true
+    @AppStorage(PosterEnrichmentDefaults.showRatingKey)
+    private var showRating = true
+
+    private var enrichmentSource: PosterEnrichmentMode {
+        PosterEnrichmentMode(rawValue: enrichmentSourceRaw) ?? .off
+    }
+
+    /// Better Posters is de enige bron die hier al echt iets tekent — RPDB
+    /// is een externe dienst zonder integratie (zie Shared/Theme/PosterEnrichmentSettings.swift).
+    private var enrichmentText: String? {
+        guard enrichmentSource == .betterPosters else { return nil }
+        var parts: [String] = []
+        if showGenre, let genre { parts.append(genre) }
+        if showRating, let rating, rating > 0 { parts.append(String(format: "★ %.1f", rating)) }
+        return parts.isEmpty ? nil : parts.joined(separator: "  ·  ")
+    }
 
     // Op tvOS bekijk je dit van op de bank (10-foot UI), op iOS hou je het
     // vast — dezelfde tvOS-maten op een telefoon gaven een los, blokkerig
@@ -46,6 +72,18 @@ struct VeyraPosterCard: View {
 #if !os(tvOS)
             .shadow(color: .black.opacity(0.28), radius: 6, y: 3)
 #endif
+            .overlay(alignment: .bottomLeading) {
+                if let enrichmentText {
+                    Text(enrichmentText)
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 4)
+                        .background(.black.opacity(0.72), in: Capsule())
+                        .padding(6)
+                }
+            }
             Text(title).font(.system(size: titleFontSize, weight: .medium)).foregroundStyle(.white)
                 .lineLimit(2).frame(height: titleHeight, alignment: .topLeading)
         }.frame(width: width).padding(cardPadding)

@@ -8,6 +8,8 @@ struct TMDBSeries: Decodable, Identifiable, Hashable {
     let backdropPath: String?
     let firstAirDate: String?
     let voteAverage: Double?
+    /// Alleen aanwezig op lijst-/ontdek-eindpunten; zie TMDBMovie.genreIDs.
+    let genreIDs: [Int]?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -17,6 +19,7 @@ struct TMDBSeries: Decodable, Identifiable, Hashable {
         case backdropPath = "backdrop_path"
         case firstAirDate = "first_air_date"
         case voteAverage = "vote_average"
+        case genreIDs = "genre_ids"
     }
 }
 

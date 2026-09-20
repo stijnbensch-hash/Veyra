@@ -199,7 +199,8 @@ struct TraktDestinationView: View {
                 } else {
                     series = TMDBSeries(id: id, name: value.name, overview: value.overview,
                                         posterPath: value.posterPath, backdropPath: value.backdropPath,
-                                        firstAirDate: value.firstAirDate, voteAverage: value.voteAverage)
+                                        firstAirDate: value.firstAirDate, voteAverage: value.voteAverage,
+                                        genreIDs: nil)
                 }
             } else { throw TraktError.missingMedia }
         } catch { self.error = error.localizedDescription }

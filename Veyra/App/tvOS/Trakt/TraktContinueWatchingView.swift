@@ -1087,7 +1087,9 @@ private struct TraktContinueWatchingDestination:
                     firstAirDate:
                         details.firstAirDate,
                     voteAverage:
-                        details.voteAverage
+                        details.voteAverage,
+                    genreIDs:
+                        nil
                 )
 
         } catch is CancellationError {

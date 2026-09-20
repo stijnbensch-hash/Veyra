@@ -209,7 +209,9 @@ struct SeriesView: View {
                     for: item
                 ),
                 symbol: "tv",
-                width: width
+                width: width,
+                genre: TMDBGenreNames.firstTVName(for: item.genreIDs ?? []),
+                rating: item.voteAverage
             )
             .traktWatched(
                 .show(
