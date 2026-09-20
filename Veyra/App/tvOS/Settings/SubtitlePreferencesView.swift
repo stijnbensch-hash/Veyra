@@ -5,28 +5,37 @@ struct SubtitlePreferencesView: View {
 
     var body: some View {
         ZStack {
-            VeyraBackground()
-            ScrollView {
-                VStack(alignment: .leading, spacing: 28) {
-                    Text("Ondertitels").font(VeyraTypography.hero)
-                    Text("Standaardtaal").font(VeyraTypography.section)
-                    Text("De speler kiest deze taal bij een nieuwe stream. Tijdens het kijken kun je altijd een ander beschikbaar spoor kiezen of ondertitels uitzetten.")
-                        .foregroundStyle(VeyraColors.secondary)
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 270))], spacing: 18) {
-                        ForEach(SubtitleLanguage.allCases) { option in
-                            Button { language = option.rawValue } label: {
-                                HStack {
-                                    Text(option.title)
-                                    Spacer()
-                                    if language == option.rawValue { Image(systemName: "checkmark") }
-                                }.padding(20)
-                            }.buttonStyle(VeyraFocusButtonStyle())
+            VeyraBackground().ignoresSafeArea()
+
+            List {
+                Section {
+                    ForEach(SubtitleLanguage.allCases) { option in
+                        Button {
+                            language = option.rawValue
+                        } label: {
+                            HStack {
+                                Text(option.title)
+                                Spacer()
+                                if language == option.rawValue {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
                         }
                     }
+                } header: {
+                    Text("Standaardtaal")
+                } footer: {
+                    Text("De speler kiest deze taal bij een nieuwe stream. Tijdens het kijken kun je altijd een ander beschikbaar spoor kiezen of ondertitels uitzetten.")
+                }
+
+                Section {
                     OpenSubtitlesConfigurationCard()
-                }.font(.system(size: 24)).frame(maxWidth: 1400).padding(60)
+                } header: {
+                    Text("OpenSubtitles")
+                }
             }
         }
+        .navigationTitle("Ondertitels")
     }
 }
 
@@ -44,19 +53,16 @@ struct OpenSubtitlesConfigurationCard: View {
     private var message: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            HStack(spacing: 18) {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(spacing: 14) {
                 Image(systemName: "captions.bubble.fill")
-                    .font(.system(size: 34, weight: .semibold))
                     .foregroundStyle(VeyraColors.cyan)
 
-                VStack(alignment: .leading, spacing: 5) {
+                VStack(alignment: .leading, spacing: 3) {
                     Text("OpenSubtitles")
-                        .font(VeyraTypography.section)
-
                     Text("Online ondertitels voor films en afleveringen")
-                        .font(.system(size: 19))
-                        .foregroundStyle(VeyraColors.secondary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
                 Spacer()
@@ -65,7 +71,7 @@ struct OpenSubtitlesConfigurationCard: View {
                     title: configured ? (enabled ? "Actief" : "Ingesteld") : "API-sleutel nodig",
                     symbol: configured ? "checkmark.circle.fill" : "key.fill",
                     accent: configured ? VeyraColors.cyan : VeyraColors.red,
-                    fontSize: 14
+                    fontSize: 13
                 )
             }
 
@@ -73,99 +79,59 @@ struct OpenSubtitlesConfigurationCard: View {
                 .disabled(!configured)
 
             Text("Veyra zoekt hiermee ondertitels in je standaardtaal wanneer een stream die taal niet bevat. Vanuit de speler kun je ook handmatig zoeken. OpenSubtitles ontvangt hiervoor de IMDb-identificatie en, bij series, het seizoen en afleveringsnummer.")
-                .foregroundStyle(VeyraColors.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+                .font(.caption)
+                .foregroundStyle(.secondary)
 
             Text("De API-sleutel wordt lokaal in de beveiligde sleutelhanger van deze Apple TV opgeslagen.")
-                .font(.system(size: 18))
+                .font(.caption2)
                 .foregroundStyle(.white.opacity(0.52))
 
-            HStack(spacing: 18) {
-                SecureField(
-                    configured
-                        ? "Nieuwe OpenSubtitles API-sleutel"
-                        : "OpenSubtitles API-sleutel",
-                    text: $apiKey
-                )
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
+            SecureField(
+                configured
+                    ? "Nieuwe OpenSubtitles API-sleutel"
+                    : "OpenSubtitles API-sleutel",
+                text: $apiKey
+            )
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
 
-                Button {
-                    saveAPIKey()
-                } label: {
-                    Label(
-                        "Opslaan en inschakelen",
-                        systemImage: "key.fill"
-                    )
-                    .font(.system(size: 21, weight: .bold))
-                    .padding(.horizontal, 22)
-                    .frame(height: 60)
-                }
-                .buttonStyle(
-                    VeyraFocusButtonStyle(primary: true)
-                )
-                .disabled(
-                    apiKey.trimmingCharacters(
-                        in: .whitespacesAndNewlines
-                    ).isEmpty
-                )
+            Button {
+                saveAPIKey()
+            } label: {
+                Label("Opslaan en inschakelen", systemImage: "key.fill")
             }
+            .disabled(apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
             if let message {
                 Text(message)
-                    .font(.system(size: 19, weight: .medium))
-                    .foregroundStyle(
-                        configured
-                            ? VeyraColors.ice
-                            : .orange
-                    )
+                    .font(.caption)
+                    .foregroundStyle(configured ? VeyraColors.ice : .orange)
             }
         }
-        .padding(30)
-        .veyraGlass()
         .onAppear {
-            configured =
-                AppConfiguration
-                    .openSubtitlesAPIKey
-                != nil
+            configured = AppConfiguration.openSubtitlesAPIKey != nil
         }
     }
 
     private func saveAPIKey() {
-        let value =
-            apiKey.trimmingCharacters(
-                in: .whitespacesAndNewlines
-            )
-
-        guard !value.isEmpty else {
-            return
-        }
+        let value = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return }
 
         do {
-            try AppConfiguration
-                .setOpenSubtitlesAPIKey(
-                    value
-                )
-
+            try AppConfiguration.setOpenSubtitlesAPIKey(value)
             apiKey = ""
-            configured =
-                AppConfiguration
-                    .openSubtitlesAPIKey
-                != nil
-
+            configured = AppConfiguration.openSubtitlesAPIKey != nil
             enabled = configured
-
             message = configured
                 ? "API-sleutel veilig opgeslagen. OpenSubtitles is ingeschakeld."
                 : "De API-sleutel kon niet worden gecontroleerd."
-
         } catch {
-            configured =
-                AppConfiguration
-                    .openSubtitlesAPIKey
-                != nil
-            message =
-                "Opslaan van de API-sleutel is niet gelukt."
+            configured = AppConfiguration.openSubtitlesAPIKey != nil
+            message = "Opslaan van de API-sleutel is niet gelukt."
         }
     }
+}
+
+#Preview {
+    NavigationStack { SubtitlePreferencesView() }
 }

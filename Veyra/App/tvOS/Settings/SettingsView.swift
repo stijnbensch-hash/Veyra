@@ -1802,94 +1802,40 @@ struct AccountView:
         ZStack {
             VeyraSettingsTheme.background
 
-            ScrollView(
-                .vertical,
-                showsIndicators: false
-            ) {
-                VStack(
-                    alignment: .leading,
-                    spacing: 24
-                ) {
-                    Text("Account")
-                        .font(.system(size: 50, weight: .bold, design: .rounded))
-                        .foregroundStyle(
-                            .white
-                        )
-
-                    Text(
-                        "Beheer je profiel, koppelingen en ondertitelvoorkeuren."
-                    )
-                    .font(
-                        .system(size: 26)
-                    )
-                    .foregroundStyle(
-                        .white.opacity(
-                            0.62
-                        )
-                    )
-
-                    // MARK: Trakt-account
-
-                    Text("TRAKT-ACCOUNT")
-                        .font(.system(size: 20, weight: .semibold))
-                        .tracking(2)
-                        .foregroundStyle(.white.opacity(0.5))
-
+            List {
+                Section {
                     NavigationLink {
                         TraktView()
                     } label: {
-                        VeyraActionLabel(
-                            title: trakt.isConnected ? "Trakt — verbonden" : "Trakt — niet gekoppeld",
-                            symbol: "checkmark.circle"
+                        Label(
+                            trakt.isConnected ? "Trakt — verbonden" : "Trakt — niet gekoppeld",
+                            systemImage: "checkmark.circle"
                         )
                     }
-                    .buttonStyle(
-                        VeyraFocusButtonStyle()
-                    )
 
                     NavigationLink {
                         TraktPrivacyView()
                     } label: {
-                        VeyraActionLabel(
-                            title: "Privacy en gedeelde kijkgegevens",
-                            symbol: "hand.raised"
-                        )
+                        Label("Privacy en gedeelde kijkgegevens", systemImage: "hand.raised")
                     }
-                    .buttonStyle(
-                        VeyraFocusButtonStyle()
-                    )
+                } header: {
+                    Text("Trakt-account")
+                }
 
-                    // MARK: Ondertitels
-
-                    Text("ONDERTITELS")
-                        .font(.system(size: 20, weight: .semibold))
-                        .tracking(2)
-                        .foregroundStyle(.white.opacity(0.5))
-                        .padding(.top, 12)
-
+                Section {
                     OpenSubtitlesConfigurationCard()
 
                     NavigationLink {
                         SubtitlePreferencesView()
                     } label: {
-                        VeyraActionLabel(
-                            title: "Taal en ondertitelvoorkeuren",
-                            symbol: "captions.bubble"
-                        )
+                        Label("Taal en ondertitelvoorkeuren", systemImage: "captions.bubble")
                     }
-                    .buttonStyle(
-                        VeyraFocusButtonStyle()
-                    )
+                } header: {
+                    Text("Ondertitels")
                 }
-                .frame(
-                    maxWidth: 1200,
-                    alignment: .leading
-                )
-                .padding(.horizontal, VeyraSpacing.page)
-                .padding(.top, 36)
-                .padding(.bottom, 50)
             }
         }
+        .navigationTitle("Account")
     }
 
 }

@@ -29,8 +29,23 @@ struct VeyraPosterCard: View {
         var parts: [String] = []
         if showGenre, let genre { parts.append(genre) }
         if showRating, let rating, rating > 0 { parts.append(String(format: "★ %.1f", rating)) }
-        return parts.isEmpty ? nil : parts.joined(separator: "  ·  ")
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
+
+    // Op de smalle iOS-postercards (112pt) liep de badge-tekst ("Actie ·
+    // ★ 7.8") tegen de rand aan en werd afgekapt met "…" — op tvOS (220pt+)
+    // is daar meer dan genoeg ruimte voor. Kleinere badge-tekst, minder
+    // opvulling en een schaalfactor lossen dat op zonder de inhoud te
+    // moeten inkorten.
+#if os(tvOS)
+    private var enrichmentFontSize: CGFloat { 14 }
+    private var enrichmentHPadding: CGFloat { 8 }
+    private var enrichmentVPadding: CGFloat { 5 }
+#else
+    private var enrichmentFontSize: CGFloat { 9 }
+    private var enrichmentHPadding: CGFloat { 6 }
+    private var enrichmentVPadding: CGFloat { 3 }
+#endif
 
     // Op tvOS bekijk je dit van op de bank (10-foot UI), op iOS hou je het
     // vast — dezelfde tvOS-maten op een telefoon gaven een los, blokkerig
@@ -75,13 +90,15 @@ struct VeyraPosterCard: View {
             .overlay(alignment: .bottomLeading) {
                 if let enrichmentText {
                     Text(enrichmentText)
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .font(.system(size: enrichmentFontSize, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
                         .lineLimit(1)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 4)
+                        .minimumScaleFactor(0.7)
+                        .padding(.horizontal, enrichmentHPadding)
+                        .padding(.vertical, enrichmentVPadding)
                         .background(.black.opacity(0.72), in: Capsule())
                         .padding(6)
+                        .frame(maxWidth: width - 12, alignment: .leading)
                 }
             }
             Text(title).font(.system(size: titleFontSize, weight: .medium)).foregroundStyle(.white)
