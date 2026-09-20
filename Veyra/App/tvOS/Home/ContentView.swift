@@ -129,7 +129,9 @@ struct ContentView: View {
                                                 NavigationLink { VeyraMovieDestination(movie: movie, play: false) } label: {
                                                     VeyraPosterCard(title: movie.title, url: movie.posterPath.flatMap {
                                                         URL(string: "https://image.tmdb.org/t/p/w500" + $0)
-                                                    }, width: 250)
+                                                    }, width: 250,
+                                                    genre: TMDBGenreNames.firstMovieName(for: movie.genreIDs ?? []),
+                                                    rating: movie.voteAverage)
                                                     .traktWatched(.movie(TraktIDs(tmdb: movie.id)))
                                                 }.buttonStyle(VeyraFocusButtonStyle(radius: VeyraRadius.poster))
                                                     .reportsHero(.movie(movie))
