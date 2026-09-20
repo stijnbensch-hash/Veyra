@@ -71,6 +71,10 @@ struct IPTVPlaybackSettingsView: View {
                             Text(mode.title).tag(mode.rawValue)
                         }
                     }
+                    // .menu: deze rij wordt direct gevolgd door een rij die
+                    // in-/uitklapt zodra de keuze verandert. Zie de zelfde
+                    // fix + toelichting in MetadataSettingsView.swift.
+                    .pickerStyle(.menu)
 
                     if catchUpOffsetMode == .manual {
                         // `Stepper` bestaat niet op tvOS — hier vervangen

@@ -27,34 +27,62 @@ struct SettingsView: View {
         MediaServerStore()
 
     var body: some View {
-        ZStack {
-            background
+        List {
+            Section {
+                Text("Beheer je bronnen, kijkprofiel en appgegevens.")
+                    .foregroundStyle(.secondary)
+            }
 
-            ScrollView(
-                .vertical,
-                showsIndicators: false
-            ) {
-                VStack(
-                    alignment: .leading,
-                    spacing: 36
-                ) {
-                    header
-                    settingsGrid
-                    if let errorMessage {
-                        Text(errorMessage).foregroundStyle(VeyraColors.red)
-                    }
-                    versionInformation
+            Section {
+                settingsRow(destination: .iptv, icon: "tv", title: "IPTV",
+                            subtitle: "Live TV en VOD via Xtream of M3U", status: iptvStatus, statusColor: iptvStatusColor)
+                settingsRow(destination: .addons, icon: "puzzlepiece.extension", title: "Addons",
+                            subtitle: "Streams via gekoppelde addons", status: addonsStatus, statusColor: VeyraColors.cyan)
+                settingsRow(destination: .mediaServers, icon: "server.rack", title: "Mediaservers",
+                            subtitle: "Jellyfin en andere eigen servers", status: mediaServersStatus, statusColor: VeyraColors.cyan)
+            } header: {
+                Text("Bronnen")
+            }
+
+            Section {
+                settingsRow(destination: .subtitles, icon: "captions.bubble", title: "Ondertitels",
+                            subtitle: "Standaardtaal en OpenSubtitles", status: "", statusColor: VeyraColors.cyan)
+                settingsRow(destination: .subtitleAppearance, icon: "textformat.size", title: "Ondertitelweergave",
+                            subtitle: "Grootte, plaatsing, achtergrond", status: "", statusColor: VeyraColors.secondary)
+                settingsRow(destination: .playback, icon: "play.circle", title: "Afspelen",
+                            subtitle: "Resolutie, taal en oversla-segmenten", status: "", statusColor: VeyraColors.secondary)
+                settingsRow(destination: .metadata, icon: "star.leadinghalf.filled", title: "Metadata",
+                            subtitle: "Ratings op film- en seriepagina's", status: "", statusColor: VeyraColors.secondary)
+                settingsRow(destination: .shelves, icon: "rectangle.grid.1x2", title: "Planken",
+                            subtitle: "Eigen rijen op het hoofdmenu", status: "", statusColor: VeyraColors.secondary)
+            } header: {
+                Text("Weergave")
+            }
+
+            Section {
+                settingsRow(destination: .account, icon: "person.crop.circle", title: "Account",
+                            subtitle: "Trakt, ondertitels en profiel",
+                            status: trakt.isConnected ? "Trakt verbonden" : "Trakt niet gekoppeld",
+                            statusColor: trakt.isConnected ? VeyraColors.cyan : VeyraColors.secondary)
+                settingsRow(destination: .cloudSync, icon: "icloud", title: "Gegevens en opslag",
+                            subtitle: "iCloud-synchronisatie en opslaggebruik",
+                            status: cloudSync.isEnabled ? "Aan" : "Uit",
+                            statusColor: cloudSync.isEnabled ? VeyraColors.cyan : VeyraColors.secondary)
+            } header: {
+                Text("Account")
+            }
+
+            if let errorMessage {
+                Section {
+                    Text(errorMessage).foregroundStyle(VeyraColors.red)
                 }
-                .frame(
-                    maxWidth: 1580,
-                    alignment: .leading
-                )
-                .padding(.horizontal, VeyraSpacing.page)
-                .padding(.top, 36)
-                .padding(.bottom, 50)
-                .frame(maxWidth: .infinity)
+            }
+
+            Section {
+                versionInformation
             }
         }
+        .navigationTitle("Instellingen")
         .onAppear {
             AddonMigration()
                 .runIfNeeded()
@@ -115,113 +143,9 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Background
+    // MARK: - Settings row
 
-    private var background: some View {
-        VeyraBackground()
-        .ignoresSafeArea()
-    }
-
-    // MARK: - Header
-
-    private var header: some View {
-        HStack(
-            alignment: .center,
-            spacing: 22
-        ) {
-            RoundedRectangle(cornerRadius: 3)
-            .fill(
-                LinearGradient(
-                    colors: [VeyraColors.cyan, VeyraColors.red],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
-            .frame(
-                width: 4,
-                height: 66
-            )
-            .accessibilityHidden(true)
-
-            VStack(
-                alignment: .leading,
-                spacing: 12
-            ) {
-                Text("Instellingen")
-                    .font(.system(size: 50, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
-
-                Text(
-                    "Beheer je bronnen, kijkprofiel en appgegevens."
-                )
-                .font(.system(size: 26))
-                .foregroundStyle(
-                    .white.opacity(0.62)
-                )
-            }
-
-            Spacer()
-        }
-        .padding(.bottom, 8)
-    }
-
-    private var settingsGrid: some View {
-        VStack(alignment: .leading, spacing: 40) {
-            settingsSection(title: "BRONNEN") {
-                settingsButton(destination: .iptv, icon: "tv", title: "IPTV",
-                               subtitle: "Live TV en VOD via Xtream of M3U", status: iptvStatus, statusColor: iptvStatusColor)
-                settingsButton(destination: .addons, icon: "puzzlepiece.extension", title: "Addons",
-                               subtitle: "Streams via gekoppelde addons", status: addonsStatus, statusColor: VeyraColors.cyan)
-                settingsButton(destination: .mediaServers, icon: "server.rack", title: "Mediaservers",
-                               subtitle: "Jellyfin en andere eigen servers", status: mediaServersStatus, statusColor: VeyraColors.cyan)
-            }
-
-            settingsSection(title: "WEERGAVE") {
-                settingsButton(destination: .subtitles, icon: "captions.bubble", title: "Ondertitels",
-                               subtitle: "Standaardtaal en OpenSubtitles", status: "", statusColor: VeyraColors.cyan)
-                settingsButton(destination: .subtitleAppearance, icon: "textformat.size", title: "Ondertitelweergave",
-                               subtitle: "Grootte, plaatsing, achtergrond", status: "", statusColor: VeyraColors.secondary)
-                settingsButton(destination: .playback, icon: "play.circle", title: "Afspelen",
-                               subtitle: "Resolutie, taal en oversla-segmenten", status: "", statusColor: VeyraColors.secondary)
-                settingsButton(destination: .metadata, icon: "star.leadinghalf.filled", title: "Metadata",
-                               subtitle: "Ratings op film- en seriepagina's", status: "", statusColor: VeyraColors.secondary)
-                settingsButton(destination: .shelves, icon: "rectangle.grid.1x2", title: "Planken",
-                               subtitle: "Eigen rijen op het hoofdmenu", status: "", statusColor: VeyraColors.secondary)
-            }
-
-            settingsSection(title: "ACCOUNT") {
-                settingsButton(destination: .account, icon: "person.crop.circle", title: "Account",
-                               subtitle: "Trakt, ondertitels en profiel",
-                               status: trakt.isConnected ? "Trakt verbonden" : "Trakt niet gekoppeld",
-                               statusColor: trakt.isConnected ? VeyraColors.cyan : VeyraColors.secondary)
-                settingsButton(destination: .cloudSync, icon: "icloud", title: "Gegevens en opslag",
-                               subtitle: "iCloud-synchronisatie en opslaggebruik",
-                               status: cloudSync.isEnabled ? "Aan" : "Uit",
-                               statusColor: cloudSync.isEnabled ? VeyraColors.cyan : VeyraColors.secondary)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func settingsSection<Content: View>(
-        title: String,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Text(title)
-                .font(.system(size: 22, weight: .semibold))
-                .tracking(3)
-                .foregroundStyle(.white.opacity(0.62))
-
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 28), GridItem(.flexible(), spacing: 28)], spacing: 28) {
-                content()
-            }
-        }
-    }
-
-    // MARK: - Settings Button
-
-    private func settingsButton(
+    private func settingsRow(
         destination target: SettingsDestination,
         icon: String,
         title: String,
@@ -229,115 +153,31 @@ struct SettingsView: View {
         status: String,
         statusColor: Color
     ) -> some View {
-        let isFocused =
-            focusedRow == target
-
-        return Button {
+        Button {
             destination = target
         } label: {
-            HStack(spacing: 24) {
-                ZStack {
-                    RoundedRectangle(
-                        cornerRadius: 16,
-                        style: .continuous
-                    )
-                    .fill(
-                        Color.cyan.opacity(
-                            isFocused
-                            ? 0.20
-                            : 0.10
-                        )
-                    )
+            HStack(spacing: 18) {
+                Image(systemName: icon)
+                    .font(.system(size: 24))
+                    .foregroundStyle(VeyraColors.cyan)
+                    .frame(width: 36)
 
-                    Image(
-                        systemName: icon
-                    )
-                    .font(
-                        .system(
-                            size: 39,
-                            weight: .light
-                        )
-                    )
-                    .foregroundStyle(
-                        isFocused
-                        ? .white
-                        : .cyan
-                    )
-                }
-                .frame(
-                    width: 68,
-                    height: 68
-                )
-
-                VStack(
-                    alignment: .leading,
-                    spacing: 8
-                ) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(title)
-                        .font(
-                            .system(
-                                size: 33,
-                                weight: .semibold
-                            )
-                        )
-                        .foregroundStyle(.white)
-
                     Text(subtitle)
-                        .font(
-                            .system(size: 22)
-                        )
-                        .foregroundStyle(
-                            .white.opacity(
-                                isFocused
-                                ? 0.85
-                                : 0.60
-                            )
-                        )
-                    if !status.isEmpty {
-                        Text(status).font(.system(size: 18, weight: .medium)).foregroundStyle(statusColor)
-                    }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-                .frame(
-                    maxWidth: .infinity,
-                    alignment: .leading
-                )
 
-                Image(
-                    systemName:
-                        "chevron.right"
-                )
-                .font(
-                    .system(
-                        size: 22,
-                        weight: .semibold
-                    )
-                )
-                .foregroundStyle(
-                    Color.cyan.opacity(
-                        isFocused
-                        ? 1.0
-                        : 0.55
-                    )
-                )
+                Spacer()
+
+                if !status.isEmpty {
+                    Text(status)
+                        .font(.caption)
+                        .foregroundStyle(statusColor)
+                }
             }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 20)
-            .frame(
-                maxWidth: .infinity,
-                minHeight: 112,
-                alignment: .leading
-            )
         }
-        .buttonStyle(
-            VeyraSettingsCardStyle(
-                isFocused: isFocused
-            )
-        )
-        .focused(
-            $focusedRow,
-            equals: target
-        )
-        .focusEffectDisabled()
     }
 
     // MARK: - Version
