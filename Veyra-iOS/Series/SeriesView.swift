@@ -15,7 +15,7 @@ struct SeriesView: View {
 
     @State private var catalogRequestID = UUID()
 
-    private let columns = [GridItem(.adaptive(minimum: 150), spacing: 16)]
+    private let columns = [GridItem(.adaptive(minimum: 112), spacing: 12)]
     private let posterBaseURL = URL(string: "https://image.tmdb.org/t/p/w500")!
 
     var body: some View {
@@ -134,12 +134,12 @@ struct SeriesView: View {
         } else if series.isEmpty {
             ContentUnavailableView("Geen series beschikbaar", systemImage: "tv")
         } else {
-            LazyVGrid(columns: columns, spacing: 20) {
+            LazyVGrid(columns: columns, spacing: 14) {
                 ForEach(series) { item in
                     Button {
                         selectedSeries = item
                     } label: {
-                        VeyraPosterCard(title: item.name, url: posterURL(for: item), symbol: "tv", width: 150)
+                        VeyraPosterCard(title: item.name, url: posterURL(for: item), symbol: "tv", width: 112)
                     }
                     .buttonStyle(.plain)
                 }

@@ -16,7 +16,7 @@ struct MoviesView: View {
 
     @State private var catalogRequestID = UUID()
 
-    private let columns = [GridItem(.adaptive(minimum: 150), spacing: 16)]
+    private let columns = [GridItem(.adaptive(minimum: 112), spacing: 12)]
     private let posterBaseURL = URL(string: "https://image.tmdb.org/t/p/w500")!
 
     var body: some View {
@@ -141,12 +141,12 @@ struct MoviesView: View {
         } else if movies.isEmpty {
             ContentUnavailableView("Geen films beschikbaar", systemImage: "film")
         } else {
-            LazyVGrid(columns: columns, spacing: 20) {
+            LazyVGrid(columns: columns, spacing: 14) {
                 ForEach(movies) { movie in
                     Button {
                         Task { await openMovie(movie) }
                     } label: {
-                        VeyraPosterCard(title: movie.title, url: posterURL(for: movie), width: 150)
+                        VeyraPosterCard(title: movie.title, url: posterURL(for: movie), width: 112)
                     }
                     .buttonStyle(.plain)
                     .disabled(isOpeningMovie)

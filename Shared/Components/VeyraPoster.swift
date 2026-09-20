@@ -5,8 +5,28 @@ struct VeyraPosterCard: View {
     let url: URL?
     var symbol = "film"
     var width: CGFloat = 220
+
+    // Op tvOS bekijk je dit van op de bank (10-foot UI), op iOS hou je het
+    // vast — dezelfde tvOS-maten op een telefoon gaven een los, blokkerig
+    // 2-koloms grid met veel te grote titels. Op iOS dus overal kleiner en
+    // subtieler, met een zachte schaduw voor wat diepte i.p.v. een zware
+    // gradient.
+#if os(tvOS)
+    private var titleFontSize: CGFloat { 22 }
+    private var titleHeight: CGFloat { 56 }
+    private var gradientHeight: CGFloat { 90 }
+    private var cardPadding: CGFloat { 8 }
+    private var stackSpacing: CGFloat { 12 }
+#else
+    private var titleFontSize: CGFloat { 13 }
+    private var titleHeight: CGFloat { 34 }
+    private var gradientHeight: CGFloat { 44 }
+    private var cardPadding: CGFloat { 4 }
+    private var stackSpacing: CGFloat { 6 }
+#endif
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: stackSpacing) {
             AsyncImage(url: url) { phase in
                 if let image = phase.image { image.resizable().scaledToFill() }
                 else {
@@ -20,12 +40,15 @@ struct VeyraPosterCard: View {
             .clipShape(RoundedRectangle(cornerRadius: VeyraRadius.poster, style: .continuous))
             .overlay(alignment: .bottom) {
                 LinearGradient(colors: [.clear, .black.opacity(0.35)], startPoint: .top, endPoint: .bottom)
-                    .frame(height: 90)
+                    .frame(height: gradientHeight)
                     .clipShape(RoundedRectangle(cornerRadius: VeyraRadius.poster, style: .continuous))
             }
-            Text(title).font(.system(size: 22, weight: .medium)).foregroundStyle(.white)
-                .lineLimit(2).frame(height: 56, alignment: .topLeading)
-        }.frame(width: width).padding(8)
+#if !os(tvOS)
+            .shadow(color: .black.opacity(0.28), radius: 6, y: 3)
+#endif
+            Text(title).font(.system(size: titleFontSize, weight: .medium)).foregroundStyle(.white)
+                .lineLimit(2).frame(height: titleHeight, alignment: .topLeading)
+        }.frame(width: width).padding(cardPadding)
     }
 }
 
