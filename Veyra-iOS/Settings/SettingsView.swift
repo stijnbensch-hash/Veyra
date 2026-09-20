@@ -5,10 +5,9 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
     case addons
     case mediaServers
     case general
-    case trakt
     case subtitles
-    case playback
     case metadata
+    case playback
     case shelves
     case account
     case cloudSync
@@ -21,10 +20,9 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
         case .addons: return "Addons"
         case .mediaServers: return "Mediaservers"
         case .general: return "Algemeen"
-        case .trakt: return "Trakt"
         case .subtitles: return "Ondertitels"
-        case .playback: return "Afspelen"
         case .metadata: return "Metadata"
+        case .playback: return "Afspelen"
         case .shelves: return "Planken"
         case .account: return "Account"
         case .cloudSync: return "Gegevens en opslag"
@@ -37,12 +35,11 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
         case .addons: return "Streams via gekoppelde addons"
         case .mediaServers: return "Jellyfin en andere eigen servers"
         case .general: return "Startscherm, sport en kaartweergave"
-        case .trakt: return "Kijkgeschiedenis, voortgang en lijsten"
-        case .subtitles: return "Standaardtaal en OpenSubtitles"
-        case .playback: return "Resolutie, taal en oversla-segmenten"
+        case .subtitles: return "Taal, weergave en OpenSubtitles"
         case .metadata: return "Ratings op film- en seriepagina's"
+        case .playback: return "Resolutie, taal en oversla-segmenten"
         case .shelves: return "Eigen rijen op het hoofdmenu"
-        case .account: return "API-sleutels en profiel"
+        case .account: return "Trakt, TMDB en API-sleutels"
         case .cloudSync: return "iCloud-synchronisatie en opslaggebruik"
         }
     }
@@ -53,10 +50,9 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
         case .addons: return "puzzlepiece.extension.fill"
         case .mediaServers: return "server.rack"
         case .general: return "slider.horizontal.3"
-        case .trakt: return "checkmark.circle"
         case .subtitles: return "captions.bubble"
-        case .playback: return "play.circle"
         case .metadata: return "star.leadinghalf.filled"
+        case .playback: return "play.circle"
         case .shelves: return "rectangle.grid.1x2"
         case .account: return "person.crop.circle"
         case .cloudSync: return "icloud"
@@ -75,6 +71,7 @@ struct SettingsView: View {
     @State private var mediaServerCount = 0
     @State private var iptvErrored = false
     @State private var selection: SettingsDestination?
+    @State private var settingsPath = NavigationPath()
     @State private var categoryOrder: [SourceCategory] = SourceOrderDefaults.loadCategoryOrder()
 
     private let iptvStore = IPTVConfigurationStore()
@@ -104,12 +101,21 @@ struct SettingsView: View {
                 }
             } else {
                 // iPhone: klassieke gestapelde navigatie.
-                NavigationStack {
+                //
+                // Instellingen zit op iPhone altijd achter het automatische "More"-tabblad
+                // (er zijn meer dan 4 tabs), en dat "More"-scherm heeft zelf al een eigen
+                // navigatiebalk met terugknop. Onze eigen NavigationStack hieronder krijgt
+                // dus een TWEEDE navigatiebalk zodra we iets pushen, wat een dubbele
+                // terugpijl gaf. Daarom verbergen we de buitenste (More-)balk zodra we
+                // dieper dan het hoofdmenu zitten, en laten we alleen de eigen balk van het
+                // gepushte scherm (met zijn eigen terugknop naar het hoofdmenu) zichtbaar.
+                NavigationStack(path: $settingsPath) {
                     sidebarList
                         .navigationDestination(for: SettingsDestination.self) { destination in
                             destinationView(destination)
                         }
                 }
+                .toolbar(settingsPath.isEmpty ? .visible : .hidden, for: .navigationBar)
             }
         }
         .onAppear { reload() }
@@ -145,22 +151,33 @@ struct SettingsView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 14) {
-                        Text("VOORKEUREN")
+                        Text("WEERGAVE")
                             .font(.system(size: 15, weight: .semibold))
                             .tracking(2)
                             .foregroundStyle(VeyraColors.secondary)
 
-                        settingsCard(
-                            .trakt,
-                            status: trakt.isConnected ? "Verbonden" : "Niet gekoppeld",
-                            statusColor: VeyraColors.cyan
-                        )
                         settingsCard(.general, status: "", statusColor: VeyraColors.cyan)
                         settingsCard(.subtitles, status: "", statusColor: VeyraColors.cyan)
-                        settingsCard(.playback, status: "", statusColor: VeyraColors.cyan)
                         settingsCard(.metadata, status: "", statusColor: VeyraColors.cyan)
+                        settingsCard(.playback, status: "", statusColor: VeyraColors.cyan)
                         settingsCard(.shelves, status: "", statusColor: VeyraColors.cyan)
-                        settingsCard(.account, status: "", statusColor: VeyraColors.cyan)
+                    }
+
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("ACCOUNT")
+                            .font(.system(size: 15, weight: .semibold))
+                            .tracking(2)
+                            .foregroundStyle(VeyraColors.secondary)
+
+                        // Trakt (koppelen, synchroniseren, ontkoppelen) zit
+                        // hier onder Account, samen met de TMDB/Trakt
+                        // API-sleutels — niet meer als los item op het
+                        // hoofdmenu.
+                        settingsCard(
+                            .account,
+                            status: trakt.isConnected ? "Trakt verbonden" : "Trakt niet gekoppeld",
+                            statusColor: trakt.isConnected ? VeyraColors.cyan : VeyraColors.secondary
+                        )
                     }
 
                     VStack(alignment: .leading, spacing: 14) {
@@ -361,10 +378,9 @@ struct SettingsView: View {
         case .addons: AddonsSettingsView()
         case .mediaServers: MediaServersSettingsView()
         case .general: GeneralSettingsView()
-        case .trakt: TraktSettingsView()
         case .subtitles: SubtitlePreferencesView()
-        case .playback: PlaybackSettingsView()
         case .metadata: MetadataSettingsView()
+        case .playback: PlaybackSettingsView()
         case .shelves: ShelvesSettingsView()
         case .account: AccountView()
         case .cloudSync: CloudSyncSettingsView()

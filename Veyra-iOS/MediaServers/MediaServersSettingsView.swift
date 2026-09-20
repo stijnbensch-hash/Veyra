@@ -89,8 +89,19 @@ private struct MediaServerAddView: View {
             Section("Type") {
                 Picker("Server", selection: $selectedKind) {
                     ForEach(MediaServerKind.allCases, id: \.self) { kind in
-                        Text(kind.isAvailable ? kind.displayName : "\(kind.displayName) (binnenkort)")
-                            .tag(kind)
+                        HStack {
+                            Text(kind.displayName)
+
+                            if !kind.isAvailable {
+                                Spacer()
+                                Text("BINNENKORT")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .tracking(1)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .tag(kind)
+                        .disabled(!kind.isAvailable)
                     }
                 }
                 .pickerStyle(.inline)

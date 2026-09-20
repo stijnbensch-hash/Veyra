@@ -1,32 +1,60 @@
 import SwiftUI
 
 struct AccountView: View {
+    @ObservedObject private var trakt = TraktStore.shared
+
     var body: some View {
         ZStack {
             VeyraColors.background.ignoresSafeArea()
 
             List {
                 Section {
-                    Text("Beheer je profiel en accountinstellingen.")
+                    Text("Beheer je profiel, koppelingen en API-sleutels.")
                         .foregroundStyle(.secondary)
                 }
 
+                Section("Trakt-account") {
+                    NavigationLink {
+                        TraktSettingsView()
+                    } label: {
+                        HStack {
+                            Image(systemName: "checkmark.circle")
+                                .foregroundStyle(VeyraColors.cyan)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Trakt")
+                                Text("Kijkgeschiedenis, voortgang en lijsten")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Text(trakt.isConnected ? "Verbonden" : "Niet gekoppeld")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(trakt.isConnected ? VeyraColors.cyan : .secondary)
+                        }
+                    }
+                }
+
                 Section("Ondertitels") {
+                    NavigationLink("Taal en ondertitelvoorkeuren") {
+                        SubtitlePreferencesView()
+                    }
                     OpenSubtitlesConfigurationCard()
                 }
 
                 Section {
-                    NavigationLink("Taal en ondertitelvoorkeuren") {
-                        SubtitlePreferencesView()
-                    }
-                }
-
-                Section("TMDB") {
                     TMDBConfigurationCard()
+                } header: {
+                    Text("TMDB")
+                } footer: {
+                    Text("Nodig voor filmposters, series en metadata in Veyra.")
                 }
 
-                Section("Trakt") {
+                Section {
                     TraktConfigurationCard()
+                } header: {
+                    Text("Trakt API-sleutels")
+                } footer: {
+                    Text("Alleen nodig om zelf een Trakt-koppeling mogelijk te maken — dezelfde sleutels als op je andere Veyra-toestellen.")
                 }
             }
             .scrollContentBackground(.hidden)
