@@ -103,19 +103,21 @@ struct SettingsView: View {
                 // iPhone: klassieke gestapelde navigatie.
                 //
                 // Instellingen zit op iPhone altijd achter het automatische "More"-tabblad
-                // (er zijn meer dan 4 tabs), en dat "More"-scherm heeft zelf al een eigen
-                // navigatiebalk met terugknop. Onze eigen NavigationStack hieronder krijgt
-                // dus een TWEEDE navigatiebalk zodra we iets pushen, wat een dubbele
-                // terugpijl gaf. Daarom verbergen we de buitenste (More-)balk zodra we
-                // dieper dan het hoofdmenu zitten, en laten we alleen de eigen balk van het
-                // gepushte scherm (met zijn eigen terugknop naar het hoofdmenu) zichtbaar.
+                // (er zijn meer dan 4 tabs). Dat "More"-scherm wikkelt zijn inhoud in een
+                // eigen UIKit-navigatiecontroller met eigen navigatiebalk; onze eigen
+                // NavigationStack hieronder kreeg daardoor een TWEEDE, geneste navigatiebalk
+                // zodra we iets pushten, wat de dubbele terugpijl gaf. Het `.toolbar(_:for:)`
+                // op déze NavigationStack bepaalt enkel de zichtbaarheid van onze EIGEN balk,
+                // niet van de balk die "More" zelf toevoegt — dus dat loste het niet op. De
+                // buitenste "More"-balk wordt nu rechtstreeks verborgen door
+                // `hidingMoreTabNavigationBar()` op de TabView in ContentView.swift, dus hier
+                // hoeven we alleen nog onze eigen NavigationStack normaal te laten werken.
                 NavigationStack(path: $settingsPath) {
                     sidebarList
                         .navigationDestination(for: SettingsDestination.self) { destination in
                             destinationView(destination)
                         }
                 }
-                .toolbar(settingsPath.isEmpty ? .visible : .hidden, for: .navigationBar)
             }
         }
         .onAppear { reload() }

@@ -31,6 +31,7 @@ struct ContentView: View {
         }
         .tint(VeyraColors.cyan)
         .preferredColorScheme(.dark)
+        .hidingMoreTabNavigationBar()
     }
 }
 
