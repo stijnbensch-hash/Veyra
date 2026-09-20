@@ -52,16 +52,16 @@ struct ContentView: View {
             }
             .tint(VeyraColors.cyan)
 
-            // Losse, zwevende knoppen bovenin: tandwiel linksboven
-            // (Instellingen), vergrootglas rechtsboven (Zoeken) — aan
+            // Losse, zwevende knoppen bovenin: vergrootglas linksboven
+            // (Zoeken), tandwiel rechtsboven (Instellingen) — aan
             // weerszijden van het scherm, zichtbaar op elk tabblad.
             HStack {
-                FloatingIconButton(symbol: "gearshape.fill", accessibilityLabel: "Instellingen") {
-                    showSettings = true
-                }
-                Spacer()
                 FloatingIconButton(symbol: "magnifyingglass", accessibilityLabel: "Zoeken") {
                     showSearch = true
+                }
+                Spacer()
+                FloatingIconButton(symbol: "gearshape.fill", accessibilityLabel: "Instellingen") {
+                    showSettings = true
                 }
             }
             .padding(.horizontal, 20)
