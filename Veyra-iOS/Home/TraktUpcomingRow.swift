@@ -5,6 +5,7 @@ import SwiftUI
 /// zonder focus-effecten. Tikken opent alleen de seriepagina (geen auto-play).
 struct TraktUpcomingRow: View {
     @ObservedObject private var store = TraktStore.shared
+    @AppStorage(GeneralSettingsDefaults.showUpcomingKey) private var showUpcoming = true
 
     @State private var episodes: [VeyraUpcomingEpisodeIOS] = []
     @State private var isLoading = false
@@ -27,7 +28,7 @@ struct TraktUpcomingRow: View {
 
     var body: some View {
         Group {
-            if store.isConnected && !upcoming.isEmpty {
+            if showUpcoming && store.isConnected && !upcoming.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
                     VeyraSectionHeader(title: "Binnenkort")
                         .padding(.horizontal)

@@ -5,6 +5,8 @@ import SwiftUI
 /// native iOS-rij in plaats van de focus-gestuurde tvOS-kaarten.
 struct ContinueWatchingRow: View {
     @ObservedObject private var store = TraktStore.shared
+    @AppStorage(GeneralSettingsDefaults.showContinueWatchingKey) private var showContinueWatching = true
+    @AppStorage(GeneralSettingsDefaults.continueWatchingLimitKey) private var continueWatchingLimit = 10
     @State private var destination: ContinueWatchingTarget?
 
     private var items: [TraktEntry] {
@@ -18,12 +20,12 @@ struct ContinueWatchingRow: View {
             }
         }
 
-        return result
+        return Array(result.prefix(max(0, continueWatchingLimit)))
     }
 
     var body: some View {
         Group {
-            if store.isConnected && !items.isEmpty {
+            if showContinueWatching && store.isConnected && !items.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
                     VeyraSectionHeader(title: "Verder kijken")
                         .padding(.horizontal)
