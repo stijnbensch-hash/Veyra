@@ -97,12 +97,6 @@ struct SettingsView: View {
             case .mediaServers:
                 MediaServersSettingsView()
 
-            case .trakt:
-                TraktView()
-
-            case .privacy:
-                TraktPrivacyView()
-
             case .account:
                 AccountView()
             case .subtitles:
@@ -172,34 +166,56 @@ struct SettingsView: View {
     }
 
     private var settingsGrid: some View {
-        LazyVGrid(columns: [GridItem(.flexible(), spacing: 28), GridItem(.flexible(), spacing: 28)], spacing: 28) {
-            settingsButton(destination: .subtitles, icon: "captions.bubble", title: "Ondertitels",
-                           subtitle: "Standaardtaal en OpenSubtitles", status: "", statusColor: VeyraColors.cyan)
-            settingsButton(destination: .subtitleAppearance, icon: "textformat.size", title: "Ondertitelweergave",
-                           subtitle: "Grootte, plaatsing, achtergrond", status: "", statusColor: VeyraColors.secondary)
-            settingsButton(destination: .playback, icon: "play.circle", title: "Afspelen",
-                           subtitle: "Resolutie, taal en oversla-segmenten", status: "", statusColor: VeyraColors.secondary)
-            settingsButton(destination: .iptv, icon: "tv", title: "IPTV",
-                           subtitle: "Live TV en VOD via Xtream of M3U", status: iptvStatus, statusColor: iptvStatusColor)
-            settingsButton(destination: .addons, icon: "puzzlepiece.extension", title: "Addons",
-                           subtitle: "Streams via gekoppelde addons", status: addonsStatus, statusColor: VeyraColors.cyan)
-            settingsButton(destination: .mediaServers, icon: "server.rack", title: "Mediaservers",
-                           subtitle: "Jellyfin en andere eigen servers", status: mediaServersStatus, statusColor: VeyraColors.cyan)
-            settingsButton(destination: .account, icon: "person.crop.circle", title: "Account",
-                           subtitle: "Profiel en accountinstellingen", status: "", statusColor: VeyraColors.cyan)
-            settingsButton(destination: .trakt, icon: "checkmark.circle", title: "Trakt",
-                           subtitle: "Kijkgeschiedenis, voortgang en lijsten",
-                           status: trakt.isConnected ? "Verbonden" : "Niet gekoppeld", statusColor: VeyraColors.cyan)
-            settingsButton(destination: .privacy, icon: "hand.raised", title: "Privacy en Trakt",
-                           subtitle: "Je koppeling en gedeelde kijkgegevens", status: "", statusColor: VeyraColors.secondary)
-            settingsButton(destination: .metadata, icon: "star.leadinghalf.filled", title: "Metadata",
-                           subtitle: "Ratings op film- en seriepagina's", status: "", statusColor: VeyraColors.secondary)
-            settingsButton(destination: .shelves, icon: "rectangle.grid.1x2", title: "Planken",
-                           subtitle: "Eigen rijen op het hoofdmenu", status: "", statusColor: VeyraColors.secondary)
-            settingsButton(destination: .cloudSync, icon: "icloud", title: "Gegevens en opslag",
-                           subtitle: "iCloud-synchronisatie en opslaggebruik",
-                           status: cloudSync.isEnabled ? "Aan" : "Uit",
-                           statusColor: cloudSync.isEnabled ? VeyraColors.cyan : VeyraColors.secondary)
+        VStack(alignment: .leading, spacing: 40) {
+            settingsSection(title: "BRONNEN") {
+                settingsButton(destination: .iptv, icon: "tv", title: "IPTV",
+                               subtitle: "Live TV en VOD via Xtream of M3U", status: iptvStatus, statusColor: iptvStatusColor)
+                settingsButton(destination: .addons, icon: "puzzlepiece.extension", title: "Addons",
+                               subtitle: "Streams via gekoppelde addons", status: addonsStatus, statusColor: VeyraColors.cyan)
+                settingsButton(destination: .mediaServers, icon: "server.rack", title: "Mediaservers",
+                               subtitle: "Jellyfin en andere eigen servers", status: mediaServersStatus, statusColor: VeyraColors.cyan)
+            }
+
+            settingsSection(title: "WEERGAVE") {
+                settingsButton(destination: .subtitles, icon: "captions.bubble", title: "Ondertitels",
+                               subtitle: "Standaardtaal en OpenSubtitles", status: "", statusColor: VeyraColors.cyan)
+                settingsButton(destination: .subtitleAppearance, icon: "textformat.size", title: "Ondertitelweergave",
+                               subtitle: "Grootte, plaatsing, achtergrond", status: "", statusColor: VeyraColors.secondary)
+                settingsButton(destination: .playback, icon: "play.circle", title: "Afspelen",
+                               subtitle: "Resolutie, taal en oversla-segmenten", status: "", statusColor: VeyraColors.secondary)
+                settingsButton(destination: .metadata, icon: "star.leadinghalf.filled", title: "Metadata",
+                               subtitle: "Ratings op film- en seriepagina's", status: "", statusColor: VeyraColors.secondary)
+                settingsButton(destination: .shelves, icon: "rectangle.grid.1x2", title: "Planken",
+                               subtitle: "Eigen rijen op het hoofdmenu", status: "", statusColor: VeyraColors.secondary)
+            }
+
+            settingsSection(title: "ACCOUNT") {
+                settingsButton(destination: .account, icon: "person.crop.circle", title: "Account",
+                               subtitle: "Trakt, ondertitels en profiel",
+                               status: trakt.isConnected ? "Trakt verbonden" : "Trakt niet gekoppeld",
+                               statusColor: trakt.isConnected ? VeyraColors.cyan : VeyraColors.secondary)
+                settingsButton(destination: .cloudSync, icon: "icloud", title: "Gegevens en opslag",
+                               subtitle: "iCloud-synchronisatie en opslaggebruik",
+                               status: cloudSync.isEnabled ? "Aan" : "Uit",
+                               statusColor: cloudSync.isEnabled ? VeyraColors.cyan : VeyraColors.secondary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func settingsSection<Content: View>(
+        title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text(title)
+                .font(.system(size: 22, weight: .semibold))
+                .tracking(3)
+                .foregroundStyle(.white.opacity(0.62))
+
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 28), GridItem(.flexible(), spacing: 28)], spacing: 28) {
+                content()
+            }
         }
     }
 
@@ -460,8 +476,6 @@ private enum SettingsDestination:
     case iptv
     case addons
     case mediaServers
-    case trakt
-    case privacy
     case account
     case subtitles
     case subtitleAppearance
@@ -1782,6 +1796,8 @@ private struct AddonEditView:
 struct AccountView:
     View
 {
+    @ObservedObject private var trakt = TraktStore.shared
+
     var body: some View {
         ZStack {
             VeyraSettingsTheme.background
@@ -1801,7 +1817,7 @@ struct AccountView:
                         )
 
                     Text(
-                        "Beheer je profiel en accountinstellingen."
+                        "Beheer je profiel, koppelingen en ondertitelvoorkeuren."
                     )
                     .font(
                         .system(size: 26)
@@ -1811,6 +1827,45 @@ struct AccountView:
                             0.62
                         )
                     )
+
+                    // MARK: Trakt-account
+
+                    Text("TRAKT-ACCOUNT")
+                        .font(.system(size: 20, weight: .semibold))
+                        .tracking(2)
+                        .foregroundStyle(.white.opacity(0.5))
+
+                    NavigationLink {
+                        TraktView()
+                    } label: {
+                        VeyraActionLabel(
+                            title: trakt.isConnected ? "Trakt — verbonden" : "Trakt — niet gekoppeld",
+                            symbol: "checkmark.circle"
+                        )
+                    }
+                    .buttonStyle(
+                        VeyraFocusButtonStyle()
+                    )
+
+                    NavigationLink {
+                        TraktPrivacyView()
+                    } label: {
+                        VeyraActionLabel(
+                            title: "Privacy en gedeelde kijkgegevens",
+                            symbol: "hand.raised"
+                        )
+                    }
+                    .buttonStyle(
+                        VeyraFocusButtonStyle()
+                    )
+
+                    // MARK: Ondertitels
+
+                    Text("ONDERTITELS")
+                        .font(.system(size: 20, weight: .semibold))
+                        .tracking(2)
+                        .foregroundStyle(.white.opacity(0.5))
+                        .padding(.top, 12)
 
                     OpenSubtitlesConfigurationCard()
 
