@@ -56,6 +56,12 @@ final class PlaybackViewModel: ObservableObject {
         }
     }
 
+    /// Opnieuw proberen na een afspeelfout, zonder het scherm te sluiten.
+    func retry() async {
+        playbackError = nil
+        await startPlayback()
+    }
+
     func stopForDisappear() {
         tracker?.finish()
         playbackEngine?.stop()

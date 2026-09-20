@@ -6,6 +6,7 @@ import Foundation
 @MainActor
 struct SettingsView: View {
     @ObservedObject private var trakt = TraktStore.shared
+    @ObservedObject private var cloudSync = CloudSettingsSync.shared
 
     @State private var configuration: IPTVStoredConfiguration?
     @State private var errorMessage: String?
@@ -110,6 +111,8 @@ struct SettingsView: View {
                 MetadataSettingsView()
             case .shelves:
                 ShelvesSettingsView()
+            case .cloudSync:
+                CloudSyncSettingsView()
             }
         }
     }
@@ -185,6 +188,10 @@ struct SettingsView: View {
                            subtitle: "Ratings op film- en seriepagina's", status: "", statusColor: VeyraColors.secondary)
             settingsButton(destination: .shelves, icon: "rectangle.grid.1x2", title: "Planken",
                            subtitle: "Eigen rijen op het hoofdmenu", status: "", statusColor: VeyraColors.secondary)
+            settingsButton(destination: .cloudSync, icon: "icloud", title: "Gegevens en opslag",
+                           subtitle: "iCloud-synchronisatie en opslaggebruik",
+                           status: cloudSync.isEnabled ? "Aan" : "Uit",
+                           statusColor: cloudSync.isEnabled ? VeyraColors.cyan : VeyraColors.secondary)
         }
     }
 
@@ -451,6 +458,7 @@ private enum SettingsDestination:
     case subtitles
     case metadata
     case shelves
+    case cloudSync
 
     var id: String {
         rawValue

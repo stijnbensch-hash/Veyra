@@ -12,6 +12,11 @@ struct Veyra_iOSApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .task {
+                    // Instellingen via iCloud spiegelen — zie
+                    // `Shared/Sync/CloudSettingsSync.swift`.
+                    CloudSettingsSync.shared.start()
+                }
         }
     }
 }

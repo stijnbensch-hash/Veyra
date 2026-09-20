@@ -443,8 +443,20 @@ struct IPTVConfigurationStore {
 
     // MARK: - Keychain Read
 
+    // Probeert eerst het gesynchroniseerde (iCloud Keychain) item; valt
+    // terug op een niet-gesynchroniseerd item van vóór deze wijziging.
     private func readKeychainData(
         account: String
+    ) throws -> Data? {
+        if let synced = try readKeychainData(account: account, synchronizable: true) {
+            return synced
+        }
+        return try readKeychainData(account: account, synchronizable: false)
+    }
+
+    private func readKeychainData(
+        account: String,
+        synchronizable: Bool
     ) throws -> Data? {
         let query: [String: Any] = [
             kSecClass as String:
@@ -455,6 +467,9 @@ struct IPTVConfigurationStore {
 
             kSecAttrAccount as String:
                 account,
+
+            kSecAttrSynchronizable as String:
+                synchronizable,
 
             kSecReturnData as String:
                 true,
@@ -497,6 +512,11 @@ struct IPTVConfigurationStore {
 
     // MARK: - Keychain Write
 
+    /// Schrijft naar het gesynchroniseerde (iCloud Keychain) item, zodat
+    /// IPTV-inloggegevens automatisch meegaan naar andere apparaten met
+    /// hetzelfde iCloud-account. `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`
+    /// is niet te combineren met `kSecAttrSynchronizable: true`, dus nieuwe
+    /// items gebruiken `kSecAttrAccessibleWhenUnlocked`.
     private func writeKeychainData(
         _ data: Data,
         account: String
@@ -509,7 +529,10 @@ struct IPTVConfigurationStore {
                 service,
 
             kSecAttrAccount as String:
-                account
+                account,
+
+            kSecAttrSynchronizable as String:
+                true
         ]
 
         let updateAttributes: [String: Any] = [
@@ -534,6 +557,11 @@ struct IPTVConfigurationStore {
                 )
         }
 
+        // Eenmalige opruiming: een niet-gesynchroniseerd item van vóór deze
+        // wijziging staat de nieuwe (gesynchroniseerde) toevoeging niet in
+        // de weg, maar blijft anders als verouderd duplicaat achter.
+        try? deleteKeychainItem(account: account, synchronizable: false)
+
         var addQuery =
             lookupQuery
 
@@ -545,7 +573,7 @@ struct IPTVConfigurationStore {
         addQuery[
             kSecAttrAccessible as String
         ] =
-            kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+            kSecAttrAccessibleWhenUnlocked
 
         let addStatus =
             SecItemAdd(
@@ -568,6 +596,14 @@ struct IPTVConfigurationStore {
     private func deleteKeychainItem(
         account: String
     ) throws {
+        try deleteKeychainItem(account: account, synchronizable: true)
+        try deleteKeychainItem(account: account, synchronizable: false)
+    }
+
+    private func deleteKeychainItem(
+        account: String,
+        synchronizable: Bool
+    ) throws {
         let query: [String: Any] = [
             kSecClass as String:
                 kSecClassGenericPassword,
@@ -576,7 +612,10 @@ struct IPTVConfigurationStore {
                 service,
 
             kSecAttrAccount as String:
-                account
+                account,
+
+            kSecAttrSynchronizable as String:
+                synchronizable
         ]
 
         let status =

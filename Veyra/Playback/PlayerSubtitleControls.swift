@@ -97,9 +97,45 @@ struct PlayerSubtitleControls: View {
     @State private var presentation = VeyraPlayerPresentation()
     @State private var nextEpisode: MediaItem?
 
+    // "Hierna"-instellingen (automatisch doorspelen + aftellen). Zelfde
+    // sleutels als de iOS-speler, zie `Shared/Theme/PlaybackSettings.swift`.
+    @AppStorage(PlaybackSettingsDefaults.autoPlayNextEpisodeKey)
+    private var autoPlayNextEpisodeSetting = true
+    @AppStorage(PlaybackSettingsDefaults.autoPlayNextCountdownEnabledKey)
+    private var autoPlayNextCountdownEnabled = true
+    @AppStorage(PlaybackSettingsDefaults.countdownDurationKey)
+    private var countdownDurationRaw = PlaybackCountdownDuration.ten.rawValue
+
+    @State private var countdownRemaining: Int?
+    @State private var countdownTask: Task<Void, Never>?
+    @State private var countdownCancelled = false
+
+    private var countdownDuration: PlaybackCountdownDuration {
+        PlaybackCountdownDuration(rawValue: countdownDurationRaw) ?? .ten
+    }
+
+    // Afspeelsnelheid. Bewust niet opgeslagen (@State, geen @AppStorage) —
+    // per sessie, niet een blijvende voorkeur, net als op iOS.
+    @State private var playbackRate: Float = 1.0
+
+    // Intro/recap/aftiteling overslaan — zie `Shared/Playback/IntroDBClient.swift`
+    // en de bijbehorende instellingen in `Shared/Theme/PlaybackSettings.swift`.
+    @AppStorage(PlaybackSettingsDefaults.showSkipIntroButtonKey)
+    private var showSkipIntroButton = true
+    @AppStorage(PlaybackSettingsDefaults.autoSkipIntroKey)
+    private var autoSkipIntro = false
+    @AppStorage(PlaybackSettingsDefaults.showSkipRecapButtonKey)
+    private var showSkipRecapButton = true
+    @AppStorage(PlaybackSettingsDefaults.showSkipCreditsButtonKey)
+    private var showSkipCreditsButton = true
+
+    @State private var introDBSegments: IntroDBSegments = .empty
+    @State private var autoSkippedIntro = false
+
     private var controlsVisible: Bool { presentation.controlsVisible }
     private var showingSubtitles: Bool { presentation.panel == .subtitles }
     private var showingAudio: Bool { presentation.panel == .audio }
+    private var showingSpeed: Bool { presentation.panel == .speed }
 
     @State private var interaction = 0
 
@@ -116,7 +152,7 @@ struct PlayerSubtitleControls: View {
         case track(Int)
     }
 
-    private var panelVisible: Bool { showingSubtitles || showingAudio }
+    private var panelVisible: Bool { showingSubtitles || showingAudio || showingSpeed }
 
     private var isNearEndOfEpisode: Bool {
         guard engine.duration.isFinite, engine.duration > 0 else { return false }
@@ -124,7 +160,53 @@ struct PlayerSubtitleControls: View {
     }
 
     private var showNextEpisodeOverlay: Bool {
-        item?.type == .series && nextEpisode != nil && !panelVisible && isNearEndOfEpisode
+        autoPlayNextEpisodeSetting && item?.type == .series && nextEpisode != nil && !panelVisible
+            && isNearEndOfEpisode && !countdownCancelled
+    }
+
+    // MARK: - Skip segment (intro/recap/aftiteling)
+
+    private enum SkipSegmentKind {
+        case intro, recap, credits
+
+        var label: String {
+            switch self {
+            case .intro: return "Intro overslaan"
+            case .recap: return "Samenvatting overslaan"
+            case .credits: return "Aftiteling overslaan"
+            }
+        }
+    }
+
+    private var activeSkipSegment: (kind: SkipSegmentKind, segment: IntroDBSegment)? {
+        guard !showNextEpisodeOverlay, !panelVisible else { return nil }
+
+        if showSkipIntroButton, let intro = introDBSegments.intro, intro.contains(engine.currentTime) {
+            return (.intro, intro)
+        }
+        if showSkipRecapButton, let recap = introDBSegments.recap, recap.contains(engine.currentTime) {
+            return (.recap, recap)
+        }
+        if showSkipCreditsButton, let credits = introDBSegments.credits,
+            credits.contains(engine.currentTime)
+        {
+            return (.credits, credits)
+        }
+        return nil
+    }
+
+    private func skipSegment(_ segment: IntroDBSegment) {
+        let target = segment.end ?? engine.duration
+        guard target.isFinite, target > engine.currentTime else { return }
+        Task { await engine.seek(to: target) }
+    }
+
+    private func handleAutoSkip(at time: Double) {
+        guard autoSkipIntro, !autoSkippedIntro, let intro = introDBSegments.intro,
+            let end = intro.end, intro.contains(time)
+        else { return }
+        autoSkippedIntro = true
+        Task { await engine.seek(to: end) }
     }
 
     var body: some View {
@@ -140,11 +222,19 @@ struct PlayerSubtitleControls: View {
 
             PlayerSubtitleOverlay(engine: engine).allowsHitTesting(false)
 
+            if let active = activeSkipSegment {
+                skipSegmentButton(active.kind, active.segment)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 72)
+                    .padding(.bottom, controlsVisible ? 190 : 48)
+            }
+
             if showNextEpisodeOverlay, let nextEpisode {
                 nextEpisodeOverlayButton(nextEpisode)
                     .frame(maxWidth: .infinity, alignment: .trailing)
                     .padding(.trailing, 72)
                     .padding(.bottom, controlsVisible ? 190 : 48)
+                    .onAppear { startCountdownIfNeeded(for: nextEpisode) }
             }
 
             if controlsVisible && !panelVisible { playbackControls }
@@ -156,7 +246,10 @@ struct PlayerSubtitleControls: View {
             restoreControlFocus(.play)
         }.onChange(of: focused) { _, _ in interaction += 1 }.onChange(of: audioFocused) { _, _ in
             interaction += 1
-        }.onDisappear { seekController.cancel() }.onChange(of: scenePhase) { _, phase in
+        }.onDisappear {
+            seekController.cancel()
+            countdownTask?.cancel()
+        }.onChange(of: scenePhase) { _, phase in
             if phase != .active { seekController.cancel() }
         }.onChange(of: canSeek) { _, available in
             if !available {
@@ -185,6 +278,9 @@ struct PlayerSubtitleControls: View {
 
             } else if showingAudio {
                 audioPanel.frame(width: 680).padding(32).focusSection()
+
+            } else if showingSpeed {
+                speedPanel.frame(width: 480).padding(32).focusSection()
             }
         }
         // One handler outside the overlay owns Back for both the controls and
@@ -193,23 +289,97 @@ struct PlayerSubtitleControls: View {
             togglePlayback()
             if !panelVisible { revealControls(focus: .play) }
         }.task(id: item?.id) {
+            countdownTask?.cancel()
+            countdownTask = nil
+            countdownRemaining = nil
+            countdownCancelled = false
+            autoSkippedIntro = false
+            introDBSegments = .empty
             nextEpisode = await NextEpisodeResolver.resolve(after: item)
+            introDBSegments = await IntroDBClient.shared.segments(
+                tmdbID: item?.tmdbID,
+                season: item?.type == .series ? item?.seasonNumber : nil,
+                episode: item?.type == .series ? item?.episodeNumber : nil,
+                durationSeconds: engine.duration > 0 ? engine.duration : nil
+            )
+        }.onChange(of: engine.currentTime) { _, time in
+            handleAutoSkip(at: time)
         }
+    }
+
+    // MARK: - Skip segment overlay
+
+    private func skipSegmentButton(_ kind: SkipSegmentKind, _ segment: IntroDBSegment) -> some View {
+        Button {
+            skipSegment(segment)
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "forward.end.fill")
+                Text(kind.label).font(.system(size: 18, weight: .semibold))
+            }.padding(.horizontal, 24).padding(.vertical, 16)
+        }.buttonStyle(VeyraFocusButtonStyle(radius: VeyraRadius.pill)).focused(
+            $focused, equals: .skipSegment
+        ).focusSection()
     }
 
     // MARK: - Next episode overlay
 
+    @ViewBuilder
     private func nextEpisodeOverlayButton(_ next: MediaItem) -> some View {
-        Button {
+        if autoPlayNextCountdownEnabled, let countdownRemaining {
+            HStack(spacing: 14) {
+                Button {
+                    countdownTask?.cancel()
+                    countdownTask = nil
+                    countdownCancelled = true
+                } label: {
+                    Image(systemName: "xmark").font(.system(size: 18, weight: .semibold))
+                        .frame(width: 54, height: 54)
+                }.buttonStyle(VeyraFocusButtonStyle(radius: VeyraRadius.pill)).focused(
+                    $focused, equals: .cancelNextEpisode
+                )
+
+                Button {
+                    countdownTask?.cancel()
+                    onPlayNextEpisode(next)
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "forward.end.fill")
+                        Text("Volgende aflevering over \(countdownRemaining)s")
+                            .font(.system(size: 18, weight: .semibold)).monospacedDigit()
+                    }.padding(.horizontal, 24).padding(.vertical, 16)
+                }.buttonStyle(VeyraFocusButtonStyle(radius: VeyraRadius.pill)).focused(
+                    $focused, equals: .nextEpisode
+                )
+            }.focusSection()
+
+        } else {
+            Button {
+                countdownTask?.cancel()
+                onPlayNextEpisode(next)
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "forward.end.fill")
+                    Text("Volgende aflevering").font(.system(size: 18, weight: .semibold))
+                }.padding(.horizontal, 24).padding(.vertical, 16)
+            }.buttonStyle(VeyraFocusButtonStyle(radius: VeyraRadius.pill)).focused(
+                $focused, equals: .nextEpisode
+            ).focusSection()
+        }
+    }
+
+    private func startCountdownIfNeeded(for next: MediaItem) {
+        guard autoPlayNextCountdownEnabled, countdownTask == nil, !countdownCancelled else { return }
+        countdownRemaining = countdownDuration.seconds
+        countdownTask = Task {
+            while let remaining = countdownRemaining, remaining > 0 {
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled else { return }
+                countdownRemaining = remaining - 1
+            }
+            guard !Task.isCancelled else { return }
             onPlayNextEpisode(next)
-        } label: {
-            HStack(spacing: 10) {
-                Image(systemName: "forward.end.fill")
-                Text("Volgende aflevering").font(.system(size: 18, weight: .semibold))
-            }.padding(.horizontal, 24).padding(.vertical, 16)
-        }.buttonStyle(VeyraFocusButtonStyle(radius: VeyraRadius.pill)).focused(
-            $focused, equals: .nextEpisode
-        ).focusSection()
+        }
     }
 
     // MARK: - Playback controls
@@ -310,6 +480,14 @@ struct PlayerSubtitleControls: View {
                     Image(systemName: "speaker.wave.2").padding(14)
                 }.focused($focused, equals: .audio)
 
+                Button {
+                    openSpeed()
+
+                } label: {
+                    Text(speedLabel(playbackRate)).font(.system(size: 17, weight: .semibold))
+                        .frame(minWidth: 46, minHeight: 46)
+                }.focused($focused, equals: .speed)
+
                 Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
             }.font(.system(size: 19, weight: .medium)).buttonStyle(
                 VeyraFocusButtonStyle(radius: VeyraRadius.pill)
@@ -396,6 +574,71 @@ struct PlayerSubtitleControls: View {
         return parts.joined(separator: " · ")
     }
 
+    // MARK: - Speed
+
+    @FocusState private var speedFocused: Float?
+
+    private var availablePlaybackRates: [Float] {
+        [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0].filter { $0 <= engine.maxSupportedRate }
+    }
+
+    private func speedLabel(_ rate: Float) -> String {
+        rate == 1.0 ? "1x" : String(format: "%.2gx", rate)
+    }
+
+    private var speedPanel: some View {
+        VStack(alignment: .leading, spacing: 24) {
+            HStack {
+                Text("Snelheid").font(.system(size: 32, weight: .semibold))
+
+                Spacer()
+
+                Button("Sluiten", systemImage: "xmark") { closeSpeed() }.padding(8).focused(
+                    $speedFocused, equals: -1)
+            }
+
+            LazyVStack(spacing: 18) {
+                ForEach(availablePlaybackRates, id: \.self) { rate in
+                    Button {
+                        playbackRate = rate
+                        engine.setRate(rate)
+                        closeSpeed()
+
+                    } label: {
+                        HStack(spacing: 18) {
+                            Image(
+                                systemName: rate == playbackRate ? "checkmark.circle.fill" : "circle"
+                            ).foregroundStyle(VeyraColors.cyan)
+
+                            Text(speedLabel(rate))
+
+                            Spacer()
+                        }.padding(20)
+                    }.focused($speedFocused, equals: rate)
+                }
+            }
+        }.padding(28).buttonStyle(VeyraFocusButtonStyle()).veyraGlass().onAppear {
+            Task { @MainActor in
+                await Task.yield()
+                speedFocused = playbackRate
+            }
+        }
+    }
+
+    private func openSpeed() {
+        focused = nil
+        speedFocused = nil
+        presentation.open(.speed)
+        interaction += 1
+    }
+
+    private func closeSpeed() {
+        guard presentation.close(.speed) else { return }
+        speedFocused = nil
+        interaction += 1
+        restoreControlFocus(.speed)
+    }
+
     // MARK: - Playback helpers
 
     private var episodeLabel: String? {
@@ -449,7 +692,12 @@ struct PlayerSubtitleControls: View {
         switch presentation.handleBack() {
         case .closedPanel(let panel):
             audioFocused = nil
-            restoreControlFocus(panel == .subtitles ? .subtitles : .audio)
+            speedFocused = nil
+            switch panel {
+            case .subtitles: restoreControlFocus(.subtitles)
+            case .audio: restoreControlFocus(.audio)
+            case .speed: restoreControlFocus(.speed)
+            }
         case .hidControls: focused = .surface
         case .exitPlayer:
             seekController.cancel()

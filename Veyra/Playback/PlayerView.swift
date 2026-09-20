@@ -66,6 +66,19 @@ struct PlayerView: View {
                             size: 22
                         )
                     )
+
+                    HStack(spacing: 24) {
+                        Button("Sluiten") {
+                            dismiss()
+                        }
+                        .buttonStyle(.card)
+
+                        Button("Opnieuw proberen") {
+                            Task { await viewModel.retry() }
+                        }
+                        .buttonStyle(.card)
+                    }
+                    .padding(.top, 12)
                 }
                 .padding(50)
 

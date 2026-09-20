@@ -9,6 +9,7 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
     case metadata
     case shelves
     case account
+    case cloudSync
 
     var id: String { rawValue }
 
@@ -22,6 +23,7 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
         case .metadata: return "Metadata"
         case .shelves: return "Planken"
         case .account: return "Account"
+        case .cloudSync: return "Gegevens en opslag"
         }
     }
 
@@ -35,6 +37,7 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
         case .metadata: return "Ratings op film- en seriepagina's"
         case .shelves: return "Eigen rijen op het hoofdmenu"
         case .account: return "API-sleutels en profiel"
+        case .cloudSync: return "iCloud-synchronisatie en opslaggebruik"
         }
     }
 
@@ -48,6 +51,7 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
         case .metadata: return "star.leadinghalf.filled"
         case .shelves: return "rectangle.grid.1x2"
         case .account: return "person.crop.circle"
+        case .cloudSync: return "icloud"
         }
     }
 }
@@ -56,6 +60,7 @@ struct SettingsView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @ObservedObject private var trakt = TraktStore.shared
+    @ObservedObject private var cloudSync = CloudSettingsSync.shared
 
     @State private var iptvProviderCount = 0
     @State private var addonCount = 0
@@ -153,6 +158,19 @@ struct SettingsView: View {
                         settingsCard(.metadata, status: "", statusColor: VeyraColors.cyan)
                         settingsCard(.shelves, status: "", statusColor: VeyraColors.cyan)
                         settingsCard(.account, status: "", statusColor: VeyraColors.cyan)
+                    }
+
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("GEGEVENS EN OPSLAG")
+                            .font(.system(size: 15, weight: .semibold))
+                            .tracking(2)
+                            .foregroundStyle(VeyraColors.secondary)
+
+                        settingsCard(
+                            .cloudSync,
+                            status: cloudSync.isEnabled ? "iCloud-sync aan" : "iCloud-sync uit",
+                            statusColor: cloudSync.isEnabled ? VeyraColors.cyan : VeyraColors.secondary
+                        )
                     }
 
                     versionInformation
@@ -267,6 +285,7 @@ struct SettingsView: View {
         case .metadata: MetadataSettingsView()
         case .shelves: ShelvesSettingsView()
         case .account: AccountView()
+        case .cloudSync: CloudSyncSettingsView()
         }
     }
 

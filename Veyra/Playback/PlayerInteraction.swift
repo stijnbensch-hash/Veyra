@@ -109,6 +109,7 @@ struct VeyraPlayerPresentation {
     enum Panel: Equatable {
         case subtitles
         case audio
+        case speed
     }
 
     enum BackAction: Equatable {
@@ -158,7 +159,10 @@ enum VeyraPlayerControl: Hashable {
     case surface
     case subtitles
     case audio
+    case speed
     case nextEpisode
+    case cancelNextEpisode
+    case skipSegment
     case timeline
     case play
     case backward
@@ -166,7 +170,9 @@ enum VeyraPlayerControl: Hashable {
 
     func horizontalNeighbor(forward: Bool, canSeek: Bool) -> Self {
         let row: [Self] =
-            canSeek ? [.subtitles, .backward, .play, .forward, .audio] : [.subtitles, .play, .audio]
+            canSeek
+            ? [.subtitles, .backward, .play, .forward, .audio, .speed]
+            : [.subtitles, .play, .audio, .speed]
         guard let index = row.firstIndex(of: self) else { return .play }
         return row[min(row.count - 1, max(0, index + (forward ? 1 : -1)))]
     }

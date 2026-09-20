@@ -1,5 +1,6 @@
 import SwiftUI
 import AetherEngine
+import UIKit
 
 struct PlayerView: View {
     @Environment(\.dismiss)
@@ -46,8 +47,15 @@ struct PlayerView: View {
                         .foregroundStyle(.white.opacity(0.7))
                         .multilineTextAlignment(.center)
 
-                    Button("Sluiten") { dismiss() }
+                    HStack(spacing: 14) {
+                        Button("Sluiten") { dismiss() }
+                            .buttonStyle(.bordered)
+
+                        Button("Opnieuw proberen") {
+                            Task { await viewModel.retry() }
+                        }
                         .buttonStyle(.borderedProminent)
+                    }
                 }
                 .padding(40)
 
@@ -105,13 +113,101 @@ private struct iOSPlayerSurface: View {
     @State private var activePanel: IOSPlayerPanel?
     @State private var nextEpisode: MediaItem?
 
+    // "Hierna"-instellingen (automatisch doorspelen + aftellen). Zelfde
+    // sleutels als de tvOS-speler, zie `Shared/Theme/PlaybackSettings.swift`.
+    @AppStorage(PlaybackSettingsDefaults.autoPlayNextEpisodeKey)
+    private var autoPlayNextEpisodeSetting = true
+    @AppStorage(PlaybackSettingsDefaults.autoPlayNextCountdownEnabledKey)
+    private var autoPlayNextCountdownEnabled = true
+    @AppStorage(PlaybackSettingsDefaults.countdownDurationKey)
+    private var countdownDurationRaw = PlaybackCountdownDuration.ten.rawValue
+
+    @State private var countdownRemaining: Int?
+    @State private var countdownTask: Task<Void, Never>?
+    @State private var countdownCancelled = false
+
+    private var countdownDuration: PlaybackCountdownDuration {
+        PlaybackCountdownDuration(rawValue: countdownDurationRaw) ?? .ten
+    }
+
+    // Afspeelsnelheid. Bewust niet opgeslagen — per sessie, geen blijvende
+    // voorkeur.
+    @State private var playbackRate: Float = 1.0
+
+    // Picture-in-Picture en AirPlay. Zie
+    // `Veyra-iOS/Playback/AetherPictureInPicture.swift` en `AirPlayButton.swift`.
+    @StateObject private var pip = AetherPictureInPictureController()
+
+    // Helderheid/volume via verticale sleepgebaren, zie
+    // `Veyra-iOS/Playback/SystemVolumeSlider.swift`.
+    @State private var volumeSlider: UISlider?
+    @State private var gestureIndicator: (symbol: String, value: Double)?
+    @State private var gestureIndicatorTask: Task<Void, Never>?
+
+    // Intro/recap/aftiteling overslaan — zie `Shared/Playback/IntroDBClient.swift`.
+    @AppStorage(PlaybackSettingsDefaults.showSkipIntroButtonKey)
+    private var showSkipIntroButton = true
+    @AppStorage(PlaybackSettingsDefaults.autoSkipIntroKey)
+    private var autoSkipIntro = false
+    @AppStorage(PlaybackSettingsDefaults.showSkipRecapButtonKey)
+    private var showSkipRecapButton = true
+    @AppStorage(PlaybackSettingsDefaults.showSkipCreditsButtonKey)
+    private var showSkipCreditsButton = true
+
+    @State private var introDBSegments: IntroDBSegments = .empty
+    @State private var autoSkippedIntro = false
+
     private var isNearEndOfEpisode: Bool {
         guard engine.duration.isFinite, engine.duration > 0 else { return false }
         return engine.currentTime / engine.duration >= 0.95
     }
 
     private var showNextEpisodeOverlay: Bool {
-        item?.type == .series && nextEpisode != nil && isNearEndOfEpisode
+        autoPlayNextEpisodeSetting && item?.type == .series && nextEpisode != nil
+            && isNearEndOfEpisode && !countdownCancelled
+    }
+
+    private enum SkipSegmentKind {
+        case intro, recap, credits
+
+        var label: String {
+            switch self {
+            case .intro: return "Intro overslaan"
+            case .recap: return "Samenvatting overslaan"
+            case .credits: return "Aftiteling overslaan"
+            }
+        }
+    }
+
+    private var activeSkipSegment: (kind: SkipSegmentKind, segment: IntroDBSegment)? {
+        guard !showNextEpisodeOverlay else { return nil }
+
+        if showSkipIntroButton, let intro = introDBSegments.intro, intro.contains(engine.currentTime) {
+            return (.intro, intro)
+        }
+        if showSkipRecapButton, let recap = introDBSegments.recap, recap.contains(engine.currentTime) {
+            return (.recap, recap)
+        }
+        if showSkipCreditsButton, let credits = introDBSegments.credits,
+            credits.contains(engine.currentTime)
+        {
+            return (.credits, credits)
+        }
+        return nil
+    }
+
+    private func skipSegment(_ segment: IntroDBSegment) {
+        let target = segment.end ?? engine.duration
+        guard target.isFinite, target > engine.currentTime else { return }
+        Task { await engine.seek(to: target) }
+    }
+
+    private func handleAutoSkip(at time: Double) {
+        guard autoSkipIntro, !autoSkippedIntro, let intro = introDBSegments.intro,
+            let end = intro.end, intro.contains(time)
+        else { return }
+        autoSkippedIntro = true
+        Task { await engine.seek(to: end) }
     }
 
     var body: some View {
@@ -122,8 +218,29 @@ private struct iOSPlayerSurface: View {
                     withAnimation { controlsVisible.toggle() }
                     scheduleAutoHide()
                 }
+                .gesture(brightnessVolumeGesture)
 
             IOSSubtitleOverlay(engine: engine).allowsHitTesting(false)
+
+            SystemVolumeSlider(slider: $volumeSlider).frame(width: 0, height: 0).opacity(0)
+
+            if let indicator = gestureIndicator {
+                gestureIndicatorView(indicator.symbol, value: indicator.value)
+                    .transition(.opacity)
+            }
+
+            if let active = activeSkipSegment {
+                VStack {
+                    Spacer()
+                    HStack {
+                        skipSegmentButton(active.kind, active.segment)
+                        Spacer()
+                    }
+                }
+                .padding(.leading, 16)
+                .padding(.bottom, controlsVisible ? 148 : 28)
+                .transition(.opacity)
+            }
 
             if showNextEpisodeOverlay, let nextEpisode {
                 VStack {
@@ -136,6 +253,7 @@ private struct iOSPlayerSurface: View {
                 .padding(.trailing, 16)
                 .padding(.bottom, controlsVisible ? 148 : 28)
                 .transition(.opacity)
+                .onAppear { startCountdownIfNeeded(for: nextEpisode) }
             }
 
             if controlsVisible {
@@ -147,10 +265,28 @@ private struct iOSPlayerSurface: View {
                 .transition(.opacity)
             }
         }
-        .onAppear { scheduleAutoHide() }
-        .onDisappear { hideTask?.cancel() }
+        .onAppear {
+            scheduleAutoHide()
+            pip.attach(engine: engine)
+        }
+        .onDisappear { hideTask?.cancel(); countdownTask?.cancel() }
         .task(id: item?.id) {
+            countdownTask?.cancel()
+            countdownTask = nil
+            countdownRemaining = nil
+            countdownCancelled = false
+            autoSkippedIntro = false
+            introDBSegments = .empty
             nextEpisode = await NextEpisodeResolver.resolve(after: item)
+            introDBSegments = await IntroDBClient.shared.segments(
+                tmdbID: item?.tmdbID,
+                season: item?.type == .series ? item?.seasonNumber : nil,
+                episode: item?.type == .series ? item?.episodeNumber : nil,
+                durationSeconds: engine.duration > 0 ? engine.duration : nil
+            )
+        }
+        .onChange(of: engine.currentTime) { _, time in
+            handleAutoSkip(at: time)
         }
         .sheet(item: $activePanel) { panel in
             Group {
@@ -201,7 +337,22 @@ private struct iOSPlayerSurface: View {
 
             Spacer()
 
-            Color.clear.frame(width: 33, height: 33)
+            HStack(spacing: 10) {
+                if pip.isAvailable {
+                    Button {
+                        pip.toggle()
+                    } label: {
+                        Image(systemName: pip.isActive ? "pip.exit" : "pip.enter")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .padding(11)
+                            .background(.black.opacity(0.4), in: Circle())
+                    }
+                }
+
+                AirPlayButton()
+                    .frame(width: 33, height: 33)
+            }
         }
         .padding(.horizontal)
         .padding(.top, 8)
@@ -276,6 +427,8 @@ private struct iOSPlayerSurface: View {
                         .frame(width: 40, height: 40)
                 }
 
+                speedMenu
+
                 Spacer(minLength: 0)
             }
             .foregroundStyle(.white)
@@ -287,21 +440,159 @@ private struct iOSPlayerSurface: View {
         .padding(.bottom, 20)
     }
 
-    // MARK: - Next episode overlay
+    // MARK: - Speed
 
-    private func nextEpisodeOverlayButton(_ next: MediaItem) -> some View {
+    private var availablePlaybackRates: [Float] {
+        [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0].filter { $0 <= engine.maxSupportedRate }
+    }
+
+    private func speedLabel(_ rate: Float) -> String {
+        rate == 1.0 ? "1x" : String(format: "%.2gx", rate)
+    }
+
+    private var speedMenu: some View {
+        Menu {
+            ForEach(availablePlaybackRates, id: \.self) { rate in
+                Button {
+                    playbackRate = rate
+                    engine.setRate(rate)
+                } label: {
+                    if rate == playbackRate {
+                        Label(speedLabel(rate), systemImage: "checkmark")
+                    } else {
+                        Text(speedLabel(rate))
+                    }
+                }
+            }
+        } label: {
+            Text(speedLabel(playbackRate))
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 40, height: 40)
+        }
+    }
+
+    // MARK: - Skip segment overlay
+
+    private func skipSegmentButton(_ kind: SkipSegmentKind, _ segment: IntroDBSegment) -> some View {
         Button {
-            onPlayNextEpisode(next)
+            skipSegment(segment)
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "forward.end.fill")
-                Text("Volgende aflevering")
+                Text(kind.label)
                     .font(.system(size: 15, weight: .semibold))
             }
             .foregroundStyle(.white)
             .padding(.horizontal, 18)
             .padding(.vertical, 12)
             .background(.black.opacity(0.55), in: Capsule())
+        }
+    }
+
+    // MARK: - Brightness/volume gesture
+
+    private var brightnessVolumeGesture: some Gesture {
+        DragGesture(minimumDistance: 12)
+            .onChanged { value in
+                let isLeftSide = value.startLocation.x < UIScreen.main.bounds.width / 2
+                let delta = Double(-value.translation.height / 200)
+
+                if isLeftSide {
+                    let newValue = min(1, max(0, UIScreen.main.brightness + delta / 30))
+                    UIScreen.main.brightness = newValue
+                    showGestureIndicator(symbol: "sun.max.fill", value: newValue)
+                } else if let volumeSlider {
+                    let newValue = min(1, max(0, Double(volumeSlider.value) + delta / 30))
+                    volumeSlider.value = Float(newValue)
+                    showGestureIndicator(symbol: "speaker.wave.2.fill", value: newValue)
+                }
+            }
+    }
+
+    private func showGestureIndicator(symbol: String, value: Double) {
+        gestureIndicator = (symbol, value)
+        gestureIndicatorTask?.cancel()
+        gestureIndicatorTask = Task {
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled else { return }
+            withAnimation { gestureIndicator = nil }
+        }
+    }
+
+    private func gestureIndicatorView(_ symbol: String, value: Double) -> some View {
+        VStack(spacing: 10) {
+            Image(systemName: symbol)
+                .font(.system(size: 22))
+            ProgressView(value: value)
+                .frame(width: 90)
+        }
+        .foregroundStyle(.white)
+        .padding(18)
+        .background(.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    // MARK: - Next episode overlay
+
+    @ViewBuilder
+    private func nextEpisodeOverlayButton(_ next: MediaItem) -> some View {
+        if autoPlayNextCountdownEnabled, let countdownRemaining {
+            HStack(spacing: 10) {
+                Button {
+                    countdownTask?.cancel()
+                    countdownTask = nil
+                    countdownCancelled = true
+                } label: {
+                    Image(systemName: "xmark")
+                        .foregroundStyle(.white)
+                        .frame(width: 40, height: 40)
+                        .background(.black.opacity(0.55), in: Circle())
+                }
+
+                Button {
+                    countdownTask?.cancel()
+                    onPlayNextEpisode(next)
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "forward.end.fill")
+                        Text("Volgende aflevering over \(countdownRemaining)s")
+                            .font(.system(size: 15, weight: .semibold)).monospacedDigit()
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 12)
+                    .background(.black.opacity(0.55), in: Capsule())
+                }
+            }
+        } else {
+            Button {
+                countdownTask?.cancel()
+                onPlayNextEpisode(next)
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "forward.end.fill")
+                    Text("Volgende aflevering")
+                        .font(.system(size: 15, weight: .semibold))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 12)
+                .background(.black.opacity(0.55), in: Capsule())
+            }
+        }
+    }
+
+    private func startCountdownIfNeeded(for next: MediaItem) {
+        guard autoPlayNextCountdownEnabled, countdownTask == nil, !countdownCancelled else { return }
+        countdownRemaining = countdownDuration.seconds
+        countdownTask = Task {
+            while let remaining = countdownRemaining, remaining > 0 {
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled else { return }
+                countdownRemaining = remaining - 1
+            }
+            guard !Task.isCancelled else { return }
+            onPlayNextEpisode(next)
         }
     }
 

@@ -60,91 +60,11 @@ struct ShelfEditView: View {
 
             switch sourceKind {
             case .trakt:
-                Section("Lijst") {
-                    Picker("Lijst", selection: $traktList) {
-                        ForEach(TraktShelfList.availableLists(for: kind), id: \.self) { list in
-                            Text(list.label(for: kind)).tag(list)
-                        }
-                        if !traktPersonalLists.isEmpty {
-                            ForEach(traktPersonalLists, id: \.self) { list in
-                                Text(list.name)
-                                    .tag(TraktShelfList.personal(id: list.ids.trakt, slug: list.ids.slug, name: list.name))
-                            }
-                        }
-                    }
-
-                    if isLoadingTraktPersonalLists {
-                        ProgressView("Eigen lijsten laden…")
-                    } else if traktPersonalLists.isEmpty {
-                        Text("Log in bij Trakt (Instellingen → Account) om je eigen lijsten hier te kunnen kiezen.")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .task { await loadTraktPersonalLists() }
+                traktSourceSection
             case .tmdb:
-                Section("Lijst") {
-                    Picker("Type lijst", selection: $tmdbListSourceMode) {
-                        Text("Standaardlijst").tag(TMDBListSourceMode.standard)
-                        Text("Eigen lijst (ID)").tag(TMDBListSourceMode.personal)
-                    }
-                    .pickerStyle(.segmented)
-
-                    if tmdbListSourceMode == .standard {
-                        Picker("Lijst", selection: $tmdbList) {
-                            ForEach(TMDBShelfList.availableLists(for: kind), id: \.self) { list in
-                                Text(list.label(for: kind)).tag(list)
-                            }
-                        }
-                    } else {
-                        TextField("TMDB-lijst-ID", text: $tmdbPersonalListIDInput)
-
-                        Button("Lijst ophalen") { Task { await fetchTMDBPersonalList() } }
-                            .disabled(
-                                tmdbPersonalListIDInput.trimmingCharacters(in: .whitespaces).isEmpty
-                                    || isFetchingTMDBPersonalList
-                            )
-
-                        if isFetchingTMDBPersonalList {
-                            ProgressView("Lijst controleren…")
-                        }
-                        if let tmdbPersonalListName {
-                            Text("Gevonden: \(tmdbPersonalListName)").foregroundStyle(.secondary)
-                        }
-                        if let tmdbPersonalListError {
-                            Text(tmdbPersonalListError).foregroundStyle(.orange)
-                        }
-                    }
-                } footer: {
-                    if tmdbListSourceMode == .personal {
-                        Text("Het ID vind je in de URL van je TMDB-lijst, bv. themoviedb.org/list/12345 → 12345. De lijst moet publiek staan.")
-                    }
-                }
+                tmdbSourceSection
             case .addon:
-                Section("Addon") {
-                    if metadataAddons.isEmpty {
-                        Text("Voeg eerst een AIOMetadata-addon toe bij Addons.")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Picker("Addon", selection: $selectedAddonID) {
-                            ForEach(metadataAddons) { addon in
-                                Text(addon.name).tag(addon.id as UUID?)
-                            }
-                        }
-
-                        if isLoadingCatalogs {
-                            ProgressView("Catalogi laden…")
-                        } else if availableCatalogs.isEmpty {
-                            Text("Geen catalogi gevonden voor deze addon.")
-                                .foregroundStyle(.secondary)
-                        } else {
-                            Picker("Catalogus", selection: $selectedCatalog) {
-                                ForEach(availableCatalogs, id: \.self) { catalog in
-                                    Text(catalog.displayName).tag(catalog as AIOMetadataCatalog?)
-                                }
-                            }
-                        }
-                    }
-                }
+                addonSourceSection
             }
 
             Section("Titel") {
@@ -177,10 +97,7 @@ struct ShelfEditView: View {
         .onAppear { setupFromExisting() }
         .onChange(of: kind) { _, _ in updateDefaultTitleIfNeeded() }
         .onChange(of: sourceKind) { _, newValue in
-            if newValue == .addon, selectedAddonID == nil {
-                selectedAddonID = metadataAddons.first?.id
-            }
-            updateDefaultTitleIfNeeded()
+            handleSourceKindChange(newValue)
         }
         .onChange(of: traktList) { _, _ in updateDefaultTitleIfNeeded() }
         .onChange(of: tmdbList) { _, _ in updateDefaultTitleIfNeeded() }
@@ -192,7 +109,113 @@ struct ShelfEditView: View {
         .onChange(of: selectedCatalog) { _, _ in updateDefaultTitleIfNeeded() }
     }
 
+    // MARK: - Source sections
+
+    @ViewBuilder
+    private var traktSourceSection: some View {
+        Section("Lijst") {
+            Picker("Lijst", selection: $traktList) {
+                ForEach(TraktShelfList.availableLists(for: kind), id: \.self) { list in
+                    Text(list.label(for: kind)).tag(list)
+                }
+                if !traktPersonalLists.isEmpty {
+                    ForEach(traktPersonalLists, id: \.self) { list in
+                        Text(list.name)
+                            .tag(TraktShelfList.personal(id: list.ids.trakt, slug: list.ids.slug, name: list.name))
+                    }
+                }
+            }
+
+            if isLoadingTraktPersonalLists {
+                ProgressView("Eigen lijsten laden…")
+            } else if traktPersonalLists.isEmpty {
+                Text("Log in bij Trakt (Instellingen → Account) om je eigen lijsten hier te kunnen kiezen.")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .task { await loadTraktPersonalLists() }
+    }
+
+    @ViewBuilder
+    private var tmdbSourceSection: some View {
+        Section {
+            Picker("Type lijst", selection: $tmdbListSourceMode) {
+                Text("Standaardlijst").tag(TMDBListSourceMode.standard)
+                Text("Eigen lijst (ID)").tag(TMDBListSourceMode.personal)
+            }
+            .pickerStyle(.segmented)
+
+            if tmdbListSourceMode == .standard {
+                Picker("Lijst", selection: $tmdbList) {
+                    ForEach(TMDBShelfList.availableLists(for: kind), id: \.self) { list in
+                        Text(list.label(for: kind)).tag(list)
+                    }
+                }
+            } else {
+                TextField("TMDB-lijst-ID", text: $tmdbPersonalListIDInput)
+
+                Button("Lijst ophalen") { Task { await fetchTMDBPersonalList() } }
+                    .disabled(
+                        tmdbPersonalListIDInput.trimmingCharacters(in: .whitespaces).isEmpty
+                            || isFetchingTMDBPersonalList
+                    )
+
+                if isFetchingTMDBPersonalList {
+                    ProgressView("Lijst controleren…")
+                }
+                if let tmdbPersonalListName {
+                    Text("Gevonden: \(tmdbPersonalListName)").foregroundStyle(.secondary)
+                }
+                if let tmdbPersonalListError {
+                    Text(tmdbPersonalListError).foregroundStyle(.orange)
+                }
+            }
+        } header: {
+            Text("Lijst")
+        } footer: {
+            if tmdbListSourceMode == .personal {
+                Text("Het ID vind je in de URL van je TMDB-lijst, bv. themoviedb.org/list/12345 → 12345. De lijst moet publiek staan.")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var addonSourceSection: some View {
+        Section("Addon") {
+            if metadataAddons.isEmpty {
+                Text("Voeg eerst een AIOMetadata-addon toe bij Addons.")
+                    .foregroundStyle(.secondary)
+            } else {
+                Picker("Addon", selection: $selectedAddonID) {
+                    ForEach(metadataAddons) { addon in
+                        Text(addon.name).tag(addon.id as UUID?)
+                    }
+                }
+
+                if isLoadingCatalogs {
+                    ProgressView("Catalogi laden…")
+                } else if availableCatalogs.isEmpty {
+                    Text("Geen catalogi gevonden voor deze addon.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    Picker("Catalogus", selection: $selectedCatalog) {
+                        ForEach(availableCatalogs, id: \.self) { catalog in
+                            Text(catalog.displayName).tag(catalog as AIOMetadataCatalog?)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // MARK: - Setup
+
+    private func handleSourceKindChange(_ newValue: ShelfSourceKind) {
+        if newValue == .addon, selectedAddonID == nil {
+            selectedAddonID = metadataAddons.first?.id
+        }
+        updateDefaultTitleIfNeeded()
+    }
 
     private func setupFromExisting() {
         guard let shelf else {
