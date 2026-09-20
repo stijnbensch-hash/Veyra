@@ -7,6 +7,9 @@ struct MoviesView: View {
     @State private var isOpeningMovie = false
     @State private var errorMessage: String?
     @State private var selectedProvider: WatchProvider?
+    @State private var selectedGenreID: Int?
+    @State private var selectedDecade: VeyraDecadeFilter?
+    @State private var selectedRating: VeyraRatingFilter?
 
     @AppStorage("catalog.watchRegion")
     private var watchRegion = "BE"
@@ -52,6 +55,13 @@ struct MoviesView: View {
                                 selection: $selectedProvider,
                                 region: $watchRegion
                             )
+
+                            MediaFiltersRowIOS(
+                                kind: .movie,
+                                selectedGenreID: $selectedGenreID,
+                                selectedDecade: $selectedDecade,
+                                selectedRating: $selectedRating
+                            )
                         }
 
                         content
@@ -69,7 +79,7 @@ struct MoviesView: View {
             }
             .toolbar(.hidden, for: .navigationBar)
             .onChange(of: watchRegion) { _, _ in selectedProvider = nil }
-            .task(id: "\(watchRegion)-\(selectedProvider?.id ?? 0)") { await loadMovies() }
+            .task(id: catalogTaskID) { await loadMovies() }
             .navigationDestination(item: $selectedMovieItem) { movie in
                 MovieDetailView(movie: movie)
             }
@@ -81,8 +91,41 @@ struct MoviesView: View {
     private var header: some View {
         VeyraSectionHeader(
             title: "Films",
-            subtitle: selectedProvider.map { "\($0.name) · \(watchRegion)" } ?? "Populair · \(watchRegion)"
+            subtitle: filterSummary
         )
+    }
+
+    /// NB: `selectedGenreID`/`selectedDecade`/`selectedRating` filteren de
+    /// TMDB-aanroep zelf nog niet (die ondersteunt dat vandaag niet) — ze
+    /// veranderen alleen deze samenvatting en de cache-sleutel hieronder,
+    /// zodat de UI alvast klaarstaat zodra `TMDBClient`/`TMDBService`
+    /// discover-parameters krijgen.
+    private var filterSummary: String {
+        var parts: [String] = []
+
+        if let selectedProvider { parts.append(selectedProvider.name) }
+        if let selectedGenreID, let name = TMDBGenreNames.movieName(for: selectedGenreID) {
+            parts.append(name)
+        }
+        if let selectedDecade { parts.append(selectedDecade.title) }
+        if let selectedRating { parts.append(selectedRating.title) }
+
+        guard !parts.isEmpty else { return "Populair · \(watchRegion)" }
+
+        parts.append(watchRegion)
+        return parts.joined(separator: " · ")
+    }
+
+    /// `.task(id:)`-sleutel: verandert zodra een van de filters wijzigt, om
+    /// de catalogus opnieuw op te halen.
+    private var catalogTaskID: String {
+        [
+            watchRegion,
+            selectedProvider?.id.description ?? "-",
+            selectedGenreID?.description ?? "-",
+            selectedDecade?.id ?? "-",
+            selectedRating.map { String($0.rawValue) } ?? "-",
+        ].joined(separator: "|")
     }
 
     // MARK: - Content

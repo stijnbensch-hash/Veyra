@@ -45,10 +45,19 @@ final class IPTVAccountsViewModel: ObservableObject {
         defer { isLoading = false }
 
         do {
-            providers = try configurationStore.loadProviders()
+            let loaded = try configurationStore.loadProviders()
+            let order = SourceOrderDefaults.loadIPTVProviderOrder()
+            providers = SourceOrderDefaults.sortedProviders(loaded, order: order) { $0.id }
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    /// Herschikt providers (drag-to-reorder in de iOS-lijst) en bewaart de
+    /// nieuwe volgorde, zodat ze zo terugkomt bij de volgende keer laden.
+    func moveProviders(fromOffsets source: IndexSet, toOffset destination: Int) {
+        providers.move(fromOffsets: source, toOffset: destination)
+        SourceOrderDefaults.saveIPTVProviderOrder(providers.map(\.id))
     }
 
     func remove(_ provider: IPTVStoredProvider) {

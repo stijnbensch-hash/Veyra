@@ -133,22 +133,17 @@ final class CloudSettingsSync: ObservableObject {
     ]
 
     private static var simpleKeysAll: [String] {
-        // NB: "veyra.hero.style" wordt hier als kale sleutel meegenomen
-        // (Hero-instellingen bestaan nog niet als eigen type in dit
-        // project-exemplaar) — mocht die instelling later verschijnen, dan
-        // gaat hij via dezelfde sleutelnaam vanzelf mee.
-        simpleKeys + iptvDisplayKeys + subtitleKeys + generalKeys + ["veyra.hero.style"]
+        simpleKeys + iptvDisplayKeys + subtitleKeys + generalKeys + [HeroSettingsDefaults.styleKey]
     }
 
     /// JSON-gecodeerde (`Data`) waarden — alleen via elke store's eigen
     /// load/save-methoden gelezen, dus een pull moet ook de bijbehorende
     /// bestaande wijzigingsmelding posten zodat een open scherm het
     /// zelf opnieuw inlaadt.
-    // NB: Hero-instellingen (HeroSettingsDefaults) bestaan nog niet in dit
-    // project-exemplaar en zijn hier bewust weggelaten — alleen de
-    // plankvolgorde zelf wordt gesynchroniseerd.
     private static let shelfHeroDataKeys: [(key: String, notify: Notification.Name?)] = [
         ("veyra.shelves.configured", .veyraShelfConfigurationDidChange),
+        (HeroSettingsDefaults.primarySourceKey, .veyraShelfConfigurationDidChange),
+        (HeroSettingsDefaults.secondarySourceKey, .veyraShelfConfigurationDidChange),
     ]
 
     private static let sourceOrderDataKeys: [(key: String, notify: Notification.Name?)] = [

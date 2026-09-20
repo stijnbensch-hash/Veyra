@@ -901,6 +901,11 @@ private struct IPTVChannelManagementView:
     private var focusedChannelID:
         String?
 
+    // Logo aanpassen: lang drukken op een zenderlogo opent
+    // `ChannelLogoPickerView`. Zie `LiveTVView.swift` voor dezelfde aanpak.
+    @State private var editingLogoChannel: IPTVChannel?
+    @State private var logoOverrideVersion = 0
+
     private let service =
         IPTVService()
 
@@ -926,6 +931,15 @@ private struct IPTVChannelManagementView:
         }
         .task {
             await loadChannels()
+        }
+        .sheet(item: $editingLogoChannel) { channel in
+            ChannelLogoPickerView(
+                channelID: channel.id,
+                channelName: channel.name,
+                currentOverrideURL: ChannelLogoOverrideStore.logoURL(forChannelID: channel.id)
+            ) {
+                logoOverrideVersion += 1
+            }
         }
     }
 
@@ -1113,6 +1127,22 @@ private struct IPTVChannelManagementView:
                 visible: !visible
             )
         }
+        .contextMenu {
+            Button {
+                editingLogoChannel = channel
+            } label: {
+                Label("Logo aanpassen…", systemImage: "photo.badge.plus")
+            }
+
+            if ChannelLogoOverrideStore.logoURL(forChannelID: channel.id) != nil {
+                Button(role: .destructive) {
+                    ChannelLogoOverrideStore.removeOverride(forChannelID: channel.id)
+                    logoOverrideVersion += 1
+                } label: {
+                    Label("Standaardlogo herstellen", systemImage: "arrow.counterclockwise")
+                }
+            }
+        }
     }
 
     @ViewBuilder
@@ -1120,7 +1150,9 @@ private struct IPTVChannelManagementView:
         _ channel: IPTVChannel
     ) -> some View {
         AsyncImage(
-            url: channel.logoURL
+            url: ChannelLogoOverrideStore.effectiveLogoURL(
+                channelID: channel.id, defaultLogoURL: channel.logoURL
+            )
         ) { phase in
             switch phase {
             case .success(let image):
@@ -1149,6 +1181,7 @@ private struct IPTVChannelManagementView:
                 )
             }
         }
+        .id(logoOverrideVersion)
         .frame(
             width: 100,
             height: 65

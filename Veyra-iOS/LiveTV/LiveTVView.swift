@@ -4,6 +4,13 @@ struct LiveTVView: View {
     @StateObject private var guide = VeyraEPGStore()
     @State private var selectedSource: PlayableSource?
 
+    // Logo aanpassen: lang drukken op een zenderlogo opent
+    // `ChannelLogoPickerView`. `logoOverrideVersion` dwingt de betrokken
+    // AsyncImage opnieuw te laden zodra een override is opgeslagen.
+    @State private var editingLogoChannelID: String?
+    @State private var editingLogoChannelName = ""
+    @State private var logoOverrideVersion = 0
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -21,6 +28,22 @@ struct LiveTVView: View {
                     source: source,
                     item: MediaItem(title: source.name, type: .liveTV)
                 )
+            }
+            .sheet(
+                isPresented: Binding(
+                    get: { editingLogoChannelID != nil },
+                    set: { if !$0 { editingLogoChannelID = nil } }
+                )
+            ) {
+                if let channelID = editingLogoChannelID {
+                    ChannelLogoPickerView(
+                        channelID: channelID,
+                        channelName: editingLogoChannelName,
+                        currentOverrideURL: ChannelLogoOverrideStore.logoURL(forChannelID: channelID)
+                    ) {
+                        logoOverrideVersion += 1
+                    }
+                }
             }
         }
     }
@@ -48,7 +71,11 @@ struct LiveTVView: View {
                     selectedSource = guide.play(row)
                 } label: {
                     HStack(spacing: 14) {
-                        AsyncImage(url: row.channel.logoURL) { phase in
+                        AsyncImage(
+                            url: ChannelLogoOverrideStore.effectiveLogoURL(
+                                channelID: row.channel.id, defaultLogoURL: row.channel.logoURL
+                            )
+                        ) { phase in
                             switch phase {
                             case .success(let image):
                                 image.resizable().scaledToFit()
@@ -56,7 +83,25 @@ struct LiveTVView: View {
                                 Image(systemName: "tv").foregroundStyle(.secondary)
                             }
                         }
+                        .id(logoOverrideVersion)
                         .frame(width: 44, height: 44)
+                        .contextMenu {
+                            Button {
+                                editingLogoChannelID = row.channel.id
+                                editingLogoChannelName = row.channel.name
+                            } label: {
+                                Label("Logo aanpassen…", systemImage: "photo.badge.plus")
+                            }
+
+                            if ChannelLogoOverrideStore.logoURL(forChannelID: row.channel.id) != nil {
+                                Button(role: .destructive) {
+                                    ChannelLogoOverrideStore.removeOverride(forChannelID: row.channel.id)
+                                    logoOverrideVersion += 1
+                                } label: {
+                                    Label("Standaardlogo herstellen", systemImage: "arrow.counterclockwise")
+                                }
+                            }
+                        }
 
                         Text(row.channel.name)
                             .foregroundStyle(.primary)

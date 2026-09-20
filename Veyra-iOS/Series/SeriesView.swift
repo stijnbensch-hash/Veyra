@@ -6,6 +6,9 @@ struct SeriesView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var selectedProvider: WatchProvider?
+    @State private var selectedGenreID: Int?
+    @State private var selectedDecade: VeyraDecadeFilter?
+    @State private var selectedRating: VeyraRatingFilter?
 
     @AppStorage("catalog.watchRegion")
     private var watchRegion = "BE"
@@ -51,6 +54,13 @@ struct SeriesView: View {
                                 selection: $selectedProvider,
                                 region: $watchRegion
                             )
+
+                            MediaFiltersRowIOS(
+                                kind: .tv,
+                                selectedGenreID: $selectedGenreID,
+                                selectedDecade: $selectedDecade,
+                                selectedRating: $selectedRating
+                            )
                         }
 
                         content
@@ -62,7 +72,7 @@ struct SeriesView: View {
             }
             .toolbar(.hidden, for: .navigationBar)
             .onChange(of: watchRegion) { _, _ in selectedProvider = nil }
-            .task(id: "\(watchRegion)-\(selectedProvider?.id ?? 0)") { await loadSeries() }
+            .task(id: catalogTaskID) { await loadSeries() }
             .navigationDestination(item: $selectedSeries) { series in
                 SeriesDetailView(series: series)
             }
@@ -74,8 +84,41 @@ struct SeriesView: View {
     private var header: some View {
         VeyraSectionHeader(
             title: "Series",
-            subtitle: selectedProvider.map { "\($0.name) · \(watchRegion)" } ?? "Populair · \(watchRegion)"
+            subtitle: filterSummary
         )
+    }
+
+    /// NB: `selectedGenreID`/`selectedDecade`/`selectedRating` filteren de
+    /// TMDB-aanroep zelf nog niet (die ondersteunt dat vandaag niet) — ze
+    /// veranderen alleen deze samenvatting en de cache-sleutel hieronder,
+    /// zodat de UI alvast klaarstaat zodra `TMDBClient`/`SeriesService`
+    /// discover-parameters krijgen.
+    private var filterSummary: String {
+        var parts: [String] = []
+
+        if let selectedProvider { parts.append(selectedProvider.name) }
+        if let selectedGenreID, let name = TMDBGenreNames.tvName(for: selectedGenreID) {
+            parts.append(name)
+        }
+        if let selectedDecade { parts.append(selectedDecade.title) }
+        if let selectedRating { parts.append(selectedRating.title) }
+
+        guard !parts.isEmpty else { return "Populair · \(watchRegion)" }
+
+        parts.append(watchRegion)
+        return parts.joined(separator: " · ")
+    }
+
+    /// `.task(id:)`-sleutel: verandert zodra een van de filters wijzigt, om
+    /// de catalogus opnieuw op te halen.
+    private var catalogTaskID: String {
+        [
+            watchRegion,
+            selectedProvider?.id.description ?? "-",
+            selectedGenreID?.description ?? "-",
+            selectedDecade?.id ?? "-",
+            selectedRating.map { String($0.rawValue) } ?? "-",
+        ].joined(separator: "|")
     }
 
     // MARK: - Content

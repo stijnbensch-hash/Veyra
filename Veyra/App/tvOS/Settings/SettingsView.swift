@@ -107,6 +107,10 @@ struct SettingsView: View {
                 AccountView()
             case .subtitles:
                 SubtitlePreferencesView()
+            case .subtitleAppearance:
+                SubtitleAppearanceSettingsView()
+            case .playback:
+                PlaybackSettingsView()
             case .metadata:
                 MetadataSettingsView()
             case .shelves:
@@ -171,6 +175,10 @@ struct SettingsView: View {
         LazyVGrid(columns: [GridItem(.flexible(), spacing: 28), GridItem(.flexible(), spacing: 28)], spacing: 28) {
             settingsButton(destination: .subtitles, icon: "captions.bubble", title: "Ondertitels",
                            subtitle: "Standaardtaal en OpenSubtitles", status: "", statusColor: VeyraColors.cyan)
+            settingsButton(destination: .subtitleAppearance, icon: "textformat.size", title: "Ondertitelweergave",
+                           subtitle: "Grootte, plaatsing, achtergrond", status: "", statusColor: VeyraColors.secondary)
+            settingsButton(destination: .playback, icon: "play.circle", title: "Afspelen",
+                           subtitle: "Resolutie, taal en oversla-segmenten", status: "", statusColor: VeyraColors.secondary)
             settingsButton(destination: .iptv, icon: "tv", title: "IPTV",
                            subtitle: "Live TV en VOD via Xtream of M3U", status: iptvStatus, statusColor: iptvStatusColor)
             settingsButton(destination: .addons, icon: "puzzlepiece.extension", title: "Addons",
@@ -456,6 +464,8 @@ private enum SettingsDestination:
     case privacy
     case account
     case subtitles
+    case subtitleAppearance
+    case playback
     case metadata
     case shelves
     case cloudSync

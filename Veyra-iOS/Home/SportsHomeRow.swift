@@ -57,6 +57,10 @@ private struct SportsMatchCardIOS: View {
     let match: SportsMatch
     let stale: Bool
 
+    @AppStorage(GeneralSettingsDefaults.hideScoreSpoilersKey)
+    private var hideScoreSpoilers = false
+    @State private var scoreRevealed = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
@@ -108,9 +112,16 @@ private struct SportsMatchCardIOS: View {
             Spacer()
 
             if match.showsScore, let score {
-                Text(score)
+                let hidden = hideScoreSpoilers && !scoreRevealed
+
+                Text(hidden ? "••" : score)
                     .font(.footnote.weight(.bold))
                     .foregroundStyle(.primary)
+                    .blur(radius: hidden ? 6 : 0)
+                    .contentShape(Rectangle())
+                    .highPriorityGesture(
+                        TapGesture().onEnded { scoreRevealed = true }
+                    )
             }
         }
     }

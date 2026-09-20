@@ -2,84 +2,12 @@ import AetherEngine
 import SwiftUI
 
 // MARK: - Subtitle preferences
-
-private enum VeyraSubtitlePosition: String, CaseIterable {
-    case low
-    case standard
-    case high
-
-    var title: String {
-        switch self {
-        case .low: return "Laag"
-
-        case .standard: return "Standaard"
-
-        case .high: return "Hoog"
-        }
-    }
-
-    func bottomPadding(for height: CGFloat) -> CGFloat {
-        switch self {
-        case .low: return max(42, height * 0.045)
-
-        case .standard: return max(70, height * 0.075)
-
-        case .high: return max(110, height * 0.13)
-        }
-    }
-}
-
-private enum VeyraSubtitleSize: String, CaseIterable {
-    case small
-    case normal
-    case large
-
-    var title: String {
-        switch self {
-        case .small: return "Klein"
-
-        case .normal: return "Normaal"
-
-        case .large: return "Groot"
-        }
-    }
-
-    var multiplier: CGFloat {
-        switch self {
-        case .small: return 0.82
-
-        case .normal: return 1.0
-
-        case .large: return 1.22
-        }
-    }
-}
-
-private enum VeyraSubtitleBackground: String, CaseIterable {
-    case none
-    case subtle
-    case strong
-
-    var title: String {
-        switch self {
-        case .none: return "Geen"
-
-        case .subtle: return "Subtiel"
-
-        case .strong: return "Donker"
-        }
-    }
-
-    var opacity: Double {
-        switch self {
-        case .none: return 0
-
-        case .subtle: return 0.42
-
-        case .strong: return 0.70
-        }
-    }
-}
+//
+// `VeyraSubtitleSize`/`VeyraSubtitlePosition`/`VeyraSubtitleBackground` zijn
+// verhuisd naar `Shared/Theme/SubtitleAppearanceSettings.swift`, zodat ze
+// ook door de nieuwe Instellingen → Ondertitels-schermen (iOS + tvOS)
+// gebruikt kunnen worden. Zelfde sleutels/cases, dus bestaande waarden
+// blijven gelden.
 
 // MARK: - Player controls
 

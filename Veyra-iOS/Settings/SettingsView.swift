@@ -4,8 +4,10 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
     case iptv
     case addons
     case mediaServers
+    case general
     case trakt
     case subtitles
+    case playback
     case metadata
     case shelves
     case account
@@ -18,8 +20,10 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
         case .iptv: return "IPTV"
         case .addons: return "Addons"
         case .mediaServers: return "Mediaservers"
+        case .general: return "Algemeen"
         case .trakt: return "Trakt"
         case .subtitles: return "Ondertitels"
+        case .playback: return "Afspelen"
         case .metadata: return "Metadata"
         case .shelves: return "Planken"
         case .account: return "Account"
@@ -32,8 +36,10 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
         case .iptv: return "Live TV en VOD via Xtream of M3U"
         case .addons: return "Streams via gekoppelde addons"
         case .mediaServers: return "Jellyfin en andere eigen servers"
+        case .general: return "Startscherm, sport en kaartweergave"
         case .trakt: return "Kijkgeschiedenis, voortgang en lijsten"
         case .subtitles: return "Standaardtaal en OpenSubtitles"
+        case .playback: return "Resolutie, taal en oversla-segmenten"
         case .metadata: return "Ratings op film- en seriepagina's"
         case .shelves: return "Eigen rijen op het hoofdmenu"
         case .account: return "API-sleutels en profiel"
@@ -46,8 +52,10 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
         case .iptv: return "antenna.radiowaves.left.and.right"
         case .addons: return "puzzlepiece.extension.fill"
         case .mediaServers: return "server.rack"
+        case .general: return "slider.horizontal.3"
         case .trakt: return "checkmark.circle"
         case .subtitles: return "captions.bubble"
+        case .playback: return "play.circle"
         case .metadata: return "star.leadinghalf.filled"
         case .shelves: return "rectangle.grid.1x2"
         case .account: return "person.crop.circle"
@@ -67,6 +75,7 @@ struct SettingsView: View {
     @State private var mediaServerCount = 0
     @State private var iptvErrored = false
     @State private var selection: SettingsDestination?
+    @State private var categoryOrder: [SourceCategory] = SourceOrderDefaults.loadCategoryOrder()
 
     private let iptvStore = IPTVConfigurationStore()
     private let addonStore = AddonStore()
@@ -126,21 +135,13 @@ struct SettingsView: View {
                             .tracking(2)
                             .foregroundStyle(VeyraColors.secondary)
 
-                        settingsCard(
-                            .iptv,
-                            status: iptvStatus,
-                            statusColor: iptvStatusColor
-                        )
-                        settingsCard(
-                            .addons,
-                            status: addonCount == 0 ? "Niet ingesteld" : "\(addonCount) actief",
-                            statusColor: VeyraColors.cyan
-                        )
-                        settingsCard(
-                            .mediaServers,
-                            status: mediaServerCount == 0 ? "Niet gekoppeld" : "\(mediaServerCount) gekoppeld",
-                            statusColor: VeyraColors.cyan
-                        )
+                        ForEach(categoryOrder) { category in
+                            bronnenRow(for: category)
+                        }
+
+                        Text("Schik de kaarten met de pijltjes; de volgorde hier bepaalt de volgorde bij het zoeken naar afspeelbronnen.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.white.opacity(0.45))
                     }
 
                     VStack(alignment: .leading, spacing: 14) {
@@ -154,7 +155,9 @@ struct SettingsView: View {
                             status: trakt.isConnected ? "Verbonden" : "Niet gekoppeld",
                             statusColor: VeyraColors.cyan
                         )
+                        settingsCard(.general, status: "", statusColor: VeyraColors.cyan)
                         settingsCard(.subtitles, status: "", statusColor: VeyraColors.cyan)
+                        settingsCard(.playback, status: "", statusColor: VeyraColors.cyan)
                         settingsCard(.metadata, status: "", statusColor: VeyraColors.cyan)
                         settingsCard(.shelves, status: "", statusColor: VeyraColors.cyan)
                         settingsCard(.account, status: "", statusColor: VeyraColors.cyan)
@@ -272,6 +275,83 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: - Bronnen (categorievolgorde)
+
+    /// Eén categorie in BRONNEN, met omhoog/omlaag-knoppen om de
+    /// categorievolgorde te herschikken — dit hoort thuis in dezelfde
+    /// BRONNEN-groep, geen eigen tweede "Bronnen"-instelling.
+    @ViewBuilder
+    private func bronnenRow(for category: SourceCategory) -> some View {
+        switch category {
+        case .mediaServers:
+            reorderableRow(category) {
+                settingsCard(
+                    .mediaServers,
+                    status: mediaServerCount == 0 ? "Niet gekoppeld" : "\(mediaServerCount) gekoppeld",
+                    statusColor: VeyraColors.cyan
+                )
+            }
+        case .iptv:
+            reorderableRow(category) {
+                settingsCard(.iptv, status: iptvStatus, statusColor: iptvStatusColor)
+            }
+        case .addons:
+            reorderableRow(category) {
+                settingsCard(
+                    .addons,
+                    status: addonCount == 0 ? "Niet ingesteld" : "\(addonCount) actief",
+                    statusColor: VeyraColors.cyan
+                )
+            }
+        }
+    }
+
+    private func reorderableRow(
+        _ category: SourceCategory,
+        @ViewBuilder content: () -> some View
+    ) -> some View {
+        HStack(spacing: 10) {
+            content()
+
+            VStack(spacing: 2) {
+                Button {
+                    moveCategory(category, by: -1)
+                } label: {
+                    Image(systemName: "chevron.up")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 7)
+                }
+                .disabled(categoryOrder.first == category)
+
+                Divider().frame(width: 18).overlay(VeyraColors.ice.opacity(0.2))
+
+                Button {
+                    moveCategory(category, by: 1)
+                } label: {
+                    Image(systemName: "chevron.down")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 7)
+                }
+                .disabled(categoryOrder.last == category)
+            }
+            .buttonStyle(.plain)
+            .font(.system(size: 12, weight: .bold))
+            .foregroundStyle(VeyraColors.ice)
+            .frame(width: 30)
+            .background(
+                Capsule().fill(VeyraColors.ice.opacity(0.12))
+            )
+        }
+    }
+
+    private func moveCategory(_ category: SourceCategory, by offset: Int) {
+        guard let index = categoryOrder.firstIndex(of: category) else { return }
+        let destination = index + offset
+        guard categoryOrder.indices.contains(destination) else { return }
+        categoryOrder.swapAt(index, destination)
+        SourceOrderDefaults.saveCategoryOrder(categoryOrder)
+    }
+
     // MARK: - Destination
 
     @ViewBuilder
@@ -280,8 +360,10 @@ struct SettingsView: View {
         case .iptv: IPTVAccountsView()
         case .addons: AddonsSettingsView()
         case .mediaServers: MediaServersSettingsView()
+        case .general: GeneralSettingsView()
         case .trakt: TraktSettingsView()
         case .subtitles: SubtitlePreferencesView()
+        case .playback: PlaybackSettingsView()
         case .metadata: MetadataSettingsView()
         case .shelves: ShelvesSettingsView()
         case .account: AccountView()

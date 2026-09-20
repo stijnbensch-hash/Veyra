@@ -43,6 +43,8 @@ struct SeriesDetailView: View {
                                 .foregroundStyle(.secondary)
                         }
 
+                        WatchlistToggleButton(item: mediaItem(from: details))
+
                         let seasons = details.seasons.filter { $0.seasonNumber > 0 }
                         if !seasons.isEmpty {
                             Text("Seizoenen")
@@ -107,5 +109,18 @@ struct SeriesDetailView: View {
     private func releaseYear(from date: String?) -> String? {
         guard let date, date.count >= 4 else { return nil }
         return String(date.prefix(4))
+    }
+
+    /// `MediaItem` voor de serie als geheel (geen seizoen/aflevering), voor
+    /// de watchlist-knop op deze infopagina.
+    private func mediaItem(from details: TMDBSeriesDetails) -> MediaItem {
+        MediaItem(
+            title: details.name,
+            type: .series,
+            tmdbID: series.id,
+            overview: details.overview,
+            releaseDate: details.firstAirDate,
+            backdropURL: imageURL(path: details.backdropPath ?? series.backdropPath, size: "w1280")
+        )
     }
 }

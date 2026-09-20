@@ -18,6 +18,14 @@ struct LiveTVView: View {
     @State
     private var pendingSource: PlayableSource?
 
+    // Logo aanpassen: lang drukken op een zenderlogo opent
+    // `ChannelLogoPickerView`. `logoOverrideVersion` dwingt de betrokken
+    // AsyncImage opnieuw te laden zodra een override is opgeslagen.
+    @State
+    private var editingLogoChannel: IPTVChannel?
+    @State
+    private var logoOverrideVersion = 0
+
     @Environment(\.scenePhase)
     private var scenePhase
 
@@ -60,6 +68,15 @@ struct LiveTVView: View {
                         )
                     }
                 )
+            }
+            .sheet(item: $editingLogoChannel) { channel in
+                ChannelLogoPickerView(
+                    channelID: channel.id,
+                    channelName: channel.name,
+                    currentOverrideURL: ChannelLogoOverrideStore.logoURL(forChannelID: channel.id)
+                ) {
+                    logoOverrideVersion += 1
+                }
             }
     }
 
@@ -1271,6 +1288,22 @@ struct LiveTVView: View {
         .accessibilityHint(
             "Opent zenderinformatie en Kijk live"
         )
+        .contextMenu {
+            Button {
+                editingLogoChannel = row.channel
+            } label: {
+                Label("Logo aanpassen…", systemImage: "photo.badge.plus")
+            }
+
+            if ChannelLogoOverrideStore.logoURL(forChannelID: row.channel.id) != nil {
+                Button(role: .destructive) {
+                    ChannelLogoOverrideStore.removeOverride(forChannelID: row.channel.id)
+                    logoOverrideVersion += 1
+                } label: {
+                    Label("Standaardlogo herstellen", systemImage: "arrow.counterclockwise")
+                }
+            }
+        }
     }
 
     private func selectChannel(
@@ -1335,7 +1368,9 @@ struct LiveTVView: View {
     ) -> some View {
         AsyncImage(
             url:
-                row.channel.logoURL
+                ChannelLogoOverrideStore.effectiveLogoURL(
+                    channelID: row.channel.id, defaultLogoURL: row.channel.logoURL
+                )
         ) { phase in
             if let image =
                 phase.image
@@ -1361,6 +1396,7 @@ struct LiveTVView: View {
                 )
             }
         }
+        .id(logoOverrideVersion)
         .frame(
             width: 76,
             height: 68

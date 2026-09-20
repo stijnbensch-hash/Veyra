@@ -56,8 +56,13 @@ struct IPTVAccountsView: View {
                             }
                         }
                     }
+                    .onMove { source, destination in
+                        viewModel.moveProviders(fromOffsets: source, toOffset: destination)
+                    }
                 } header: {
                     Text("Providers")
+                } footer: {
+                    Text("Sleep om te herordenen. Dit bepaalt de volgorde in de IPTV-lijst.")
                 }
             }
 
@@ -76,6 +81,16 @@ struct IPTVAccountsView: View {
                     showAddSheet = true
                 } label: {
                     Image(systemName: "plus")
+                }
+            }
+            ToolbarItem(placement: .primaryAction) {
+                EditButton()
+            }
+            ToolbarItem(placement: .secondaryAction) {
+                NavigationLink {
+                    IPTVPlaybackSettingsView()
+                } label: {
+                    Label("Live TV instellingen", systemImage: "slider.horizontal.3")
                 }
             }
         }

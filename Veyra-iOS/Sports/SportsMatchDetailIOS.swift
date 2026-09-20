@@ -5,6 +5,10 @@ import SwiftUI
 struct SportsMatchDetailIOS: View {
     let match: SportsMatch
 
+    @AppStorage(GeneralSettingsDefaults.hideScoreSpoilersKey)
+    private var hideScoreSpoilers = false
+    @State private var scoreRevealed = false
+
     var body: some View {
         VStack(spacing: 24) {
             Text(match.league.name)
@@ -57,9 +61,16 @@ struct SportsMatchDetailIOS: View {
             Spacer()
 
             if match.showsScore, let score {
-                Text(score)
+                let hidden = hideScoreSpoilers && !scoreRevealed
+
+                Text(hidden ? "••" : score)
                     .font(.title3.weight(.bold))
                     .foregroundStyle(.primary)
+                    .blur(radius: hidden ? 6 : 0)
+                    .contentShape(Rectangle())
+                    .highPriorityGesture(
+                        TapGesture().onEnded { scoreRevealed = true }
+                    )
             }
         }
     }

@@ -28,16 +28,20 @@ struct MovieDetailView: View {
                             .foregroundStyle(.secondary)
                     }
 
-                    NavigationLink {
-                        SourceSelectionView(item: movie)
-                    } label: {
-                        Label("Afspelen", systemImage: "play.fill")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
+                    HStack(spacing: 10) {
+                        NavigationLink {
+                            SourceSelectionView(item: movie)
+                        } label: {
+                            Label("Afspelen", systemImage: "play.fill")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(VeyraColors.cyan)
+
+                        WatchlistToggleButton(item: movie, compact: true)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(VeyraColors.cyan)
                 }
                 .padding(.horizontal)
             }

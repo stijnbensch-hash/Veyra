@@ -43,7 +43,10 @@ final class AetherPictureInPictureController: NSObject, ObservableObject {
             return
         }
 
-        let newController = AVPictureInPictureController(playerLayer: layer)
+        guard let newController = AVPictureInPictureController(playerLayer: layer) else {
+            isAvailable = false
+            return
+        }
         newController.delegate = self
         controller = newController
         attachedLayer = layer

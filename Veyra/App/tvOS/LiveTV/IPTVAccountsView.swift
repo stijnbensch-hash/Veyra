@@ -83,7 +83,10 @@ struct IPTVAccountsView: View {
                 alignment: .leading,
                 spacing: 18
             ) {
-                addProviderButton
+                HStack(spacing: 18) {
+                    addProviderButton
+                    settingsButton
+                }
 
                 ForEach(viewModel.providers) {
                     provider in
@@ -117,6 +120,21 @@ struct IPTVAccountsView: View {
                 )
 
                 Text("IPTV TOEVOEGEN")
+                    .font(.system(size: 22))
+            }
+        }
+        .buttonStyle(.bordered)
+    }
+
+    // MARK: - Settings
+
+    private var settingsButton: some View {
+        NavigationLink {
+            IPTVPlaybackSettingsView()
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "slider.horizontal.3")
+                Text("LIVE TV INSTELLINGEN")
                     .font(.system(size: 22))
             }
         }
