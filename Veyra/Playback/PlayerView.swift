@@ -2,58 +2,129 @@ import SwiftUI
 import AetherEngine
 
 struct PlayerView: View {
+    @Environment(\.veyraPlayerVisibility)
+    private var setPlayerVisible
+
+    @Environment(\.dismiss)
+    private var dismiss
+
     let source: PlayableSource
 
-    @State private var playbackEngine: AetherPlaybackEngine?
-    @State private var playbackError: String?
+    var item: MediaItem? = nil
+
+    var resumeProgress: Double? = nil
+
+    @Environment(\.scenePhase)
+    private var scenePhase
+
+    @StateObject
+    private var viewModel: PlaybackViewModel
+
+    @State
+    private var nextEpisodeRequest: MediaItem?
+
+    init(source: PlayableSource, item: MediaItem? = nil, resumeProgress: Double? = nil) {
+        self.source = source
+        self.item = item
+        self.resumeProgress = resumeProgress
+        _viewModel = StateObject(
+            wrappedValue: PlaybackViewModel(
+                source: source,
+                item: item,
+                resumeProgress: resumeProgress
+            )
+        )
+    }
 
     var body: some View {
         ZStack {
             Color.black
                 .ignoresSafeArea()
 
-            if let playbackEngine {
+            if let playbackError = viewModel.playbackError {
+                VStack(
+                    spacing: 20
+                ) {
+                    Text(
+                        "Afspelen niet mogelijk"
+                    )
+                    .font(
+                        .system(
+                            size: 34,
+                            weight: .bold
+                        )
+                    )
+
+                    Text(
+                        playbackError
+                    )
+                    .foregroundStyle(
+                        .secondary
+                    )
+                    .font(
+                        .system(
+                            size: 22
+                        )
+                    )
+                }
+                .padding(50)
+
+            } else if let playbackEngine = viewModel.playbackEngine {
                 AetherPlayerSurface(
-                    engine: playbackEngine.engine
+                    engine:
+                        playbackEngine.engine
                 )
                 .ignoresSafeArea()
-            } else if let playbackError {
-                VStack(spacing: 20) {
-                    Image(systemName: "exclamationmark.triangle")
-                        .font(.system(size: 60))
 
-                    Text("Afspelen niet mogelijk")
-                        .font(.title)
+                PlayerSubtitleControls(
+                    engine:
+                        playbackEngine.engine,
+                    title:
+                        item?.title,
+                    item: item,
+                    onRequestExit: {
+                        dismiss()
+                    },
+                    onPlayNextEpisode: { next in
+                        nextEpisodeRequest = next
+                    }
+                )
+                .ignoresSafeArea()
 
-                    Text(playbackError)
-                        .font(.body)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 40)
-                }
             } else {
-                VStack(spacing: 16) {
+                VStack(
+                    spacing: 16
+                ) {
                     ProgressView()
 
-                    Text("Veyra Player starten…")
-                        .font(.title3)
+                    Text(
+                        "Veyra Player starten…"
+                    )
+                    .font(
+                        .system(
+                            size: 26
+                        )
+                    )
                 }
             }
         }
-        .task {
-            await startPlayback()
+        .onAppear {
+            setPlayerVisible(true)
         }
-    }
-
-    @MainActor
-    private func startPlayback() async {
-        do {
-            let engine = try AetherPlaybackEngine()
-            playbackEngine = engine
-
-            try await engine.play(source)
-        } catch {
-            playbackError = error.localizedDescription
+        .task {
+            await viewModel.startPlayback()
+        }
+        .onDisappear {
+            setPlayerVisible(false)
+            viewModel.stopForDisappear()
+        }
+        .onChange(
+            of: scenePhase
+        ) { _, phase in
+            viewModel.handleScenePhaseChange(phase)
+        }
+        .navigationDestination(item: $nextEpisodeRequest) { next in
+            SourceSelectionView(item: next)
         }
     }
 }

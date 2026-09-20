@@ -1,10 +1,12 @@
 {
   "images" : [
     {
+      "filename" : "veyra-back-400x240.png",
       "idiom" : "tv",
       "scale" : "1x"
     },
     {
+      "filename" : "veyra-back-800x480.png",
       "idiom" : "tv",
       "scale" : "2x"
     }

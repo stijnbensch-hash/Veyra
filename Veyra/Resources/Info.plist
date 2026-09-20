@@ -29,7 +29,17 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>PrivacyPolicyURL</key>
+	<string>$(PRIVACY_POLICY_URL)</string>
 	<key>TMDBReadAccessToken</key>
 	<string>$(TMDB_READ_ACCESS_TOKEN)</string>
+	<key>OMDbAPIKey</key>
+	<string>$(OMDB_API_KEY)</string>
+	<key>TraktClientID</key>
+	<string>$(TRAKT_CLIENT_ID)</string>
+	<key>TraktClientSecret</key>
+	<string>$(TRAKT_CLIENT_SECRET)</string>
+	<key>TraktRedirectURI</key>
+	<string>$(TRAKT_REDIRECT_URI)</string>
 </dict>
 </plist>
