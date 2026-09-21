@@ -23,6 +23,7 @@ struct LiveTVView: View {
     // AsyncImage opnieuw te laden zodra een override is opgeslagen.
     @State
     private var editingLogoChannel: IPTVChannel?
+
     @State
     private var logoOverrideVersion = 0
 
@@ -69,12 +70,20 @@ struct LiveTVView: View {
                     }
                 )
             }
-            .sheet(item: $editingLogoChannel) { channel in
+            .sheet(
+                item: $editingLogoChannel
+            ) { channel in
                 ChannelLogoPickerView(
                     channelID: channel.id,
                     channelName: channel.name,
-                    currentOverrideURL: ChannelLogoOverrideStore.logoURL(forChannelID: channel.id),
-                    currentNameOverride: ChannelNameOverrideStore.name(forChannelID: channel.id)
+                    currentOverrideURL:
+                        ChannelLogoOverrideStore.logoURL(
+                            forChannelID: channel.id
+                        ),
+                    currentNameOverride:
+                        ChannelNameOverrideStore.name(
+                            forChannelID: channel.id
+                        )
                 ) {
                     logoOverrideVersion += 1
                 }
@@ -489,19 +498,27 @@ struct LiveTVView: View {
 
     private var searchBar: some View {
         HStack(
-            spacing: 20
+            spacing: 10
         ) {
+            Spacer(
+                minLength: 0
+            )
+
             searchField
 
             if !guide.searchText.isEmpty {
                 clearSearchButton
             }
         }
+        .frame(
+            maxWidth: .infinity,
+            alignment: .trailing
+        )
     }
 
     private var searchField: some View {
         HStack(
-            spacing: 18
+            spacing: 12
         ) {
             Image(
                 systemName:
@@ -509,7 +526,7 @@ struct LiveTVView: View {
             )
             .font(
                 .system(
-                    size: 27,
+                    size: 22,
                     weight: .medium
                 )
             )
@@ -520,13 +537,13 @@ struct LiveTVView: View {
             )
 
             TextField(
-                "Zoek zenders en programma's in dit tijdvak",
+                "Zoeken",
                 text:
                     $guide.searchText
             )
             .font(
                 .system(
-                    size: 26
+                    size: 21
                 )
             )
             .textInputAutocapitalization(
@@ -539,14 +556,15 @@ struct LiveTVView: View {
         }
         .padding(
             .horizontal,
-            24
+            18
         )
         .padding(
             .vertical,
-            18
+            12
         )
         .frame(
-            minHeight: 72
+            width: 340,
+            height: 58
         )
         .background(
             RoundedRectangle(
@@ -586,13 +604,13 @@ struct LiveTVView: View {
             )
             .font(
                 .system(
-                    size: 23,
+                    size: 19,
                     weight: .semibold
                 )
             )
             .frame(
-                width: 60,
-                height: 60
+                width: 52,
+                height: 52
             )
         }
         .buttonStyle(
@@ -1292,7 +1310,8 @@ struct LiveTVView: View {
         )
         .accessibilityLabel(
             ChannelNameOverrideStore.effectiveName(
-                channelID: row.channel.id, defaultName: row.channel.name
+                channelID: row.channel.id,
+                defaultName: row.channel.name
             )
         )
         .accessibilityHint(
@@ -1300,17 +1319,37 @@ struct LiveTVView: View {
         )
         .contextMenu {
             Button {
-                editingLogoChannel = row.channel
+                editingLogoChannel =
+                    row.channel
+
             } label: {
-                Label("Logo/naam aanpassen…", systemImage: "photo.badge.plus")
+                Label(
+                    "Logo/naam aanpassen…",
+                    systemImage:
+                        "photo.badge.plus"
+                )
             }
 
-            if ChannelLogoOverrideStore.logoURL(forChannelID: row.channel.id) != nil {
-                Button(role: .destructive) {
-                    ChannelLogoOverrideStore.removeOverride(forChannelID: row.channel.id)
+            if ChannelLogoOverrideStore.logoURL(
+                forChannelID:
+                    row.channel.id
+            ) != nil {
+                Button(
+                    role: .destructive
+                ) {
+                    ChannelLogoOverrideStore.removeOverride(
+                        forChannelID:
+                            row.channel.id
+                    )
+
                     logoOverrideVersion += 1
+
                 } label: {
-                    Label("Standaardlogo herstellen", systemImage: "arrow.counterclockwise")
+                    Label(
+                        "Standaardlogo herstellen",
+                        systemImage:
+                            "arrow.counterclockwise"
+                    )
                 }
             }
         }
@@ -1379,7 +1418,10 @@ struct LiveTVView: View {
         AsyncImage(
             url:
                 ChannelLogoOverrideStore.effectiveLogoURL(
-                    channelID: row.channel.id, defaultLogoURL: row.channel.logoURL
+                    channelID:
+                        row.channel.id,
+                    defaultLogoURL:
+                        row.channel.logoURL
                 )
         ) { phase in
             if let image =
@@ -1406,7 +1448,9 @@ struct LiveTVView: View {
                 )
             }
         }
-        .id(logoOverrideVersion)
+        .id(
+            logoOverrideVersion
+        )
         .frame(
             width: 76,
             height: 68
@@ -1423,7 +1467,10 @@ struct LiveTVView: View {
         ) {
             Text(
                 ChannelNameOverrideStore.effectiveName(
-                    channelID: row.channel.id, defaultName: row.channel.name
+                    channelID:
+                        row.channel.id,
+                    defaultName:
+                        row.channel.name
                 )
             )
             .font(
@@ -1736,7 +1783,10 @@ struct LiveTVView: View {
             title
             + ", "
             + ChannelNameOverrideStore.effectiveName(
-                channelID: row.channel.id, defaultName: row.channel.name
+                channelID:
+                    row.channel.id,
+                defaultName:
+                    row.channel.name
             )
     }
 
@@ -1908,6 +1958,7 @@ struct LiveTVView: View {
     }
 }
 
+
 // MARK: - Selection
 
 private struct VeyraEPGSelection:
@@ -1923,6 +1974,7 @@ private struct VeyraEPGSelection:
         "\(row.id):\(programme?.id ?? "channel")"
     }
 }
+
 
 // MARK: - Programme details
 
@@ -1980,7 +2032,10 @@ private struct VeyraEPGDetails:
     {
         Text(
             ChannelNameOverrideStore.effectiveName(
-                channelID: selection.row.channel.id, defaultName: selection.row.channel.name
+                channelID:
+                    selection.row.channel.id,
+                defaultName:
+                    selection.row.channel.name
             )
         )
         .font(
@@ -2235,6 +2290,7 @@ private struct VeyraEPGDetails:
     }
 }
 
+
 // MARK: - Veyra button style
 
 private struct VeyraEPGButtonStyle:
@@ -2264,6 +2320,7 @@ private struct VeyraEPGButtonStyle:
         )
     }
 }
+
 
 private struct VeyraEPGButtonSurface<
     Label: View
@@ -2400,6 +2457,7 @@ private struct VeyraEPGButtonSurface<
     }
 }
 
+
 // MARK: - Theme
 
 private enum VeyraEPGTheme {
@@ -2409,6 +2467,7 @@ private enum VeyraEPGTheme {
         VeyraBackground()
     }
 }
+
 
 // MARK: - Local time formatting
 
@@ -2472,6 +2531,7 @@ private enum VeyraEPGFormat {
         )
     }
 }
+
 
 #Preview {
     NavigationStack {

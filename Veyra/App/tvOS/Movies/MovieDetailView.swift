@@ -93,25 +93,29 @@ struct MovieDetailView: View {
                         )
                     }
 
-                    NavigationLink {
-                        SourceSelectionView(
-                            item: movie
-                        )
-                    } label: {
-                        Label(
-                            "AFSPELEN",
-                            systemImage: "play.fill"
-                        )
-                        .font(
-                            .system(
-                                size: 22,
-                                weight: .bold
+                    HStack(spacing: 20) {
+                        NavigationLink {
+                            SourceSelectionView(
+                                item: movie
                             )
-                        )
-                        .padding(
-                            .horizontal,
-                            12
-                        )
+                        } label: {
+                            Label(
+                                "AFSPELEN",
+                                systemImage: "play.fill"
+                            )
+                            .font(
+                                .system(
+                                    size: 22,
+                                    weight: .bold
+                                )
+                            )
+                            .padding(
+                                .horizontal,
+                                12
+                            )
+                        }
+
+                        WatchlistToggleButton(item: movie)
                     }
 
                     Spacer()
