@@ -13,6 +13,7 @@ struct SettingsView: View {
     @State private var destination: SettingsDestination?
     @State private var enabledAddonCount = 0
     @State private var mediaServerCount = 0
+    @State private var categoryOrder: [SourceCategory] = SourceOrderDefaults.loadCategoryOrder()
 
     @FocusState
     private var focusedRow: SettingsDestination?
@@ -27,62 +28,61 @@ struct SettingsView: View {
         MediaServerStore()
 
     var body: some View {
-        List {
-            Section {
-                Text("Beheer je bronnen, kijkprofiel en appgegevens.")
-                    .foregroundStyle(.secondary)
-            }
+        ZStack {
+            VeyraBackground().ignoresSafeArea()
 
-            Section {
-                settingsRow(destination: .iptv, icon: "tv", title: "IPTV",
-                            subtitle: "Live TV en VOD via Xtream of M3U", status: iptvStatus, statusColor: iptvStatusColor)
-                settingsRow(destination: .addons, icon: "puzzlepiece.extension", title: "Addons",
-                            subtitle: "Streams via gekoppelde addons", status: addonsStatus, statusColor: VeyraColors.cyan)
-                settingsRow(destination: .mediaServers, icon: "server.rack", title: "Mediaservers",
-                            subtitle: "Jellyfin en andere eigen servers", status: mediaServersStatus, statusColor: VeyraColors.cyan)
-            } header: {
-                VeyraSectionHeader(title: "Bronnen").textCase(nil).padding(.bottom, 18)
-            }
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 44) {
+                    header
 
-            Section {
-                settingsRow(destination: .subtitles, icon: "captions.bubble", title: "Ondertitels",
-                            subtitle: "Standaardtaal en OpenSubtitles", status: "", statusColor: VeyraColors.cyan)
-                settingsRow(destination: .subtitleAppearance, icon: "textformat.size", title: "Ondertitelweergave",
-                            subtitle: "Grootte, plaatsing, achtergrond", status: "", statusColor: VeyraColors.secondary)
-                settingsRow(destination: .playback, icon: "play.circle", title: "Afspelen",
-                            subtitle: "Resolutie, taal en oversla-segmenten", status: "", statusColor: VeyraColors.secondary)
-                settingsRow(destination: .metadata, icon: "star.leadinghalf.filled", title: "Metadata",
-                            subtitle: "Ratings op film- en seriepagina's", status: "", statusColor: VeyraColors.secondary)
-                settingsRow(destination: .shelves, icon: "rectangle.grid.1x2", title: "Planken",
-                            subtitle: "Eigen rijen op het hoofdmenu", status: "", statusColor: VeyraColors.secondary)
-            } header: {
-                VeyraSectionHeader(title: "Weergave").textCase(nil).padding(.bottom, 18)
-            }
+                    settingsSection(title: "Live TV") {
+                        settingsCard(destination: .liveTVSettings, icon: "slider.horizontal.3", title: "Live TV instellingen",
+                                     subtitle: "Gids, player, buffer en kanaalcache", status: "", statusColor: VeyraColors.secondary)
+                    }
 
-            Section {
-                settingsRow(destination: .account, icon: "person.crop.circle", title: "Account",
-                            subtitle: "Trakt, ondertitels en profiel",
-                            status: trakt.isConnected ? "Trakt verbonden" : "Trakt niet gekoppeld",
-                            statusColor: trakt.isConnected ? VeyraColors.cyan : VeyraColors.secondary)
-                settingsRow(destination: .cloudSync, icon: "icloud", title: "Gegevens en opslag",
-                            subtitle: "iCloud-synchronisatie en opslaggebruik",
-                            status: cloudSync.isEnabled ? "Aan" : "Uit",
-                            statusColor: cloudSync.isEnabled ? VeyraColors.cyan : VeyraColors.secondary)
-            } header: {
-                VeyraSectionHeader(title: "Account").textCase(nil).padding(.bottom, 18)
-            }
+                    settingsSection(title: "Bronnen") {
+                        ForEach(categoryOrder) { category in
+                            bronnenRow(for: category)
+                        }
+                    }
 
-            if let errorMessage {
-                Section {
-                    Text(errorMessage).foregroundStyle(VeyraColors.red)
+                    settingsSection(title: "Weergave") {
+                        settingsCard(destination: .subtitles, icon: "captions.bubble", title: "Ondertitels",
+                                     subtitle: "Standaardtaal en OpenSubtitles", status: "", statusColor: VeyraColors.cyan)
+                        settingsCard(destination: .subtitleAppearance, icon: "textformat.size", title: "Ondertitelweergave",
+                                     subtitle: "Grootte, plaatsing, achtergrond", status: "", statusColor: VeyraColors.secondary)
+                        settingsCard(destination: .playback, icon: "play.circle", title: "Afspelen",
+                                     subtitle: "Resolutie, taal en oversla-segmenten", status: "", statusColor: VeyraColors.secondary)
+                        settingsCard(destination: .metadata, icon: "star.leadinghalf.filled", title: "Metadata",
+                                     subtitle: "Ratings op film- en seriepagina's", status: "", statusColor: VeyraColors.secondary)
+                        settingsCard(destination: .shelves, icon: "rectangle.grid.1x2", title: "Planken",
+                                     subtitle: "Eigen rijen op het hoofdmenu", status: "", statusColor: VeyraColors.secondary)
+                    }
+
+                    settingsSection(title: "Account") {
+                        settingsCard(destination: .account, icon: "person.crop.circle", title: "Account",
+                                     subtitle: "Trakt, ondertitels en profiel",
+                                     status: trakt.isConnected ? "Trakt verbonden" : "Trakt niet gekoppeld",
+                                     statusColor: trakt.isConnected ? VeyraColors.cyan : VeyraColors.secondary)
+                        settingsCard(destination: .cloudSync, icon: "icloud", title: "Gegevens en opslag",
+                                     subtitle: "iCloud-synchronisatie en opslaggebruik",
+                                     status: cloudSync.isEnabled ? "Aan" : "Uit",
+                                     statusColor: cloudSync.isEnabled ? VeyraColors.cyan : VeyraColors.secondary)
+                    }
+
+                    if let errorMessage {
+                        Text(errorMessage).foregroundStyle(VeyraColors.red)
+                    }
+
+                    versionInformation
                 }
-            }
-
-            Section {
-                versionInformation
+                .frame(maxWidth: 1300, alignment: .leading)
+                .padding(.horizontal, VeyraSpacing.page)
+                .padding(.top, 36)
+                .padding(.bottom, 60)
+                .frame(maxWidth: .infinity)
             }
         }
-        .navigationTitle("Instellingen")
         .onAppear {
             AddonMigration()
                 .runIfNeeded()
@@ -119,6 +119,9 @@ struct SettingsView: View {
             case .iptv:
                 IPTVAccountsView()
 
+            case .liveTVSettings:
+                IPTVPlaybackSettingsView()
+
             case .addons:
                 VeyraAddonsSettingsView()
 
@@ -143,9 +146,57 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Settings row
+    // MARK: - Header
 
-    private func settingsRow(
+    private var header: some View {
+        HStack(alignment: .center, spacing: 22) {
+            RoundedRectangle(cornerRadius: 3)
+                .fill(
+                    LinearGradient(
+                        colors: [VeyraColors.cyan, VeyraColors.red],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .frame(width: 4, height: 66)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Instellingen")
+                    .font(.system(size: 50, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+
+                Text("Beheer je bronnen, kijkprofiel en appgegevens.")
+                    .font(.system(size: 26))
+                    .foregroundStyle(.white.opacity(0.62))
+            }
+
+            Spacer()
+        }
+    }
+
+    // MARK: - Section
+
+    @ViewBuilder
+    private func settingsSection<Content: View>(
+        title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text(title.uppercased())
+                .font(.system(size: 22, weight: .semibold))
+                .tracking(3)
+                .foregroundStyle(.white.opacity(0.62))
+
+            VStack(spacing: 18) {
+                content()
+            }
+        }
+    }
+
+    // MARK: - Settings card
+
+    private func settingsCard(
         destination target: SettingsDestination,
         icon: String,
         title: String,
@@ -156,28 +207,107 @@ struct SettingsView: View {
         Button {
             destination = target
         } label: {
-            HStack(spacing: 18) {
-                Image(systemName: icon)
-                    .font(.system(size: 24))
-                    .foregroundStyle(VeyraColors.cyan)
-                    .frame(width: 36)
+            HStack(spacing: 24) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(VeyraColors.cyan.opacity(0.14))
 
-                VStack(alignment: .leading, spacing: 4) {
+                    Image(systemName: icon)
+                        .font(.system(size: 30, weight: .light))
+                        .foregroundStyle(VeyraColors.cyan)
+                }
+                .frame(width: 68, height: 68)
+
+                VStack(alignment: .leading, spacing: 6) {
                     Text(title)
+                        .font(.system(size: 28, weight: .semibold))
+                        .foregroundStyle(.white)
+
                     Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                        .font(.system(size: 20))
+                        .foregroundStyle(.white.opacity(0.60))
 
-                Spacer()
-
-                if !status.isEmpty {
-                    Text(status)
-                        .font(.caption)
-                        .foregroundStyle(statusColor)
+                    if !status.isEmpty {
+                        Text(status)
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundStyle(statusColor)
+                    }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(VeyraColors.cyan.opacity(0.55))
+            }
+            .padding(.horizontal, 22)
+            .padding(.vertical, 20)
+        }
+        .buttonStyle(VeyraFocusButtonStyle(radius: VeyraRadius.card))
+    }
+
+    // MARK: - Bronnen (categorievolgorde)
+
+    /// Eén categorie in Bronnen, met omhoog/omlaag-knoppen om de
+    /// categorievolgorde te herschikken — dezelfde SourceOrderDefaults-
+    /// opslag als op iOS, alleen met tvOS-focusknoppen.
+    @ViewBuilder
+    private func bronnenRow(for category: SourceCategory) -> some View {
+        switch category {
+        case .iptv:
+            reorderableRow(category) {
+                settingsCard(destination: .iptv, icon: "tv", title: "IPTV",
+                             subtitle: "Live TV en VOD via Xtream of M3U", status: iptvStatus, statusColor: iptvStatusColor)
+            }
+        case .addons:
+            reorderableRow(category) {
+                settingsCard(destination: .addons, icon: "puzzlepiece.extension", title: "Addons",
+                             subtitle: "Streams via gekoppelde addons", status: addonsStatus, statusColor: VeyraColors.cyan)
+            }
+        case .mediaServers:
+            reorderableRow(category) {
+                settingsCard(destination: .mediaServers, icon: "server.rack", title: "Mediaservers",
+                             subtitle: "Jellyfin en andere eigen servers", status: mediaServersStatus, statusColor: VeyraColors.cyan)
             }
         }
+    }
+
+    private func reorderableRow(
+        _ category: SourceCategory,
+        @ViewBuilder content: () -> some View
+    ) -> some View {
+        HStack(spacing: 14) {
+            content()
+
+            VStack(spacing: 10) {
+                Button {
+                    moveCategory(category, by: -1)
+                } label: {
+                    Image(systemName: "chevron.up")
+                        .font(.system(size: 22, weight: .semibold))
+                        .frame(width: 60, height: 44)
+                }
+                .buttonStyle(VeyraFocusButtonStyle(radius: 14))
+                .disabled(categoryOrder.first == category)
+
+                Button {
+                    moveCategory(category, by: 1)
+                } label: {
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 22, weight: .semibold))
+                        .frame(width: 60, height: 44)
+                }
+                .buttonStyle(VeyraFocusButtonStyle(radius: 14))
+                .disabled(categoryOrder.last == category)
+            }
+        }
+    }
+
+    private func moveCategory(_ category: SourceCategory, by offset: Int) {
+        guard let index = categoryOrder.firstIndex(of: category) else { return }
+        let destination = index + offset
+        guard categoryOrder.indices.contains(destination) else { return }
+        categoryOrder.swapAt(index, destination)
+        SourceOrderDefaults.saveCategoryOrder(categoryOrder)
     }
 
     // MARK: - Version
@@ -314,6 +444,7 @@ private enum SettingsDestination:
     Hashable
 {
     case iptv
+    case liveTVSettings
     case addons
     case mediaServers
     case account
@@ -983,8 +1114,9 @@ private struct AddonAddView:
     @Environment(\.dismiss)
     private var dismiss
 
-    @State private var selectedKind: AddonKind = .aioStreams
-
+    // Geen "Type"-keuze meer: elke Stremio-compatibele addon beschrijft
+    // zelf via zijn manifest.json wat voor addon hij is — zie
+    // Shared/Addons/StremioManifestFetcher.swift.
     @State private var name =
         ""
 
@@ -996,6 +1128,12 @@ private struct AddonAddView:
 
     @State private var errorMessage:
         String?
+
+    @State private var isFetchingManifest =
+        false
+
+    @State private var manifestNamePlaceholder =
+        ""
 
     @FocusState
     private var saveFocused:
@@ -1021,7 +1159,7 @@ private struct AddonAddView:
                     .foregroundStyle(.white)
 
                     Text(
-                        "Koppel een stream-addon."
+                        "Koppel een addon via zijn manifest-URL."
                     )
                     .font(
                         .system(size: 26)
@@ -1030,32 +1168,10 @@ private struct AddonAddView:
                         .white.opacity(0.62)
                     )
 
-                    fieldTitle("TYPE")
-
-                    Picker("Type", selection: $selectedKind) {
-                        Text("AIOStreams")
-                            .tag(AddonKind.aioStreams)
-                        Text("Torrent")
-                            .tag(AddonKind.torrent)
-                        Text("AIOMetadata")
-                            .tag(AddonKind.aioMetadata)
-                    }
-                    .pickerStyle(.segmented)
-                    .onChange(of: selectedKind) { _, newKind in
-                        // Update default name based on type
-                        if name.isEmpty {
-                            switch newKind {
-                            case .aioStreams: name = "AIOStreams"
-                            case .torrent: name = "Torrent"
-                            case .aioMetadata: name = "AIOMetadata"
-                            }
-                        }
-                    }
-
-                    fieldTitle("NAAM")
+                    fieldTitle("NAAM (OPTIONEEL)")
 
                     TextField(
-                        "AIOStreams",
+                        manifestNamePlaceholder.isEmpty ? "Overgenomen uit het manifest" : manifestNamePlaceholder,
                         text: $name
                     )
                     .textFieldStyle(.plain)
@@ -1068,11 +1184,11 @@ private struct AddonAddView:
                     )
 
                     fieldTitle(
-                        "AIOSTREAMS BASIS-URL"
+                        "MANIFEST-URL"
                     )
 
                     TextField(
-                        "https://jouw-server.example",
+                        "https://jouw-server.example/manifest.json",
                         text: $baseURLText
                     )
                     .textFieldStyle(.plain)
@@ -1089,7 +1205,7 @@ private struct AddonAddView:
                     )
 
                     Text(
-                        "Gebruik dezelfde basis-URL die Veyra voorheen als AIOStreamsBaseURL gebruikte."
+                        "Naam en type (streaming of metadata) worden automatisch uit het manifest gehaald."
                     )
                     .font(
                         .system(size: 18)
@@ -1175,7 +1291,9 @@ private struct AddonAddView:
             saveFocused
 
         return Text(
-            "ADDON TOEVOEGEN"
+            isFetchingManifest
+            ? "BEZIG..."
+            : "ADDON TOEVOEGEN"
         )
         .font(
             .system(
@@ -1227,17 +1345,18 @@ private struct AddonAddView:
             )
         )
         .contentShape(Rectangle())
-        .focusable(true)
+        .focusable(!isFetchingManifest)
         .focused(
             $saveFocused
         )
         .focusEffectDisabled()
         .onTapGesture {
-            save()
+            guard !isFetchingManifest else { return }
+            Task { await save() }
         }
     }
 
-    private func save() {
+    private func save() async {
         errorMessage = nil
 
         let trimmedName =
@@ -1254,14 +1373,6 @@ private struct AddonAddView:
                 )
 
         guard
-            !trimmedName.isEmpty
-        else {
-            errorMessage =
-                "Vul een naam in."
-            return
-        }
-
-        guard
             let url =
                 validatedAddonURL(
                     trimmedURL
@@ -1272,20 +1383,49 @@ private struct AddonAddView:
             return
         }
 
+        isFetchingManifest = true
+
+        let kind: AddonKind
+        var finalName = trimmedName
+
+        do {
+            let fetched = try await StremioManifestFetcher.fetch(from: url)
+            kind = fetched.kind
+            manifestNamePlaceholder = fetched.name
+            if finalName.isEmpty {
+                finalName = fetched.name
+            }
+        } catch {
+            isFetchingManifest = false
+            errorMessage =
+                (error as? LocalizedError)?.errorDescription
+                ?? "Kon het manifest niet ophalen."
+            return
+        }
+
+        guard !finalName.isEmpty else {
+            isFetchingManifest = false
+            errorMessage =
+                "Kon geen naam uit het manifest halen — vul zelf een naam in."
+            return
+        }
+
         let addon =
             AddonManifest(
-                name: trimmedName,
-                kind: selectedKind,  // Gebruik de geselecteerde kind
+                name: finalName,
+                kind: kind,
                 baseURL: url,
-                isEnabled: isEnabled  // Standaard true
+                isEnabled: isEnabled
             )
 
         do {
             try store.add(addon)
 
+            isFetchingManifest = false
             notifyAddonChange()
             dismiss()
         } catch {
+            isFetchingManifest = false
             errorMessage =
                 error.localizedDescription
         }
@@ -1312,6 +1452,9 @@ private struct AddonEditView:
 
     @State private var saveMessage:
         String?
+
+    @State private var isFetchingManifest =
+        false
 
     @FocusState
     private var saveFocused:
@@ -1364,7 +1507,7 @@ private struct AddonEditView:
                         .white.opacity(0.62)
                     )
 
-                    fieldTitle("TYPE")
+                    fieldTitle("TYPE (AUTOMATISCH)")
 
                     Text(
                         manifest.kind == .aioStreams
@@ -1381,6 +1524,16 @@ private struct AddonEditView:
                         .foregroundStyle(
                             .cyan
                         )
+
+                    Text(
+                        "Wordt opnieuw uit het manifest gehaald bij het opslaan."
+                    )
+                    .font(
+                        .system(size: 18)
+                    )
+                    .foregroundStyle(
+                        .secondary
+                    )
 
                     fieldTitle("NAAM")
 
@@ -1510,7 +1663,11 @@ private struct AddonEditView:
         let focused =
             saveFocused
 
-        return Text("OPSLAAN")
+        return Text(
+            isFetchingManifest
+            ? "BEZIG..."
+            : "OPSLAAN"
+        )
             .font(
                 .system(
                     size: 21,
@@ -1561,17 +1718,18 @@ private struct AddonEditView:
                 )
             )
             .contentShape(Rectangle())
-            .focusable(true)
+            .focusable(!isFetchingManifest)
             .focused(
                 $saveFocused
             )
             .focusEffectDisabled()
             .onTapGesture {
-                save()
+                guard !isFetchingManifest else { return }
+                Task { await save() }
             }
     }
 
-    private func save() {
+    private func save() async {
         errorMessage = nil
         saveMessage = nil
 
@@ -1590,14 +1748,6 @@ private struct AddonEditView:
                 )
 
         guard
-            !trimmedName.isEmpty
-        else {
-            errorMessage =
-                "Naam mag niet leeg zijn."
-            return
-        }
-
-        guard
             let url =
                 validatedAddonURL(
                     trimmedURL
@@ -1608,8 +1758,33 @@ private struct AddonEditView:
             return
         }
 
+        isFetchingManifest = true
+
+        var finalName = trimmedName
+
+        do {
+            let fetched = try await StremioManifestFetcher.fetch(from: url)
+            manifest.kind = fetched.kind
+            if finalName.isEmpty {
+                finalName = fetched.name
+            }
+        } catch {
+            isFetchingManifest = false
+            errorMessage =
+                (error as? LocalizedError)?.errorDescription
+                ?? "Kon het manifest niet ophalen."
+            return
+        }
+
+        guard !finalName.isEmpty else {
+            isFetchingManifest = false
+            errorMessage =
+                "Kon geen naam uit het manifest halen — vul zelf een naam in."
+            return
+        }
+
         manifest.name =
-            trimmedName
+            finalName
 
         manifest.baseURL =
             url
@@ -1619,11 +1794,13 @@ private struct AddonEditView:
                 manifest
             )
 
+            isFetchingManifest = false
             saveMessage =
                 "Addon opgeslagen."
 
             notifyAddonChange()
         } catch {
+            isFetchingManifest = false
             errorMessage =
                 error.localizedDescription
         }

@@ -207,7 +207,9 @@ struct JellyfinItemsView: View {
             title: item.displayTitle,
             url: service.imageURL(for: item),
             symbol: item.isSeries ? "tv" : "film",
-            width: 230
+            width: 230,
+            genre: item.primaryGenre,
+            rating: item.communityRating
         )
     }
 

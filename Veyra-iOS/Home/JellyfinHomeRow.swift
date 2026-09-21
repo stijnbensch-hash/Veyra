@@ -47,7 +47,9 @@ struct JellyfinHomeRow: View {
                 title: entry.item.displayTitle,
                 url: JellyfinService(account: entry.account).imageURL(for: entry.item),
                 symbol: entry.item.isEpisode ? "tv" : "film",
-                width: posterWidth
+                width: posterWidth,
+                genre: entry.item.primaryGenre,
+                rating: entry.item.communityRating
             )
         }
         .buttonStyle(.plain)

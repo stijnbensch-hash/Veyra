@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 extension Notification.Name {
     static let iptvHomeRefreshRequested =
@@ -11,6 +12,19 @@ extension Notification.Name {
 struct VeyraApp: App {
     @Environment(\.scenePhase)
     private var scenePhase
+
+    // tvOS kent `.scrollContentBackground(.hidden)` niet (die modifier
+    // bestaat wel op iOS, maar is niet beschikbaar op tvOS), waardoor de
+    // standaard lichte achtergrond van List/Form door onze eigen donkere
+    // `VeyraBackground()` heen bleef schijnen ("witte balken" in
+    // Instellingen). Dit is de tvOS-tegenhanger: de achtergrond van de
+    // onderliggende UITableView/UICollectionView app-breed transparant
+    // maken, zodat overal (List én Form) onze eigen achtergrond zichtbaar
+    // blijft.
+    init() {
+        UITableView.appearance().backgroundColor = .clear
+        UICollectionView.appearance().backgroundColor = .clear
+    }
 
     // Toont de openingsanimatie (beeldmerk verschijnt, vliegt dan weg) één
     // keer bij een koude start — zie `Shared/LaunchAnimationView.swift`.

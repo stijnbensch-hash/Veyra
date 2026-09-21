@@ -21,7 +21,9 @@ struct ShelfRowView: View {
                                         title: item.title,
                                         url: item.posterURL,
                                         symbol: item.type == .movie ? "film" : "tv",
-                                        width: 220
+                                        width: 220,
+                                        genre: item.genre,
+                                        rating: item.rating
                                     )
                                 }
                                 .buttonStyle(VeyraFocusButtonStyle(radius: VeyraRadius.poster))

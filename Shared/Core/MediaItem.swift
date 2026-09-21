@@ -16,6 +16,13 @@ struct MediaItem: Identifiable, Hashable {
     let posterURL: URL?
     let backdropURL: URL?
 
+    /// Eerste/belangrijkste genre en TMDB-score, voor de Better Posters-badge
+    /// op `VeyraPosterCard` (zie Shared/Theme/PosterEnrichmentSettings.swift).
+    /// Alleen gevuld waar de bron dit zonder extra netwerkverzoek meegeeft
+    /// (TMDB-lijsten); `nil` bij bronnen die dit niet leveren (Trakt, addons).
+    let genre: String?
+    let rating: Double?
+
     init(
         id: UUID = UUID(),
         title: String,
@@ -28,7 +35,9 @@ struct MediaItem: Identifiable, Hashable {
         overview: String? = nil,
         releaseDate: String? = nil,
         posterURL: URL? = nil,
-        backdropURL: URL? = nil
+        backdropURL: URL? = nil,
+        genre: String? = nil,
+        rating: Double? = nil
     ) {
         self.id = id
         self.title = title
@@ -42,6 +51,8 @@ struct MediaItem: Identifiable, Hashable {
         self.releaseDate = releaseDate
         self.posterURL = posterURL
         self.backdropURL = backdropURL
+        self.genre = genre
+        self.rating = rating
     }
 }
 

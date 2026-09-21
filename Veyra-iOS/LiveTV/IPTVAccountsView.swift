@@ -86,13 +86,6 @@ struct IPTVAccountsView: View {
             ToolbarItem(placement: .primaryAction) {
                 EditButton()
             }
-            ToolbarItem(placement: .secondaryAction) {
-                NavigationLink {
-                    IPTVPlaybackSettingsView()
-                } label: {
-                    Label("Live TV instellingen", systemImage: "slider.horizontal.3")
-                }
-            }
         }
         .sheet(isPresented: $showAddSheet, onDismiss: reload) {
             NavigationStack {

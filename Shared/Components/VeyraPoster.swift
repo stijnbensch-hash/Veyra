@@ -38,9 +38,9 @@ struct VeyraPosterCard: View {
     // opvulling en een schaalfactor lossen dat op zonder de inhoud te
     // moeten inkorten.
 #if os(tvOS)
-    private var enrichmentFontSize: CGFloat { 14 }
-    private var enrichmentHPadding: CGFloat { 8 }
-    private var enrichmentVPadding: CGFloat { 5 }
+    private var enrichmentFontSize: CGFloat { 16 }
+    private var enrichmentHPadding: CGFloat { 10 }
+    private var enrichmentVPadding: CGFloat { 6 }
 #else
     private var enrichmentFontSize: CGFloat { 9 }
     private var enrichmentHPadding: CGFloat { 6 }
@@ -87,18 +87,19 @@ struct VeyraPosterCard: View {
 #if !os(tvOS)
             .shadow(color: .black.opacity(0.28), radius: 6, y: 3)
 #endif
-            .overlay(alignment: .bottomLeading) {
+            .overlay(alignment: .bottom) {
                 if let enrichmentText {
                     Text(enrichmentText)
                         .font(.system(size: enrichmentFontSize, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
+                        .multilineTextAlignment(.center)
                         .padding(.horizontal, enrichmentHPadding)
                         .padding(.vertical, enrichmentVPadding)
                         .background(.black.opacity(0.72), in: Capsule())
-                        .padding(6)
-                        .frame(maxWidth: width - 12, alignment: .leading)
+                        .padding(.bottom, 6)
+                        .frame(maxWidth: width - 12)
                 }
             }
             Text(title).font(.system(size: titleFontSize, weight: .medium)).foregroundStyle(.white)

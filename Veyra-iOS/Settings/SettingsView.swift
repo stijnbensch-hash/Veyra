@@ -2,10 +2,12 @@ import SwiftUI
 
 enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
     case iptv
+    case liveTVSettings
     case addons
     case mediaServers
     case general
     case subtitles
+    case subtitleAppearance
     case metadata
     case playback
     case shelves
@@ -17,10 +19,12 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
     var title: String {
         switch self {
         case .iptv: return "IPTV"
+        case .liveTVSettings: return "Live TV instellingen"
         case .addons: return "Addons"
         case .mediaServers: return "Mediaservers"
         case .general: return "Algemeen"
         case .subtitles: return "Ondertitels"
+        case .subtitleAppearance: return "Ondertitelweergave"
         case .metadata: return "Metadata"
         case .playback: return "Afspelen"
         case .shelves: return "Planken"
@@ -32,10 +36,12 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
     var subtitle: String {
         switch self {
         case .iptv: return "Live TV en VOD via Xtream of M3U"
+        case .liveTVSettings: return "Gids, player, buffer en kanaalcache"
         case .addons: return "Streams via gekoppelde addons"
         case .mediaServers: return "Jellyfin en andere eigen servers"
         case .general: return "Startscherm, sport en kaartweergave"
-        case .subtitles: return "Taal, weergave en OpenSubtitles"
+        case .subtitles: return "Taal en OpenSubtitles"
+        case .subtitleAppearance: return "Grootte, plaatsing, achtergrond en sync"
         case .metadata: return "Ratings op film- en seriepagina's"
         case .playback: return "Resolutie, taal en oversla-segmenten"
         case .shelves: return "Eigen rijen op het hoofdmenu"
@@ -47,10 +53,12 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
     var symbol: String {
         switch self {
         case .iptv: return "antenna.radiowaves.left.and.right"
+        case .liveTVSettings: return "slider.horizontal.3"
         case .addons: return "puzzlepiece.extension.fill"
         case .mediaServers: return "server.rack"
         case .general: return "slider.horizontal.3"
         case .subtitles: return "captions.bubble"
+        case .subtitleAppearance: return "textformat.size"
         case .metadata: return "star.leadinghalf.filled"
         case .playback: return "play.circle"
         case .shelves: return "rectangle.grid.1x2"
@@ -132,6 +140,15 @@ struct SettingsView: View {
                     header
 
                     VStack(alignment: .leading, spacing: 14) {
+                        Text("LIVE TV")
+                            .font(.system(size: 15, weight: .semibold))
+                            .tracking(2)
+                            .foregroundStyle(VeyraColors.secondary)
+
+                        settingsCard(.liveTVSettings, status: "", statusColor: VeyraColors.cyan)
+                    }
+
+                    VStack(alignment: .leading, spacing: 14) {
                         Text("BRONNEN")
                             .font(.system(size: 15, weight: .semibold))
                             .tracking(2)
@@ -154,6 +171,7 @@ struct SettingsView: View {
 
                         settingsCard(.general, status: "", statusColor: VeyraColors.cyan)
                         settingsCard(.subtitles, status: "", statusColor: VeyraColors.cyan)
+                        settingsCard(.subtitleAppearance, status: "", statusColor: VeyraColors.cyan)
                         settingsCard(.metadata, status: "", statusColor: VeyraColors.cyan)
                         settingsCard(.playback, status: "", statusColor: VeyraColors.cyan)
                         settingsCard(.shelves, status: "", statusColor: VeyraColors.cyan)
@@ -371,10 +389,12 @@ struct SettingsView: View {
     private func destinationView(_ destination: SettingsDestination) -> some View {
         switch destination {
         case .iptv: IPTVAccountsView()
+        case .liveTVSettings: IPTVPlaybackSettingsView()
         case .addons: AddonsSettingsView()
         case .mediaServers: MediaServersSettingsView()
         case .general: GeneralSettingsView()
         case .subtitles: SubtitlePreferencesView()
+        case .subtitleAppearance: SubtitleAppearanceSettingsView()
         case .metadata: MetadataSettingsView()
         case .playback: PlaybackSettingsView()
         case .shelves: ShelvesSettingsView()

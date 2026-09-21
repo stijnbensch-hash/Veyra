@@ -63,7 +63,9 @@ struct JellyfinRecentlyAddedRow: View {
                 title: entry.item.displayTitle,
                 url: imageURL,
                 symbol: entry.item.isEpisode ? "tv" : "film",
-                width: posterWidth
+                width: posterWidth,
+                genre: entry.item.primaryGenre,
+                rating: entry.item.communityRating
             )
         }
         .buttonStyle(VeyraFocusButtonStyle(radius: VeyraRadius.poster))

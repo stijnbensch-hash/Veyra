@@ -845,6 +845,27 @@ private struct IOSSubtitleTrackSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showOpenSubtitlesSearch = false
 
+    @AppStorage(SubtitleAppearanceDefaults.sizeKey)
+    private var subtitleSizeRaw = VeyraSubtitleSize.normal.rawValue
+    @AppStorage(SubtitleAppearanceDefaults.positionKey)
+    private var subtitlePositionRaw = VeyraSubtitlePosition.low.rawValue
+    @AppStorage(SubtitleAppearanceDefaults.backgroundKey)
+    private var subtitleBackgroundRaw = VeyraSubtitleBackground.subtle.rawValue
+    @AppStorage(SubtitleAppearanceDefaults.shadowKey)
+    private var subtitleShadow = true
+    @AppStorage(SubtitleAppearanceDefaults.offsetKey)
+    private var subtitleOffset: Double = 0
+
+    private var subtitleSize: VeyraSubtitleSize {
+        VeyraSubtitleSize(rawValue: subtitleSizeRaw) ?? .normal
+    }
+    private var subtitlePosition: VeyraSubtitlePosition {
+        VeyraSubtitlePosition(rawValue: subtitlePositionRaw) ?? .low
+    }
+    private var subtitleBackground: VeyraSubtitleBackground {
+        VeyraSubtitleBackground(rawValue: subtitleBackgroundRaw) ?? .subtle
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -915,6 +936,53 @@ private struct IOSSubtitleTrackSheet: View {
                         }
                         .buttonStyle(.plain)
                         .padding(.top, 12)
+
+                        sectionHeader("WEERGAVE")
+
+                        appearanceRow(
+                            title: "Tekstgrootte", value: subtitleSize.title,
+                            systemImage: "textformat.size"
+                        ) { cycleSubtitleSize() }
+
+                        appearanceRow(
+                            title: "Achtergrond", value: subtitleBackground.title,
+                            systemImage: "rectangle.fill"
+                        ) { cycleBackground() }
+
+                        appearanceRow(
+                            title: "Plaatsing", value: subtitlePosition.title,
+                            systemImage: "rectangle.bottomthird.inset.filled"
+                        ) { cyclePosition() }
+
+                        appearanceRow(
+                            title: "Schaduw", value: subtitleShadow ? "Aan" : "Uit",
+                            systemImage: "shadow"
+                        ) { subtitleShadow.toggle() }
+
+                        sectionHeader("SYNCHRONISATIE")
+
+                        Text(currentOffsetDescription)
+                            .font(.footnote)
+                            .foregroundStyle(.white.opacity(0.6))
+                            .padding(.bottom, 4)
+
+                        actionRow(title: "10 sec vroeger", systemImage: "gobackward.10") {
+                            adjustOffset(by: -10)
+                        }
+                        actionRow(title: "0,1 sec vroeger", systemImage: "minus") {
+                            adjustOffset(by: -0.1)
+                        }
+                        actionRow(title: "0,1 sec later", systemImage: "plus") {
+                            adjustOffset(by: 0.1)
+                        }
+                        actionRow(title: "10 sec later", systemImage: "goforward.10") {
+                            adjustOffset(by: 10)
+                        }
+                        if subtitleOffset != 0 {
+                            actionRow(title: "Terugzetten naar 0,0s", systemImage: "arrow.counterclockwise") {
+                                subtitleOffset = 0
+                            }
+                        }
                     }
                     .padding(20)
                 }
@@ -982,6 +1050,107 @@ private struct IOSSubtitleTrackSheet: View {
         if track.isForced { parts.append("Alleen anderstalige dialoog") }
         if track.isHearingImpaired { parts.append("SDH") }
         return parts.joined(separator: " · ")
+    }
+
+    // MARK: - Weergave & synchronisatie
+
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 13, weight: .semibold))
+            .tracking(2)
+            .foregroundStyle(.white.opacity(0.5))
+            .padding(.top, 22)
+    }
+
+    private func appearanceRow(
+        title: String, value: String, systemImage: String, action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 14) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 18))
+                    .foregroundStyle(VeyraColors.cyan)
+                    .frame(width: 28)
+
+                Text(title)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.white)
+
+                Spacer()
+
+                Text(value)
+                    .font(.system(size: 15))
+                    .foregroundStyle(.white.opacity(0.6))
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.4))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .veyraGlass(radius: 14, backgroundOpacity: 0.6)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func actionRow(
+        title: String, systemImage: String, action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 14) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 18))
+                    .foregroundStyle(VeyraColors.cyan)
+                    .frame(width: 28)
+
+                Text(title)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.white)
+
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .veyraGlass(radius: 14, backgroundOpacity: 0.6)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var currentOffsetDescription: String {
+        if subtitleOffset == 0 {
+            return "Ondertitels lopen gelijk met het geluid."
+        }
+        let sign = subtitleOffset > 0 ? "+" : ""
+        return "Huidige verschuiving: \(sign)\(String(format: "%.1f", subtitleOffset))s"
+    }
+
+    private func cycleSubtitleSize() {
+        switch subtitleSize {
+        case .small: subtitleSizeRaw = VeyraSubtitleSize.normal.rawValue
+        case .normal: subtitleSizeRaw = VeyraSubtitleSize.large.rawValue
+        case .large: subtitleSizeRaw = VeyraSubtitleSize.small.rawValue
+        }
+    }
+
+    private func cyclePosition() {
+        switch subtitlePosition {
+        case .low: subtitlePositionRaw = VeyraSubtitlePosition.standard.rawValue
+        case .standard: subtitlePositionRaw = VeyraSubtitlePosition.high.rawValue
+        case .high: subtitlePositionRaw = VeyraSubtitlePosition.low.rawValue
+        }
+    }
+
+    private func cycleBackground() {
+        switch subtitleBackground {
+        case .none: subtitleBackgroundRaw = VeyraSubtitleBackground.subtle.rawValue
+        case .subtle: subtitleBackgroundRaw = VeyraSubtitleBackground.strong.rawValue
+        case .strong: subtitleBackgroundRaw = VeyraSubtitleBackground.none.rawValue
+        }
+    }
+
+    private func adjustOffset(by delta: Double) {
+        let clamped = min(60, max(-60, subtitleOffset + delta))
+        subtitleOffset = (clamped * 10).rounded() / 10
     }
 }
 

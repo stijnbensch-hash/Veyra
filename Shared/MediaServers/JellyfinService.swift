@@ -50,7 +50,7 @@ struct JellyfinService {
             URLQueryItem(name: "SortOrder", value: "Ascending"),
             URLQueryItem(
                 name: "Fields",
-                value: "Overview,ProductionYear"
+                value: "Overview,ProductionYear,Genres,CommunityRating"
             )
         ]
 
@@ -123,7 +123,7 @@ struct JellyfinService {
                 URLQueryItem(name: "Limit", value: String(limit)),
                 URLQueryItem(
                     name: "Fields",
-                    value: "Overview,ProductionYear"
+                    value: "Overview,ProductionYear,Genres,CommunityRating"
                 )
             ]
         )

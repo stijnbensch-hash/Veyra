@@ -54,18 +54,22 @@ struct ContentView: View {
 
             // Losse, zwevende knoppen bovenin: vergrootglas linksboven
             // (Zoeken), tandwiel rechtsboven (Instellingen) — aan
-            // weerszijden van het scherm, zichtbaar op elk tabblad.
-            HStack {
-                FloatingIconButton(symbol: "magnifyingglass", accessibilityLabel: "Zoeken") {
-                    showSearch = true
+            // weerszijden van het scherm. Alleen op het Home-tabblad, zodat
+            // ze niet over de andere tabbladen (Films, Series, Live, Sport)
+            // heen blijven zweven.
+            if selectedTab == .home {
+                HStack {
+                    FloatingIconButton(symbol: "magnifyingglass", accessibilityLabel: "Zoeken") {
+                        showSearch = true
+                    }
+                    Spacer()
+                    FloatingIconButton(symbol: "gearshape.fill", accessibilityLabel: "Instellingen") {
+                        showSettings = true
+                    }
                 }
-                Spacer()
-                FloatingIconButton(symbol: "gearshape.fill", accessibilityLabel: "Instellingen") {
-                    showSettings = true
-                }
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
         }
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showSettings) {

@@ -52,6 +52,10 @@ struct JellyfinItem:
     let indexNumber: Int?
     let imageTags: [String: String]?
     let backdropImageTags: [String]?
+    /// Voor de Better Posters-badge op `VeyraPosterCard` — alleen gevuld als
+    /// de aanroep dit expliciet opvraagt via `Fields=Genres,CommunityRating`.
+    let genres: [String]?
+    let communityRating: Double?
 
     enum CodingKeys: String, CodingKey {
         case id = "Id"
@@ -65,7 +69,12 @@ struct JellyfinItem:
         case indexNumber = "IndexNumber"
         case imageTags = "ImageTags"
         case backdropImageTags = "BackdropImageTags"
+        case genres = "Genres"
+        case communityRating = "CommunityRating"
     }
+
+    /// Eerste genre, voor dezelfde badge als TMDB-gebaseerde posters.
+    var primaryGenre: String? { genres?.first }
 
     var isMovie: Bool { type == "Movie" }
     var isSeries: Bool { type == "Series" }

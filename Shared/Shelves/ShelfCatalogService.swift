@@ -107,7 +107,9 @@ enum ShelfCatalogService {
                     overview: item.overview?.isEmpty == false ? item.overview : meta.description,
                     releaseDate: item.releaseDate,
                     posterURL: meta.posterURL ?? item.posterURL,
-                    backdropURL: meta.backdropURL ?? item.backdropURL
+                    backdropURL: meta.backdropURL ?? item.backdropURL,
+                    genre: item.genre,
+                    rating: item.rating
                 )
             }
         }
@@ -125,7 +127,9 @@ enum ShelfCatalogService {
                     overview: item.overview,
                     releaseDate: item.releaseDate,
                     posterURL: imageURL(details.posterPath),
-                    backdropURL: imageURL(details.backdropPath, size: "w1280")
+                    backdropURL: imageURL(details.backdropPath, size: "w1280"),
+                    genre: item.genre,
+                    rating: details.voteAverage ?? item.rating
                 )
             }
         } else if kind == .series, let service = SeriesService() {
@@ -139,7 +143,9 @@ enum ShelfCatalogService {
                     overview: item.overview,
                     releaseDate: item.releaseDate,
                     posterURL: imageURL(details.posterPath),
-                    backdropURL: imageURL(details.backdropPath, size: "w1280")
+                    backdropURL: imageURL(details.backdropPath, size: "w1280"),
+                    genre: item.genre,
+                    rating: details.voteAverage ?? item.rating
                 )
             }
         }
@@ -230,7 +236,9 @@ enum ShelfCatalogService {
             overview: movie.overview,
             releaseDate: movie.releaseDate,
             posterURL: imageURL(movie.posterPath),
-            backdropURL: imageURL(movie.backdropPath, size: "w1280")
+            backdropURL: imageURL(movie.backdropPath, size: "w1280"),
+            genre: TMDBGenreNames.firstMovieName(for: movie.genreIDs ?? []),
+            rating: movie.voteAverage
         )
     }
 
@@ -242,7 +250,9 @@ enum ShelfCatalogService {
             overview: series.overview,
             releaseDate: series.firstAirDate,
             posterURL: imageURL(series.posterPath),
-            backdropURL: imageURL(series.backdropPath, size: "w1280")
+            backdropURL: imageURL(series.backdropPath, size: "w1280"),
+            genre: TMDBGenreNames.firstTVName(for: series.genreIDs ?? []),
+            rating: series.voteAverage
         )
     }
 

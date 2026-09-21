@@ -60,6 +60,17 @@ final class IPTVAccountsViewModel: ObservableObject {
         SourceOrderDefaults.saveIPTVProviderOrder(providers.map(\.id))
     }
 
+    /// Verplaatst één provider één plek omhoog (-1) of omlaag (+1) — gebruikt
+    /// door tvOS's omhoog/omlaag-knoppen (in plaats van drag-to-reorder,
+    /// dat op tvOS niet beschikbaar is).
+    func moveProvider(_ provider: IPTVStoredProvider, by offset: Int) {
+        guard let index = providers.firstIndex(where: { $0.id == provider.id }) else { return }
+        let destination = index + offset
+        guard providers.indices.contains(destination) else { return }
+        providers.swapAt(index, destination)
+        SourceOrderDefaults.saveIPTVProviderOrder(providers.map(\.id))
+    }
+
     func remove(_ provider: IPTVStoredProvider) {
         do {
             try configurationStore.removeProvider(id: provider.id)

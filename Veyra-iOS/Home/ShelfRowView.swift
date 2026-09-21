@@ -22,7 +22,9 @@ struct ShelfRowView: View {
                                         title: item.title,
                                         url: item.posterURL,
                                         symbol: item.type == .movie ? "film" : "tv",
-                                        width: 130
+                                        width: 130,
+                                        genre: item.genre,
+                                        rating: item.rating
                                     )
                                 }
                                 .buttonStyle(.plain)

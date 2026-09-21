@@ -85,19 +85,22 @@ struct IPTVAccountsView: View {
             ) {
                 HStack(spacing: 18) {
                     addProviderButton
-                    settingsButton
                 }
 
                 ForEach(viewModel.providers) {
                     provider in
 
-                    providerCard(
-                        provider
-                    )
+                    HStack(alignment: .top, spacing: 14) {
+                        providerCard(
+                            provider
+                        )
+
+                        reorderColumn(provider)
+                    }
                 }
             }
             .frame(
-                maxWidth: 850,
+                maxWidth: 920,
                 alignment: .leading
             )
             .padding(.horizontal, 10)
@@ -120,21 +123,6 @@ struct IPTVAccountsView: View {
                 )
 
                 Text("IPTV TOEVOEGEN")
-                    .font(.system(size: 22))
-            }
-        }
-        .buttonStyle(.bordered)
-    }
-
-    // MARK: - Settings
-
-    private var settingsButton: some View {
-        NavigationLink {
-            IPTVPlaybackSettingsView()
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "slider.horizontal.3")
-                Text("LIVE TV INSTELLINGEN")
                     .font(.system(size: 22))
             }
         }
@@ -262,6 +250,37 @@ struct IPTVAccountsView: View {
     }
 
     // MARK: - Actions
+
+    // MARK: - Reorder
+
+    /// Compacte omhoog/omlaag-knoppen om providers te herschikken, los van
+    /// `providerActions` zodat de kaartgrootte van de bestaande knoppenrij
+    /// (VERVERSEN/BEHEREN/BEWERKEN) ongewijzigd blijft.
+    private func reorderColumn(_ provider: IPTVStoredProvider) -> some View {
+        VStack(spacing: 6) {
+            Button {
+                viewModel.moveProvider(provider, by: -1)
+            } label: {
+                Image(systemName: "chevron.up")
+                    .font(.system(size: 16, weight: .semibold))
+                    .frame(width: 36, height: 30)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.mini)
+            .disabled(viewModel.providers.first?.id == provider.id)
+
+            Button {
+                viewModel.moveProvider(provider, by: 1)
+            } label: {
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 16, weight: .semibold))
+                    .frame(width: 36, height: 30)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.mini)
+            .disabled(viewModel.providers.last?.id == provider.id)
+        }
+    }
 
     private func providerActions(
         _ provider:
