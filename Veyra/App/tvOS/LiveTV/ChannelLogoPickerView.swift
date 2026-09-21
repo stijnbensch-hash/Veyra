@@ -88,8 +88,6 @@ struct ChannelLogoPickerView: View {
             }
         } header: {
             Label("Naam", systemImage: "textformat")
-        } footer: {
-            Text("Geldt overal waar deze zender wordt getoond, ook in de speler.")
         }
     }
 
@@ -111,21 +109,16 @@ struct ChannelLogoPickerView: View {
     }
 
     private var currentLogoPreview: some View {
-        HStack(spacing: 20) {
-            AsyncImage(url: currentOverrideURL) { phase in
-                if case .success(let image) = phase {
-                    image.resizable().scaledToFit()
-                } else {
-                    Image(systemName: "tv").foregroundStyle(.secondary)
-                }
+        AsyncImage(url: currentOverrideURL) { phase in
+            if case .success(let image) = phase {
+                image.resizable().scaledToFit()
+            } else {
+                Image(systemName: "tv").foregroundStyle(.secondary)
             }
-            .frame(width: 90, height: 60)
-            .background(Color.white.opacity(0.06))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-
-            Text(currentOverrideURL == nil ? "Standaardlogo van de provider/EPG." : "Eigen logo ingesteld.")
-                .foregroundStyle(.secondary)
         }
+        .frame(width: 90, height: 60)
+        .background(Color.white.opacity(0.06))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 
     // MARK: - Zoeken
@@ -151,8 +144,6 @@ struct ChannelLogoPickerView: View {
             }
         } header: {
             Label("Zoeken in logo-database (iptv-org)", systemImage: "magnifyingglass")
-        } footer: {
-            Text("Gratis, doorzoekbare verzameling zenderlogo's van het open-source iptv-org-project.")
         }
     }
 
