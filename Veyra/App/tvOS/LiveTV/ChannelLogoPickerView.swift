@@ -1,18 +1,20 @@
 import SwiftUI
 
-/// tvOS-scherm om het logo van één zender aan te passen — bereikbaar door
-/// lang op een zenderlogo te drukken (contextmenu: "Logo aanpassen…") in
-/// `LiveTVView` en `IPTVLiveManagementView`.
+/// tvOS-scherm om het logo én de naam van één zender aan te passen —
+/// bereikbaar door lang op een zenderlogo te drukken (contextmenu: "Logo
+/// aanpassen…") in `LiveTVView` en `IPTVLiveManagementView`.
 ///
-/// Twee bronnen: zoeken in de gratis iptv-org logo-database
+/// Logo: zoeken in de gratis iptv-org logo-database
 /// (`IPTVOrgLogoDirectory`), of zelf een afbeeldings-URL opgeven. Er is op
 /// tvOS bewust geen fotobibliotheek-optie (PhotosPicker bestaat niet op
-/// tvOS) — die staat wel op iOS. De keuze wordt opgeslagen via
-/// `ChannelLogoOverrideStore` en geldt overal waar deze zender voorkomt.
+/// tvOS) — die staat wel op iOS. Naam: vrije tekst. Beide keuzes worden
+/// opgeslagen via `ChannelLogoOverrideStore`/`ChannelNameOverrideStore` en
+/// gelden overal waar deze zender voorkomt.
 struct ChannelLogoPickerView: View {
     let channelID: String
     let channelName: String
     let currentOverrideURL: URL?
+    let currentNameOverride: String?
 
     var onSaved: () -> Void = {}
 
@@ -25,12 +27,49 @@ struct ChannelLogoPickerView: View {
 
     @State private var customURLString = ""
 
+    @State private var nameText: String
+
+    init(
+        channelID: String,
+        channelName: String,
+        currentOverrideURL: URL?,
+        currentNameOverride: String? = nil,
+        onSaved: @escaping () -> Void = {}
+    ) {
+        self.channelID = channelID
+        self.channelName = channelName
+        self.currentOverrideURL = currentOverrideURL
+        self.currentNameOverride = currentNameOverride
+        self.onSaved = onSaved
+        _nameText = State(initialValue: currentNameOverride ?? channelName)
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
                 VeyraBackground().ignoresSafeArea()
 
                 List {
+                    Section {
+                        TextField("Zendernaam", text: $nameText)
+                        Button("Naam opslaan") {
+                            saveName()
+                        }
+                        .disabled(isNameUnchanged || trimmedName.isEmpty)
+
+                        if currentNameOverride != nil {
+                            Button("Naam herstellen naar origineel", role: .destructive) {
+                                ChannelNameOverrideStore.removeOverride(forChannelID: channelID)
+                                nameText = channelName
+                                onSaved()
+                            }
+                        }
+                    } header: {
+                        Text("Naam")
+                    } footer: {
+                        Text("Geldt overal waar deze zender wordt getoond, ook in de speler.")
+                    }
+
                     Section {
                         currentLogoPreview
                     } header: {
@@ -82,13 +121,27 @@ struct ChannelLogoPickerView: View {
                     }
                 }
             }
-            .navigationTitle(channelName)
+            .navigationTitle(currentNameOverride ?? channelName)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Sluiten") { dismiss() }
                 }
             }
         }
+    }
+
+    private var trimmedName: String {
+        nameText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var isNameUnchanged: Bool {
+        trimmedName == (currentNameOverride ?? channelName)
+    }
+
+    private func saveName() {
+        guard !trimmedName.isEmpty else { return }
+        ChannelNameOverrideStore.setName(trimmedName, forChannelID: channelID)
+        onSaved()
     }
 
     private var currentLogoPreview: some View {
@@ -169,5 +222,5 @@ struct ChannelLogoPickerView: View {
 }
 
 #Preview {
-    ChannelLogoPickerView(channelID: "preview", channelName: "BBC One", currentOverrideURL: nil)
+    ChannelLogoPickerView(channelID: "preview", channelName: "BBC One", currentOverrideURL: nil, currentNameOverride: nil)
 }
