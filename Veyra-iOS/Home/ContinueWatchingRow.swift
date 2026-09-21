@@ -65,6 +65,12 @@ struct ContinueWatchingRow: View {
                 SeriesDetailView(series: series)
             }
         }
+        .onChange(of: destination) { _, newValue in
+            // Meldt deze push aan bij de gedeelde Home-navigatiestatus zodat
+            // de zwevende zoek-/instellingenknoppen verdwijnen zolang een
+            // titel vanuit "Verder kijken" geopend staat.
+            HomeNavigationState.shared.setActive(newValue != nil, source: "continueWatching")
+        }
     }
 
     // MARK: - Afleveringsvoortgang (aantal resterende afleveringen)

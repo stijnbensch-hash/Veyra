@@ -3,124 +3,511 @@ import SwiftUI
 struct SeriesDetailView: View {
     let series: TMDBSeries
 
-    @StateObject private var viewModel: SeriesDetailViewModel
-    @State private var ratings = MetadataRatings()
+    @ObservedObject private var trakt =
+        TraktStore.shared
 
-    init(series: TMDBSeries) {
+    @StateObject private var viewModel:
+        SeriesDetailViewModel
+
+    @State private var ratings =
+        MetadataRatings()
+
+    init(
+        series: TMDBSeries
+    ) {
         self.series = series
-        _viewModel = StateObject(wrappedValue: SeriesDetailViewModel(seriesID: series.id))
+
+        _viewModel =
+            StateObject(
+                wrappedValue:
+                    SeriesDetailViewModel(
+                        seriesID: series.id
+                    )
+            )
     }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(
+                alignment: .leading,
+                spacing: 18
+            ) {
                 backdrop
 
-                VStack(alignment: .leading, spacing: 14) {
+                VStack(
+                    alignment: .leading,
+                    spacing: 14
+                ) {
                     if viewModel.isLoading {
-                        ProgressView("Serie laden…")
-                    } else if let errorMessage = viewModel.errorMessage {
-                        Text("Serie kon niet worden geladen")
-                            .font(.headline)
-                        Text(errorMessage)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    } else if let details = viewModel.details {
-                        Text(details.name)
-                            .font(.title.weight(.bold))
+                        ProgressView(
+                            "Serie laden…"
+                        )
 
-                        if let year = releaseYear(from: details.firstAirDate) {
+                    } else if
+                        let errorMessage =
+                            viewModel.errorMessage
+                    {
+                        Text(
+                            "Serie kon niet worden geladen"
+                        )
+                        .font(.headline)
+
+                        Text(
+                            errorMessage
+                        )
+                        .font(.subheadline)
+                        .foregroundStyle(
+                            .secondary
+                        )
+
+                    } else if
+                        let details =
+                            viewModel.details
+                    {
+                        HStack(
+                            alignment: .center,
+                            spacing: 10
+                        ) {
+                            Text(
+                                details.name
+                            )
+                            .font(
+                                .title
+                                    .weight(
+                                        .bold
+                                    )
+                            )
+
+                            if hasAnyWatchedEpisode {
+                                watchedBadge
+                            }
+                        }
+
+                        if let year =
+                            releaseYear(
+                                from:
+                                    details
+                                    .firstAirDate
+                            )
+                        {
                             Text(year)
-                                .font(.subheadline)
-                                .foregroundStyle(VeyraColors.cyan)
+                                .font(
+                                    .subheadline
+                                )
+                                .foregroundStyle(
+                                    VeyraColors
+                                        .cyan
+                                )
                         }
 
-                        MetadataRatingsView(ratings: ratings)
+                        MetadataRatingsView(
+                            ratings:
+                                ratings
+                        )
 
-                        if !details.overview.isEmpty {
-                            Text(details.overview)
-                                .font(.body)
-                                .foregroundStyle(.secondary)
+                        if !details
+                            .overview
+                            .isEmpty
+                        {
+                            Text(
+                                details
+                                    .overview
+                            )
+                            .font(.body)
+                            .foregroundStyle(
+                                .secondary
+                            )
                         }
 
-                        WatchlistToggleButton(item: mediaItem(from: details))
+                        WatchlistToggleButton(
+                            item:
+                                mediaItem(
+                                    from:
+                                        details
+                                )
+                        )
 
-                        let seasons = details.seasons.filter { $0.seasonNumber > 0 }
-                        if !seasons.isEmpty {
-                            Text("Seizoenen")
-                                .font(.headline)
-                                .padding(.top, 8)
-
-                            ForEach(seasons) { season in
-                                NavigationLink {
-                                    SeasonEpisodesView(series: details, season: season)
-                                } label: {
-                                    HStack {
-                                        Text("Seizoen \(season.seasonNumber)")
-                                        Spacer()
-                                        Text("\(season.episodeCount) afl.")
-                                            .foregroundStyle(.secondary)
-                                        Image(systemName: "chevron.right")
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    .font(.subheadline)
-                                    .foregroundStyle(.primary)
-                                    .contentShape(Rectangle())
+                        let seasons =
+                            details.seasons
+                                .filter {
+                                    $0.seasonNumber
+                                        > 0
                                 }
-                                .buttonStyle(.plain)
+
+                        if !seasons.isEmpty {
+                            Text(
+                                "Seizoenen"
+                            )
+                            .font(
+                                .headline
+                            )
+                            .padding(
+                                .top,
+                                8
+                            )
+
+                            ForEach(
+                                seasons
+                            ) { season in
+                                NavigationLink {
+                                    SeasonEpisodesView(
+                                        series:
+                                            details,
+                                        season:
+                                            season
+                                    )
+
+                                } label: {
+                                    HStack(
+                                        spacing: 12
+                                    ) {
+                                        Text(
+                                            "Seizoen \(season.seasonNumber)"
+                                        )
+
+                                        Spacer()
+
+                                        if isSeasonWatched(
+                                            seasonNumber:
+                                                season.seasonNumber,
+                                            episodeCount:
+                                                season.episodeCount
+                                        ) {
+                                            watchedBadge
+                                        }
+
+                                        Text(
+                                            "\(season.episodeCount) afl."
+                                        )
+                                        .foregroundStyle(
+                                            .secondary
+                                        )
+
+                                        Image(
+                                            systemName:
+                                                "chevron.right"
+                                        )
+                                        .font(
+                                            .caption
+                                        )
+                                        .foregroundStyle(
+                                            .secondary
+                                        )
+                                    }
+                                    .font(
+                                        .subheadline
+                                    )
+                                    .foregroundStyle(
+                                        .primary
+                                    )
+                                    .contentShape(
+                                        Rectangle()
+                                    )
+                                }
+                                .buttonStyle(
+                                    .plain
+                                )
+
                                 Divider()
                             }
                         }
                     }
                 }
-                .padding(.horizontal)
+                .padding(
+                    .horizontal
+                )
             }
-            .padding(.bottom, 40)
+            .padding(
+                .bottom,
+                40
+            )
         }
-        .background(VeyraColors.background.ignoresSafeArea())
-        .navigationTitle(series.name)
-        .navigationBarTitleDisplayMode(.inline)
-        .ignoresSafeArea(edges: .top)
-        .task { await viewModel.loadDetails() }
-        .task(id: series.id) {
-            ratings = await MetadataRatingsService.seriesRatings(tmdbID: series.id, imdbID: nil)
+        .background(
+            VeyraColors
+                .background
+                .ignoresSafeArea()
+        )
+        .navigationTitle(
+            series.name
+        )
+        .navigationBarTitleDisplayMode(
+            .inline
+        )
+        .ignoresSafeArea(
+            edges: .top
+        )
+        .task {
+            async let detailsTask:
+                Void =
+                viewModel.loadDetails()
+
+            async let traktTask:
+                Void =
+                refreshTrakt()
+
+            _ = await (
+                detailsTask,
+                traktTask
+            )
+        }
+        .task(
+            id: series.id
+        ) {
+            ratings =
+                await MetadataRatingsService
+                    .seriesRatings(
+                        tmdbID:
+                            series.id,
+                        imdbID:
+                            nil
+                    )
         }
     }
 
-    private var backdrop: some View {
-        AsyncImage(url: imageURL(path: viewModel.details?.backdropPath ?? series.backdropPath, size: "w1280")) { phase in
+    // MARK: - Backdrop
+
+    private var backdrop:
+        some View
+    {
+        AsyncImage(
+            url:
+                imageURL(
+                    path:
+                        viewModel
+                        .details?
+                        .backdropPath
+                        ?? series
+                        .backdropPath,
+                    size:
+                        "w1280"
+                )
+        ) { phase in
             switch phase {
-            case .success(let image):
-                image.resizable().scaledToFill()
+            case .success(
+                let image
+            ):
+                image
+                    .resizable()
+                    .scaledToFill()
+
             default:
-                VeyraColors.surface
+                VeyraColors
+                    .surface
             }
         }
-        .frame(height: 220)
+        .frame(
+            height: 220
+        )
         .clipped()
     }
 
-    private func imageURL(path: String?, size: String) -> URL? {
-        guard let path, !path.isEmpty else { return nil }
-        return URL(string: "https://image.tmdb.org/t/p/\(size)\(path)")
+    // MARK: - Watched
+
+    private var watchedBadge:
+        some View
+    {
+        ZStack {
+            Circle()
+                .fill(
+                    .ultraThinMaterial
+                )
+
+            Circle()
+                .stroke(
+                    VeyraColors
+                        .cyan
+                        .opacity(
+                            0.95
+                        ),
+                    lineWidth:
+                        1.5
+                )
+
+            Image(
+                systemName:
+                    "checkmark"
+            )
+            .font(
+                .system(
+                    size: 11,
+                    weight:
+                        .bold
+                )
+            )
+            .foregroundStyle(
+                VeyraColors
+                    .cyan
+            )
+        }
+        .frame(
+            width: 26,
+            height: 26
+        )
+        .shadow(
+            color:
+                .black.opacity(
+                    0.35
+                ),
+            radius: 5,
+            y: 2
+        )
+        .accessibilityLabel(
+            "Bekeken"
+        )
     }
 
-    private func releaseYear(from date: String?) -> String? {
-        guard let date, date.count >= 4 else { return nil }
-        return String(date.prefix(4))
+    private var watchedEntry:
+        TraktEntry?
+    {
+        trakt.watchedShows
+            .first {
+                $0.show?
+                    .ids
+                    .tmdb
+                    == series.id
+            }
     }
 
-    /// `MediaItem` voor de serie als geheel (geen seizoen/aflevering), voor
-    /// de watchlist-knop op deze infopagina.
-    private func mediaItem(from details: TMDBSeriesDetails) -> MediaItem {
+    private var hasAnyWatchedEpisode:
+        Bool
+    {
+        guard let seasons =
+            watchedEntry?
+                .seasons
+        else {
+            return false
+        }
+
+        return seasons
+            .contains {
+                season in
+
+                season.episodes
+                    .contains {
+                        episode in
+
+                        (
+                            episode
+                                .plays
+                                ?? 1
+                        ) > 0
+                    }
+            }
+    }
+
+    private func isSeasonWatched(
+        seasonNumber: Int,
+        episodeCount: Int
+    ) -> Bool {
+        guard
+            episodeCount > 0,
+            let season =
+                watchedEntry?
+                    .seasons?
+                    .first(
+                        where: {
+                            $0.number
+                                == seasonNumber
+                        }
+                    )
+        else {
+            return false
+        }
+
+        let watchedEpisodeNumbers =
+            Set(
+                season.episodes
+                    .filter {
+                        (
+                            $0.plays
+                                ?? 1
+                        ) > 0
+                    }
+                    .map(
+                        \.number
+                    )
+            )
+
+        return watchedEpisodeNumbers
+            .count
+            >= episodeCount
+    }
+
+    // MARK: - Trakt
+
+    @MainActor
+    private func refreshTrakt()
+        async
+    {
+        guard
+            trakt.isConnected
+        else {
+            return
+        }
+
+        await trakt
+            .refreshIfNeeded()
+    }
+
+    // MARK: - Helpers
+
+    private func imageURL(
+        path: String?,
+        size: String
+    ) -> URL? {
+        guard
+            let path,
+            !path.isEmpty
+        else {
+            return nil
+        }
+
+        return URL(
+            string:
+                "https://image.tmdb.org/t/p/\(size)\(path)"
+        )
+    }
+
+    private func releaseYear(
+        from date: String?
+    ) -> String? {
+        guard
+            let date,
+            date.count >= 4
+        else {
+            return nil
+        }
+
+        return String(
+            date.prefix(4)
+        )
+    }
+
+    private func mediaItem(
+        from details:
+            TMDBSeriesDetails
+    ) -> MediaItem {
         MediaItem(
-            title: details.name,
-            type: .series,
-            tmdbID: series.id,
-            overview: details.overview,
-            releaseDate: details.firstAirDate,
-            backdropURL: imageURL(path: details.backdropPath ?? series.backdropPath, size: "w1280")
+            title:
+                details.name,
+            type:
+                .series,
+            tmdbID:
+                series.id,
+            overview:
+                details.overview,
+            releaseDate:
+                details.firstAirDate,
+            backdropURL:
+                imageURL(
+                    path:
+                        details
+                        .backdropPath
+                        ?? series
+                        .backdropPath,
+                    size:
+                        "w1280"
+                )
         )
     }
 }

@@ -35,15 +35,38 @@ extension TMDBClient {
         }
     }
 
-    /// Maximaal aantal items dat per streamingdienst wordt opgehaald (5 TMDB-pagina's à 20 items).
+    /// Maximaal aantal items dat per bevraging wordt opgehaald (5 TMDB-pagina's à 20 items).
     private static let maxProviderResultPages = 5
 
-    func movies(providerID: Int, region: String) async throws -> [TMDBMovie] {
+    /// Films ontdekken via TMDB's discover-endpoint, optioneel gefilterd op
+    /// streamingdienst, genre, decennium (jarenbereik) en minimale
+    /// beoordeling. Alle parameters zijn optioneel en kunnen vrij worden
+    /// gecombineerd; wordt er niets meegegeven dan komt dit overeen met
+    /// "populair" (sortering op releasedatum, nieuwste eerst).
+    func movies(
+        providerID: Int? = nil,
+        region: String,
+        genreID: Int? = nil,
+        minimumYear: Int? = nil,
+        maximumYear: Int? = nil,
+        minimumRating: Double? = nil
+    ) async throws -> [TMDBMovie] {
         var results: [TMDBMovie] = []
         for page in 1...Self.maxProviderResultPages {
             let response: TMDBMoviePage = try await request(
                 path: "/3/discover/movie",
-                queryItems: providerQuery(providerID, region: region, sortBy: "primary_release_date.desc", page: page)
+                queryItems: discoverQuery(
+                    providerID: providerID,
+                    region: region,
+                    genreID: genreID,
+                    minimumYear: minimumYear,
+                    maximumYear: maximumYear,
+                    minimumRating: minimumRating,
+                    sortBy: "primary_release_date.desc",
+                    dateGTEKey: "primary_release_date.gte",
+                    dateLTEKey: "primary_release_date.lte",
+                    page: page
+                )
             )
             results.append(contentsOf: response.results)
             if response.results.count < 20 { break }
@@ -51,12 +74,31 @@ extension TMDBClient {
         return Array(results.prefix(100))
     }
 
-    func series(providerID: Int, region: String) async throws -> [TMDBSeries] {
+    /// Series ontdekken via TMDB's discover-endpoint — zie `movies(...)` hierboven.
+    func series(
+        providerID: Int? = nil,
+        region: String,
+        genreID: Int? = nil,
+        minimumYear: Int? = nil,
+        maximumYear: Int? = nil,
+        minimumRating: Double? = nil
+    ) async throws -> [TMDBSeries] {
         var results: [TMDBSeries] = []
         for page in 1...Self.maxProviderResultPages {
             let response: TMDBSeriesPage = try await request(
                 path: "/3/discover/tv",
-                queryItems: providerQuery(providerID, region: region, sortBy: "first_air_date.desc", page: page)
+                queryItems: discoverQuery(
+                    providerID: providerID,
+                    region: region,
+                    genreID: genreID,
+                    minimumYear: minimumYear,
+                    maximumYear: maximumYear,
+                    minimumRating: minimumRating,
+                    sortBy: "first_air_date.desc",
+                    dateGTEKey: "first_air_date.gte",
+                    dateLTEKey: "first_air_date.lte",
+                    page: page
+                )
             )
             results.append(contentsOf: response.results)
             if response.results.count < 20 { break }
@@ -64,11 +106,47 @@ extension TMDBClient {
         return Array(results.prefix(100))
     }
 
-    private func providerQuery(_ id: Int, region: String, sortBy: String, page: Int) -> [URLQueryItem] {
-        [URLQueryItem(name: "with_watch_providers", value: String(id)),
-         URLQueryItem(name: "watch_region", value: region),
-         URLQueryItem(name: "sort_by", value: sortBy),
-         URLQueryItem(name: "include_adult", value: "false"),
-         URLQueryItem(name: "page", value: String(page))]
+    private func discoverQuery(
+        providerID: Int?,
+        region: String,
+        genreID: Int?,
+        minimumYear: Int?,
+        maximumYear: Int?,
+        minimumRating: Double?,
+        sortBy: String,
+        dateGTEKey: String,
+        dateLTEKey: String,
+        page: Int
+    ) -> [URLQueryItem] {
+        var items = [
+            URLQueryItem(name: "sort_by", value: sortBy),
+            URLQueryItem(name: "include_adult", value: "false"),
+            URLQueryItem(name: "page", value: String(page))
+        ]
+
+        if let providerID {
+            items.append(URLQueryItem(name: "with_watch_providers", value: String(providerID)))
+            items.append(URLQueryItem(name: "watch_region", value: region))
+        }
+
+        if let genreID {
+            items.append(URLQueryItem(name: "with_genres", value: String(genreID)))
+        }
+
+        if let minimumYear {
+            items.append(URLQueryItem(name: dateGTEKey, value: "\(minimumYear)-01-01"))
+        }
+
+        if let maximumYear {
+            items.append(URLQueryItem(name: dateLTEKey, value: "\(maximumYear)-12-31"))
+        }
+
+        if let minimumRating {
+            items.append(URLQueryItem(name: "vote_average.gte", value: String(minimumRating)))
+            // Voorkomt dat nauwelijks-bekeken titels met een toevallige hoge score bovenaan komen.
+            items.append(URLQueryItem(name: "vote_count.gte", value: "20"))
+        }
+
+        return items
     }
 }

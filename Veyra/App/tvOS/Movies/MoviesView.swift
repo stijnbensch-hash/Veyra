@@ -7,6 +7,9 @@ struct MoviesView: View {
     @State private var isOpeningMovie = false
     @State private var errorMessage: String?
     @State private var selectedProvider: WatchProvider?
+    @State private var selectedGenreID: Int?
+    @State private var selectedDecade: VeyraDecadeFilter?
+    @State private var selectedRating: VeyraRatingFilter?
 
     @AppStorage("catalog.watchRegion")
     private var watchRegion = "BE"
@@ -68,6 +71,13 @@ struct MoviesView: View {
                             selection: $selectedProvider,
                             region: $watchRegion
                         )
+
+                        MediaFiltersRow(
+                            kind: .movie,
+                            selectedGenreID: $selectedGenreID,
+                            selectedDecade: $selectedDecade,
+                            selectedRating: $selectedRating
+                        )
                     }
 
                     content
@@ -105,8 +115,7 @@ struct MoviesView: View {
                 .refreshIfNeeded()
         }
         .task(
-            id:
-                "\(watchRegion)-\(selectedProvider?.id ?? 0)"
+            id: catalogTaskID
         ) {
             await loadPopularMovies()
         }
@@ -129,12 +138,47 @@ struct MoviesView: View {
     private var header: some View {
         VeyraSectionHeader(
             title: "Films",
-            subtitle:
-                selectedProvider.map {
-                    "\($0.name) · \(watchRegion)"
-                }
-                ?? "Populair · \(watchRegion)"
+            subtitle: filterSummary
         )
+    }
+
+    private var filterSummary: String {
+        var parts: [String] = []
+
+        if let selectedProvider {
+            parts.append(selectedProvider.name)
+        }
+
+        if let selectedGenreID, let name = TMDBGenreNames.movieName(for: selectedGenreID) {
+            parts.append(name)
+        }
+
+        if let selectedDecade {
+            parts.append(selectedDecade.title)
+        }
+
+        if let selectedRating {
+            parts.append(selectedRating.title)
+        }
+
+        guard !parts.isEmpty else {
+            return "Populair · \(watchRegion)"
+        }
+
+        parts.append(watchRegion)
+
+        return parts.joined(separator: " · ")
+    }
+
+    private var catalogTaskID: String {
+        [
+            watchRegion,
+            selectedProvider?.id.description ?? "-",
+            selectedGenreID?.description ?? "-",
+            selectedDecade?.id ?? "-",
+            selectedRating.map { String($0.rawValue) } ?? "-",
+        ]
+        .joined(separator: "|")
     }
 
     // MARK: - Content
@@ -319,7 +363,11 @@ struct MoviesView: View {
             let result:
                 [TMDBMovie]
 
-            if let selectedProvider {
+            if selectedProvider != nil
+                || selectedGenreID != nil
+                || selectedDecade != nil
+                || selectedRating != nil
+            {
                 result =
                     try await TMDBClient(
                         readAccessToken:
@@ -327,9 +375,17 @@ struct MoviesView: View {
                     )
                     .movies(
                         providerID:
-                            selectedProvider.id,
+                            selectedProvider?.id,
                         region:
-                            watchRegion
+                            watchRegion,
+                        genreID:
+                            selectedGenreID,
+                        minimumYear:
+                            selectedDecade?.startYear,
+                        maximumYear:
+                            selectedDecade?.endYear,
+                        minimumRating:
+                            selectedRating?.rawValue
                     )
 
             } else {

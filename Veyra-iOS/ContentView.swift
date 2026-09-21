@@ -12,23 +12,11 @@ private enum AppTab: Hashable {
 struct ContentView: View {
     @State private var selectedTab: AppTab = .home
     @State private var showSettings = false
+    @ObservedObject private var homeNavigation = HomeNavigationState.shared
     @State private var showSearch = false
 
     var body: some View {
         ZStack(alignment: .top) {
-            // Precies 5 tabbladen: dit blijft onder de drempel waarop iOS
-            // zelf een "More"-tabblad toevoegt (dat gebeurt pas vanaf 6).
-            // Instellingen en Zoeken zaten hier vroeger ook als tabblad,
-            // maar met 7 tabbladen viel dan telkens één van de twee (meestal
-            // Instellingen) achter "More" — en dat gaf een dubbele
-            // terugpijl zodra Instellingen zelf ook pushte (naar bv.
-            // Account), omdat de balk van "More" en onze eigen balk dan
-            // allebei zichtbaar werden. Er bleek geen betrouwbare manier om
-            // één van die twee balken via een modifier te verbergen. Door
-            // Instellingen en Zoeken helemaal geen tabblad meer te laten
-            // zijn — en ze in plaats daarvan als losse knoppen te tonen die
-            // een sheet openen — is er geen "More" meer nodig en dus ook
-            // geen dubbele balk meer mogelijk.
             TabView(selection: $selectedTab) {
                 HomeView()
                     .tabItem { Label("Home", systemImage: "house.fill") }
@@ -53,11 +41,9 @@ struct ContentView: View {
             .tint(VeyraColors.cyan)
 
             // Losse, zwevende knoppen bovenin: vergrootglas linksboven
-            // (Zoeken), tandwiel rechtsboven (Instellingen) — aan
-            // weerszijden van het scherm. Alleen op het Home-tabblad, zodat
-            // ze niet over de andere tabbladen (Films, Series, Live, Sport)
-            // heen blijven zweven.
-            if selectedTab == .home {
+            // (Zoeken), tandwiel rechtsboven (Instellingen) — enkel op het
+            // Home-tabblad, nergens anders.
+            if selectedTab == .home && homeNavigation.isAtRoot {
                 HStack {
                     FloatingIconButton(symbol: "magnifyingglass", accessibilityLabel: "Zoeken") {
                         showSearch = true

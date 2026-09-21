@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct SeriesView: View {
+    @ObservedObject private var trakt = TraktStore.shared
+
     @State private var series: [TMDBSeries] = []
     @State private var selectedSeries: TMDBSeries?
     @State private var isLoading = true
@@ -15,51 +17,92 @@ struct SeriesView: View {
 
     @State private var catalogRequestID = UUID()
 
-    private let columns = [GridItem(.adaptive(minimum: 112), spacing: 12)]
-    private let posterBaseURL = URL(string: "https://image.tmdb.org/t/p/w500")!
+    private let columns = [
+        GridItem(
+            .adaptive(minimum: 112),
+            spacing: 12
+        )
+    ]
+
+    private let posterBaseURL =
+        URL(string: "https://image.tmdb.org/t/p/w500")!
 
     var body: some View {
         NavigationStack {
             ZStack {
                 VeyraArtworkBackground(
                     url: series.first?.backdropPath.flatMap {
-                        URL(string: "https://image.tmdb.org/t/p/w1280" + $0)
+                        URL(
+                            string:
+                                "https://image.tmdb.org/t/p/w1280"
+                                + $0
+                        )
                     }
                 )
 
-                ScrollView(.vertical, showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 24) {
+                ScrollView(
+                    .vertical,
+                    showsIndicators: false
+                ) {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 24
+                    ) {
                         if let featured = series.first {
                             VeyraHero(
                                 title: featured.name,
                                 eyebrow: "Serie uitgelicht",
                                 overview: featured.overview,
-                                metadata: featured.firstAirDate.map { [String($0.prefix(4))] } ?? []
+                                metadata:
+                                    featured.firstAirDate.map {
+                                        [
+                                            String(
+                                                $0.prefix(4)
+                                            )
+                                        ]
+                                    }
+                                    ?? []
                             ) {
                                 Button {
                                     selectedSeries = featured
                                 } label: {
-                                    VeyraActionLabel(title: "Afleveringen bekijken", symbol: "play.rectangle")
+                                    VeyraActionLabel(
+                                        title:
+                                            "Afleveringen bekijken",
+                                        symbol:
+                                            "play.rectangle"
+                                    )
                                 }
                                 .buttonStyle(.plain)
-                                .background(.white.opacity(0.14), in: Capsule())
+                                .background(
+                                    .white.opacity(0.14),
+                                    in: Capsule()
+                                )
                             }
                         }
 
-                        VStack(alignment: .leading, spacing: 6) {
+                        VStack(
+                            alignment: .leading,
+                            spacing: 6
+                        ) {
                             header
 
                             WatchProviderRowIOS(
                                 kind: .tv,
-                                selection: $selectedProvider,
-                                region: $watchRegion
+                                selection:
+                                    $selectedProvider,
+                                region:
+                                    $watchRegion
                             )
 
                             MediaFiltersRowIOS(
                                 kind: .tv,
-                                selectedGenreID: $selectedGenreID,
-                                selectedDecade: $selectedDecade,
-                                selectedRating: $selectedRating
+                                selectedGenreID:
+                                    $selectedGenreID,
+                                selectedDecade:
+                                    $selectedDecade,
+                                selectedRating:
+                                    $selectedRating
                             )
                         }
 
@@ -70,11 +113,35 @@ struct SeriesView: View {
                     .padding(.bottom, 40)
                 }
             }
-            .toolbar(.hidden, for: .navigationBar)
-            .onChange(of: watchRegion) { _, _ in selectedProvider = nil }
-            .task(id: catalogTaskID) { await loadSeries() }
-            .navigationDestination(item: $selectedSeries) { series in
-                SeriesDetailView(series: series)
+            .toolbar(
+                .hidden,
+                for: .navigationBar
+            )
+            .onChange(
+                of: watchRegion
+            ) { _, _ in
+                selectedProvider = nil
+            }
+            .task(
+                id: catalogTaskID
+            ) {
+                async let catalogTask: Void =
+                    loadSeries()
+
+                async let traktTask: Void =
+                    refreshTrakt()
+
+                _ = await (
+                    catalogTask,
+                    traktTask
+                )
+            }
+            .navigationDestination(
+                item: $selectedSeries
+            ) { series in
+                SeriesDetailView(
+                    series: series
+                )
             }
         }
     }
@@ -88,65 +155,144 @@ struct SeriesView: View {
         )
     }
 
-    /// NB: `selectedGenreID`/`selectedDecade`/`selectedRating` filteren de
-    /// TMDB-aanroep zelf nog niet (die ondersteunt dat vandaag niet) — ze
-    /// veranderen alleen deze samenvatting en de cache-sleutel hieronder,
-    /// zodat de UI alvast klaarstaat zodra `TMDBClient`/`SeriesService`
-    /// discover-parameters krijgen.
     private var filterSummary: String {
         var parts: [String] = []
 
-        if let selectedProvider { parts.append(selectedProvider.name) }
-        if let selectedGenreID, let name = TMDBGenreNames.tvName(for: selectedGenreID) {
+        if let selectedProvider {
+            parts.append(
+                selectedProvider.name
+            )
+        }
+
+        if let selectedGenreID,
+           let name =
+            TMDBGenreNames.tvName(
+                for: selectedGenreID
+            )
+        {
             parts.append(name)
         }
-        if let selectedDecade { parts.append(selectedDecade.title) }
-        if let selectedRating { parts.append(selectedRating.title) }
 
-        guard !parts.isEmpty else { return "Populair · \(watchRegion)" }
+        if let selectedDecade {
+            parts.append(
+                selectedDecade.title
+            )
+        }
+
+        if let selectedRating {
+            parts.append(
+                selectedRating.title
+            )
+        }
+
+        guard !parts.isEmpty else {
+            return
+                "Populair · \(watchRegion)"
+        }
 
         parts.append(watchRegion)
-        return parts.joined(separator: " · ")
+
+        return parts.joined(
+            separator: " · "
+        )
     }
 
-    /// `.task(id:)`-sleutel: verandert zodra een van de filters wijzigt, om
-    /// de catalogus opnieuw op te halen.
     private var catalogTaskID: String {
         [
             watchRegion,
-            selectedProvider?.id.description ?? "-",
-            selectedGenreID?.description ?? "-",
-            selectedDecade?.id ?? "-",
-            selectedRating.map { String($0.rawValue) } ?? "-",
-        ].joined(separator: "|")
+            selectedProvider?
+                .id
+                .description
+                ?? "-",
+            selectedGenreID?
+                .description
+                ?? "-",
+            selectedDecade?
+                .id
+                ?? "-",
+            selectedRating.map {
+                String($0.rawValue)
+            }
+            ?? "-",
+        ]
+        .joined(
+            separator: "|"
+        )
     }
 
     // MARK: - Content
 
     @ViewBuilder
     private var content: some View {
-        if isLoading && series.isEmpty {
-            ProgressView("Series laden…")
-                .padding(.top, 20)
-                .frame(maxWidth: .infinity)
-        } else if let errorMessage, series.isEmpty {
-            errorView(errorMessage)
-        } else if series.isEmpty {
-            ContentUnavailableView("Geen series beschikbaar", systemImage: "tv")
+        if isLoading
+            && series.isEmpty
+        {
+            ProgressView(
+                "Series laden…"
+            )
+            .padding(.top, 20)
+            .frame(
+                maxWidth: .infinity
+            )
+
+        } else if
+            let errorMessage,
+            series.isEmpty
+        {
+            errorView(
+                errorMessage
+            )
+
+        } else if
+            series.isEmpty
+        {
+            ContentUnavailableView(
+                "Geen series beschikbaar",
+                systemImage: "tv"
+            )
+
         } else {
-            LazyVGrid(columns: columns, spacing: 14) {
-                ForEach(series) { item in
+            LazyVGrid(
+                columns: columns,
+                spacing: 14
+            ) {
+                ForEach(series) {
+                    item in
+
                     Button {
                         selectedSeries = item
                     } label: {
-                        VeyraPosterCard(
-                            title: item.name,
-                            url: posterURL(for: item),
-                            symbol: "tv",
-                            width: 112,
-                            genre: TMDBGenreNames.firstTVName(for: item.genreIDs ?? []),
-                            rating: item.voteAverage
-                        )
+                        ZStack(
+                            alignment:
+                                .topTrailing
+                        ) {
+                            VeyraPosterCard(
+                                title:
+                                    item.name,
+                                url:
+                                    posterURL(
+                                        for: item
+                                    ),
+                                symbol: "tv",
+                                width: 112,
+                                genre:
+                                    TMDBGenreNames
+                                    .firstTVName(
+                                        for:
+                                            item.genreIDs
+                                            ?? []
+                                    ),
+                                rating:
+                                    item.voteAverage
+                            )
+
+                            if hasWatchedProgress(
+                                item
+                            ) {
+                                watchedBadge
+                                    .padding(7)
+                            }
+                        }
                     }
                     .buttonStyle(.plain)
                 }
@@ -154,63 +300,246 @@ struct SeriesView: View {
         }
     }
 
-    private func errorView(_ message: String) -> some View {
-        VStack(spacing: 12) {
-            Text("Series konden niet worden geladen")
-                .font(.headline)
-                .foregroundStyle(.white)
+    // MARK: - Watched
+
+    private var watchedBadge:
+        some View
+    {
+        ZStack {
+            Circle()
+                .fill(
+                    .ultraThinMaterial
+                )
+
+            Circle()
+                .stroke(
+                    Color.cyan
+                        .opacity(0.95),
+                    lineWidth: 1.5
+                )
+
+            Image(
+                systemName:
+                    "checkmark"
+            )
+            .font(
+                .system(
+                    size: 11,
+                    weight: .bold
+                )
+            )
+            .foregroundStyle(
+                Color.cyan
+            )
+        }
+        .frame(
+            width: 26,
+            height: 26
+        )
+        .shadow(
+            color:
+                .black.opacity(0.35),
+            radius: 5,
+            y: 2
+        )
+        .accessibilityLabel(
+            "Bekeken"
+        )
+    }
+
+    private func hasWatchedProgress(
+        _ series: TMDBSeries
+    ) -> Bool {
+        guard let entry =
+            trakt.watchedShows
+                .first(where: {
+                    $0.show?
+                        .ids
+                        .tmdb
+                        == series.id
+                })
+        else {
+            return false
+        }
+
+        return entry.seasons?
+            .contains(where: {
+                season in
+
+                season.episodes
+                    .contains(where: {
+                        ($0.plays ?? 1) > 0
+                    })
+            })
+            ?? false
+    }
+
+    // MARK: - Error
+
+    private func errorView(
+        _ message: String
+    ) -> some View {
+        VStack(
+            spacing: 12
+        ) {
+            Text(
+                "Series konden niet worden geladen"
+            )
+            .font(.headline)
+            .foregroundStyle(.white)
+
             Text(message)
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
-            Button("Opnieuw proberen") {
-                Task { await loadSeries() }
+                .foregroundStyle(
+                    .secondary
+                )
+
+            Button(
+                "Opnieuw proberen"
+            ) {
+                Task {
+                    await loadSeries()
+                }
             }
         }
         .padding()
-        .frame(maxWidth: .infinity)
+        .frame(
+            maxWidth: .infinity
+        )
     }
 
-    private func posterURL(for series: TMDBSeries) -> URL? {
-        guard let path = series.posterPath else { return nil }
-        return posterBaseURL.appendingPathComponent(path.trimmingCharacters(in: CharacterSet(charactersIn: "/")))
+    // MARK: - Poster
+
+    private func posterURL(
+        for series: TMDBSeries
+    ) -> URL? {
+        guard let path =
+            series.posterPath
+        else {
+            return nil
+        }
+
+        return posterBaseURL
+            .appendingPathComponent(
+                path
+                    .trimmingCharacters(
+                        in:
+                            CharacterSet(
+                                charactersIn: "/"
+                            )
+                    )
+            )
     }
 
     // MARK: - Load series
 
     @MainActor
-    private func loadSeries() async {
+    private func loadSeries()
+        async
+    {
         let requestID = UUID()
-        catalogRequestID = requestID
+
+        catalogRequestID =
+            requestID
+
         isLoading = true
         errorMessage = nil
 
-        guard let service = SeriesService(), let token = AppConfiguration.tmdbReadAccessToken else {
-            errorMessage = "De metadataservice is niet geconfigureerd."
+        guard
+            let service =
+                SeriesService(),
+            let token =
+                AppConfiguration
+                .tmdbReadAccessToken
+        else {
+            errorMessage =
+                "De metadataservice is niet geconfigureerd."
+
             isLoading = false
             return
         }
 
         do {
-            let result: [TMDBSeries]
+            let result:
+                [TMDBSeries]
 
-            if let selectedProvider {
-                result = try await TMDBClient(readAccessToken: token)
-                    .series(providerID: selectedProvider.id, region: watchRegion)
+            if selectedProvider != nil
+                || selectedGenreID != nil
+                || selectedDecade != nil
+                || selectedRating != nil
+            {
+                result =
+                    try await TMDBClient(
+                        readAccessToken:
+                            token
+                    )
+                    .series(
+                        providerID:
+                            selectedProvider?.id,
+                        region:
+                            watchRegion,
+                        genreID:
+                            selectedGenreID,
+                        minimumYear:
+                            selectedDecade?.startYear,
+                        maximumYear:
+                            selectedDecade?.endYear,
+                        minimumRating:
+                            selectedRating?.rawValue
+                    )
+
             } else {
-                result = try await service.popularSeries()
+                result =
+                    try await service
+                    .popularSeries()
             }
 
-            try Task.checkCancellation()
-            guard catalogRequestID == requestID else { return }
+            try Task
+                .checkCancellation()
+
+            guard
+                catalogRequestID
+                    == requestID
+            else {
+                return
+            }
+
             series = result
+
         } catch {
-            guard !Task.isCancelled, catalogRequestID == requestID else { return }
-            errorMessage = error.localizedDescription
+            guard
+                !Task.isCancelled,
+                catalogRequestID
+                    == requestID
+            else {
+                return
+            }
+
+            errorMessage =
+                error.localizedDescription
         }
 
-        if catalogRequestID == requestID {
+        if catalogRequestID
+            == requestID
+        {
             isLoading = false
         }
+    }
+
+    // MARK: - Trakt
+
+    @MainActor
+    private func refreshTrakt()
+        async
+    {
+        guard
+            trakt.isConnected
+        else {
+            return
+        }
+
+        await trakt
+            .refreshIfNeeded()
     }
 }
 

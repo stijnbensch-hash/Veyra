@@ -93,6 +93,12 @@ struct HomeView: View {
             .navigationDestination(item: $selectedMovieItem) { movie in
                 MovieDetailView(movie: movie)
             }
+            .onChange(of: selectedMovieItem) { _, newValue in
+                // Meldt deze push aan bij de gedeelde Home-navigatiestatus
+                // zodat de zwevende zoek-/instellingenknoppen verdwijnen
+                // zolang deze titel geopend staat.
+                HomeNavigationState.shared.setActive(newValue != nil, source: "homeHero")
+            }
         }
     }
 
