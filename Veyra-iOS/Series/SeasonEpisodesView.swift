@@ -46,9 +46,14 @@ struct SeasonEpisodesView: View {
     // MARK: - Episode row
 
     private func episodeRow(_ episode: TMDBEpisode) -> some View {
-        NavigationLink {
-            destination(for: episode)
-        } label: {
+        ZStack {
+            NavigationLink {
+                destination(for: episode)
+            } label: {
+                EmptyView()
+            }
+            .opacity(0)
+
             HStack(alignment: .top, spacing: 14) {
                 AsyncImage(url: imageURL(path: episode.stillPath)) { phase in
                     switch phase {
@@ -82,8 +87,20 @@ struct SeasonEpisodesView: View {
                             .lineLimit(2)
                     }
                 }
+
+                Spacer(minLength: 0)
+
+                // Bladwijzersymbool om deze aflevering toe te voegen aan of
+                // te verwijderen uit de Trakt-watchlist, los van de
+                // NavigationLink hierboven zodat een tik erop niet ook de
+                // afleveringspagina opent.
+                if let mediaItem = mediaItem(for: episode) {
+                    WatchlistToggleButton(item: mediaItem, compact: true)
+                        .buttonStyle(.borderless)
+                }
             }
             .padding(.vertical, 4)
+            .contentShape(Rectangle())
         }
     }
 
