@@ -69,7 +69,8 @@ struct RecentLiveTVRow: View {
                 ChannelLogoPickerView(
                     channelID: channelID,
                     channelName: editingLogoChannelName,
-                    currentOverrideURL: ChannelLogoOverrideStore.logoURL(forChannelID: channelID)
+                    currentOverrideURL: ChannelLogoOverrideStore.logoURL(forChannelID: channelID),
+                    currentNameOverride: ChannelNameOverrideStore.name(forChannelID: channelID)
                 ) {
                     logoOverrideVersion += 1
                 }
@@ -105,7 +106,7 @@ struct RecentLiveTVRow: View {
                     editingLogoChannelID = row.channel.id
                     editingLogoChannelName = row.channel.name
                 } label: {
-                    Label("Logo aanpassen…", systemImage: "photo.badge.plus")
+                    Label("Logo/naam aanpassen…", systemImage: "photo.badge.plus")
                 }
 
                 if ChannelLogoOverrideStore.logoURL(forChannelID: row.channel.id) != nil {
@@ -118,7 +119,11 @@ struct RecentLiveTVRow: View {
                 }
             }
 
-            Text(row.channel.name)
+            Text(
+                ChannelNameOverrideStore.effectiveName(
+                    channelID: row.channel.id, defaultName: row.channel.name
+                )
+            )
                 .font(.caption)
                 .lineLimit(1)
                 .frame(width: 120)

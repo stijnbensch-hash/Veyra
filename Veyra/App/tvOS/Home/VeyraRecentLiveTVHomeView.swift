@@ -310,7 +310,11 @@ struct VeyraRecentLiveTVHomeView: View {
                     )
                 )
 
-            Text(row.channel.name)
+            Text(
+                ChannelNameOverrideStore.effectiveName(
+                    channelID: row.channel.id, defaultName: row.channel.name
+                )
+            )
                 .font(
                     .system(
                         size: 13,

@@ -936,7 +936,8 @@ private struct IPTVChannelManagementView:
             ChannelLogoPickerView(
                 channelID: channel.id,
                 channelName: channel.name,
-                currentOverrideURL: ChannelLogoOverrideStore.logoURL(forChannelID: channel.id)
+                currentOverrideURL: ChannelLogoOverrideStore.logoURL(forChannelID: channel.id),
+                currentNameOverride: ChannelNameOverrideStore.name(forChannelID: channel.id)
             ) {
                 logoOverrideVersion += 1
             }
@@ -1041,7 +1042,11 @@ private struct IPTVChannelManagementView:
                 channel
             )
 
-            Text(channel.name)
+            Text(
+                ChannelNameOverrideStore.effectiveName(
+                    channelID: channel.id, defaultName: channel.name
+                )
+            )
                 .font(
                     .system(
                         size: 22,
@@ -1131,7 +1136,7 @@ private struct IPTVChannelManagementView:
             Button {
                 editingLogoChannel = channel
             } label: {
-                Label("Logo aanpassen…", systemImage: "photo.badge.plus")
+                Label("Logo/naam aanpassen…", systemImage: "photo.badge.plus")
             }
 
             if ChannelLogoOverrideStore.logoURL(forChannelID: channel.id) != nil {

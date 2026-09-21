@@ -155,7 +155,9 @@ struct IPTVService {
         for channel: IPTVChannel
     ) -> PlayableSource {
         PlayableSource(
-            name: channel.name,
+            name: ChannelNameOverrideStore.effectiveName(
+                channelID: channel.id, defaultName: channel.name
+            ),
             description: channel.group,
             url: channel.streamURL,
             kind: .liveTV

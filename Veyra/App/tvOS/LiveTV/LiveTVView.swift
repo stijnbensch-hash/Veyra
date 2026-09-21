@@ -73,7 +73,8 @@ struct LiveTVView: View {
                 ChannelLogoPickerView(
                     channelID: channel.id,
                     channelName: channel.name,
-                    currentOverrideURL: ChannelLogoOverrideStore.logoURL(forChannelID: channel.id)
+                    currentOverrideURL: ChannelLogoOverrideStore.logoURL(forChannelID: channel.id),
+                    currentNameOverride: ChannelNameOverrideStore.name(forChannelID: channel.id)
                 ) {
                     logoOverrideVersion += 1
                 }
@@ -1283,7 +1284,9 @@ struct LiveTVView: View {
             VeyraEPGButtonStyle()
         )
         .accessibilityLabel(
-            row.channel.name
+            ChannelNameOverrideStore.effectiveName(
+                channelID: row.channel.id, defaultName: row.channel.name
+            )
         )
         .accessibilityHint(
             "Opent zenderinformatie en Kijk live"
@@ -1292,7 +1295,7 @@ struct LiveTVView: View {
             Button {
                 editingLogoChannel = row.channel
             } label: {
-                Label("Logo aanpassen…", systemImage: "photo.badge.plus")
+                Label("Logo/naam aanpassen…", systemImage: "photo.badge.plus")
             }
 
             if ChannelLogoOverrideStore.logoURL(forChannelID: row.channel.id) != nil {
@@ -1412,7 +1415,9 @@ struct LiveTVView: View {
             spacing: 7
         ) {
             Text(
-                row.channel.name
+                ChannelNameOverrideStore.effectiveName(
+                    channelID: row.channel.id, defaultName: row.channel.name
+                )
             )
             .font(
                 .system(
@@ -1723,7 +1728,9 @@ struct LiveTVView: View {
         return
             title
             + ", "
-            + row.channel.name
+            + ChannelNameOverrideStore.effectiveName(
+                channelID: row.channel.id, defaultName: row.channel.name
+            )
     }
 
     private func slotWidth(
@@ -1965,7 +1972,9 @@ private struct VeyraEPGDetails:
         some View
     {
         Text(
-            selection.row.channel.name
+            ChannelNameOverrideStore.effectiveName(
+                channelID: selection.row.channel.id, defaultName: selection.row.channel.name
+            )
         )
         .font(
             .system(
