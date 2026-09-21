@@ -103,7 +103,7 @@ struct HomeView: View {
     private var heroCarousel: some View {
         VStack(alignment: .leading, spacing: 14) {
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 16) {
+                HStack(spacing: 0) {
                     ForEach(heroMovies) { movie in
                         Button {
                             Task { await openMovie(movie) }
@@ -112,16 +112,15 @@ struct HomeView: View {
                         }
                         .buttonStyle(.plain)
                         .disabled(isOpeningMovie)
-                        .containerRelativeFrame(.horizontal, count: 4, span: 3, spacing: 16)
+                        .containerRelativeFrame(.horizontal)
                         .id(movie.id)
                     }
                 }
                 .scrollTargetLayout()
-                .padding(.horizontal, 24)
             }
             .scrollTargetBehavior(.viewAligned)
             .scrollPosition(id: $heroSelection)
-            .frame(height: 360)
+            .frame(height: 480)
 
             if let selected = heroMovies.first(where: { $0.id == heroSelection }) ?? heroMovies.first {
                 VStack(alignment: .leading, spacing: 4) {
@@ -141,6 +140,9 @@ struct HomeView: View {
         }
     }
 
+    /// Vult de volledige breedte van het scherm (geen omringende marge en
+    /// geen afgeronde kaartranden meer) zodat de carousel als een echte,
+    /// schermvullende hero-banner aanvoelt in plaats van een rij kaarten.
     private func heroPoster(_ movie: TMDBMovie) -> some View {
         AsyncImage(url: posterURL(for: movie)) { phase in
             switch phase {
@@ -155,9 +157,16 @@ struct HomeView: View {
                 }
             }
         }
-        .aspectRatio(2 / 3, contentMode: .fill)
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .shadow(color: .black.opacity(0.35), radius: 12, y: 6)
+        .frame(maxWidth: .infinity)
+        .clipped()
+        .overlay(alignment: .bottom) {
+            LinearGradient(
+                colors: [.clear, .black.opacity(0.55)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 140)
+        }
     }
 
     private func releaseYear(_ movie: TMDBMovie) -> String? {
