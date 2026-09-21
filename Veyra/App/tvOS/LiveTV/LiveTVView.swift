@@ -107,6 +107,13 @@ struct LiveTVView: View {
             ) { _ in
                 handleIPTVConfigurationChange()
             }
+            .onReceive(
+                NotificationCenter.default.publisher(
+                    for: .channelOverrideChanged
+                )
+            ) { _ in
+                logoOverrideVersion += 1
+            }
             .onChange(
                 of: scenePhase
             ) { _, newPhase in

@@ -932,6 +932,9 @@ private struct IPTVChannelManagementView:
         .task {
             await loadChannels()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .channelOverrideChanged)) { _ in
+            logoOverrideVersion += 1
+        }
         .sheet(item: $editingLogoChannel) { channel in
             ChannelLogoPickerView(
                 channelID: channel.id,

@@ -1,15 +1,16 @@
 import SwiftUI
 
 /// tvOS-scherm om het logo én de naam van één zender aan te passen —
-/// bereikbaar door lang op een zenderlogo te drukken (contextmenu: "Logo
-/// aanpassen…") in `LiveTVView` en `IPTVLiveManagementView`.
+/// bereikbaar door lang op een zenderlogo te drukken (contextmenu:
+/// "Logo/naam aanpassen…") in `LiveTVView` en `IPTVLiveManagementView`.
 ///
-/// Logo: zoeken in de gratis iptv-org logo-database
-/// (`IPTVOrgLogoDirectory`), of zelf een afbeeldings-URL opgeven. Er is op
-/// tvOS bewust geen fotobibliotheek-optie (PhotosPicker bestaat niet op
-/// tvOS) — die staat wel op iOS. Naam: vrije tekst. Beide keuzes worden
-/// opgeslagen via `ChannelLogoOverrideStore`/`ChannelNameOverrideStore` en
-/// gelden overal waar deze zender voorkomt.
+/// Vier duidelijk gescheiden groepen, elk met een eigen icoon in de
+/// koptekst: Naam, Logo (met de terugzetknop er meteen bij, niet los
+/// onderaan het scherm), Zoeken in de logo-database, en Eigen logo-URL. Er
+/// is op tvOS bewust geen fotobibliotheek-optie (PhotosPicker bestaat niet
+/// op tvOS) — die staat wel op iOS. Beide keuzes worden opgeslagen via
+/// `ChannelLogoOverrideStore`/`ChannelNameOverrideStore` en gelden overal
+/// waar deze zender voorkomt.
 struct ChannelLogoPickerView: View {
     let channelID: String
     let channelName: String
@@ -50,75 +51,10 @@ struct ChannelLogoPickerView: View {
                 VeyraBackground().ignoresSafeArea()
 
                 List {
-                    Section {
-                        TextField("Zendernaam", text: $nameText)
-                        Button("Naam opslaan") {
-                            saveName()
-                        }
-                        .disabled(isNameUnchanged || trimmedName.isEmpty)
-
-                        if currentNameOverride != nil {
-                            Button("Naam herstellen naar origineel", role: .destructive) {
-                                ChannelNameOverrideStore.removeOverride(forChannelID: channelID)
-                                nameText = channelName
-                                onSaved()
-                            }
-                        }
-                    } header: {
-                        Text("Naam")
-                    } footer: {
-                        Text("Geldt overal waar deze zender wordt getoond, ook in de speler.")
-                    }
-
-                    Section {
-                        currentLogoPreview
-                    } header: {
-                        Text("Huidig logo")
-                    }
-
-                    Section {
-                        TextField("Zoek zendernaam (bv. \"BBC One\")", text: $query)
-                            .onSubmit { Task { await search() } }
-
-                        if isSearching {
-                            HStack(spacing: 12) {
-                                ProgressView()
-                                Text("Zoeken in iptv-org…").foregroundStyle(.secondary)
-                            }
-                        } else if let searchError {
-                            Text(searchError).foregroundStyle(.red)
-                        } else if !results.isEmpty {
-                            ForEach(results) { result in
-                                resultRow(result)
-                            }
-                        } else if !query.trimmingCharacters(in: .whitespaces).isEmpty {
-                            Text("Geen logo's gevonden voor \"\(query)\".").foregroundStyle(.secondary)
-                        }
-                    } header: {
-                        Text("Zoeken in logo-database (iptv-org)")
-                    } footer: {
-                        Text("Gratis, doorzoekbare verzameling zenderlogo's van het open-source iptv-org-project.")
-                    }
-
-                    Section {
-                        TextField("https://…/logo.png", text: $customURLString)
-                        Button("Eigen URL gebruiken") {
-                            applyCustomURL()
-                        }
-                        .disabled(URL(string: customURLString.trimmingCharacters(in: .whitespaces))?.host == nil)
-                    } header: {
-                        Text("Eigen logo-URL")
-                    }
-
-                    if currentOverrideURL != nil {
-                        Section {
-                            Button("Terugzetten naar standaardlogo", role: .destructive) {
-                                ChannelLogoOverrideStore.removeOverride(forChannelID: channelID)
-                                onSaved()
-                                dismiss()
-                            }
-                        }
-                    }
+                    nameSection
+                    logoSection
+                    searchSection
+                    customURLSection
                 }
             }
             .navigationTitle(currentNameOverride ?? channelName)
@@ -130,18 +66,48 @@ struct ChannelLogoPickerView: View {
         }
     }
 
-    private var trimmedName: String {
-        nameText.trimmingCharacters(in: .whitespacesAndNewlines)
+    // MARK: - Naam
+
+    private var nameSection: some View {
+        Section {
+            TextField("Zendernaam", text: $nameText)
+
+            HStack(spacing: 20) {
+                Button("Naam opslaan") {
+                    saveName()
+                }
+                .disabled(isNameUnchanged || trimmedName.isEmpty)
+
+                if currentNameOverride != nil {
+                    Button("Terugzetten naar origineel", role: .destructive) {
+                        ChannelNameOverrideStore.removeOverride(forChannelID: channelID)
+                        nameText = channelName
+                        onSaved()
+                    }
+                }
+            }
+        } header: {
+            Label("Naam", systemImage: "textformat")
+        } footer: {
+            Text("Geldt overal waar deze zender wordt getoond, ook in de speler.")
+        }
     }
 
-    private var isNameUnchanged: Bool {
-        trimmedName == (currentNameOverride ?? channelName)
-    }
+    // MARK: - Logo
 
-    private func saveName() {
-        guard !trimmedName.isEmpty else { return }
-        ChannelNameOverrideStore.setName(trimmedName, forChannelID: channelID)
-        onSaved()
+    private var logoSection: some View {
+        Section {
+            currentLogoPreview
+
+            if currentOverrideURL != nil {
+                Button("Terugzetten naar standaardlogo", role: .destructive) {
+                    ChannelLogoOverrideStore.removeOverride(forChannelID: channelID)
+                    onSaved()
+                }
+            }
+        } header: {
+            Label("Logo", systemImage: "photo")
+        }
     }
 
     private var currentLogoPreview: some View {
@@ -159,6 +125,34 @@ struct ChannelLogoPickerView: View {
 
             Text(currentOverrideURL == nil ? "Standaardlogo van de provider/EPG." : "Eigen logo ingesteld.")
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - Zoeken
+
+    private var searchSection: some View {
+        Section {
+            TextField("Zoek zendernaam (bv. \"BBC One\")", text: $query)
+                .onSubmit { Task { await search() } }
+
+            if isSearching {
+                HStack(spacing: 12) {
+                    ProgressView()
+                    Text("Zoeken in iptv-org…").foregroundStyle(.secondary)
+                }
+            } else if let searchError {
+                Text(searchError).foregroundStyle(.red)
+            } else if !results.isEmpty {
+                ForEach(results) { result in
+                    resultRow(result)
+                }
+            } else if !query.trimmingCharacters(in: .whitespaces).isEmpty {
+                Text("Geen logo's gevonden voor \"\(query)\".").foregroundStyle(.secondary)
+            }
+        } header: {
+            Label("Zoeken in logo-database (iptv-org)", systemImage: "magnifyingglass")
+        } footer: {
+            Text("Gratis, doorzoekbare verzameling zenderlogo's van het open-source iptv-org-project.")
         }
     }
 
@@ -188,6 +182,38 @@ struct ChannelLogoPickerView: View {
             }
         }
     }
+
+    // MARK: - Eigen URL
+
+    private var customURLSection: some View {
+        Section {
+            TextField("https://…/logo.png", text: $customURLString)
+            Button("Eigen URL gebruiken") {
+                applyCustomURL()
+            }
+            .disabled(URL(string: customURLString.trimmingCharacters(in: .whitespaces))?.host == nil)
+        } header: {
+            Label("Eigen logo-URL", systemImage: "link")
+        }
+    }
+
+    // MARK: - Naam-acties
+
+    private var trimmedName: String {
+        nameText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var isNameUnchanged: Bool {
+        trimmedName == (currentNameOverride ?? channelName)
+    }
+
+    private func saveName() {
+        guard !trimmedName.isEmpty else { return }
+        ChannelNameOverrideStore.setName(trimmedName, forChannelID: channelID)
+        onSaved()
+    }
+
+    // MARK: - Logo-acties
 
     private func applyCustomURL() {
         let trimmed = customURLString.trimmingCharacters(in: .whitespacesAndNewlines)

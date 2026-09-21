@@ -50,6 +50,7 @@ enum ChannelNameOverrideStore {
         }
         guard let data = try? JSONEncoder().encode(dict) else { return }
         defaults.set(data, forKey: key)
+        NotificationCenter.default.post(name: .channelOverrideChanged, object: nil)
     }
 
     static func removeOverride(forChannelID channelID: String, in defaults: UserDefaults = .standard) {

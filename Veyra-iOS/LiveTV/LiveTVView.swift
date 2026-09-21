@@ -23,6 +23,9 @@ struct LiveTVView: View {
             .onReceive(NotificationCenter.default.publisher(for: .iptvConfigurationDidChange)) { _ in
                 guide.reloadID = UUID()
             }
+            .onReceive(NotificationCenter.default.publisher(for: .channelOverrideChanged)) { _ in
+                logoOverrideVersion += 1
+            }
             .navigationDestination(item: $selectedSource) { source in
                 PlayerView(
                     source: source,

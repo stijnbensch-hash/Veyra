@@ -46,6 +46,7 @@ enum ChannelLogoOverrideStore {
         }
         guard let data = try? JSONEncoder().encode(dict) else { return }
         defaults.set(data, forKey: key)
+        NotificationCenter.default.post(name: .channelOverrideChanged, object: nil)
     }
 
     static func removeOverride(forChannelID channelID: String, in defaults: UserDefaults = .standard) {
@@ -74,4 +75,15 @@ enum ChannelLogoOverrideStore {
             return nil
         }
     }
+}
+
+/// Gepost telkens een logo- of naam-overschrijving verandert (zie
+/// `ChannelLogoOverrideStore` hierboven en `ChannelNameOverrideStore`).
+/// Schermen die een zendernaam of -logo tonen luisteren hierop om
+/// zichzelf te verversen, ook wanneer de wijziging op een ander scherm
+/// gebeurde en dit scherm intussen al in het geheugen zat (bv. de
+/// Home-tab op de achtergrond) — zonder deze melding zou zo'n scherm pas
+/// bijwerken bij een volledig nieuwe weergave.
+extension Notification.Name {
+    static let channelOverrideChanged = Notification.Name("veyra.iptv.channelOverrideChanged")
 }

@@ -53,6 +53,9 @@ struct RecentLiveTVRow: View {
         .task {
             await guide.reload()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .channelOverrideChanged)) { _ in
+            logoOverrideVersion += 1
+        }
         .navigationDestination(item: $selectedSource) { source in
             PlayerView(
                 source: source,

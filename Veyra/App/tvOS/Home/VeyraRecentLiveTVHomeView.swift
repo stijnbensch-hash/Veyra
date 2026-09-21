@@ -14,6 +14,13 @@ struct VeyraRecentLiveTVHomeView: View {
     @FocusState
     private var focusedChannelID: String?
 
+    // Verversingsteller: gaat omhoog wanneer een logo- of naam-
+    // overschrijving verandert (mogelijk vanaf een ander scherm, bv. de
+    // Live TV-zenderlijst), zodat deze rij — ook als ze al in het geheugen
+    // zat — meteen de nieuwe waarde toont.
+    @State
+    private var overrideVersion = 0
+
     private var recentChannels: [VeyraGuideChannel] {
         let order = Dictionary(
             uniqueKeysWithValues:
@@ -87,6 +94,13 @@ struct VeyraRecentLiveTVHomeView: View {
                 guide.reloadID = UUID()
                 await guide.reload()
             }
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: .channelOverrideChanged
+            )
+        ) { _ in
+            overrideVersion += 1
         }
         .navigationDestination(
             item: $selectedSource
@@ -291,6 +305,7 @@ struct VeyraRecentLiveTVHomeView: View {
                     channelPlaceholder(row)
                 }
             }
+            .id(overrideVersion)
         }
         .frame(
             width: 150,
