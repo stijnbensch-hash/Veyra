@@ -160,6 +160,10 @@ private struct VeyraUpcomingEpisodeIOS: Identifiable {
         return String(format: "S%02dE%02d", season, number)
     }
 
+    var isToday: Bool {
+        Calendar.current.isDateInToday(airDate)
+    }
+
     static func nextPerShow(_ values: [Self], after now: Date, before end: Date) -> [Self] {
         let sorted = values.filter { $0.airDate > now && $0.airDate < end }
             .sorted {
@@ -180,7 +184,7 @@ private struct VeyraUpcomingCardIOS: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            ZStack(alignment: .bottomLeading) {
+            ZStack(alignment: .bottom) {
                 AsyncImage(url: imageURL) { phase in
                     switch phase {
                     case .success(let image):
@@ -195,19 +199,30 @@ private struct VeyraUpcomingCardIOS: View {
                 }
                 .frame(width: 220, height: 124)
                 .clipped()
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-
-                Text(item.episodeCode)
-                    .font(.caption2.weight(.bold))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 6))
-                    .foregroundStyle(.white)
-                    .padding(6)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay {
+                    LinearGradient(
+                        colors: [.clear, .black.opacity(0.05), .black.opacity(0.65)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .allowsHitTesting(false)
+                }
+                .overlay(alignment: .bottomLeading) {
+                    VeyraPosterBadge(title: item.episodeCode, fontSize: 11)
+                        .padding(8)
+                }
+                .overlay(alignment: .bottomTrailing) {
+                    if item.isToday {
+                        VeyraPosterBadge(title: "Vandaag", accent: VeyraColors.red, fontSize: 11)
+                            .padding(8)
+                    }
+                }
             }
 
             Text(item.showTitle)
-                .font(.caption.weight(.semibold))
+                .font(.subheadline.weight(.bold))
                 .lineLimit(1)
                 .foregroundStyle(.primary)
 
