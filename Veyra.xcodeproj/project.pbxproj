@@ -21,6 +21,7 @@
 		B3B65B0A305AB56E003B5F07 /* Exceptions for "Veyra" folder in "Veyra" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				"App/tvOS/LiveTV/LiveTVView.swift.before-vod-tab-removal",
 				Resources/Info.plist,
 			);
 			target = B3B65AC4305A5A6C003B5F07 /* Veyra */;
@@ -29,6 +30,7 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
+				LiveTV/LiveTVFavoritesOrderView.swift,
 			);
 			target = B3EE10D5305E9262002FAC51 /* Veyra-iOS */;
 		};

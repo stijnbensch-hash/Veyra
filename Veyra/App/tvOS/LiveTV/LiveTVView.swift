@@ -10,6 +10,12 @@ struct LiveTVView: View {
     private var showProviders = false
 
     @State
+    private var showSearch = false
+
+    @State
+    private var showFavoriteOrder = false
+
+    @State
     private var selection: VeyraEPGSelection?
 
     @State
@@ -18,9 +24,6 @@ struct LiveTVView: View {
     @State
     private var pendingSource: PlayableSource?
 
-    // Logo aanpassen: lang drukken op een zenderlogo opent
-    // `ChannelLogoPickerView`. `logoOverrideVersion` dwingt de betrokken
-    // AsyncImage opnieuw te laden zodra een override is opgeslagen.
     @State
     private var editingLogoChannel: IPTVChannel?
 
@@ -29,9 +32,6 @@ struct LiveTVView: View {
 
     @Environment(\.scenePhase)
     private var scenePhase
-
-    private let contentMargin: CGFloat =
-        VeyraSpacing.page
 
     var body: some View {
         navigationLayer
@@ -88,6 +88,21 @@ struct LiveTVView: View {
                     logoOverrideVersion += 1
                 }
             }
+            .sheet(
+                isPresented: $showSearch
+            ) {
+                LiveTVSearchView(
+                    searchText:
+                        $guide.searchText
+                )
+            }
+            .sheet(
+                isPresented: $showFavoriteOrder
+            ) {
+                LiveTVFavoritesOrderView(
+                    guide: guide
+                )
+            }
     }
 
     private var providerDialogLayer: some View {
@@ -125,9 +140,9 @@ struct LiveTVView: View {
             }
             .onChange(
                 of: scenePhase
-            ) { _, newPhase in
+            ) { phase in
                 handleScenePhase(
-                    newPhase
+                    phase
                 )
             }
     }
@@ -141,11 +156,9 @@ struct LiveTVView: View {
 
             VStack(
                 alignment: .leading,
-                spacing: 22
+                spacing: 18
             ) {
                 toolbar
-
-                searchBar
 
                 channelErrorView
 
@@ -155,70 +168,35 @@ struct LiveTVView: View {
             }
             .padding(
                 .horizontal,
-                contentMargin
-            )
-            .padding(
-                .top,
-                36
-            )
-            .padding(
-                .bottom,
                 50
             )
+            .padding(
+                .vertical,
+                32
+            )
         }
-        .ignoresSafeArea(
-            .container,
-            edges: .horizontal
-        )
     }
 
     @ViewBuilder
     private var channelErrorView: some View {
-        if let error = guide.channelError {
-            Text(error)
-                .font(
-                    .system(
-                        size: 26,
-                        weight: .medium
-                    )
-                )
-                .foregroundStyle(
-                    .orange
-                )
-        }
-    }
-
-    // MARK: - Guide layout
-
-    private var guideLayout: some View {
-        HStack(
-            alignment: .top,
-            spacing: 26
-        ) {
-            sidebar
-                .frame(
-                    width: 330
-                )
-
-            guideTimeline
-        }
-    }
-
-    private var guideTimeline: some View {
-        TimelineView(
-            .periodic(
-                from: .now,
-                by: 60
+        if let error =
+            guide.channelError
+        {
+            Text(
+                error
             )
-        ) { context in
-            programmeGrid(
-                now: context.date
+            .font(
+                .system(
+                    size: 18
+                )
+            )
+            .foregroundStyle(
+                .orange
             )
         }
-        .focusSection()
     }
 
-    // MARK: - Root actions
+    // MARK: - Lifecycle
 
     private func handleIPTVConfigurationChange() {
         selection = nil
@@ -228,15 +206,15 @@ struct LiveTVView: View {
     private func handleScenePhase(
         _ phase: ScenePhase
     ) {
-        guard phase == .active else {
-            return
+        if phase == .active {
+            guide.reloadID = UUID()
         }
-
-        guide.reloadID = UUID()
     }
 
     private func handleSelectionDismiss() {
-        guard let source = pendingSource else {
+        guard
+            let source = pendingSource
+        else {
             return
         }
 
@@ -282,7 +260,9 @@ struct LiveTVView: View {
     private func providerTitle(
         _ provider: IPTVStoredProvider
     ) -> String {
-        if provider.id == guide.activeProviderID {
+        if provider.id
+            == guide.activeProviderID
+        {
             return
                 provider.displayName
                 + " (actief)"
@@ -295,7 +275,7 @@ struct LiveTVView: View {
 
     private var toolbar: some View {
         HStack(
-            spacing: 22
+            spacing: 18
         ) {
             toolbarTitle
 
@@ -307,13 +287,15 @@ struct LiveTVView: View {
 
             nowButton
 
+            searchButton
+
             refreshButton
 
             settingsButton
         }
         .font(
             .system(
-                size: 24,
+                size: 18,
                 weight: .semibold
             )
         )
@@ -322,37 +304,34 @@ struct LiveTVView: View {
 
     private var toolbarTitle: some View {
         HStack(
-            spacing: 18
+            spacing: 14
         ) {
             RoundedRectangle(
-                cornerRadius: 3
+                cornerRadius: 2
             )
             .fill(
-                Color.cyan
+                .cyan
             )
             .frame(
-                width: 6,
-                height: 56
+                width: 4,
+                height: 38
             )
 
             VStack(
                 alignment: .leading,
-                spacing: 5
+                spacing: 3
             ) {
                 Text(
                     "LIVE TV"
                 )
                 .font(
                     .system(
-                        size: 46,
+                        size: 32,
                         weight: .light
                     )
                 )
                 .tracking(
-                    6.5
-                )
-                .foregroundStyle(
-                    .white
+                    5
                 )
 
                 Text(
@@ -360,16 +339,16 @@ struct LiveTVView: View {
                 )
                 .font(
                     .system(
-                        size: 17,
+                        size: 12,
                         weight: .medium
                     )
                 )
                 .tracking(
-                    2.6
+                    2
                 )
                 .foregroundStyle(
                     .cyan.opacity(
-                        0.78
+                        0.75
                     )
                 )
             }
@@ -390,15 +369,15 @@ struct LiveTVView: View {
                 1
             )
             .frame(
-                maxWidth: 370
+                maxWidth: 300
             )
             .padding(
                 .horizontal,
-                24
+                16
             )
             .padding(
                 .vertical,
-                17
+                12
             )
         }
         .buttonStyle(
@@ -421,15 +400,43 @@ struct LiveTVView: View {
             )
             .padding(
                 .horizontal,
-                24
+                16
             )
             .padding(
                 .vertical,
-                17
+                12
             )
         }
         .buttonStyle(
             VeyraEPGButtonStyle()
+        )
+    }
+
+    private var searchButton: some View {
+        Button {
+            showSearch = true
+
+        } label: {
+            Image(
+                systemName:
+                    "magnifyingglass"
+            )
+            .font(
+                .system(
+                    size: 21,
+                    weight: .semibold
+                )
+            )
+            .frame(
+                width: 48,
+                height: 48
+            )
+        }
+        .buttonStyle(
+            VeyraEPGButtonStyle()
+        )
+        .accessibilityLabel(
+            "Zoeken"
         )
     }
 
@@ -443,15 +450,9 @@ struct LiveTVView: View {
                 systemName:
                     "arrow.clockwise"
             )
-            .font(
-                .system(
-                    size: 27,
-                    weight: .semibold
-                )
-            )
             .frame(
-                width: 64,
-                height: 64
+                width: 48,
+                height: 48
             )
         }
         .buttonStyle(
@@ -459,7 +460,7 @@ struct LiveTVView: View {
         )
         .disabled(
             guide.loadingChannels
-                || guide.loadingGuide
+            || guide.loadingGuide
         )
         .accessibilityLabel(
             "Zenders en programmagids vernieuwen"
@@ -475,15 +476,9 @@ struct LiveTVView: View {
                 systemName:
                     "gearshape"
             )
-            .font(
-                .system(
-                    size: 27,
-                    weight: .semibold
-                )
-            )
             .frame(
-                width: 64,
-                height: 64
+                width: 48,
+                height: 48
             )
         }
         .buttonStyle(
@@ -494,131 +489,30 @@ struct LiveTVView: View {
         )
     }
 
-    // MARK: - Search
+    // MARK: - Layout
 
-    private var searchBar: some View {
+    private var guideLayout: some View {
         HStack(
-            spacing: 10
+            alignment: .top,
+            spacing: 22
         ) {
-            Spacer(
-                minLength: 0
-            )
+            sidebar
+                .frame(
+                    width: 250
+                )
 
-            searchField
-
-            if !guide.searchText.isEmpty {
-                clearSearchButton
+            TimelineView(
+                .periodic(
+                    from: .now,
+                    by: 60
+                )
+            ) { context in
+                programmeGrid(
+                    now: context.date
+                )
             }
+            .focusSection()
         }
-        .frame(
-            maxWidth: .infinity,
-            alignment: .trailing
-        )
-    }
-
-    private var searchField: some View {
-        HStack(
-            spacing: 12
-        ) {
-            Image(
-                systemName:
-                    "magnifyingglass"
-            )
-            .font(
-                .system(
-                    size: 22,
-                    weight: .medium
-                )
-            )
-            .foregroundStyle(
-                .cyan.opacity(
-                    0.78
-                )
-            )
-
-            TextField(
-                "Zoeken",
-                text:
-                    $guide.searchText
-            )
-            .font(
-                .system(
-                    size: 21
-                )
-            )
-            .textInputAutocapitalization(
-                .never
-            )
-            .autocorrectionDisabled()
-            .textFieldStyle(
-                .plain
-            )
-        }
-        .padding(
-            .horizontal,
-            18
-        )
-        .padding(
-            .vertical,
-            12
-        )
-        .frame(
-            width: 340,
-            height: 58
-        )
-        .background(
-            RoundedRectangle(
-                cornerRadius: 16,
-                style: .continuous
-            )
-            .fill(
-                Color(
-                    red: 0.035,
-                    green: 0.10,
-                    blue: 0.16
-                )
-            )
-        )
-        .overlay(
-            RoundedRectangle(
-                cornerRadius: 16,
-                style: .continuous
-            )
-            .strokeBorder(
-                Color.cyan.opacity(
-                    0.15
-                ),
-                lineWidth: 1
-            )
-        )
-    }
-
-    private var clearSearchButton: some View {
-        Button {
-            guide.searchText = ""
-
-        } label: {
-            Image(
-                systemName:
-                    "xmark"
-            )
-            .font(
-                .system(
-                    size: 19,
-                    weight: .semibold
-                )
-            )
-            .frame(
-                width: 52,
-                height: 52
-            )
-        }
-        .buttonStyle(
-            VeyraEPGButtonStyle()
-        )
-        .accessibilityLabel(
-            "Zoekopdracht wissen"
-        )
     }
 
     // MARK: - Categories
@@ -630,17 +524,71 @@ struct LiveTVView: View {
         ) {
             VStack(
                 alignment: .leading,
-                spacing: 11
+                spacing: 10
             ) {
-                allChannelsButton
+                categoryButton(
+                    "Alle zenders",
+                    icon: "tv",
+                    key: "all",
+                    count:
+                        guide.channels.count
+                )
 
-                favoritesButton
+                categoryButton(
+                    "Favorieten",
+                    icon: "star",
+                    key: "favorites",
+                    count:
+                        guide.favoriteRows.count
+                )
 
-                recentButton
+                categoryButton(
+                    "Recent geopend",
+                    icon:
+                        "clock.arrow.circlepath",
+                    key: "recent",
+                    count:
+                        recentCount
+                )
 
-                categoryHeader
+                Text(
+                    "CATEGORIEËN"
+                )
+                .font(
+                    .system(
+                        size: 14,
+                        weight: .semibold
+                    )
+                )
+                .tracking(
+                    2
+                )
+                .foregroundStyle(
+                    .cyan.opacity(
+                        0.6
+                    )
+                )
+                .padding(
+                    .top,
+                    18
+                )
+                .padding(
+                    .bottom,
+                    6
+                )
 
-                categoryButtons
+                ForEach(
+                    guide.categories
+                ) { category in
+                    categoryButton(
+                        category.name,
+                        icon: nil,
+                        key:
+                            "group:"
+                            + category.id,
+                        count: nil
+                    )
+                }
             }
             .padding(
                 4
@@ -649,104 +597,13 @@ struct LiveTVView: View {
         .focusSection()
     }
 
-    private var allChannelsButton: some View {
-        categoryButton(
-            "Alle zenders",
-            icon: "tv",
-            key: "all",
-            count:
-                guide.channels.count
-        )
-    }
-
-    private var favoritesButton: some View {
-        categoryButton(
-            "Favorieten",
-            icon: "star",
-            key: "favorites",
-            count:
-                favoriteCount
-        )
-    }
-
-    private var recentButton: some View {
-        categoryButton(
-            "Recent geopend",
-            icon:
-                "clock.arrow.circlepath",
-            key:
-                "recent",
-            count:
-                recentCount
-        )
-    }
-
-    private var favoriteCount: Int {
-        guide.channels.reduce(
-            into: 0
-        ) { count, row in
-            if guide.favorites.contains(
-                row.id
-            ) {
-                count += 1
-            }
-        }
-    }
-
     private var recentCount: Int {
-        guide.channels.reduce(
-            into: 0
-        ) { count, row in
-            if guide.recent.contains(
-                row.id
-            ) {
-                count += 1
-            }
-        }
-    }
-
-    private var categoryHeader: some View {
-        Text(
-            "CATEGORIEËN"
-        )
-        .font(
-            .system(
-                size: 17,
-                weight: .semibold
-            )
-        )
-        .tracking(
-            2.4
-        )
-        .foregroundStyle(
-            .cyan.opacity(
-                0.68
-            )
-        )
-        .padding(
-            .top,
-            20
-        )
-        .padding(
-            .bottom,
-            7
-        )
-    }
-
-    @ViewBuilder
-    private var categoryButtons: some View {
-        ForEach(
-            guide.categories
-        ) { category in
-            categoryButton(
-                category.name,
-                icon: nil,
-                key:
-                    "group:"
-                    + category.id,
-                count: nil
+        guide.channels.filter {
+            guide.recent.contains(
+                $0.id
             )
         }
+        .count
     }
 
     private func categoryButton(
@@ -760,10 +617,65 @@ struct LiveTVView: View {
                 key
 
         } label: {
-            categoryButtonLabel(
-                title: title,
-                icon: icon,
-                count: count
+            HStack(
+                spacing: 10
+            ) {
+                if let icon {
+                    Image(
+                        systemName:
+                            icon
+                    )
+                    .frame(
+                        width: 22
+                    )
+                }
+
+                Text(
+                    title
+                )
+                .lineLimit(
+                    2
+                )
+                .multilineTextAlignment(
+                    .leading
+                )
+
+                Spacer(
+                    minLength: 4
+                )
+
+                if let count {
+                    Text(
+                        "\(count)"
+                    )
+                    .font(
+                        .system(
+                            size: 13
+                        )
+                    )
+                    .foregroundStyle(
+                        .secondary
+                    )
+                }
+            }
+            .font(
+                .system(
+                    size: 17,
+                    weight: .medium
+                )
+            )
+            .padding(
+                .horizontal,
+                14
+            )
+            .padding(
+                .vertical,
+                13
+            )
+            .frame(
+                maxWidth: .infinity,
+                minHeight: 50,
+                alignment: .leading
             )
         }
         .buttonStyle(
@@ -775,134 +687,96 @@ struct LiveTVView: View {
         )
     }
 
-    private func categoryButtonLabel(
-        title: String,
-        icon: String?,
-        count: Int?
-    ) -> some View {
-        HStack(
-            spacing: 14
-        ) {
-            if let icon {
-                Image(
-                    systemName:
-                        icon
-                )
-                .font(
-                    .system(
-                        size: 23
-                    )
-                )
-                .frame(
-                    width: 30
-                )
-            }
-
-            Text(
-                title
-            )
-            .lineLimit(
-                2
-            )
-            .multilineTextAlignment(
-                .leading
-            )
-
-            Spacer(
-                minLength: 5
-            )
-
-            if let count {
-                Text(
-                    "\(count)"
-                )
-                .font(
-                    .system(
-                        size: 16
-                    )
-                )
-                .foregroundStyle(
-                    .secondary
-                )
-            }
-        }
-        .font(
-            .system(
-                size: 22,
-                weight: .medium
-            )
-        )
-        .padding(
-            .horizontal,
-            18
-        )
-        .padding(
-            .vertical,
-            15
-        )
-        .frame(
-            maxWidth: .infinity,
-            minHeight: 64,
-            alignment: .leading
-        )
-    }
-
-    // MARK: - Programme guide
+    // MARK: - Programme grid
 
     private func programmeGrid(
         now: Date
     ) -> some View {
-        GeometryReader { geometry in
-            programmeGridContents(
-                geometry:
-                    geometry,
-                now:
-                    now
-            )
-        }
-    }
+        let rows =
+            guide.visibleChannels
 
-    private func programmeGridContents(
-        geometry: GeometryProxy,
-        now: Date
-    ) -> some View {
-        let channelWidth:
-            CGFloat = 250
+        return GeometryReader {
+            geometry in
 
-        let timelineWidth =
-            max(
-                240,
-                geometry.size.width
+            let channelWidth:
+                CGFloat = 190
+
+            let timelineWidth =
+                max(
+                    240,
+                    geometry.size.width
                     - channelWidth
-                    - 16
-            )
+                    - 12
+                )
 
-        return VStack(
-            spacing: 16
-        ) {
-            guideWindowToolbar
+            VStack(
+                spacing: 12
+            ) {
+                guideWindowControls
 
-            guideTimeHeader(
-                channelWidth:
-                    channelWidth,
-                timelineWidth:
-                    timelineWidth,
-                now:
-                    now
-            )
+                HStack(
+                    spacing: 12
+                ) {
+                    Text(
+                        "ZENDER"
+                    )
+                    .font(
+                        .system(
+                            size: 13,
+                            weight: .medium
+                        )
+                    )
+                    .tracking(
+                        2
+                    )
+                    .foregroundStyle(
+                        .secondary
+                    )
+                    .frame(
+                        width: channelWidth,
+                        alignment: .leading
+                    )
 
-            guideRows(
-                channelWidth:
-                    channelWidth,
-                timelineWidth:
-                    timelineWidth,
-                now:
-                    now
-            )
+                    timeRuler(
+                        width:
+                            timelineWidth,
+                        now:
+                            now
+                    )
+                }
+                .frame(
+                    height: 35
+                )
+
+                if guide.loadingChannels {
+                    ProgressView(
+                        "Zenders laden..."
+                    )
+                    .frame(
+                        maxWidth: .infinity,
+                        maxHeight: .infinity
+                    )
+
+                } else if rows.isEmpty {
+                    emptyGuideView
+
+                } else {
+                    channelRows(
+                        rows:
+                            rows,
+                        channelWidth:
+                            channelWidth,
+                        timelineWidth:
+                            timelineWidth,
+                        now:
+                            now
+                    )
+                }
+            }
         }
     }
 
-    private var guideWindowToolbar: some View {
+    private var guideWindowControls: some View {
         HStack {
             Text(
                 VeyraEPGFormat.day(
@@ -911,273 +785,192 @@ struct LiveTVView: View {
             )
             .font(
                 .system(
-                    size: 27,
+                    size: 18,
                     weight: .semibold
                 )
             )
 
             Spacer()
 
-            previousWindowButton
+            Button {
+                guide.moveWindow(
+                    -3
+                )
 
-            nextWindowButton
+            } label: {
+                Label(
+                    "3 uur",
+                    systemImage:
+                        "chevron.left"
+                )
+                .padding(
+                    10
+                )
+            }
+            .buttonStyle(
+                VeyraEPGButtonStyle()
+            )
+
+            Button {
+                guide.moveWindow(
+                    3
+                )
+
+            } label: {
+                HStack(
+                    spacing: 8
+                ) {
+                    Text(
+                        "3 uur"
+                    )
+
+                    Image(
+                        systemName:
+                            "chevron.right"
+                    )
+                }
+                .padding(
+                    10
+                )
+            }
+            .buttonStyle(
+                VeyraEPGButtonStyle()
+            )
         }
         .font(
             .system(
-                size: 22,
+                size: 16,
                 weight: .semibold
             )
         )
     }
 
-    private var previousWindowButton: some View {
-        Button {
-            guide.moveWindow(
-                -3
-            )
-
-        } label: {
-            Label(
-                "3 uur",
-                systemImage:
-                    "chevron.left"
-            )
-            .padding(
-                16
-            )
-        }
-        .buttonStyle(
-            VeyraEPGButtonStyle()
-        )
-    }
-
-    private var nextWindowButton: some View {
-        Button {
-            guide.moveWindow(
-                3
-            )
-
-        } label: {
-            HStack(
-                spacing: 10
-            ) {
-                Text(
-                    "3 uur"
-                )
-
+    private var emptyGuideView: some View {
+        VStack(
+            spacing: 14
+        ) {
+            if guide.selectedCategory
+                == "favorites"
+                && guide.searchText.isEmpty
+            {
                 Image(
                     systemName:
-                        "chevron.right"
+                        "star"
+                )
+                .font(
+                    .system(
+                        size: 36
+                    )
+                )
+                .foregroundStyle(
+                    .cyan.opacity(
+                        0.7
+                    )
+                )
+
+                Text(
+                    "Geen favorieten"
+                )
+                .font(
+                    .system(
+                        size: 22,
+                        weight: .semibold
+                    )
+                )
+
+                Text(
+                    "Ga naar Alle zenders en houd een zender ingedrukt om hem aan Favorieten toe te voegen."
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+
+            } else {
+                Text(
+                    guide.searchText.isEmpty
+                    ?
+                    "Geen zichtbare zenders in deze selectie."
+                    :
+                    "Geen zoekresultaten in dit tijdvak."
+                )
+                .foregroundStyle(
+                    .secondary
                 )
             }
-            .padding(
-                16
-            )
-        }
-        .buttonStyle(
-            VeyraEPGButtonStyle()
-        )
-    }
-
-    private func guideTimeHeader(
-        channelWidth: CGFloat,
-        timelineWidth: CGFloat,
-        now: Date
-    ) -> some View {
-        HStack(
-            spacing: 16
-        ) {
-            Text(
-                "ZENDER"
-            )
-            .font(
-                .system(
-                    size: 18,
-                    weight: .medium
-                )
-            )
-            .tracking(
-                2.6
-            )
-            .foregroundStyle(
-                .secondary
-            )
-            .frame(
-                width:
-                    channelWidth,
-                alignment:
-                    .leading
-            )
-
-            timeRuler(
-                width:
-                    timelineWidth,
-                now:
-                    now
-            )
         }
         .frame(
-            height: 46
-        )
-    }
-
-    @ViewBuilder
-    private func guideRows(
-        channelWidth: CGFloat,
-        timelineWidth: CGFloat,
-        now: Date
-    ) -> some View {
-        if guide.loadingChannels {
-            ProgressView(
-                "Zenders laden..."
-            )
-            .font(
-                .system(
-                    size: 22
-                )
-            )
-            .frame(
-                maxWidth:
-                    .infinity,
-                maxHeight:
-                    .infinity
-            )
-
-        } else if guide.visibleChannels.isEmpty {
-            emptyGuideMessage
-
-        } else {
-            channelRows(
-                channelWidth:
-                    channelWidth,
-                timelineWidth:
-                    timelineWidth,
-                now:
-                    now
-            )
-        }
-    }
-
-    private var emptyGuideMessage: some View {
-        Text(
-            guide.searchText.isEmpty
-                ? "Geen zichtbare zenders in deze selectie."
-                : "Geen zoekresultaten in dit tijdvak."
-        )
-        .font(
-            .system(
-                size: 22
-            )
-        )
-        .foregroundStyle(
-            .secondary
-        )
-        .frame(
-            maxWidth:
-                .infinity,
-            maxHeight:
-                .infinity
+            maxWidth: .infinity,
+            maxHeight: .infinity
         )
     }
 
     private func channelRows(
+        rows: [VeyraGuideChannel],
         channelWidth: CGFloat,
         timelineWidth: CGFloat,
         now: Date
     ) -> some View {
-        ScrollViewReader { proxy in
+        ScrollViewReader {
+            proxy in
+
             ScrollView(
                 .vertical,
                 showsIndicators: false
             ) {
                 LazyVStack(
-                    spacing: 13
+                    spacing: 8
                 ) {
                     ForEach(
-                        guide.visibleChannels
+                        rows
                     ) { row in
-                        guideChannelRow(
-                            row:
+                        HStack(
+                            spacing: 12
+                        ) {
+                            channelButton(
                                 row,
-                            channelWidth:
-                                channelWidth,
-                            timelineWidth:
-                                timelineWidth,
-                            now:
-                                now
+                                now: now
+                            )
+                            .frame(
+                                width:
+                                    channelWidth
+                            )
+
+                            programmeRow(
+                                row,
+                                width:
+                                    timelineWidth,
+                                now:
+                                    now
+                            )
+                        }
+                        .frame(
+                            height: 88
+                        )
+                        .id(
+                            row.id
                         )
                     }
                 }
                 .padding(
                     .vertical,
-                    7
+                    4
                 )
             }
             .onChange(
-                of:
-                    guide.selectedCategory
-            ) { _, _ in
-                scrollToFirstChannel(
-                    using:
-                        proxy
-                )
+                of: guide.selectedCategory
+            ) { _ in
+                if let id =
+                    guide.visibleChannels
+                        .first?
+                        .id
+                {
+                    proxy.scrollTo(
+                        id,
+                        anchor: .top
+                    )
+                }
             }
         }
-    }
-
-    private func guideChannelRow(
-        row: VeyraGuideChannel,
-        channelWidth: CGFloat,
-        timelineWidth: CGFloat,
-        now: Date
-    ) -> some View {
-        HStack(
-            spacing: 16
-        ) {
-            channelButton(
-                row,
-                now:
-                    now
-            )
-            .frame(
-                width:
-                    channelWidth
-            )
-
-            programmeRow(
-                row,
-                width:
-                    timelineWidth,
-                now:
-                    now
-            )
-        }
-        .frame(
-            height: 126
-        )
-        .id(
-            row.id
-        )
-    }
-
-    private func scrollToFirstChannel(
-        using proxy:
-            ScrollViewProxy
-    ) {
-        guard
-            let id =
-                guide.visibleChannels
-                    .first?
-                    .id
-        else {
-            return
-        }
-
-        proxy.scrollTo(
-            id,
-            anchor:
-                .top
-        )
     }
 
     // MARK: - Time ruler
@@ -1187,132 +980,164 @@ struct LiveTVView: View {
         now: Date
     ) -> some View {
         ZStack(
-            alignment:
-                .topLeading
+            alignment: .topLeading
         ) {
-            timeLabels(
-                width:
-                    width
-            )
+            ForEach(
+                0..<6,
+                id: \.self
+            ) { index in
+                Text(
+                    VeyraEPGFormat.time(
+                        guide.windowStart
+                            .addingTimeInterval(
+                                Double(index)
+                                * 1_800
+                            )
+                    )
+                )
+                .font(
+                    .system(
+                        size: 15,
+                        weight: .medium
+                    )
+                )
+                .foregroundStyle(
+                    .white.opacity(
+                        0.6
+                    )
+                )
+                .offset(
+                    x:
+                        width
+                        * CGFloat(index)
+                        / 6
+                )
+            }
 
-            if isNowInsideWindow(
-                now
-            ) {
-                nowRulerMarker(
-                    width:
-                        width,
-                    now:
-                        now
+            if now >= guide.windowStart
+                && now < guide.windowEnd
+            {
+                Image(
+                    systemName:
+                        "arrowtriangle.down.fill"
+                )
+                .font(
+                    .system(
+                        size: 11
+                    )
+                )
+                .foregroundStyle(
+                    .cyan
+                )
+                .offset(
+                    x:
+                        width
+                        * now.timeIntervalSince(
+                            guide.windowStart
+                        )
+                        / guide.windowDuration
+                        - 5,
+                    y: 22
                 )
             }
         }
         .frame(
-            width:
-                width,
-            height:
-                42,
-            alignment:
-                .topLeading
+            width: width,
+            height: 35,
+            alignment: .topLeading
         )
         .accessibilityHidden(
             true
         )
     }
 
-    @ViewBuilder
-    private func timeLabels(
-        width: CGFloat
-    ) -> some View {
-        ForEach(
-            0..<6,
-            id: \.self
-        ) { index in
-            Text(
-                VeyraEPGFormat.time(
-                    guide.windowStart
-                        .addingTimeInterval(
-                            Double(index)
-                                * 1_800
-                        )
-                )
-            )
-            .font(
-                .system(
-                    size: 20,
-                    weight: .medium
-                )
-            )
-            .foregroundStyle(
-                .white.opacity(
-                    0.72
-                )
-            )
-            .offset(
-                x:
-                    width
-                    * CGFloat(index)
-                    / 6
-            )
-        }
-    }
-
-    private func nowRulerMarker(
-        width: CGFloat,
-        now: Date
-    ) -> some View {
-        Image(
-            systemName:
-                "arrowtriangle.down.fill"
-        )
-        .font(
-            .system(
-                size: 14
-            )
-        )
-        .foregroundStyle(
-            .cyan
-        )
-        .offset(
-            x:
-                nowXPosition(
-                    width:
-                        width,
-                    now:
-                        now
-                )
-                - 7,
-            y:
-                26
-        )
-    }
-
-    // MARK: - Channel button
+    // MARK: - Channel
 
     private func channelButton(
-        _ row:
-            VeyraGuideChannel,
+        _ row: VeyraGuideChannel,
         now: Date
     ) -> some View {
         Button {
             selectChannel(
                 row,
-                now:
-                    now
+                now: now
             )
 
         } label: {
-            channelButtonLabel(
-                row
+            HStack(
+                spacing: 12
+            ) {
+                channelLogo(
+                    row
+                )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 5
+                ) {
+                    Text(
+                        ChannelNameOverrideStore
+                            .effectiveName(
+                                channelID:
+                                    row.channel.id,
+                                defaultName:
+                                    row.channel.name
+                            )
+                    )
+                    .font(
+                        .system(
+                            size: 16,
+                            weight: .semibold
+                        )
+                    )
+                    .lineLimit(
+                        2
+                    )
+
+                    if guide.favorites
+                        .contains(
+                            row.id
+                        )
+                    {
+                        Image(
+                            systemName:
+                                "star.fill"
+                        )
+                        .font(
+                            .system(
+                                size: 12
+                            )
+                        )
+                        .foregroundStyle(
+                            .cyan
+                        )
+                    }
+                }
+
+                Spacer(
+                    minLength: 0
+                )
+            }
+            .padding(
+                12
+            )
+            .frame(
+                maxWidth: .infinity,
+                minHeight: 88,
+                maxHeight: 88
             )
         }
         .buttonStyle(
             VeyraEPGButtonStyle()
         )
         .accessibilityLabel(
-            ChannelNameOverrideStore.effectiveName(
-                channelID: row.channel.id,
-                defaultName: row.channel.name
-            )
+            ChannelNameOverrideStore
+                .effectiveName(
+                    channelID:
+                        row.channel.id,
+                    defaultName:
+                        row.channel.name
+                )
         )
         .accessibilityHint(
             "Opent zenderinformatie en Kijk live"
@@ -1330,17 +1155,61 @@ struct LiveTVView: View {
                 )
             }
 
-            if ChannelLogoOverrideStore.logoURL(
-                forChannelID:
-                    row.channel.id
-            ) != nil {
+            Button {
+                guide.toggleFavorite(
+                    row
+                )
+
+            } label: {
+                if guide.favorites
+                    .contains(
+                        row.id
+                    )
+                {
+                    Label(
+                        "Uit favorieten verwijderen",
+                        systemImage:
+                            "star.slash"
+                    )
+
+                } else {
+                    Label(
+                        "Aan favorieten toevoegen",
+                        systemImage:
+                            "star"
+                    )
+                }
+            }
+
+            if !guide.favoriteRows.isEmpty {
+                Button {
+                    showFavoriteOrder =
+                        true
+
+                } label: {
+                    Label(
+                        "Favorieten ordenen…",
+                        systemImage:
+                            "line.3.horizontal"
+                    )
+                }
+            }
+
+            if ChannelLogoOverrideStore
+                .logoURL(
+                    forChannelID:
+                        row.channel.id
+                )
+                != nil
+            {
                 Button(
                     role: .destructive
                 ) {
-                    ChannelLogoOverrideStore.removeOverride(
-                        forChannelID:
-                            row.channel.id
-                    )
+                    ChannelLogoOverrideStore
+                        .removeOverride(
+                            forChannelID:
+                                row.channel.id
+                        )
 
                     logoOverrideVersion += 1
 
@@ -1356,73 +1225,36 @@ struct LiveTVView: View {
     }
 
     private func selectChannel(
-        _ row:
-            VeyraGuideChannel,
+        _ row: VeyraGuideChannel,
         now: Date
     ) {
-        let currentProgramme =
-            guide.programmes(
-                for: row
-            )
-            .first {
-                $0.isOnAir(
-                    at: now
-                )
-            }
-
         selection =
             VeyraEPGSelection(
-                row:
-                    row,
+                row: row,
                 programme:
-                    currentProgramme
+                    guide.programmes(
+                        for: row
+                    )
+                    .first {
+                        $0.isOnAir(
+                            at: now
+                        )
+                    }
             )
-    }
-
-    private func channelButtonLabel(
-        _ row:
-            VeyraGuideChannel
-    ) -> some View {
-        HStack(
-            spacing: 16
-        ) {
-            channelLogo(
-                row
-            )
-
-            channelName(
-                row
-            )
-
-            Spacer(
-                minLength: 0
-            )
-        }
-        .padding(
-            16
-        )
-        .frame(
-            maxWidth:
-                .infinity,
-            minHeight:
-                116,
-            maxHeight:
-                116
-        )
     }
 
     private func channelLogo(
-        _ row:
-            VeyraGuideChannel
+        _ row: VeyraGuideChannel
     ) -> some View {
         AsyncImage(
             url:
-                ChannelLogoOverrideStore.effectiveLogoURL(
-                    channelID:
-                        row.channel.id,
-                    defaultLogoURL:
-                        row.channel.logoURL
-                )
+                ChannelLogoOverrideStore
+                    .effectiveLogoURL(
+                        channelID:
+                            row.channel.id,
+                        defaultLogoURL:
+                            row.channel.logoURL
+                    )
         ) { phase in
             if let image =
                 phase.image
@@ -1438,7 +1270,7 @@ struct LiveTVView: View {
                 )
                 .font(
                     .system(
-                        size: 34
+                        size: 26
                     )
                 )
                 .foregroundStyle(
@@ -1452,61 +1284,15 @@ struct LiveTVView: View {
             logoOverrideVersion
         )
         .frame(
-            width: 76,
-            height: 68
+            width: 56,
+            height: 50
         )
     }
 
-    private func channelName(
-        _ row:
-            VeyraGuideChannel
-    ) -> some View {
-        VStack(
-            alignment: .leading,
-            spacing: 7
-        ) {
-            Text(
-                ChannelNameOverrideStore.effectiveName(
-                    channelID:
-                        row.channel.id,
-                    defaultName:
-                        row.channel.name
-                )
-            )
-            .font(
-                .system(
-                    size: 21,
-                    weight: .semibold
-                )
-            )
-            .lineLimit(
-                2
-            )
-
-            if guide.favorites.contains(
-                row.id
-            ) {
-                Image(
-                    systemName:
-                        "star.fill"
-                )
-                .font(
-                    .system(
-                        size: 16
-                    )
-                )
-                .foregroundStyle(
-                    .cyan
-                )
-            }
-        }
-    }
-
-    // MARK: - Programme row
+    // MARK: - Programmes
 
     private func programmeRow(
-        _ row:
-            VeyraGuideChannel,
+        _ row: VeyraGuideChannel,
         width: CGFloat,
         now: Date
     ) -> some View {
@@ -1521,416 +1307,224 @@ struct LiveTVView: View {
                     guide.windowEnd
             )
 
-        return ZStack(
-            alignment:
-                .leading
-        ) {
-            programmeSlots(
-                slots:
-                    slots,
-                row:
-                    row,
-                width:
-                    width,
-                now:
-                    now
-            )
-
-            if isNowInsideWindow(
-                now
-            ) {
-                nowLine(
-                    width:
-                        width,
-                    now:
-                        now
-                )
-            }
-        }
-        .frame(
-            width:
-                width,
-            height:
-                116,
-            alignment:
-                .leading
-        )
-    }
-
-    private func programmeSlots(
-        slots: [VeyraEPGSlot],
-        row: VeyraGuideChannel,
-        width: CGFloat,
-        now: Date
-    ) -> some View {
-        HStack(
+        return HStack(
             spacing: 0
         ) {
             ForEach(
                 slots
             ) { slot in
-                programmeSlot(
-                    slot:
-                        slot,
-                    row:
-                        row,
-                    width:
-                        width,
-                    now:
-                        now
-                )
-            }
-        }
-    }
-
-    private func programmeSlot(
-        slot: VeyraEPGSlot,
-        row: VeyraGuideChannel,
-        width: CGFloat,
-        now: Date
-    ) -> some View {
-        let span =
-            slotWidth(
-                slot:
-                    slot,
-                totalWidth:
+                let span =
                     width
-            )
-
-        return Button {
-            selection =
-                VeyraEPGSelection(
-                    row:
-                        row,
-                    programme:
-                        slot.programme
-                )
-
-        } label: {
-            programmeSlotLabel(
-                slot:
-                    slot,
-                span:
-                    span,
-                now:
-                    now
-            )
-        }
-        .buttonStyle(
-            VeyraEPGButtonStyle(
-                onAir:
-                    slot.programme?
-                        .isOnAir(
-                            at: now
+                    * slot.end
+                        .timeIntervalSince(
+                            slot.start
                         )
-                    == true,
-                channelColor:
-                    channelColor(
-                        for: row
+                    / guide.windowDuration
+
+                Button {
+                    selection =
+                        VeyraEPGSelection(
+                            row: row,
+                            programme:
+                                slot.programme
+                        )
+
+                } label: {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 5
+                    ) {
+                        if span > 60 {
+                            Text(
+                                slot.programme?
+                                    .title
+                                ??
+                                (
+                                    guide.loadingGuide
+                                    ?
+                                    "Gids laden..."
+                                    :
+                                    "Geen programma-informatie"
+                                )
+                            )
+                            .font(
+                                .system(
+                                    size: 17,
+                                    weight: .semibold
+                                )
+                            )
+                            .lineLimit(
+                                2
+                            )
+
+                            if let programme =
+                                slot.programme,
+                               span > 95
+                            {
+                                HStack(
+                                    spacing: 7
+                                ) {
+                                    Text(
+                                        VeyraEPGFormat.time(
+                                            programme.start
+                                        )
+                                    )
+                                    .foregroundStyle(
+                                        .white.opacity(
+                                            0.65
+                                        )
+                                    )
+
+                                    if programme.isOnAir(
+                                        at: now
+                                    ) {
+                                        Text(
+                                            "NU"
+                                        )
+                                        .foregroundStyle(
+                                            .cyan
+                                        )
+                                        .bold()
+                                    }
+                                }
+                                .font(
+                                    .system(
+                                        size: 12
+                                    )
+                                )
+                            }
+                        }
+
+                        Spacer(
+                            minLength: 0
+                        )
+                    }
+                    .padding(
+                        .horizontal,
+                        span > 60
+                        ? 12
+                        : 0
                     )
-            )
-        )
-        .frame(
-            width:
-                span,
-            alignment:
-                .leading
-        )
-        .accessibilityLabel(
-            programmeAccessibilityLabel(
-                slot:
-                    slot,
-                row:
-                    row
-            )
-        )
-        .accessibilityHint(
-            "Toon programmadetails; begint niet automatisch met afspelen"
-        )
-    }
-
-    private func programmeSlotLabel(
-        slot: VeyraEPGSlot,
-        span: CGFloat,
-        now: Date
-    ) -> some View {
-        VStack(
-            alignment: .leading,
-            spacing: 7
-        ) {
-            if span > 60 {
-                Text(
-                    programmeTitle(
-                        slot
+                    .padding(
+                        .vertical,
+                        12
                     )
-                )
-                .font(
-                    .system(
-                        size: 21,
-                        weight: .semibold
-                    )
-                )
-                .lineLimit(
-                    2
-                )
-
-                if let programme =
-                    slot.programme,
-                   span > 105
-                {
-                    programmeTimeLabel(
-                        programme,
-                        now:
-                            now
-                    )
-                }
-            }
-
-            Spacer(
-                minLength: 0
-            )
-        }
-        .padding(
-            .horizontal,
-            span > 60
-                ? 16
-                : 0
-        )
-        .padding(
-            .vertical,
-            16
-        )
-        .frame(
-            width:
-                max(
-                    0,
-                    span - 3
-                ),
-            height:
-                116,
-            alignment:
-                .topLeading
-        )
-        .clipped()
-    }
-
-    private func programmeTimeLabel(
-        _ programme:
-            VeyraEPGProgramme,
-        now: Date
-    ) -> some View {
-        HStack(
-            spacing: 9
-        ) {
-            Text(
-                VeyraEPGFormat.time(
-                    programme.start
-                )
-            )
-            .foregroundStyle(
-                .white.opacity(
-                    0.72
-                )
-            )
-
-            if programme.isOnAir(
-                at: now
-            ) {
-                Text(
-                    "NU"
-                )
-                .foregroundStyle(
-                    .cyan
-                )
-                .bold()
-            }
-        }
-        .font(
-            .system(
-                size: 16
-            )
-        )
-    }
-
-    private func programmeTitle(
-        _ slot:
-            VeyraEPGSlot
-    ) -> String {
-        if let title =
-            slot.programme?.title
-        {
-            return title
-        }
-
-        if guide.loadingGuide {
-            return
-                "Gids laden..."
-        }
-
-        return
-            "Geen programma-informatie"
-    }
-
-    private func programmeAccessibilityLabel(
-        slot: VeyraEPGSlot,
-        row: VeyraGuideChannel
-    ) -> String {
-        let title =
-            slot.programme?.title
-            ?? "Geen programma-informatie"
-
-        return
-            title
-            + ", "
-            + ChannelNameOverrideStore.effectiveName(
-                channelID:
-                    row.channel.id,
-                defaultName:
-                    row.channel.name
-            )
-    }
-
-    private func slotWidth(
-        slot: VeyraEPGSlot,
-        totalWidth: CGFloat
-    ) -> CGFloat {
-        let duration =
-            slot.end
-                .timeIntervalSince(
-                    slot.start
-                )
-
-        return
-            totalWidth
-            * duration
-            / guide.windowDuration
-    }
-
-    // MARK: - Current time
-
-    private func isNowInsideWindow(
-        _ now: Date
-    ) -> Bool {
-        now >= guide.windowStart
-            && now < guide.windowEnd
-    }
-
-    private func nowXPosition(
-        width: CGFloat,
-        now: Date
-    ) -> CGFloat {
-        let elapsed =
-            now.timeIntervalSince(
-                guide.windowStart
-            )
-
-        return
-            width
-            * elapsed
-            / guide.windowDuration
-    }
-
-    private func nowLine(
-        width: CGFloat,
-        now: Date
-    ) -> some View {
-        Rectangle()
-            .fill(
-                Color.cyan.opacity(
-                    0.82
-                )
-            )
-            .frame(
-                width: 3
-            )
-            .offset(
-                x:
-                    nowXPosition(
+                    .frame(
                         width:
-                            width,
-                        now:
-                            now
+                            max(
+                                0,
+                                span - 3
+                            ),
+                        height: 88,
+                        alignment:
+                            .topLeading
                     )
-            )
-            .allowsHitTesting(
-                false
-            )
-    }
-
-    // MARK: - Channel color
-
-    private func channelColor(
-        for row:
-            VeyraGuideChannel
-    ) -> Color {
-        let hash =
-            abs(
-                row.id.hashValue
-            )
-
-        let palette:
-            [
-                (
-                    red: Double,
-                    green: Double,
-                    blue: Double
+                    .clipped()
+                }
+                .buttonStyle(
+                    VeyraEPGButtonStyle(
+                        onAir:
+                            slot.programme?
+                                .isOnAir(
+                                    at: now
+                                )
+                            == true
+                    )
                 )
-            ] = [
-                (0.3, 0.7, 0.9),
-                (0.4, 0.8, 0.4),
-                (0.9, 0.5, 0.3),
-                (0.7, 0.4, 0.8),
-                (0.9, 0.7, 0.3),
-                (0.3, 0.8, 0.7),
-                (0.9, 0.4, 0.5),
-                (0.5, 0.7, 0.3),
-                (0.8, 0.3, 0.6),
-                (0.4, 0.6, 0.9),
-                (0.9, 0.6, 0.2),
-                (0.5, 0.8, 0.5)
-            ]
-
-        let index =
-            hash
-            % palette.count
-
-        let color =
-            palette[index]
-
-        return Color(
-            red:
-                color.red,
-            green:
-                color.green,
-            blue:
-                color.blue
+                .frame(
+                    width: span,
+                    alignment: .leading
+                )
+                .accessibilityLabel(
+                    (
+                        slot.programme?
+                            .title
+                        ??
+                        "Geen programma-informatie"
+                    )
+                    +
+                    ", "
+                    +
+                    ChannelNameOverrideStore
+                        .effectiveName(
+                            channelID:
+                                row.channel.id,
+                            defaultName:
+                                row.channel.name
+                        )
+                )
+                .accessibilityHint(
+                    "Toon programmadetails; begint niet automatisch met afspelen"
+                )
+            }
+        }
+        .frame(
+            width: width,
+            height: 88,
+            alignment: .leading
         )
+        .overlay(
+            alignment: .leading
+        ) {
+            if now >= guide.windowStart
+                && now < guide.windowEnd
+            {
+                Rectangle()
+                    .fill(
+                        Color.cyan.opacity(
+                            0.7
+                        )
+                    )
+                    .frame(
+                        width: 2
+                    )
+                    .offset(
+                        x:
+                            width
+                            * now.timeIntervalSince(
+                                guide.windowStart
+                            )
+                            / guide.windowDuration
+                    )
+                    .allowsHitTesting(
+                        false
+                    )
+            }
+        }
     }
 
     // MARK: - Footer
 
     private var footer: some View {
         HStack(
-            spacing: 14
+            spacing: 12
         ) {
             if guide.loadingGuide {
                 ProgressView()
                     .scaleEffect(
-                        0.75
+                        0.65
                     )
             }
 
             Text(
-                footerMessage
+                guide.loadingGuide
+                ?
+                "Programmagids laden; zenders zijn al beschikbaar."
+                :
+                (
+                    guide.guideMessage
+                    ??
+                    "Selecteer een programma voor informatie of kies Kijk live."
+                )
             )
             .font(
                 .system(
-                    size: 17
+                    size: 14
                 )
             )
             .foregroundStyle(
                 .white.opacity(
-                    0.62
+                    0.55
                 )
             )
             .lineLimit(
@@ -1942,19 +1536,127 @@ struct LiveTVView: View {
             )
         }
         .frame(
-            minHeight: 28
+            minHeight: 24
         )
     }
+}
 
-    private var footerMessage: String {
-        if guide.loadingGuide {
-            return
-                "Programmagids laden; zenders zijn al beschikbaar."
+
+// MARK: - Search
+
+@MainActor
+private struct LiveTVSearchView: View {
+    @Binding
+    var searchText: String
+
+    @Environment(\.dismiss)
+    private var dismiss
+
+    var body: some View {
+        ZStack {
+            VeyraEPGTheme.background
+                .ignoresSafeArea()
+
+            VStack(
+                alignment: .leading,
+                spacing: 30
+            ) {
+                HStack {
+                    Text(
+                        "ZOEKEN"
+                    )
+                    .font(
+                        .system(
+                            size: 38,
+                            weight: .light
+                        )
+                    )
+                    .tracking(
+                        4
+                    )
+
+                    Spacer()
+
+                    Button {
+                        dismiss()
+
+                    } label: {
+                        Image(
+                            systemName:
+                                "xmark"
+                        )
+                        .frame(
+                            width: 60,
+                            height: 60
+                        )
+                    }
+                    .buttonStyle(
+                        VeyraEPGButtonStyle()
+                    )
+                }
+
+                TextField(
+                    "Zoek zenders en programma's",
+                    text:
+                        $searchText
+                )
+                .font(
+                    .system(
+                        size: 28
+                    )
+                )
+                .textInputAutocapitalization(
+                    .never
+                )
+                .autocorrectionDisabled()
+                .textFieldStyle(
+                    .plain
+                )
+                .padding(
+                    20
+                )
+                .background(
+                    RoundedRectangle(
+                        cornerRadius: 14,
+                        style: .continuous
+                    )
+                    .fill(
+                        Color(
+                            red: 0.035,
+                            green: 0.10,
+                            blue: 0.16
+                        )
+                    )
+                )
+
+                if !searchText.isEmpty {
+                    Button {
+                        searchText = ""
+
+                    } label: {
+                        Label(
+                            "Zoekopdracht wissen",
+                            systemImage:
+                                "xmark.circle"
+                        )
+                        .padding(
+                            16
+                        )
+                    }
+                    .buttonStyle(
+                        VeyraEPGButtonStyle()
+                    )
+                }
+
+                Spacer()
+            }
+            .padding(
+                60
+            )
         }
-
-        return
-            guide.guideMessage
-            ?? "Selecteer een programma voor informatie of kies Kijk live."
+        .foregroundStyle(
+            .white
+        )
     }
 }
 
@@ -1976,12 +1678,10 @@ private struct VeyraEPGSelection:
 }
 
 
-// MARK: - Programme details
+// MARK: - Details
 
 @MainActor
-private struct VeyraEPGDetails:
-    View
-{
+private struct VeyraEPGDetails: View {
     let selection:
         VeyraEPGSelection
 
@@ -2003,22 +1703,209 @@ private struct VeyraEPGDetails:
             ScrollView {
                 VStack(
                     alignment: .leading,
-                    spacing: 30
+                    spacing: 24
                 ) {
-                    channelTitle
+                    Text(
+                        ChannelNameOverrideStore
+                            .effectiveName(
+                                channelID:
+                                    selection.row
+                                        .channel
+                                        .id,
+                                defaultName:
+                                    selection.row
+                                        .channel
+                                        .name
+                            )
+                    )
+                    .font(
+                        .system(
+                            size: 22,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        .cyan
+                    )
 
-                    programmeTitle
+                    Text(
+                        selection.programme?
+                            .title
+                        ??
+                        "Zenderinformatie"
+                    )
+                    .font(
+                        .system(
+                            size: 38,
+                            weight: .semibold
+                        )
+                    )
 
-                    programmeInformation
+                    if let programme =
+                        selection.programme
+                    {
+                        Text(
+                            VeyraEPGFormat.day(
+                                programme.start
+                            )
+                            +
+                            "  "
+                            +
+                            VeyraEPGFormat.time(
+                                programme.start
+                            )
+                            +
+                            " - "
+                            +
+                            VeyraEPGFormat.time(
+                                programme.end
+                            )
+                        )
+                        .foregroundStyle(
+                            .cyan.opacity(
+                                0.8
+                            )
+                        )
 
-                    actionButtons
+                        if !programme
+                            .subtitle
+                            .isEmpty
+                        {
+                            Text(
+                                programme.subtitle
+                            )
+                            .font(
+                                .title3
+                            )
+                        }
+
+                        Text(
+                            programme.summary
+                                .isEmpty
+                            ?
+                            "Geen beschrijving beschikbaar."
+                            :
+                            programme.summary
+                        )
+                        .foregroundStyle(
+                            .white.opacity(
+                                0.75
+                            )
+                        )
+                        .fixedSize(
+                            horizontal: false,
+                            vertical: true
+                        )
+
+                        if programme.estimatedEnd {
+                            Text(
+                                "De eindtijd is afgeleid van het volgende programma."
+                            )
+                            .font(
+                                .caption
+                            )
+                            .foregroundStyle(
+                                .secondary
+                            )
+                        }
+
+                        if !programme.isOnAir(
+                            at: Date()
+                        ) {
+                            Text(
+                                "Kijk live opent de huidige uitzending van deze zender, niet dit geplande of afgelopen programma. Terugkijken is in deze gids nog niet ingebouwd."
+                            )
+                            .font(
+                                .callout
+                            )
+                            .foregroundStyle(
+                                .secondary
+                            )
+                        }
+
+                    } else {
+                        Text(
+                            "Geen programma-informatie voor dit tijdvak. De livezender blijft beschikbaar."
+                        )
+                        .foregroundStyle(
+                            .secondary
+                        )
+                    }
+
+                    HStack(
+                        spacing: 20
+                    ) {
+                        Button(
+                            action:
+                                onPlay
+                        ) {
+                            Label(
+                                "Kijk live",
+                                systemImage:
+                                    "play.fill"
+                            )
+                            .padding(
+                                16
+                            )
+                        }
+                        .buttonStyle(
+                            VeyraEPGButtonStyle(
+                                selected: true
+                            )
+                        )
+
+                        Button {
+                            guide.toggleFavorite(
+                                selection.row
+                            )
+
+                        } label: {
+                            Label(
+                                guide.favorites
+                                    .contains(
+                                        selection.row.id
+                                    )
+                                ?
+                                "Favoriet verwijderen"
+                                :
+                                "Favoriet maken",
+                                systemImage:
+                                    guide.favorites
+                                        .contains(
+                                            selection.row.id
+                                        )
+                                    ?
+                                    "star.fill"
+                                    :
+                                    "star"
+                            )
+                            .padding(
+                                16
+                            )
+                        }
+                        .buttonStyle(
+                            VeyraEPGButtonStyle()
+                        )
+
+                        Button(
+                            "Sluiten"
+                        ) {
+                            dismiss()
+                        }
+                        .padding(
+                            16
+                        )
+                        .buttonStyle(
+                            VeyraEPGButtonStyle()
+                        )
+                    }
                 }
                 .frame(
-                    maxWidth: 1360,
+                    maxWidth: 1200,
                     alignment: .leading
                 )
                 .padding(
-                    52
+                    60
                 )
             }
         }
@@ -2026,285 +1913,20 @@ private struct VeyraEPGDetails:
             .white
         )
     }
-
-    private var channelTitle:
-        some View
-    {
-        Text(
-            ChannelNameOverrideStore.effectiveName(
-                channelID:
-                    selection.row.channel.id,
-                defaultName:
-                    selection.row.channel.name
-            )
-        )
-        .font(
-            .system(
-                size: 28,
-                weight: .semibold
-            )
-        )
-        .foregroundStyle(
-            .cyan
-        )
-    }
-
-    private var programmeTitle:
-        some View
-    {
-        Text(
-            selection.programme?.title
-            ?? "Zenderinformatie"
-        )
-        .font(
-            .system(
-                size: 46,
-                weight: .semibold
-            )
-        )
-    }
-
-    @ViewBuilder
-    private var programmeInformation:
-        some View
-    {
-        if let programme =
-            selection.programme
-        {
-            Text(
-                VeyraEPGFormat.day(
-                    programme.start
-                )
-                + "  "
-                + VeyraEPGFormat.time(
-                    programme.start
-                )
-                + " - "
-                + VeyraEPGFormat.time(
-                    programme.end
-                )
-            )
-            .font(
-                .system(
-                    size: 23,
-                    weight: .medium
-                )
-            )
-            .foregroundStyle(
-                .cyan.opacity(
-                    0.85
-                )
-            )
-
-            if !programme.subtitle.isEmpty {
-                Text(
-                    programme.subtitle
-                )
-                .font(
-                    .system(
-                        size: 28,
-                        weight: .medium
-                    )
-                )
-            }
-
-            Text(
-                programme.summary.isEmpty
-                    ? "Geen beschrijving beschikbaar."
-                    : programme.summary
-            )
-            .font(
-                .system(
-                    size: 24
-                )
-            )
-            .foregroundStyle(
-                .white.opacity(
-                    0.78
-                )
-            )
-            .fixedSize(
-                horizontal:
-                    false,
-                vertical:
-                    true
-            )
-
-            if programme.estimatedEnd {
-                Text(
-                    "De eindtijd is afgeleid van het volgende programma."
-                )
-                .font(
-                    .system(
-                        size: 19
-                    )
-                )
-                .foregroundStyle(
-                    .secondary
-                )
-            }
-
-            if !programme.isOnAir(
-                at: Date()
-            ) {
-                Text(
-                    "Kijk live opent de huidige uitzending van deze zender, niet dit geplande of afgelopen programma. Terugkijken is in deze gids nog niet ingebouwd."
-                )
-                .font(
-                    .system(
-                        size: 21
-                    )
-                )
-                .foregroundStyle(
-                    .secondary
-                )
-            }
-
-        } else {
-            Text(
-                "Geen programma-informatie voor dit tijdvak. De livezender blijft beschikbaar."
-            )
-            .font(
-                .system(
-                    size: 24
-                )
-            )
-            .foregroundStyle(
-                .secondary
-            )
-        }
-    }
-
-    private var actionButtons:
-        some View
-    {
-        HStack(
-            spacing: 22
-        ) {
-            playButton
-
-            favoriteButton
-
-            closeButton
-        }
-    }
-
-    private var playButton:
-        some View
-    {
-        Button(
-            action:
-                onPlay
-        ) {
-            Label(
-                "Kijk live",
-                systemImage:
-                    "play.fill"
-            )
-            .font(
-                .system(
-                    size: 23,
-                    weight: .semibold
-                )
-            )
-            .padding(
-                20
-            )
-        }
-        .buttonStyle(
-            VeyraEPGButtonStyle(
-                selected: true
-            )
-        )
-    }
-
-    private var favoriteButton:
-        some View
-    {
-        Button {
-            guide.toggleFavorite(
-                selection.row
-            )
-
-        } label: {
-            Label(
-                favoriteTitle,
-                systemImage:
-                    favoriteIcon
-            )
-            .font(
-                .system(
-                    size: 23,
-                    weight: .semibold
-                )
-            )
-            .padding(
-                20
-            )
-        }
-        .buttonStyle(
-            VeyraEPGButtonStyle()
-        )
-    }
-
-    private var favoriteTitle:
-        String
-    {
-        guide.favorites.contains(
-            selection.row.id
-        )
-        ? "Favoriet verwijderen"
-        : "Favoriet maken"
-    }
-
-    private var favoriteIcon:
-        String
-    {
-        guide.favorites.contains(
-            selection.row.id
-        )
-        ? "star.fill"
-        : "star"
-    }
-
-    private var closeButton:
-        some View
-    {
-        Button(
-            "Sluiten"
-        ) {
-            dismiss()
-        }
-        .font(
-            .system(
-                size: 23,
-                weight: .semibold
-            )
-        )
-        .padding(
-            20
-        )
-        .buttonStyle(
-            VeyraEPGButtonStyle()
-        )
-    }
 }
 
 
-// MARK: - Veyra button style
+// MARK: - Button style
 
 private struct VeyraEPGButtonStyle:
     ButtonStyle
 {
     var selected = false
-
     var onAir = false
 
-    var channelColor:
-        Color? = nil
-
     func makeBody(
-        configuration: Configuration
+        configuration:
+            Configuration
     ) -> some View {
         VeyraEPGButtonSurface(
             label:
@@ -2314,9 +1936,7 @@ private struct VeyraEPGButtonStyle:
             selected:
                 selected,
             onAir:
-                onAir,
-            channelColor:
-                channelColor
+                onAir
         )
     }
 }
@@ -2328,15 +1948,9 @@ private struct VeyraEPGButtonSurface<
     View
 {
     let label: Label
-
     let pressed: Bool
-
     let selected: Bool
-
     let onAir: Bool
-
-    let channelColor:
-        Color?
 
     @Environment(\.isFocused)
     private var isFocused
@@ -2351,7 +1965,7 @@ private struct VeyraEPGButtonSurface<
             )
             .background(
                 RoundedRectangle(
-                    cornerRadius: 16,
+                    cornerRadius: 12,
                     style: .continuous
                 )
                 .fill(
@@ -2360,24 +1974,37 @@ private struct VeyraEPGButtonSurface<
             )
             .overlay(
                 RoundedRectangle(
-                    cornerRadius: 16,
+                    cornerRadius: 12,
                     style: .continuous
                 )
                 .strokeBorder(
-                    borderColor,
+                    isFocused
+                    ?
+                    Color.cyan
+                    :
+                    Color.cyan.opacity(
+                        selected
+                        ? 0.45
+                        : 0.08
+                    ),
                     lineWidth:
                         isFocused
-                        ? 2.5
+                        ? 2
                         : 1
                 )
             )
-            .opacity(
-                opacity
-            )
             .scaleEffect(
                 isFocused
-                    ? 1.025
-                    : 1
+                ? 1.025
+                : 1
+            )
+            .opacity(
+                !isEnabled
+                ? 0.4
+                :
+                pressed
+                ? 0.8
+                : 1
             )
             .animation(
                 .easeOut(
@@ -2388,34 +2015,29 @@ private struct VeyraEPGButtonSurface<
             )
     }
 
-    private var baseColor:
-        Color
-    {
-        channelColor
-        ?? Color.cyan
-    }
-
     private var backgroundColor:
         Color
     {
         if isFocused {
             return
-                baseColor.opacity(
-                    0.32
+                Color.cyan.opacity(
+                    0.24
                 )
         }
 
         if selected {
             return
-                baseColor.opacity(
-                    0.22
+                Color.cyan.opacity(
+                    0.16
                 )
         }
 
         if onAir {
             return
-                baseColor.opacity(
-                    0.16
+                Color(
+                    red: 0.035,
+                    green: 0.20,
+                    blue: 0.25
                 )
         }
 
@@ -2425,36 +2047,6 @@ private struct VeyraEPGButtonSurface<
             blue: 0.16
         )
     }
-
-    private var borderColor:
-        Color
-    {
-        if isFocused {
-            return
-                baseColor
-        }
-
-        return
-            baseColor.opacity(
-                selected
-                ? 0.50
-                : 0.10
-            )
-    }
-
-    private var opacity:
-        Double
-    {
-        if !isEnabled {
-            return 0.4
-        }
-
-        if pressed {
-            return 0.8
-        }
-
-        return 1
-    }
 }
 
 
@@ -2462,14 +2054,31 @@ private struct VeyraEPGButtonSurface<
 
 private enum VeyraEPGTheme {
     static var background:
-        some View
+        LinearGradient
     {
-        VeyraBackground()
+        LinearGradient(
+            colors: [
+                Color(
+                    red: 0.01,
+                    green: 0.04,
+                    blue: 0.07
+                ),
+                Color(
+                    red: 0.02,
+                    green: 0.10,
+                    blue: 0.16
+                )
+            ],
+            startPoint:
+                .topLeading,
+            endPoint:
+                .bottomTrailing
+        )
     }
 }
 
 
-// MARK: - Local time formatting
+// MARK: - Formatting
 
 @MainActor
 private enum VeyraEPGFormat {
