@@ -268,7 +268,9 @@ struct VeyraRecentLiveTVHomeView: View {
             )
 
             AsyncImage(
-                url: row.channel.logoURL
+                url: ChannelLogoOverrideStore.effectiveLogoURL(
+                    channelID: row.channel.id, defaultLogoURL: row.channel.logoURL
+                )
             ) { phase in
                 switch phase {
                 case .success(let image):
