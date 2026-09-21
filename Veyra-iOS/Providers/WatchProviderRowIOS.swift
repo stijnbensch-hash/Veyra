@@ -94,31 +94,24 @@ struct WatchProviderRowIOS: View {
 
     // MARK: - Provider button
 
+    /// Toont enkel het merklogo van de dienst (geen naam ernaast meer) —
+    /// het logo zelf draagt al de merkherkenning en -kleur, dus een aparte
+    /// tekstlabel en gevulde achtergrond voegden alleen ruis toe. Enkel een
+    /// dun accentrandje maakt nog duidelijk welke dienst geselecteerd is.
     private func providerButton(_ provider: WatchProvider) -> some View {
         let selected = selection?.id == provider.id
 
         return Button {
             selection = selected ? nil : provider
         } label: {
-            HStack(spacing: 8) {
-                WatchProviderLogoIOS(provider: provider)
-                    .frame(width: 24, height: 24)
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-
-                Text(provider.name)
-                    .font(.system(size: 14, weight: .medium))
-                    .lineLimit(1)
-                    .foregroundStyle(.white)
-            }
-            .padding(.horizontal, 14)
-            .frame(height: 40)
-            .background(
-                selected ? VeyraColors.cyan.opacity(0.22) : Color.white.opacity(0.08),
-                in: Capsule()
-            )
-            .overlay(
-                Capsule().strokeBorder(selected ? VeyraColors.cyan : .clear, lineWidth: 1.5)
-            )
+            WatchProviderLogoIOS(provider: provider)
+                .frame(height: 34)
+                .padding(.horizontal, 10)
+                .frame(height: 40)
+                .background(Color.white.opacity(0.06), in: Capsule())
+                .overlay(
+                    Capsule().strokeBorder(selected ? VeyraColors.cyan : .clear, lineWidth: 1.5)
+                )
         }
         .buttonStyle(.plain)
         .accessibilityLabel(provider.name)
@@ -164,6 +157,7 @@ private struct WatchProviderLogoIOS: View {
             switch phase {
             case .success(let image):
                 image.resizable().scaledToFit()
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             case .empty:
                 ProgressView().scaleEffect(0.7)
             case .failure:

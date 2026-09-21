@@ -170,8 +170,8 @@ struct WatchProviderRow: View {
                 provider: provider
             )
             .frame(
-                width: 190,
-                height: 88
+                width: 150,
+                height: 66
             )
         }
         .buttonStyle(
@@ -333,11 +333,11 @@ private struct WatchProviderLogo: View {
         )
         .padding(
             .horizontal,
-            12
+            8
         )
         .padding(
             .vertical,
-            9
+            6
         )
     }
 
@@ -381,6 +381,11 @@ private struct WatchProviderPillStyle:
     }
 }
 
+/// Enkel het merklogo blijft over als achtergrond — geen gevulde
+/// kaart meer erachter, zodat de eigen kleur van elk logo (net als de
+/// referentie-app) het beeld bepaalt in plaats van een grijze tegel.
+/// Focus en selectie blijven zichtbaar via een dun randje en een lichte
+/// gloed/opschaling, zonder een extra achtergrondvlak toe te voegen.
 private struct WatchProviderPillSurface<
     Label: View
 >: View {
@@ -395,25 +400,15 @@ private struct WatchProviderPillSurface<
 
     var body: some View {
         label
-            .background(
-                LinearGradient(
-                    colors: [
-                        Color.white.opacity(isFocused ? 0.13 : 0.06),
-                        VeyraColors.surface.opacity(0.72)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
             .clipShape(
                 RoundedRectangle(
-                    cornerRadius: 28,
+                    cornerRadius: 18,
                     style: .continuous
                 )
             )
             .overlay {
                 RoundedRectangle(
-                    cornerRadius: 28,
+                    cornerRadius: 18,
                     style: .continuous
                 )
                 .strokeBorder(
@@ -436,16 +431,11 @@ private struct WatchProviderPillSurface<
                     ? 14
                     : 0
             )
-            .shadow(
-                color: isFocused ? VeyraColors.red.opacity(0.14) : .clear,
-                radius: isFocused ? 14 : 0,
-                x: 8
-            )
             .scaleEffect(
                 pressed
                 ? 0.98
                 : isFocused
-                    ? 1.055
+                    ? 1.08
                     : 1
             )
             .animation(
