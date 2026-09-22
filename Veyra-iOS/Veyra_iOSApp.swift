@@ -9,6 +9,12 @@ import SwiftUI
 
 @main
 struct Veyra_iOSApp: App {
+    // Nodig zodat `OrientationLock` (Playback/OrientationLock.swift) de
+    // toegestane schermoriëntaties tijdens het afspelen kan beperken —
+    // zie "Automatisch draaien naar liggend" in de Afspelen-instellingen.
+    @UIApplicationDelegateAdaptor(AppDelegate.self)
+    private var appDelegate
+
     @AppStorage(GeneralSettingsDefaults.textSizeKey)
     private var textSizeRaw = GeneralTextSize.defaultSize.rawValue
 

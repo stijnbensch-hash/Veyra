@@ -1,21 +1,16 @@
 import Foundation
 
-/// "Afspelen"-instellingen, zoals Strand die aanbiedt: automatisch draaien,
-/// resolutie, ondertitel- en audiotaal, oversla-segmenten, automatisch
-/// doorspelen en spelerkeuze.
+/// Centrale afspeelinstellingen voor heel Veyra.
 ///
-/// HDR en Dolby Vision hebben hier bewust geen instelling: `AetherEngine`
-/// herkent en schakelt daar zelf automatisch naar over (zie z'n eigen
-/// `VideoFormat`/`DolbyVisionConversion`), dus daar is niets voor Veyra om
-/// aan te sturen.
+/// Deze waarden gelden voor:
+/// - films
+/// - series
+/// - afleveringen
+/// - Live TV
+/// - mediaservers
 ///
-/// Status van de rest: "Volgende aflevering automatisch afspelen", de
-/// aftel-instellingen ("Hierna") en de oversla-knoppen voor intro/recap/
-/// aftiteling sturen de speler inmiddels wél aan. De overige instellingen
-/// (resolutielimieten, taalvoorkeuren, spelerkeuze) leggen nog alleen
-/// opslag + keuzelijsten vast — `AetherEngine` zit niet in dit
-/// project-exemplaar, dus of en hoe die bv. resolutielimieten of een
-/// externe speler ondersteunt, is hier niet te verifiëren.
+/// Zolang alle playback via dezelfde PlayerView / AetherEngine loopt,
+/// worden deze voorkeuren overal hetzelfde toegepast.
 enum PlaybackSettingsDefaults {
     // Afspelen
     static let autoRotateLandscapeKey = "playback.autoRotateLandscape"
@@ -52,109 +47,386 @@ enum PlaybackSettingsDefaults {
 }
 
 enum PlaybackResolutionOption: String, CaseIterable, Identifiable {
-    case highest, uhd4K, fullHD1080, hd720
+    case highest
+    case uhd4K
+    case fullHD1080
+    case hd720
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .highest: return "Highest Available"
-        case .uhd4K: return "4K"
-        case .fullHD1080: return "1080p"
-        case .hd720: return "720p"
+        case .highest:
+            return "Highest Available"
+
+        case .uhd4K:
+            return "4K"
+
+        case .fullHD1080:
+            return "1080p"
+
+        case .hd720:
+            return "720p"
         }
     }
 }
 
 enum PlaybackCellularResolutionOption: String, CaseIterable, Identifiable {
-    case highest, fullHD1080, hd720, sd480
+    case highest
+    case fullHD1080
+    case hd720
+    case sd480
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .highest: return "Highest Available"
-        case .fullHD1080: return "1080p Max"
-        case .hd720: return "720p Max"
-        case .sd480: return "480p Max"
+        case .highest:
+            return "Highest Available"
+
+        case .fullHD1080:
+            return "1080p Max"
+
+        case .hd720:
+            return "720p Max"
+
+        case .sd480:
+            return "480p Max"
         }
     }
 }
 
-/// Kleine, op zichzelf staande taallijst voor deze Afspelen-instellingen.
-/// Bewust niet gedeeld met de bestaande Ondertitels-standaardtaal, om geen
-/// aannames te doen over een type dat niet in dit project-exemplaar zit.
+/// Centrale taalkeuze voor heel Veyra.
+///
+/// `rawValue` blijft hetzelfde als in de bestaande instellingen.
+/// Daardoor blijven eerder opgeslagen keuzes geldig.
 enum PlaybackLanguageOption: String, CaseIterable, Identifiable {
-    case original, dutch, english, french, german, spanish
+    case original
+    case dutch
+    case english
+    case french
+    case german
+    case spanish
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .original: return "Original Language"
-        case .dutch: return "Dutch"
-        case .english: return "English"
-        case .french: return "French"
-        case .german: return "German"
-        case .spanish: return "Spanish"
+        case .original:
+            return "Original Language"
+
+        case .dutch:
+            return "Dutch"
+
+        case .english:
+            return "English"
+
+        case .french:
+            return "French"
+
+        case .german:
+            return "German"
+
+        case .spanish:
+            return "Spanish"
         }
+    }
+
+    /// ISO 639-1, ISO 639-2 en veelgebruikte varianten die
+    /// mediaservers/containers kunnen teruggeven.
+    var languageCodes: Set<String> {
+        switch self {
+        case .original:
+            return []
+
+        case .dutch:
+            return [
+                "nl",
+                "nld",
+                "dut",
+                "nl-nl",
+                "nl-be"
+            ]
+
+        case .english:
+            return [
+                "en",
+                "eng",
+                "en-us",
+                "en-gb",
+                "en-au",
+                "en-ca"
+            ]
+
+        case .french:
+            return [
+                "fr",
+                "fra",
+                "fre",
+                "fr-fr",
+                "fr-be",
+                "fr-ca"
+            ]
+
+        case .german:
+            return [
+                "de",
+                "deu",
+                "ger",
+                "de-de",
+                "de-at",
+                "de-ch"
+            ]
+
+        case .spanish:
+            return [
+                "es",
+                "spa",
+                "es-es",
+                "es-mx",
+                "es-ar"
+            ]
+        }
+    }
+
+    /// Namen die gebruikt worden wanneer een stream geen correcte
+    /// ISO-taalcode bevat maar wel een bruikbare tracknaam.
+    private var languageNames: [String] {
+        switch self {
+        case .original:
+            return []
+
+        case .dutch:
+            return [
+                "dutch",
+                "nederlands",
+                "nederlandse",
+                "vlaams",
+                "flemish"
+            ]
+
+        case .english:
+            return [
+                "english",
+                "engels",
+                "engelse"
+            ]
+
+        case .french:
+            return [
+                "french",
+                "français",
+                "francais",
+                "frans",
+                "franse"
+            ]
+
+        case .german:
+            return [
+                "german",
+                "deutsch",
+                "duits",
+                "duitse"
+            ]
+
+        case .spanish:
+            return [
+                "spanish",
+                "español",
+                "espanol",
+                "spaans",
+                "spaanse"
+            ]
+        }
+    }
+
+    /// Controleert een audiotrack of ondertiteltrack.
+    ///
+    /// Eerst wordt de echte taalcode gecontroleerd.
+    /// Alleen als fallback wordt ook de tracknaam bekeken.
+    func matches(
+        languageCode: String?,
+        trackName: String?
+    ) -> Bool {
+        guard self != .original else {
+            return false
+        }
+
+        if let languageCode {
+            let normalized =
+                Self.normalizeLanguageCode(
+                    languageCode
+                )
+
+            if languageCodes.contains(
+                normalized
+            ) {
+                return true
+            }
+
+            let base =
+                normalized
+                    .split(separator: "-")
+                    .first
+                    .map(String.init)
+
+            if let base,
+               languageCodes.contains(base)
+            {
+                return true
+            }
+        }
+
+        if let trackName {
+            let normalizedName =
+                trackName
+                    .folding(
+                        options: [
+                            .diacriticInsensitive,
+                            .caseInsensitive
+                        ],
+                        locale: .current
+                    )
+                    .lowercased()
+
+            for name in languageNames {
+                let normalizedCandidate =
+                    name
+                        .folding(
+                            options: [
+                                .diacriticInsensitive,
+                                .caseInsensitive
+                            ],
+                            locale: .current
+                        )
+                        .lowercased()
+
+                if normalizedName.contains(
+                    normalizedCandidate
+                ) {
+                    return true
+                }
+            }
+        }
+
+        return false
+    }
+
+    private static func normalizeLanguageCode(
+        _ value: String
+    ) -> String {
+        value
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+            .replacingOccurrences(
+                of: "_",
+                with: "-"
+            )
+            .lowercased()
     }
 }
 
-enum PlaybackAutoSelectSubtitlesOption: String, CaseIterable, Identifiable {
-    case off, forcedOnly, full
+enum PlaybackAutoSelectSubtitlesOption:
+    String,
+    CaseIterable,
+    Identifiable
+{
+    case off
+    case forcedOnly
+    case full
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .off: return "Off"
-        case .forcedOnly: return "Forced Only"
-        case .full: return "Full Subtitles"
+        case .off:
+            return "Off"
+
+        case .forcedOnly:
+            return "Forced Only"
+
+        case .full:
+            return "Full Subtitles"
         }
     }
 }
 
-enum PlaybackAnimeAudioOption: String, CaseIterable, Identifiable {
-    case noPreference, sub, dub
+enum PlaybackAnimeAudioOption:
+    String,
+    CaseIterable,
+    Identifiable
+{
+    case noPreference
+    case sub
+    case dub
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .noPreference: return "No Preference"
-        case .sub: return "Sub"
-        case .dub: return "Dub"
+        case .noPreference:
+            return "No Preference"
+
+        case .sub:
+            return "Sub"
+
+        case .dub:
+            return "Dub"
         }
     }
 }
 
-enum PlaybackCountdownDuration: String, CaseIterable, Identifiable {
-    case five, ten, fifteen, twenty
+enum PlaybackCountdownDuration:
+    String,
+    CaseIterable,
+    Identifiable
+{
+    case five
+    case ten
+    case fifteen
+    case twenty
 
     var id: String { rawValue }
 
     var seconds: Int {
         switch self {
-        case .five: return 5
-        case .ten: return 10
-        case .fifteen: return 15
-        case .twenty: return 20
+        case .five:
+            return 5
+
+        case .ten:
+            return 10
+
+        case .fifteen:
+            return 15
+
+        case .twenty:
+            return 20
         }
     }
 
-    var title: String { "\(seconds) seconden" }
+    var title: String {
+        "\(seconds) seconden"
+    }
 }
 
-enum PlaybackSelectedPlayer: String, CaseIterable, Identifiable {
-    case intern, extern
+enum PlaybackSelectedPlayer:
+    String,
+    CaseIterable,
+    Identifiable
+{
+    case intern
+    case extern
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .intern: return "Intern"
-        case .extern: return "Extern"
+        case .intern:
+            return "Intern"
+
+        case .extern:
+            return "Extern"
         }
     }
 }

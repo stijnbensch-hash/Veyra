@@ -96,10 +96,102 @@ final class AetherPlaybackEngine:
             "[Veyra] State after play:",
             engine.state
         )
+
+        Self.applyPreferredAudioTrack(engine)
+        Self.applyPreferredSubtitleTrack(engine)
     }
 
     func stop() {
         engine.stop()
+    }
+
+    // MARK: - Taal
+
+    /// Selecteert automatisch de audiotrack die overeenkomt met de
+    /// "Afspelen \u2192 Taal"-instellingen (primaire/terugval-audiotaal).
+    /// "Original Language" laat de standaardtrack van de bron ongemoeid.
+    private static func applyPreferredAudioTrack(_ engine: AetherEngine) {
+        guard !engine.audioTracks.isEmpty else { return }
+
+        let defaults = UserDefaults.standard
+
+        let primary = PlaybackLanguageOption(
+            rawValue: defaults.string(forKey: PlaybackSettingsDefaults.audioLanguageKey)
+                ?? PlaybackLanguageOption.original.rawValue
+        ) ?? .original
+
+        guard primary != .original else { return }
+
+        if let match = engine.audioTracks.first(where: {
+            primary.matches(languageCode: $0.language, trackName: $0.name)
+        }) {
+            engine.selectAudioTrack(index: match.id)
+            return
+        }
+
+        let fallback = PlaybackLanguageOption(
+            rawValue: defaults.string(forKey: PlaybackSettingsDefaults.audioFallbackLanguageKey)
+                ?? PlaybackLanguageOption.english.rawValue
+        ) ?? .english
+
+        guard fallback != .original,
+              let fallbackMatch = engine.audioTracks.first(where: {
+                  fallback.matches(languageCode: $0.language, trackName: $0.name)
+              })
+        else { return }
+
+        engine.selectAudioTrack(index: fallbackMatch.id)
+    }
+
+    /// Selecteert automatisch de ondertiteltrack die overeenkomt met de
+    /// "Afspelen \u2192 Taal"-instellingen (primaire/terugval-ondertiteltaal),
+    /// als aanvulling op `LoadOptions.preferredSubtitleLanguages`: die hint
+    /// alleen doorgeven aan de engine bleek in de praktijk niet te leiden tot
+    /// een automatisch geselecteerde track, dus hier wordt expliciet dezelfde
+    /// track-matching als bij audio toegepast zodra de tracks bekend zijn.
+    private static func applyPreferredSubtitleTrack(_ engine: AetherEngine) {
+        guard !engine.subtitleTracks.isEmpty else { return }
+
+        let defaults = UserDefaults.standard
+
+        let autoSelect = PlaybackAutoSelectSubtitlesOption(
+            rawValue: defaults.string(forKey: PlaybackSettingsDefaults.autoSelectSubtitlesKey)
+                ?? PlaybackAutoSelectSubtitlesOption.forcedOnly.rawValue
+        ) ?? .forcedOnly
+
+        guard autoSelect != .off else { return }
+
+        let candidates =
+            autoSelect == .forcedOnly
+            ? engine.subtitleTracks.filter { $0.isForced }
+            : engine.subtitleTracks
+
+        guard !candidates.isEmpty else { return }
+
+        let primary = PlaybackLanguageOption(
+            rawValue: defaults.string(forKey: PlaybackSettingsDefaults.subtitleLanguageKey)
+                ?? PlaybackLanguageOption.dutch.rawValue
+        ) ?? .dutch
+
+        if let match = candidates.first(where: {
+            primary.matches(languageCode: $0.language, trackName: $0.name)
+        }) {
+            engine.selectSubtitleTrack(index: match.id)
+            return
+        }
+
+        let fallback = PlaybackLanguageOption(
+            rawValue: defaults.string(forKey: PlaybackSettingsDefaults.subtitleFallbackLanguageKey)
+                ?? PlaybackLanguageOption.english.rawValue
+        ) ?? .english
+
+        guard
+            let fallbackMatch = candidates.first(where: {
+                fallback.matches(languageCode: $0.language, trackName: $0.name)
+            })
+        else { return }
+
+        engine.selectSubtitleTrack(index: fallbackMatch.id)
     }
 
     // MARK: - Load options
@@ -120,7 +212,7 @@ final class AetherPlaybackEngine:
                 .automatic
         }
 
-        options.preferredSubtitleLanguages = SubtitlePreferences.language().codes
+        options.preferredSubtitleLanguages = Self.preferredSubtitleLanguageCodes()
 
         // Embedded subtitletracks al tijdens
         // het laden voorbereiden.
@@ -128,6 +220,42 @@ final class AetherPlaybackEngine:
             true
 
         return options
+    }
+
+    /// Bepaalt welke taalcodes de engine mag gebruiken om bij het laden
+    /// automatisch een ingebouwde ondertitel te selecteren, op basis van
+    /// de "Afspelen \u2192 Taal"-instellingen (`PlaybackSettingsDefaults`).
+    /// Bij "Uit" wordt niets automatisch geselecteerd. Anders worden de
+    /// primaire en terugval-taal gecombineerd met de bestaande
+    /// ondertitel-weergavevoorkeur (`SubtitlePreferences`), zodat een
+    /// eerder gekozen standaardtaal daar blijft werken.
+    private static func preferredSubtitleLanguageCodes() -> [String] {
+        let defaults = UserDefaults.standard
+
+        let autoSelect = PlaybackAutoSelectSubtitlesOption(
+            rawValue: defaults.string(forKey: PlaybackSettingsDefaults.autoSelectSubtitlesKey)
+                ?? PlaybackAutoSelectSubtitlesOption.forcedOnly.rawValue
+        ) ?? .forcedOnly
+
+        guard autoSelect != .off else { return [] }
+
+        let primary = PlaybackLanguageOption(
+            rawValue: defaults.string(forKey: PlaybackSettingsDefaults.subtitleLanguageKey)
+                ?? PlaybackLanguageOption.dutch.rawValue
+        ) ?? .dutch
+
+        let fallback = PlaybackLanguageOption(
+            rawValue: defaults.string(forKey: PlaybackSettingsDefaults.subtitleFallbackLanguageKey)
+                ?? PlaybackLanguageOption.english.rawValue
+        ) ?? .english
+
+        var codes: [String] = []
+        codes.append(contentsOf: primary.languageCodes)
+        codes.append(contentsOf: fallback.languageCodes)
+        codes.append(contentsOf: SubtitlePreferences.language().codes)
+
+        var seen = Set<String>()
+        return codes.filter { seen.insert($0).inserted }
     }
 
     // MARK: - Resume

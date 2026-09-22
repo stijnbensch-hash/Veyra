@@ -2,9 +2,12 @@ import SwiftUI
 
 /// "Afspelen"-instellingen, zoals Strand die aanbiedt. Zie
 /// `PlaybackSettings.swift` (Shared) voor de opgeslagen sleutels en
-/// keuzelijsten, en voor de status: dit scherm legt alleen de instellingen
-/// zelf vast (UI + opslag) — geen van deze schakelaars stuurt vandaag al de
-/// speler (`AetherEngine`) aan.
+/// keuzelijsten. De meeste schakelaars sturen de speler nu ook echt aan
+/// (automatisch draaien, eerste bron/details overslaan, taalvoorkeuren,
+/// oversla-segmenten, "hierna"). Nog niet aangesloten: voorkeursresolutie/
+/// mobiele resolutie (AetherEngine's laadopties bieden hier vooralsnog geen
+/// haakje voor), anime-audio, melding na de aftiteling en externe speler —
+/// zie de footers hieronder per sectie.
 struct PlaybackSettingsView: View {
     // Afspelen
     @AppStorage(PlaybackSettingsDefaults.autoRotateLandscapeKey)
@@ -85,7 +88,7 @@ struct PlaybackSettingsView: View {
                 } header: {
                     Text("Afspelen")
                 } footer: {
-                    Text("HDR en Dolby Vision worden automatisch herkend en afgespeeld door de speler — daar is geen instelling voor nodig.")
+                    Text("HDR en Dolby Vision worden automatisch herkend en afgespeeld door de speler — daar is geen instelling voor nodig. Voorkeursresolutie en resolutie via mobiele data zijn nog niet aangesloten op de speler.")
                 }
 
                 Section {
@@ -127,6 +130,8 @@ struct PlaybackSettingsView: View {
                     }
                 } header: {
                     Text("Taal")
+                } footer: {
+                    Text("Anime-audio is nog niet aangesloten op de speler.")
                 }
 
                 Section {

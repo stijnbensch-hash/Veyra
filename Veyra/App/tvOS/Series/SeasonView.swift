@@ -24,6 +24,12 @@ struct SeasonView: View {
     private var focusedEpisodeNumber:
         Int?
 
+    // "Verder kijken"-voortgang per aflevering (Trakt playback-status),
+    // zodat een gedeeltelijk bekeken aflevering een voortgangsbalkje en
+    // een "Verder kijken"-label krijgt, net als op Home.
+    @ObservedObject
+    private var traktStore = TraktStore.shared
+
     private let imageBaseURL =
         URL(
             string:
@@ -324,35 +330,48 @@ struct SeasonView: View {
         HStack(
             spacing: 25
         ) {
-            AsyncImage(
-                url:
-                    imageURL(
-                        path:
-                            episode
-                                .stillPath,
-                        size:
-                            "w500"
-                    )
-            ) { phase in
-                switch phase {
-                case .empty:
-                    episodePlaceholder
-                        .overlay {
-                            ProgressView()
-                        }
+            ZStack(alignment: .bottom) {
+                AsyncImage(
+                    url:
+                        imageURL(
+                            path:
+                                episode
+                                    .stillPath,
+                            size:
+                                "w500"
+                        )
+                ) { phase in
+                    switch phase {
+                    case .empty:
+                        episodePlaceholder
+                            .overlay {
+                                ProgressView()
+                            }
 
-                case .success(
-                    let image
-                ):
-                    image
-                        .resizable()
-                        .scaledToFill()
+                    case .success(
+                        let image
+                    ):
+                        image
+                            .resizable()
+                            .scaledToFill()
 
-                case .failure:
-                    episodePlaceholder
+                    case .failure:
+                        episodePlaceholder
 
-                @unknown default:
-                    episodePlaceholder
+                    @unknown default:
+                        episodePlaceholder
+                    }
+                }
+
+                if let progress = watchProgress(for: episode) {
+                    GeometryReader { geometry in
+                        Rectangle()
+                            .fill(VeyraColors.cyan)
+                            .frame(width: geometry.size.width * progress / 100, height: 5)
+                    }
+                    .frame(height: 5)
+                    .padding(.horizontal, 6)
+                    .padding(.bottom, 6)
                 }
             }
             .frame(
@@ -424,6 +443,18 @@ struct SeasonView: View {
                         .white
                     )
                     .lineLimit(1)
+
+                    if watchProgress(for: episode) != nil {
+                        Text("Verder kijken")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(VeyraColors.cyan)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(
+                                VeyraColors.cyan.opacity(0.14),
+                                in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            )
+                    }
                 }
 
                 if let overview =
@@ -635,6 +666,30 @@ struct SeasonView: View {
             size:
                 "w1280"
         )
+    }
+
+    // MARK: - Voortgang
+
+    /// Trakt-afspeelvoortgang (0-100) voor deze aflevering, als er
+    /// gepauzeerd is met minder dan 100% bekeken. `nil` als er niets
+    /// bekend is, of als de aflevering al (bijna) helemaal is afgespeeld.
+    private func watchProgress(for episode: TMDBEpisode) -> Double? {
+        guard let entry = traktStore.playback.first(where: { entry in
+            guard let entryEpisode = entry.episode,
+                  entryEpisode.season == episode.seasonNumber,
+                  entryEpisode.number == episode.episodeNumber
+            else { return false }
+
+            let showIDs = entry.show?.ids
+            if let tmdb = showIDs?.tmdb, tmdb == series.id { return true }
+            if let imdb = showIDs?.imdb, let imdbID, !imdbID.isEmpty, imdb == imdbID { return true }
+            return false
+        }) else { return nil }
+
+        guard let progress = entry.progress, progress.isFinite, progress > 0, progress < 100 else {
+            return nil
+        }
+        return progress
     }
 
     private func imageURL(

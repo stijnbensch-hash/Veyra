@@ -7,6 +7,10 @@ struct SourceSelectionView: View {
     @ObservedObject private var traktStore = TraktStore.shared
     @State private var selectedSource: PlayableSource?
 
+    // "Eerste bron automatisch selecteren" (Afspelen-instellingen).
+    @AppStorage(PlaybackSettingsDefaults.autoSelectFirstSourceKey)
+    private var autoSelectFirstSource = false
+
     init(item: MediaItem) {
         self.item = item
         _viewModel = StateObject(wrappedValue: SourceSelectionViewModel(item: item))
@@ -50,6 +54,12 @@ struct SourceSelectionView: View {
         .navigationTitle(item.title)
         .navigationBarTitleDisplayMode(.inline)
         .task { await viewModel.loadSources() }
+        .onChange(of: viewModel.hasLoaded) { _, hasLoaded in
+            guard hasLoaded, autoSelectFirstSource, selectedSource == nil,
+                  let first = viewModel.sources.first
+            else { return }
+            selectedSource = first.source
+        }
         .navigationDestination(item: $selectedSource) { source in
             PlayerView(
                 source: source,

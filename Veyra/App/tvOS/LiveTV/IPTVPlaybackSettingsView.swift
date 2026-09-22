@@ -3,37 +3,112 @@ import SwiftUI
 /// tvOS-versie van de Live TV-voorkeuren: gidsvormgeving, afspeelmotor,
 /// buffering/catch-up en hoe vaak zenderlijst/gids ververst worden. Zie
 /// `IPTVPlaybackSettings.swift` (Shared) voor wat er nu al werkt en wat nog
-/// een stub is — momenteel is dat alles: er bestaat nog geen zenderlijst-/
-/// gidscache, afspeelmotor-keuze of FPS-teller in Veyra.
+/// een stub is — momenteel is dat alles behalve gidsthema en de landcode-
+/// schakelaar: er bestaat nog geen zenderlijst-/gidscache, afspeelmotor-
+/// keuze of FPS-teller in Veyra.
+///
+/// Was één lange lijst met vier secties; voor meer overzicht nu een
+/// categoriemenu naar kleine subschermen — zelfde patroon als
+/// `PlaybackSettingsView`/`SettingsView`.
 struct IPTVPlaybackSettingsView: View {
+    @State private var destination: IPTVPlaybackDestination?
+
+    var body: some View {
+        ZStack {
+            VeyraBackground().ignoresSafeArea()
+
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 18) {
+                    categoryCard(
+                        .guide, icon: "tv.badge.wifi", title: "Zenderguide",
+                        subtitle: "Gidsthema, zendernamen"
+                    )
+                    categoryCard(
+                        .playback, icon: "play.laptopcomputer", title: "Afspelen",
+                        subtitle: "Afspeelmotor, buffering, catch-up"
+                    )
+                    categoryCard(
+                        .cache, icon: "arrow.triangle.2.circlepath", title: "Cache & verversen",
+                        subtitle: "Zenderlijst en programmagids"
+                    )
+                    categoryCard(
+                        .developer, icon: "ladybug", title: "Ontwikkelaarsopties",
+                        subtitle: "FPS-teller"
+                    )
+                }
+                .frame(maxWidth: 1300, alignment: .leading)
+                .padding(.horizontal, VeyraSpacing.page)
+                .padding(.top, 36)
+                .padding(.bottom, 60)
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .navigationTitle("Live TV")
+        .navigationDestination(item: $destination) { destination in
+            switch destination {
+            case .guide: IPTVGuideSettingsView()
+            case .playback: IPTVEnginePlaybackSettingsView()
+            case .cache: IPTVCacheSettingsView()
+            case .developer: IPTVDeveloperSettingsView()
+            }
+        }
+    }
+
+    private func categoryCard(
+        _ target: IPTVPlaybackDestination,
+        icon: String,
+        title: String,
+        subtitle: String
+    ) -> some View {
+        Button {
+            destination = target
+        } label: {
+            HStack(spacing: 24) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(VeyraColors.cyan.opacity(0.14))
+
+                    Image(systemName: icon)
+                        .font(.system(size: 30, weight: .light))
+                        .foregroundStyle(VeyraColors.cyan)
+                }
+                .frame(width: 68, height: 68)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(title)
+                        .font(.system(size: 28, weight: .semibold))
+                        .foregroundStyle(.white)
+
+                    Text(subtitle)
+                        .font(.system(size: 20))
+                        .foregroundStyle(.white.opacity(0.60))
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.35))
+            }
+            .padding(20)
+            .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        }
+        .buttonStyle(VeyraFocusButtonStyle(radius: 22))
+    }
+}
+
+private enum IPTVPlaybackDestination: String, Identifiable, Hashable {
+    case guide, playback, cache, developer
+
+    var id: String { rawValue }
+}
+
+// MARK: - Zenderguide
+
+private struct IPTVGuideSettingsView: View {
     @AppStorage(IPTVPlaybackSettingsDefaults.guideThemeKey)
     private var guideThemeRaw = IPTVGuideTheme.colourful.rawValue
     @AppStorage(IPTVPlaybackSettingsDefaults.hideCountryPrefixKey)
     private var hideCountryPrefix = true
-
-    @AppStorage(IPTVPlaybackSettingsDefaults.playerEngineKey)
-    private var playerEngineRaw = IPTVPlayerEngineOption.intern.rawValue
-
-    @AppStorage(IPTVPlaybackSettingsDefaults.bufferDurationKey)
-    private var bufferDurationRaw = IPTVBufferDurationOption.none.rawValue
-    @AppStorage(IPTVPlaybackSettingsDefaults.catchUpOffsetModeKey)
-    private var catchUpOffsetModeRaw = IPTVCatchUpOffsetMode.automatic.rawValue
-    @AppStorage(IPTVPlaybackSettingsDefaults.catchUpOffsetManualSecondsKey)
-    private var catchUpOffsetManualSeconds = 0
-
-    @AppStorage(IPTVPlaybackSettingsDefaults.refreshChannelsIntervalKey)
-    private var refreshChannelsIntervalRaw = IPTVCacheRefreshInterval.sixHours.rawValue
-    @AppStorage(IPTVPlaybackSettingsDefaults.refreshEPGIntervalKey)
-    private var refreshEPGIntervalRaw = IPTVCacheRefreshInterval.twelveHours.rawValue
-
-    @AppStorage(IPTVPlaybackSettingsDefaults.showFPSCounterKey)
-    private var showFPSCounter = false
-
-    @State private var cacheAlertMessage: String?
-
-    private var catchUpOffsetMode: IPTVCatchUpOffsetMode {
-        IPTVCatchUpOffsetMode(rawValue: catchUpOffsetModeRaw) ?? .automatic
-    }
 
     var body: some View {
         ZStack {
@@ -47,12 +122,36 @@ struct IPTVPlaybackSettingsView: View {
                         }
                     }
                     Toggle("Landcode voor zendernaam verbergen", isOn: $hideCountryPrefix)
-                } header: {
-                    sectionHeader("Zenderguide", symbol: "tv.badge.wifi", tint: VeyraColors.cyan)
                 } footer: {
                     Text("Gidsthema past de kleuren van de programmagids aan. Bij ingeschakeld wordt de landcode voor zendernamen weggelaten.")
                 }
+            }
+        }
+        .navigationTitle("Zenderguide")
+    }
+}
 
+// MARK: - Afspelen
+
+private struct IPTVEnginePlaybackSettingsView: View {
+    @AppStorage(IPTVPlaybackSettingsDefaults.playerEngineKey)
+    private var playerEngineRaw = IPTVPlayerEngineOption.intern.rawValue
+    @AppStorage(IPTVPlaybackSettingsDefaults.bufferDurationKey)
+    private var bufferDurationRaw = IPTVBufferDurationOption.none.rawValue
+    @AppStorage(IPTVPlaybackSettingsDefaults.catchUpOffsetModeKey)
+    private var catchUpOffsetModeRaw = IPTVCatchUpOffsetMode.automatic.rawValue
+    @AppStorage(IPTVPlaybackSettingsDefaults.catchUpOffsetManualSecondsKey)
+    private var catchUpOffsetManualSeconds = 0
+
+    private var catchUpOffsetMode: IPTVCatchUpOffsetMode {
+        IPTVCatchUpOffsetMode(rawValue: catchUpOffsetModeRaw) ?? .automatic
+    }
+
+    var body: some View {
+        ZStack {
+            VeyraBackground().ignoresSafeArea()
+
+            List {
                 Section {
                     Picker("Afspeelmotor", selection: $playerEngineRaw) {
                         ForEach(IPTVPlayerEngineOption.allCases) { option in
@@ -94,12 +193,30 @@ struct IPTVPlaybackSettingsView: View {
                             }
                         }
                     }
-                } header: {
-                    sectionHeader("Afspelen", symbol: "play.laptopcomputer", tint: VeyraColors.ice)
                 } footer: {
                     Text("Afspeelmotor bepaalt welke engine live-zenders afspeelt. Buffering: hoeveel live video vooraf klaarstaat. Catch-up-tijdcorrectie volgt normaal de klok van de provider, of stel 'm handmatig in. Nog niet aangesloten op de speler.")
                 }
+            }
+        }
+        .navigationTitle("Afspelen")
+    }
+}
 
+// MARK: - Cache & verversen
+
+private struct IPTVCacheSettingsView: View {
+    @AppStorage(IPTVPlaybackSettingsDefaults.refreshChannelsIntervalKey)
+    private var refreshChannelsIntervalRaw = IPTVCacheRefreshInterval.sixHours.rawValue
+    @AppStorage(IPTVPlaybackSettingsDefaults.refreshEPGIntervalKey)
+    private var refreshEPGIntervalRaw = IPTVCacheRefreshInterval.twelveHours.rawValue
+
+    @State private var cacheAlertMessage: String?
+
+    var body: some View {
+        ZStack {
+            VeyraBackground().ignoresSafeArea()
+
+            List {
                 Section {
                     Picker("Zenderlijst verversen", selection: $refreshChannelsIntervalRaw) {
                         ForEach(IPTVCacheRefreshInterval.allCases) { interval in
@@ -118,22 +235,12 @@ struct IPTVPlaybackSettingsView: View {
                     Button("Gidscache wissen") {
                         cacheAlertMessage = "Er is nog geen gidscache in Veyra om te wissen."
                     }
-                } header: {
-                    sectionHeader("Cache & verversen", symbol: "arrow.triangle.2.circlepath", tint: VeyraColors.secondary)
                 } footer: {
                     Text("Veyra heeft nog geen zenderlijst- of gidscache, dus deze instellingen en knoppen doen voorlopig niets.")
                 }
-
-                Section {
-                    Toggle("FPS-teller tonen", isOn: $showFPSCounter)
-                } header: {
-                    sectionHeader("Ontwikkelaarsopties", symbol: "ladybug", tint: VeyraColors.red)
-                } footer: {
-                    Text("Er is nog geen FPS-teller in Veyra; deze schakelaar heeft voorlopig geen effect.")
-                }
             }
         }
-        .navigationTitle("Live TV")
+        .navigationTitle("Cache & verversen")
         .alert(
             "Cache",
             isPresented: Binding(
@@ -146,15 +253,27 @@ struct IPTVPlaybackSettingsView: View {
             Text(cacheAlertMessage ?? "")
         }
     }
+}
 
-    @ViewBuilder
-    private func sectionHeader(_ title: String, symbol: String, tint: Color) -> some View {
-        Label {
-            Text(title)
-        } icon: {
-            Image(systemName: symbol)
-                .foregroundStyle(tint)
+// MARK: - Ontwikkelaarsopties
+
+private struct IPTVDeveloperSettingsView: View {
+    @AppStorage(IPTVPlaybackSettingsDefaults.showFPSCounterKey)
+    private var showFPSCounter = false
+
+    var body: some View {
+        ZStack {
+            VeyraBackground().ignoresSafeArea()
+
+            List {
+                Section {
+                    Toggle("FPS-teller tonen", isOn: $showFPSCounter)
+                } footer: {
+                    Text("Er is nog geen FPS-teller in Veyra; deze schakelaar heeft voorlopig geen effect.")
+                }
+            }
         }
+        .navigationTitle("Ontwikkelaarsopties")
     }
 }
 

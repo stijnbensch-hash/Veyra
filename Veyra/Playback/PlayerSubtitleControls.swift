@@ -16,6 +16,7 @@ struct PlayerSubtitleControls: View {
 
     var title: String? = nil
     var item: MediaItem? = nil
+    var sourceMetadata: SourceMetadata? = nil
 
     var onRequestExit: () -> Void = {}
     var onPlayNextEpisode: (MediaItem) -> Void = { _ in }
@@ -61,9 +62,6 @@ struct PlayerSubtitleControls: View {
     @State private var autoSkippedIntro = false
 
     private var controlsVisible: Bool { presentation.controlsVisible }
-    private var showingSubtitles: Bool { presentation.panel == .subtitles }
-    private var showingAudio: Bool { presentation.panel == .audio }
-    private var showingSpeed: Bool { presentation.panel == .speed }
 
     @State private var interaction = 0
 
@@ -76,11 +74,46 @@ struct PlayerSubtitleControls: View {
     private typealias Control = VeyraPlayerControl
 
     private enum AudioFocus: Hashable {
-        case close
         case track(Int)
     }
 
-    private var panelVisible: Bool { showingSubtitles || showingAudio || showingSpeed }
+    // MARK: - Boven uitklapbaar menu (Afspelen/Audio/Ondertitels/Info)
+
+    private enum TopMenuTab: String, CaseIterable, Hashable {
+        case metadata, subtitles, audio
+
+        var title: String {
+            switch self {
+            case .metadata: return "Info"
+            case .subtitles: return "Ondertitels"
+            case .audio: return "Audio"
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .metadata: return "info.circle"
+            case .subtitles: return "captions.bubble"
+            case .audio: return "speaker.wave.2"
+            }
+        }
+    }
+
+    private enum TopMenuFocus: Hashable {
+        case tab(TopMenuTab)
+        case close
+    }
+
+    @State private var topMenuOpen = false
+    @State private var ratings = MetadataRatings()
+    // Poster van de serie zelf (niet de afleveringsstill) + een korte
+    // TMDB-metadatatekst (jaar) onder de titel in de Info-tab.
+    @State private var metadataPosterURL: URL?
+    @State private var metadataInfoLine: String?
+    @State private var selectedTopMenuTab: TopMenuTab = .metadata
+    @FocusState private var topTabFocus: TopMenuFocus?
+
+    private var panelVisible: Bool { topMenuOpen }
 
     private var isNearEndOfEpisode: Bool {
         guard engine.duration.isFinite, engine.duration > 0 else { return false }
@@ -143,8 +176,8 @@ struct PlayerSubtitleControls: View {
                 .focused($focused, equals: .surface).focusEffectDisabled().onMoveCommand { _ in
                     guard !panelVisible else { return }
 
-                    revealControls(focus: .play)
-                }.onTapGesture { revealControls(focus: .play) }
+                    revealControls(focus: .timeline)
+                }.onTapGesture { revealControls(focus: .timeline) }
 
             Color.black.opacity(controlsVisible || panelVisible ? 0.16 : 0).allowsHitTesting(false)
 
@@ -171,7 +204,7 @@ struct PlayerSubtitleControls: View {
             focused = .nextEpisode
         }.onAppear {
             presentation.revealControls()
-            restoreControlFocus(.play)
+            restoreControlFocus(.timeline)
         }.onChange(of: focused) { _, _ in interaction += 1 }.onChange(of: audioFocused) { _, _ in
             interaction += 1
         }.onDisappear {
@@ -182,8 +215,10 @@ struct PlayerSubtitleControls: View {
         }.onChange(of: canSeek) { _, available in
             if !available {
                 seekController.cancel()
-                if focused == .timeline || focused == .backward || focused == .forward {
+                if focused == .backward || focused == .forward {
                     focused = .play
+                } else if focused == .timeline {
+                    focused = .surface
                 }
             }
         }.task(id: interaction) {
@@ -198,24 +233,19 @@ struct PlayerSubtitleControls: View {
                 focused = .surface
                 return
             }
-        }.overlay(alignment: .trailing) {
-            if showingSubtitles {
-                SubtitleSettingsPanel(engine: engine, item: item) { closeSubtitles() }.frame(
-                    width: 820
-                ).padding(32).focusSection()
-
-            } else if showingAudio {
-                audioPanel.frame(width: 680).padding(32).focusSection()
-
-            } else if showingSpeed {
-                speedPanel.frame(width: 480).padding(32).focusSection()
+        }.overlay(alignment: .top) {
+            // Top-anchored (rather than centered) for the same reason the old
+            // side panels were: growing content shouldn't reposition rows the
+            // focus cursor is already resting on.
+            if topMenuOpen {
+                topMenu.padding(.top, 40).focusSection()
             }
         }
         // One handler outside the overlay owns Back for both the controls and
         // every submenu. A single command changes exactly one presentation layer.
         .onExitCommand { handleExitCommand() }.onPlayPauseCommand {
             togglePlayback()
-            if !panelVisible { revealControls(focus: .play) }
+            if !panelVisible { revealControls(focus: .timeline) }
         }.task(id: item?.id) {
             countdownTask?.cancel()
             countdownTask = nil
@@ -329,6 +359,19 @@ struct PlayerSubtitleControls: View {
                                     .foregroundStyle(VeyraColors.cyan)
                                     .lineLimit(1)
                             }
+
+                            if let sourceMetadata {
+                                HStack(spacing: 6) {
+                                    ForEach(metadataBadges(sourceMetadata), id: \.self) { badge in
+                                        Text(badge).font(.system(size: 12, weight: .semibold))
+                                            .padding(.horizontal, 9).padding(.vertical, 4)
+                                            .background(
+                                                Color.white.opacity(0.12),
+                                                in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                            ).foregroundStyle(.white.opacity(0.82))
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -352,11 +395,11 @@ struct PlayerSubtitleControls: View {
                 switch direction {
                 case .left: requestSeek(by: -30)
                 case .right: requestSeek(by: 30)
-                case .down: focused = .play
+                case .up: openTopMenu()
                 default: break
                 }
             }.accessibilityLabel("Voortgang").accessibilityHint(
-                "Links of rechts: dertig seconden springen. Omlaag: afspeelknoppen."
+                "Links of rechts: dertig seconden springen. Omhoog: menu met audio, ondertitels en info."
             ).accessibilityAdjustableAction { direction in
                 switch direction {
                 case .increment: requestSeek(by: 30)
@@ -365,81 +408,104 @@ struct PlayerSubtitleControls: View {
                 }
             }
 
-            HStack(spacing: 22) {
-                Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
-
-                Button {
-                    openSubtitles()
-
-                } label: {
-                    Image(systemName: "captions.bubble").padding(14)
-                }.focused($focused, equals: .subtitles)
-
-                Button {
-                    requestSeek(by: -30)
-
-                } label: {
-                    Image(systemName: "gobackward.30").frame(width: 58, height: 58)
-                }.focused($focused, equals: .backward).disabled(!canSeek)
-
-                Button {
-                    togglePlayback()
-
-                    revealControls(focus: .play)
-
-                } label: {
-                    Image(systemName: engine.state == .playing ? "pause.fill" : "play.fill").font(
-                        .system(size: 27)
-                    ).frame(width: 70, height: 70).background(
-                        VeyraColors.red.opacity(0.22), in: Circle())
-                }.focused($focused, equals: .play)
-
-                Button {
-                    requestSeek(by: 30)
-
-                } label: {
-                    Image(systemName: "goforward.30").frame(width: 58, height: 58)
-                }.focused($focused, equals: .forward).disabled(!canSeek)
-
-                Button {
-                    openAudio()
-
-                } label: {
-                    Image(systemName: "speaker.wave.2").padding(14)
-                }.focused($focused, equals: .audio)
-
-                Button {
-                    openSpeed()
-
-                } label: {
-                    Text(speedLabel(playbackRate)).font(.system(size: 17, weight: .semibold))
-                        .frame(minWidth: 46, minHeight: 46)
-                }.focused($focused, equals: .speed)
-
-                Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
-            }.font(.system(size: 19, weight: .medium)).buttonStyle(
-                VeyraFocusButtonStyle(radius: VeyraRadius.pill)
-            ).focusSection().onMoveCommand { direction in handleTransportMove(direction) }
+            playbackButtonsRow
         }.padding(.horizontal, 22).padding(.vertical, 15).veyraGlass(backgroundOpacity: 0.4)
             .padding(.horizontal, 72).padding(.bottom, 34)
     }
 
-    // MARK: - Audio
+    // MARK: - Boven uitklapbaar menu
 
-    private var audioPanel: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            HStack {
-                Text("Audio").font(.system(size: 32, weight: .semibold))
+    private var topMenu: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            HStack(spacing: 14) {
+                ForEach(TopMenuTab.allCases, id: \.self) { tab in
+                    Button {
+                        selectedTopMenuTab = tab
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: tab.icon)
+                            Text(tab.title)
+                        }.font(.system(size: 19, weight: .semibold)).padding(
+                            .horizontal, 22
+                        ).padding(.vertical, 14)
+                    }.focused($topTabFocus, equals: .tab(tab))
+                }
 
                 Spacer()
 
-                Button("Sluiten", systemImage: "xmark") { closeAudio() }.padding(8).focused(
-                    $audioFocused, equals: .close)
-            }
+                Button {
+                    closeTopMenu()
+                } label: {
+                    Image(systemName: "xmark").font(.system(size: 19, weight: .semibold)).padding(
+                        16)
+                }.focused($topTabFocus, equals: .close)
+            }.buttonStyle(VeyraFocusButtonStyle(radius: VeyraRadius.pill)).focusSection()
 
+            Group {
+                switch selectedTopMenuTab {
+                case .metadata: metadataTabContent
+                case .subtitles:
+                    SubtitleSettingsPanel(engine: engine, item: item) { closeTopMenu() }
+                case .audio: audioTabContent
+                }
+            }.frame(maxWidth: .infinity, alignment: .leading)
+        }.padding(28).frame(width: 1520).frame(maxHeight: 620, alignment: .top).veyraGlass()
+            .onAppear {
+                Task { @MainActor in
+                    await Task.yield()
+                    topTabFocus = .tab(selectedTopMenuTab)
+                }
+            }
+    }
+
+    private var playbackButtonsRow: some View {
+        HStack(spacing: 22) {
+            Button {
+                requestSeek(by: -30)
+
+            } label: {
+                Image(systemName: "gobackward.30").font(.system(size: 22)).frame(
+                    width: 58, height: 58
+                ).background(transportButtonFill(.backward), in: Circle())
+            }.focused($focused, equals: .backward).disabled(!canSeek)
+
+            Button {
+                togglePlayback()
+
+            } label: {
+                Image(systemName: engine.state == .playing ? "pause.fill" : "play.fill").font(
+                    .system(size: 27)
+                ).frame(width: 70, height: 70).background(
+                    VeyraColors.red.opacity(focused == .play ? 0.40 : 0.22), in: Circle())
+            }.focused($focused, equals: .play)
+
+            Button {
+                requestSeek(by: 30)
+
+            } label: {
+                Image(systemName: "goforward.30").font(.system(size: 22)).frame(
+                    width: 58, height: 58
+                ).background(transportButtonFill(.forward), in: Circle())
+            }.focused($focused, equals: .forward).disabled(!canSeek)
+
+            Button {
+                cyclePlaybackRate()
+
+            } label: {
+                Text(speedLabel(playbackRate)).font(.system(size: 19, weight: .bold)).frame(
+                    width: 58, height: 58
+                ).background(transportButtonFill(.speed), in: Circle())
+            }.focused($focused, equals: .speed)
+        }.buttonStyle(VeyraFocusButtonStyle(radius: VeyraRadius.pill)).padding(.top, 12)
+            .focusSection()
+    }
+
+    private var audioTabContent: some View {
+        Group {
             if engine.audioTracks.isEmpty {
                 Text("Geen audiotracks beschikbaar voor deze stream.").foregroundStyle(
-                    VeyraColors.secondary)
+                    VeyraColors.secondary
+                ).padding(.top, 20)
 
             } else {
                 ScrollView {
@@ -447,8 +513,6 @@ struct PlayerSubtitleControls: View {
                         ForEach(engine.audioTracks) { track in
                             Button {
                                 engine.selectAudioTrack(index: track.id)
-
-                                closeAudio()
 
                             } label: {
                                 HStack(spacing: 18) {
@@ -473,18 +537,220 @@ struct PlayerSubtitleControls: View {
                     }.padding(8)
                 }
             }
-        }.padding(28).buttonStyle(VeyraFocusButtonStyle()).veyraGlass().onAppear {
+        }.buttonStyle(VeyraFocusButtonStyle()).padding(.top, 12).focusSection().onAppear {
             Task { @MainActor in
                 await Task.yield()
 
-                if let first = engine.audioTracks.first {
-                    audioFocused = .track(first.id)
+                // Focus moet landen op de al geselecteerde track, niet
+                // altijd op de eerste in de lijst - anders lijkt de cursor
+                // "verkeerd" te landen zodra een niet-eerste track actief is.
+                let active = engine.audioTracks.first { $0.id == engine.activeAudioTrackIndex }
 
-                } else {
-                    audioFocused = .close
+                if let target = active ?? engine.audioTracks.first {
+                    audioFocused = .track(target.id)
                 }
             }
         }
+    }
+
+    private var metadataTabContent: some View {
+        HStack(alignment: .top, spacing: 28) {
+            AsyncImage(url: metadataPosterURL ?? item?.posterURL) { phase in
+                switch phase {
+                case .success(let image):
+                    image.resizable().scaledToFill()
+                default:
+                    ZStack {
+                        VeyraColors.surface
+                        Image(systemName: "photo").foregroundStyle(.secondary)
+                    }
+                }
+            }.frame(width: 200, height: 300).clipShape(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+            )
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        if let title, !title.isEmpty {
+                            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                                Text(title).font(.system(size: 26, weight: .bold, design: .rounded))
+
+                                if let episodeLabel {
+                                    Text(episodeLabel).font(
+                                        .system(size: 19, weight: .semibold, design: .rounded)
+                                    ).foregroundStyle(VeyraColors.cyan)
+                                }
+                            }
+                        }
+
+                        if let metadataInfoLine {
+                            Text(metadataInfoLine).font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.white.opacity(0.55))
+                        }
+
+                        if let overview = item?.overview, !overview.isEmpty {
+                            Text(overview).font(.system(size: 19)).foregroundStyle(
+                                .white.opacity(0.75)
+                            ).lineSpacing(3)
+                        }
+                    }
+
+                    if ratings.hasVisibleRatings {
+                        Divider().overlay(Color.white.opacity(0.12))
+
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("RATINGS").font(.system(size: 15, weight: .semibold)).tracking(2)
+                                .foregroundStyle(.secondary)
+
+                            MetadataRatingsView(ratings: ratings)
+                        }
+                    }
+
+                    if let sourceMetadata, hasTechnicalInfo(sourceMetadata) {
+                        Divider().overlay(Color.white.opacity(0.12))
+
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("STREAM").font(.system(size: 15, weight: .semibold)).tracking(2)
+                                .foregroundStyle(.secondary)
+
+                            ForEach(technicalInfoRows(sourceMetadata), id: \.0) { row in
+                                HStack {
+                                    Text(row.0).foregroundStyle(.secondary)
+                                    Spacer()
+                                    Text(row.1).foregroundStyle(.white)
+                                }.font(.system(size: 19))
+                            }
+                        }
+                    }
+                }.padding(.top, 12).padding(.trailing, 12)
+            }
+        }.task(id: item?.id) {
+            async let ratingsLoad: Void = loadRatings()
+            async let metadataLoad: Void = loadTMDBMetadata()
+            _ = await (ratingsLoad, metadataLoad)
+        }
+    }
+
+    @MainActor
+    private func loadRatings() async {
+        ratings = MetadataRatings()
+        guard let tmdbID = item?.tmdbID else { return }
+
+        if item?.type == .series {
+            ratings = await MetadataRatingsService.seriesRatings(tmdbID: tmdbID, imdbID: item?.imdbID)
+        } else {
+            ratings = await MetadataRatingsService.movieRatings(tmdbID: tmdbID, imdbID: item?.imdbID)
+        }
+    }
+
+    // Voor een aflevering wijst `item.posterURL` naar de afleveringsstill,
+    // niet naar de posterafbeelding van de serie zelf - hier wordt de echte
+    // serieposter opgehaald, plus een korte metadatatekst (uitzend-/releasejaar)
+    // voor onder de titel.
+    @MainActor
+    private func loadTMDBMetadata() async {
+        metadataPosterURL = nil
+        metadataInfoLine = nil
+
+        guard let tmdbID = item?.tmdbID, let token = AppConfiguration.tmdbReadAccessToken else {
+            return
+        }
+
+        if item?.type == .series {
+            guard let service = SeriesService() else { return }
+
+            if let details = try? await service.seriesDetails(id: tmdbID) {
+                metadataPosterURL = tmdbImageURL(path: details.posterPath)
+            }
+
+            if let seasonNumber = item?.seasonNumber, let episodeNumber = item?.episodeNumber,
+                let seasonDetails = try? await service.season(
+                    seriesID: tmdbID, seasonNumber: seasonNumber)
+            {
+                let airDate = seasonDetails.episodes.first { $0.episodeNumber == episodeNumber }?
+                    .airDate
+                metadataInfoLine = tmdbYear(airDate)
+            }
+
+        } else {
+            let client = TMDBClient(readAccessToken: token)
+
+            if let movie = try? await client.movieDetails(id: tmdbID) {
+                metadataPosterURL = tmdbImageURL(path: movie.posterPath)
+                metadataInfoLine = tmdbYear(movie.releaseDate)
+            }
+        }
+    }
+
+    private func tmdbImageURL(path: String?, size: String = "w500") -> URL? {
+        guard let path, !path.isEmpty else { return nil }
+        return URL(string: "https://image.tmdb.org/t/p/\(size)\(path)")
+    }
+
+    private func tmdbYear(_ dateString: String?) -> String? {
+        guard let dateString, dateString.count >= 4 else { return nil }
+        return String(dateString.prefix(4))
+    }
+
+    // Korte badges (resolutie/HDR/codec) naast de titel in de onderbalk, als
+    // snel overzicht - de volledige technische info staat nog uitgebreider in
+    // de Info-tab van het boven-uitklapmenu.
+    private func metadataBadges(_ metadata: SourceMetadata) -> [String] {
+        var badges: [String] = []
+        if let resolution = metadata.resolution { badges.append(resolution) }
+        badges.append(contentsOf: metadata.dynamicRange)
+        if let videoCodec = metadata.videoCodec { badges.append(videoCodec.uppercased()) }
+        return badges
+    }
+
+    private func hasTechnicalInfo(_ metadata: SourceMetadata) -> Bool {
+        metadata.resolution != nil || metadata.videoCodec != nil || metadata.bitrate != nil
+            || metadata.quality != nil || !metadata.dynamicRange.isEmpty
+            || metadata.releaseName != nil || metadata.providerName != nil
+    }
+
+    private func technicalInfoRows(_ metadata: SourceMetadata) -> [(String, String)] {
+        var rows: [(String, String)] = []
+        if let resolution = metadata.resolution { rows.append(("Resolutie", resolution)) }
+        if let videoCodec = metadata.videoCodec {
+            rows.append(("Codec", videoCodec.uppercased()))
+        }
+        if !metadata.dynamicRange.isEmpty {
+            rows.append(("HDR", metadata.dynamicRange.joined(separator: ", ")))
+        }
+        if let bitrate = metadata.bitrate { rows.append(("Bitrate", bitrate)) }
+        if let quality = metadata.quality { rows.append(("Kwaliteit", quality)) }
+        if let providerName = metadata.providerName { rows.append(("Bron", providerName)) }
+        return rows
+    }
+
+    private func cyclePlaybackRate() {
+        let rates = availablePlaybackRates
+        guard !rates.isEmpty else { return }
+        guard let index = rates.firstIndex(of: playbackRate) else {
+            playbackRate = 1.0
+            engine.setRate(1.0)
+            return
+        }
+        let next = rates[(index + 1) % rates.count]
+        playbackRate = next
+        engine.setRate(next)
+    }
+
+    private func openTopMenu() {
+        focused = nil
+        topMenuOpen = true
+        interaction += 1
+    }
+
+    private func closeTopMenu() {
+        guard topMenuOpen else { return }
+        topMenuOpen = false
+        topTabFocus = nil
+        audioFocused = nil
+        interaction += 1
+        restoreControlFocus(.timeline)
     }
 
     private func audioDescription(_ track: TrackInfo) -> String {
@@ -502,9 +768,7 @@ struct PlayerSubtitleControls: View {
         return parts.joined(separator: " · ")
     }
 
-    // MARK: - Speed
-
-    @FocusState private var speedFocused: Float?
+    // MARK: - Snelheid
 
     private var availablePlaybackRates: [Float] {
         [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0].filter { $0 <= engine.maxSupportedRate }
@@ -512,59 +776,6 @@ struct PlayerSubtitleControls: View {
 
     private func speedLabel(_ rate: Float) -> String {
         rate == 1.0 ? "1x" : String(format: "%.2gx", rate)
-    }
-
-    private var speedPanel: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            HStack {
-                Text("Snelheid").font(.system(size: 32, weight: .semibold))
-
-                Spacer()
-
-                Button("Sluiten", systemImage: "xmark") { closeSpeed() }.padding(8).focused(
-                    $speedFocused, equals: -1)
-            }
-
-            LazyVStack(spacing: 18) {
-                ForEach(availablePlaybackRates, id: \.self) { rate in
-                    Button {
-                        playbackRate = rate
-                        engine.setRate(rate)
-                        closeSpeed()
-
-                    } label: {
-                        HStack(spacing: 18) {
-                            Image(
-                                systemName: rate == playbackRate ? "checkmark.circle.fill" : "circle"
-                            ).foregroundStyle(VeyraColors.cyan)
-
-                            Text(speedLabel(rate))
-
-                            Spacer()
-                        }.padding(20)
-                    }.focused($speedFocused, equals: rate)
-                }
-            }
-        }.padding(28).buttonStyle(VeyraFocusButtonStyle()).veyraGlass().onAppear {
-            Task { @MainActor in
-                await Task.yield()
-                speedFocused = playbackRate
-            }
-        }
-    }
-
-    private func openSpeed() {
-        focused = nil
-        speedFocused = nil
-        presentation.open(.speed)
-        interaction += 1
-    }
-
-    private func closeSpeed() {
-        guard presentation.close(.speed) else { return }
-        speedFocused = nil
-        interaction += 1
-        restoreControlFocus(.speed)
     }
 
     // MARK: - Playback helpers
@@ -576,6 +787,14 @@ struct PlayerSubtitleControls: View {
         else { return nil }
 
         return "S\(season) · A\(episode)"
+    }
+
+    // Duidelijke, altijd-zichtbare achtergrond per transportknop (in plaats
+    // van enkel de dunne rand die VeyraFocusButtonStyle toevoegt), zodat elke
+    // knop ook in rust herkenbaar is en de gefocuste knop overduidelijk
+    // opvalt tussen de rest.
+    private func transportButtonFill(_ control: Control) -> Color {
+        focused == control ? VeyraColors.cyan.opacity(0.35) : Color.white.opacity(0.08)
     }
 
     private var canSeek: Bool { engine.duration.isFinite && engine.duration > 0 }
@@ -592,18 +811,6 @@ struct PlayerSubtitleControls: View {
         }
     }
 
-    private func handleTransportMove(_ direction: MoveCommandDirection) {
-        switch direction {
-        case .up: if canSeek { focused = .timeline }
-        case .left:
-            focused = (focused ?? .play).horizontalNeighbor(forward: false, canSeek: canSeek)
-        case .right:
-            focused = (focused ?? .play).horizontalNeighbor(forward: true, canSeek: canSeek)
-        default: break
-        }
-        interaction += 1
-    }
-
     private func togglePlayback() {
         if engine.state == .playing {
             engine.pause()
@@ -617,50 +824,23 @@ struct PlayerSubtitleControls: View {
 
     private func handleExitCommand() {
         interaction += 1
-        switch presentation.handleBack() {
-        case .closedPanel(let panel):
-            audioFocused = nil
-            speedFocused = nil
-            switch panel {
-            case .subtitles: restoreControlFocus(.subtitles)
-            case .audio: restoreControlFocus(.audio)
-            case .speed: restoreControlFocus(.speed)
-            }
-        case .hidControls: focused = .surface
-        case .exitPlayer:
-            seekController.cancel()
-            onRequestExit()
+
+        if topMenuOpen {
+            closeTopMenu()
+            return
         }
+
+        if controlsVisible {
+            presentation.hideControls()
+            focused = .surface
+            return
+        }
+
+        seekController.cancel()
+        onRequestExit()
     }
 
-    // MARK: - Panels
-
-    private func openSubtitles() {
-        audioFocused = nil
-        focused = nil
-        presentation.open(.subtitles)
-        interaction += 1
-    }
-
-    private func closeSubtitles() {
-        guard presentation.close(.subtitles) else { return }
-        interaction += 1
-        restoreControlFocus(.subtitles)
-    }
-
-    private func openAudio() {
-        focused = nil
-        audioFocused = nil
-        presentation.open(.audio)
-        interaction += 1
-    }
-
-    private func closeAudio() {
-        guard presentation.close(.audio) else { return }
-        audioFocused = nil
-        interaction += 1
-        restoreControlFocus(.audio)
-    }
+    // MARK: - Focus helpers
 
     private func restoreControlFocus(_ target: Control) {
         Task { @MainActor in
@@ -676,6 +856,7 @@ struct PlayerSubtitleControls: View {
         interaction += 1
     }
 }
+
 
 // MARK: - Timeline
 

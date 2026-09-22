@@ -95,6 +95,7 @@ struct PlayerView: View {
                     title:
                         item?.title,
                     item: item,
+                    sourceMetadata: source.metadata,
                     onRequestExit: {
                         dismiss()
                     },

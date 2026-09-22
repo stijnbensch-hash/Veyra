@@ -19,6 +19,15 @@ struct PlayerView: View {
     @State
     private var nextEpisodeRequest: MediaItem?
 
+    // "Automatisch draaien naar liggend" (Afspelen-instellingen). Uit =
+    // speler blijft in staand vergrendeld, ongeacht toestelrotatie.
+    @AppStorage(PlaybackSettingsDefaults.autoRotateLandscapeKey)
+    private var autoRotateLandscape = true
+
+    // "Voortgangsbalk verbergen" (Laadscherm-instellingen).
+    @AppStorage(PlaybackSettingsDefaults.hideProgressBarKey)
+    private var hideProgressBar = false
+
     init(source: PlayableSource, item: MediaItem? = nil, resumeProgress: Double? = nil) {
         self.source = source
         self.item = item
@@ -68,8 +77,10 @@ struct PlayerView: View {
 
             } else {
                 VStack(spacing: 16) {
-                    ProgressView()
-                        .tint(.white)
+                    if !hideProgressBar {
+                        ProgressView()
+                            .tint(.white)
+                    }
                     Text("Veyra Player starten…")
                         .foregroundStyle(.white.opacity(0.8))
                 }
@@ -80,8 +91,16 @@ struct PlayerView: View {
         .task {
             await viewModel.startPlayback()
         }
+        .onAppear {
+            if autoRotateLandscape {
+                OrientationLock.shared.allowAll()
+            } else {
+                OrientationLock.shared.lockToPortrait()
+            }
+        }
         .onDisappear {
             viewModel.stopForDisappear()
+            OrientationLock.shared.allowAll()
         }
         .onChange(of: scenePhase) { _, phase in
             viewModel.handleScenePhaseChange(phase)

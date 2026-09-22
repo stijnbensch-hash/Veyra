@@ -1,27 +1,98 @@
 import SwiftUI
 
+/// Was één lange lijst met vier secties; voor meer overzicht nu een
+/// categoriemenu naar kleine subschermen — zelfde patroon als
+/// `PlaybackSettingsView`/`SettingsView`.
 struct MetadataSettingsView: View {
-    @AppStorage("metadata.source.preference")
-    private var metadataSourceRaw = MetadataSourceOption.tmdb.rawValue
+    @State private var destination: MetadataSettingsDestination?
 
-    @AppStorage("metadata.rating.imdb")
-    private var imdb = true
+    var body: some View {
+        ZStack {
+            VeyraBackground().ignoresSafeArea()
 
-    @AppStorage("metadata.rating.tmdb")
-    private var tmdb = true
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 18) {
+                    categoryCard(
+                        .posterEnrichment, icon: "photo.badge.checkmark", title: "Posterverrijking",
+                        subtitle: "Genre-/beoordelingsbadge op posters"
+                    )
+                    categoryCard(
+                        .source, icon: "server.rack", title: "Metadatabron",
+                        subtitle: "Poster, achtergrond en omschrijving"
+                    )
+                    categoryCard(
+                        .ratings, icon: "star.leadinghalf.filled", title: "Ratings",
+                        subtitle: "Zichtbare beoordelingen op detailpagina's"
+                    )
+                }
+                .frame(maxWidth: 1300, alignment: .leading)
+                .padding(.horizontal, VeyraSpacing.page)
+                .padding(.top, 36)
+                .padding(.bottom, 60)
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .navigationTitle("Metadata")
+        .navigationDestination(item: $destination) { destination in
+            switch destination {
+            case .posterEnrichment: PosterEnrichmentSettingsView()
+            case .source: MetadataSourceSettingsView()
+            case .ratings: MetadataRatingsSettingsView()
+            }
+        }
+    }
 
-    @AppStorage("metadata.rating.tomatometer")
-    private var tomatometer = true
+    private func categoryCard(
+        _ target: MetadataSettingsDestination,
+        icon: String,
+        title: String,
+        subtitle: String
+    ) -> some View {
+        Button {
+            destination = target
+        } label: {
+            HStack(spacing: 24) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(VeyraColors.cyan.opacity(0.14))
 
-    @AppStorage("metadata.rating.metacritic")
-    private var metacritic = true
+                    Image(systemName: icon)
+                        .font(.system(size: 30, weight: .light))
+                        .foregroundStyle(VeyraColors.cyan)
+                }
+                .frame(width: 68, height: 68)
 
-    @AppStorage("metadata.rating.trakt")
-    private var trakt = true
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(title)
+                        .font(.system(size: 28, weight: .semibold))
+                        .foregroundStyle(.white)
 
-    @AppStorage("metadata.rating.popcornmeter")
-    private var popcornmeter = true
+                    Text(subtitle)
+                        .font(.system(size: 20))
+                        .foregroundStyle(.white.opacity(0.60))
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
 
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.35))
+            }
+            .padding(20)
+            .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        }
+        .buttonStyle(VeyraFocusButtonStyle(radius: 22))
+    }
+}
+
+private enum MetadataSettingsDestination: String, Identifiable, Hashable {
+    case posterEnrichment, source, ratings
+
+    var id: String { rawValue }
+}
+
+// MARK: - Posterverrijking
+
+private struct PosterEnrichmentSettingsView: View {
     @AppStorage(PosterEnrichmentDefaults.modeKey)
     private var posterEnrichmentSourceRaw = PosterEnrichmentMode.off.rawValue
     @AppStorage(PosterEnrichmentDefaults.showGenreKey)
@@ -95,228 +166,114 @@ struct MetadataSettingsView: View {
                     Text("RPDB (ratingposterdb.com) is een externe dienst waarvoor nog geen integratie bestaat — deze keuze doet nog niets. Kies Better Posters voor werkende genre-/beoordelingslabels.")
                         .foregroundStyle(.secondary)
                 }
-            } header: {
-                Text("Posterverrijking")
             } footer: {
                 Text("Toont een badge met genre en/of beoordeling op de posters in Films, Series en het startscherm. Genre en Beoordeling via Better Posters werken al echt; Leeftijdsclassificatie, Kwaliteitslabels, Trendlabels en Resterende afleveringen staan klaar maar Veyra haalt die gegevens nog niet op.")
             }
+        }
+        .navigationTitle("Posterverrijking")
+    }
+}
 
+// MARK: - Metadatabron
+
+private struct MetadataSourceSettingsView: View {
+    @AppStorage("metadata.source.preference")
+    private var metadataSourceRaw = MetadataSourceOption.tmdb.rawValue
+
+    var body: some View {
+        Form {
             Section {
-                Picker(
-                    "Metadatabron",
-                    selection: $metadataSourceRaw
-                ) {
+                Picker("Metadatabron", selection: $metadataSourceRaw) {
                     ForEach(MetadataSourceOption.allCases) { option in
                         Text(option.title).tag(option.rawValue)
                     }
                 }
-            } header: {
-                Text("Metadatabron")
             } footer: {
-                Text(
-                    "Bepaalt waar poster, achtergrond en omschrijving vandaan komen voor titels zonder eigen afbeeldingen (bv. Trakt-lijsten). AIOMetadata vereist een addon bij Addons."
-                )
-            }
-
-            Section {
-                Toggle(
-                    isOn: $imdb
-                ) {
-                    providerRow(
-                        .imdb
-                    )
-                }
-
-                Toggle(
-                    isOn: $tmdb
-                ) {
-                    providerRow(
-                        .tmdb
-                    )
-                }
-
-                Toggle(
-                    isOn: $tomatometer
-                ) {
-                    providerRow(
-                        .tomatometer
-                    )
-                }
-
-                Toggle(
-                    isOn: $metacritic
-                ) {
-                    providerRow(
-                        .metacritic
-                    )
-                }
-
-                Toggle(
-                    isOn: $trakt
-                ) {
-                    providerRow(
-                        .trakt
-                    )
-                }
-
-                Toggle(
-                    isOn: $popcornmeter
-                ) {
-                    providerRow(
-                        .popcornmeter
-                    )
-                }
-
-            } header: {
-                Text(
-                    "Ratings"
-                )
-
-            } footer: {
-                Text(
-                    "Kies welke ratings zichtbaar zijn op film- en seriepagina's."
-                )
-            }
-
-            Section {
-                Button(
-                    "Alle ratings inschakelen"
-                ) {
-                    enableAll()
-                }
-
-                Button(
-                    "Alle ratings uitschakelen"
-                ) {
-                    disableAll()
-                }
-
-                Button(
-                    "Standaardinstellingen herstellen"
-                ) {
-                    resetDefaults()
-                }
+                Text("Bepaalt waar poster, achtergrond en omschrijving vandaan komen voor titels zonder eigen afbeeldingen (bv. Trakt-lijsten). AIOMetadata vereist een addon bij Addons.")
             }
         }
-        .navigationTitle(
-            "Metadata"
-        )
+        .navigationTitle("Metadatabron")
+    }
+}
+
+// MARK: - Ratings
+
+private struct MetadataRatingsSettingsView: View {
+    @AppStorage("metadata.rating.imdb") private var imdb = true
+    @AppStorage("metadata.rating.tmdb") private var tmdb = true
+    @AppStorage("metadata.rating.tomatometer") private var tomatometer = true
+    @AppStorage("metadata.rating.metacritic") private var metacritic = true
+    @AppStorage("metadata.rating.trakt") private var trakt = true
+    @AppStorage("metadata.rating.popcornmeter") private var popcornmeter = true
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle(isOn: $imdb) { providerRow(.imdb) }
+                Toggle(isOn: $tmdb) { providerRow(.tmdb) }
+                Toggle(isOn: $tomatometer) { providerRow(.tomatometer) }
+                Toggle(isOn: $metacritic) { providerRow(.metacritic) }
+                Toggle(isOn: $trakt) { providerRow(.trakt) }
+                Toggle(isOn: $popcornmeter) { providerRow(.popcornmeter) }
+            } footer: {
+                Text("Kies welke ratings zichtbaar zijn op film- en seriepagina's.")
+            }
+
+            Section {
+                Button("Alle ratings inschakelen") { enableAll() }
+                Button("Alle ratings uitschakelen") { disableAll() }
+                Button("Standaardinstellingen herstellen") { resetDefaults() }
+            }
+        }
+        .navigationTitle("Ratings")
     }
 
     // MARK: - Provider Row
 
     @ViewBuilder
-    private func providerRow(
-        _ provider:
-            MetadataRatingProvider
-    ) -> some View {
-        HStack(
-            spacing: 16
-        ) {
-            providerIcon(
-                provider
-            )
+    private func providerRow(_ provider: MetadataRatingProvider) -> some View {
+        HStack(spacing: 16) {
+            providerIcon(provider)
 
-            Text(
-                provider.title
-            )
-            .font(
-                .system(
-                    size: 22,
-                    weight: .medium,
-                    design: .rounded
-                )
-            )
+            Text(provider.title)
+                .font(.system(size: 22, weight: .medium, design: .rounded))
         }
     }
 
     // MARK: - Provider Icon
 
     @ViewBuilder
-    private func providerIcon(
-        _ provider:
-            MetadataRatingProvider
-    ) -> some View {
+    private func providerIcon(_ provider: MetadataRatingProvider) -> some View {
         ZStack {
-            RoundedRectangle(
-                cornerRadius: 8,
-                style: .continuous
-            )
-            .fill(
-                iconBackground(
-                    provider
-                )
-            )
-            .frame(
-                width: 44,
-                height: 44
-            )
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(iconBackground(provider))
+                .frame(width: 44, height: 44)
 
-            Image(
-                systemName:
-                    provider.systemImage
-            )
-            .font(
-                .system(
-                    size: 20,
-                    weight: .bold
-                )
-            )
-            .foregroundStyle(
-                iconForeground(
-                    provider
-                )
-            )
+            Image(systemName: provider.systemImage)
+                .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(iconForeground(provider))
         }
     }
 
-    private func iconBackground(
-        _ provider:
-            MetadataRatingProvider
-    ) -> Color {
+    private func iconBackground(_ provider: MetadataRatingProvider) -> Color {
         switch provider {
-        case .imdb:
-            return .yellow
-
-        case .tmdb:
-            return .cyan.opacity(0.22)
-
-        case .tomatometer:
-            return .red.opacity(0.22)
-
-        case .metacritic:
-            return .yellow.opacity(0.18)
-
-        case .trakt:
-            return .pink.opacity(0.22)
-
-        case .popcornmeter:
-            return .orange.opacity(0.22)
+        case .imdb: return .yellow
+        case .tmdb: return .cyan.opacity(0.22)
+        case .tomatometer: return .red.opacity(0.22)
+        case .metacritic: return .yellow.opacity(0.18)
+        case .trakt: return .pink.opacity(0.22)
+        case .popcornmeter: return .orange.opacity(0.22)
         }
     }
 
-    private func iconForeground(
-        _ provider:
-            MetadataRatingProvider
-    ) -> Color {
+    private func iconForeground(_ provider: MetadataRatingProvider) -> Color {
         switch provider {
-        case .imdb:
-            return .black
-
-        case .tmdb:
-            return .cyan
-
-        case .tomatometer:
-            return .red
-
-        case .metacritic:
-            return .yellow
-
-        case .trakt:
-            return .pink
-
-        case .popcornmeter:
-            return .orange
+        case .imdb: return .black
+        case .tmdb: return .cyan
+        case .tomatometer: return .red
+        case .metacritic: return .yellow
+        case .trakt: return .pink
+        case .popcornmeter: return .orange
         }
     }
 

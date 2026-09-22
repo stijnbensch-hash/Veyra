@@ -28,6 +28,10 @@ struct SourceSelectionView: View {
     @State
     private var selectedFilter: SourceFilter = .all
 
+    // "Eerste bron automatisch selecteren" (Afspelen-instellingen).
+    @AppStorage(PlaybackSettingsDefaults.autoSelectFirstSourceKey)
+    private var autoSelectFirstSource = false
+
     @FocusState
     private var focusedSourceID: UUID?
 
@@ -73,6 +77,12 @@ struct SourceSelectionView: View {
             id: reloadID
         ) {
             await loadSources()
+        }
+        .onChange(of: hasLoaded) { _, loaded in
+            guard loaded, autoSelectFirstSource, selectedSource == nil,
+                  let first = sources.first
+            else { return }
+            selectedSource = first.source
         }
         .navigationDestination(
             item: $selectedSource

@@ -11,6 +11,11 @@ struct SeasonEpisodesView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
 
+    // "Verder kijken"-voortgang per aflevering (Trakt playback-status),
+    // zodat een aflevering die al gedeeltelijk bekeken is een balkje
+    // krijgt, net als de "Verder kijken"-rij op Home.
+    @ObservedObject private var traktStore = TraktStore.shared
+
     private let imageBaseURL = URL(string: "https://image.tmdb.org/t/p/w500")!
 
     var body: some View {
@@ -50,16 +55,29 @@ struct SeasonEpisodesView: View {
             destination(for: episode)
         } label: {
             HStack(alignment: .top, spacing: 14) {
-                AsyncImage(url: imageURL(path: episode.stillPath)) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image.resizable().scaledToFill()
-                    default:
-                        ZStack {
-                            VeyraColors.surface
-                            Image(systemName: "tv")
-                                .foregroundStyle(.secondary)
+                ZStack(alignment: .bottom) {
+                    AsyncImage(url: imageURL(path: episode.stillPath)) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image.resizable().scaledToFill()
+                        default:
+                            ZStack {
+                                VeyraColors.surface
+                                Image(systemName: "tv")
+                                    .foregroundStyle(.secondary)
+                            }
                         }
+                    }
+
+                    if let progress = watchProgress(for: episode) {
+                        GeometryReader { geometry in
+                            Rectangle()
+                                .fill(VeyraColors.cyan)
+                                .frame(width: geometry.size.width * progress / 100, height: 3)
+                        }
+                        .frame(height: 3)
+                        .padding(.horizontal, 4)
+                        .padding(.bottom, 4)
                     }
                 }
                 .frame(width: 140, height: 79)
@@ -67,9 +85,17 @@ struct SeasonEpisodesView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Aflevering \(episode.episodeNumber)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    HStack(spacing: 6) {
+                        Text("Aflevering \(episode.episodeNumber)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        if watchProgress(for: episode) != nil {
+                            Text("· Verder kijken")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(VeyraColors.cyan)
+                        }
+                    }
 
                     Text(episode.name)
                         .font(.subheadline.weight(.semibold))
@@ -116,6 +142,30 @@ struct SeasonEpisodesView: View {
             }
         }
         .padding()
+    }
+
+    // MARK: - Voortgang
+
+    /// Trakt-afspeelvoortgang (0-100) voor deze aflevering, als er
+    /// gepauzeerd is met minder dan 100% bekeken. `nil` als er niets
+    /// bekend is, of als de aflevering al (bijna) helemaal is afgespeeld.
+    private func watchProgress(for episode: TMDBEpisode) -> Double? {
+        guard let entry = traktStore.playback.first(where: { entry in
+            guard let entryEpisode = entry.episode,
+                  entryEpisode.season == episode.seasonNumber,
+                  entryEpisode.number == episode.episodeNumber
+            else { return false }
+
+            let showIDs = entry.show?.ids
+            if let tmdb = showIDs?.tmdb, tmdb == series.id { return true }
+            if let imdb = showIDs?.imdb, let imdbID, !imdbID.isEmpty, imdb == imdbID { return true }
+            return false
+        }) else { return nil }
+
+        guard let progress = entry.progress, progress.isFinite, progress > 0, progress < 100 else {
+            return nil
+        }
+        return progress
     }
 
     // MARK: - Media item

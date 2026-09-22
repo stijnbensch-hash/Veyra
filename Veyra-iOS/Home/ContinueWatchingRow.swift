@@ -12,6 +12,13 @@ struct ContinueWatchingRow: View {
     @AppStorage(GeneralSettingsDefaults.continueWatchingLimitKey) private var continueWatchingLimit = 10
     @State private var destination: ContinueWatchingTarget?
 
+    // "Details overslaan bij verdergaan" (Afspelen-instellingen): films
+    // gaan dan direct naar bronkeuze in plaats van eerst het filmdetail te
+    // tonen. Voor series blijft dit via het detailscherm lopen — daar moet
+    // sowieso een aflevering gekozen worden.
+    @AppStorage(PlaybackSettingsDefaults.skipContinueWatchingDetailsKey)
+    private var skipContinueWatchingDetails = false
+
     private var items: [ContinueWatchingItemIOS] {
         var seen = Set<String>()
         var result: [ContinueWatchingItemIOS] = []
@@ -61,6 +68,8 @@ struct ContinueWatchingRow: View {
             switch target {
             case .movie(let item):
                 MovieDetailView(movie: item)
+            case .moviePlayback(let item):
+                SourceSelectionView(item: item)
             case .series(let series):
                 SeriesDetailView(series: series)
             }
@@ -98,7 +107,7 @@ struct ContinueWatchingRow: View {
             if let movie = entry.movie, let tmdbID = movie.ids.tmdb, tmdbID > 0 {
                 guard let service = TMDBService() else { return }
                 if let item = try? await service.mediaItem(forMovieID: tmdbID) {
-                    destination = .movie(item)
+                    destination = skipContinueWatchingDetails ? .moviePlayback(item) : .movie(item)
                 }
             } else if let show = entry.show, let tmdbID = show.ids.tmdb, tmdbID > 0 {
                 destination = .series(
@@ -120,11 +129,13 @@ struct ContinueWatchingRow: View {
 
 private enum ContinueWatchingTarget: Hashable, Identifiable {
     case movie(MediaItem)
+    case moviePlayback(MediaItem)
     case series(TMDBSeries)
 
     var id: String {
         switch self {
         case .movie(let item): return "movie:\(item.id)"
+        case .moviePlayback(let item): return "moviePlayback:\(item.id)"
         case .series(let series): return "series:\(series.id)"
         }
     }
