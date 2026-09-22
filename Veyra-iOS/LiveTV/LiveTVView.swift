@@ -19,6 +19,9 @@ struct LiveTVView: View {
     @State
     private var showFavoriteOrder = false
 
+    @State
+    private var displayMode: LiveTVDisplayMode = .channels
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -28,6 +31,14 @@ struct LiveTVView: View {
                 VStack(
                     spacing: 0
                 ) {
+                    Picker("Weergave", selection: $displayMode) {
+                        Text("Kanalen").tag(LiveTVDisplayMode.channels)
+                        Text("Gids").tag(LiveTVDisplayMode.guide)
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+
                     categorySelector
 
                     content
@@ -45,6 +56,11 @@ struct LiveTVView: View {
                     guide.reloadID
             ) {
                 await guide.reload()
+            }
+            .onReceive(
+                Timer.publish(every: 1_800, on: .main, in: .common).autoconnect()
+            ) { _ in
+                guide.reloadID = UUID()
             }
             .onReceive(
                 NotificationCenter
@@ -260,7 +276,13 @@ struct LiveTVView: View {
             searchOrChannelEmptyView
 
         } else {
-            channelList
+            if displayMode == .guide {
+                LiveTVGuideView(guide: guide, logoOverrideVersion: logoOverrideVersion) { row in
+                    selectedSource = guide.play(row)
+                }
+            } else {
+                channelList
+            }
         }
     }
 
@@ -552,4 +574,9 @@ struct LiveTVView: View {
             }
         }
     }
+}
+
+private enum LiveTVDisplayMode: Hashable {
+    case channels
+    case guide
 }

@@ -13,7 +13,7 @@ import Foundation
 /// `IPTVChannel.id` — die al "m3u-…" of "xtream-live-…" bevat, dus uniek
 /// genoeg over providers heen zonder aparte scoping.
 enum ChannelLogoOverrideStore {
-    private static let key = "veyra.iptv.channelLogoOverrides"
+    static let key = "veyra.iptv.channelLogoOverrides"
 
     static func all(from defaults: UserDefaults = .standard) -> [String: String] {
         guard let data = defaults.data(forKey: key),
@@ -44,7 +44,9 @@ enum ChannelLogoOverrideStore {
         } else {
             dict.removeValue(forKey: channelID)
         }
-        guard let data = try? JSONEncoder().encode(dict) else { return }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        guard let data = try? encoder.encode(dict) else { return }
         defaults.set(data, forKey: key)
         NotificationCenter.default.post(name: .channelOverrideChanged, object: nil)
     }

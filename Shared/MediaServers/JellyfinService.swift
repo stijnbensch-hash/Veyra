@@ -3,7 +3,7 @@ import Foundation
 /// Thin Jellyfin API client for one connected server account.
 ///
 /// Used both to browse the user's own library (MediaServers) and,
-/// via JellyfinSourceProvider, to resolve a direct stream for a
+/// via JellyfinSourceProvider, to resolve streams for a
 /// TMDB-matched movie or episode.
 struct JellyfinService {
     let account: MediaServerAccount
@@ -27,7 +27,8 @@ struct JellyfinService {
 
         let data = try await get(url)
 
-        return try JellyfinLibrariesResponseDecoder.decode(data)
+        return try JellyfinLibrariesResponseDecoder
+            .decode(data)
     }
 
     // MARK: - Items
@@ -43,32 +44,60 @@ struct JellyfinService {
         var queryItems: [URLQueryItem] = [
             URLQueryItem(
                 name: "IncludeItemTypes",
-                value: includeItemTypes.joined(separator: ",")
+                value: includeItemTypes.joined(
+                    separator: ","
+                )
             ),
-            URLQueryItem(name: "Recursive", value: recursive ? "true" : "false"),
-            URLQueryItem(name: "SortBy", value: sortBy),
-            URLQueryItem(name: "SortOrder", value: "Ascending"),
+
+            URLQueryItem(
+                name: "Recursive",
+                value: recursive ? "true" : "false"
+            ),
+
+            URLQueryItem(
+                name: "SortBy",
+                value: sortBy
+            ),
+
+            URLQueryItem(
+                name: "SortOrder",
+                value: "Ascending"
+            ),
+
             URLQueryItem(
                 name: "Fields",
-                value: "Overview,ProductionYear,Genres,CommunityRating"
+                value:
+                    "Overview,ProductionYear,Genres,CommunityRating"
             )
         ]
 
         if let parentID {
             queryItems.append(
-                URLQueryItem(name: "ParentId", value: parentID)
+                URLQueryItem(
+                    name: "ParentId",
+                    value: parentID
+                )
             )
         }
 
-        if let searchTerm, !searchTerm.isEmpty {
+        if
+            let searchTerm,
+            !searchTerm.isEmpty
+        {
             queryItems.append(
-                URLQueryItem(name: "SearchTerm", value: searchTerm)
+                URLQueryItem(
+                    name: "SearchTerm",
+                    value: searchTerm
+                )
             )
         }
 
         if let limit {
             queryItems.append(
-                URLQueryItem(name: "Limit", value: String(limit))
+                URLQueryItem(
+                    name: "Limit",
+                    value: String(limit)
+                )
             )
         }
 
@@ -79,7 +108,8 @@ struct JellyfinService {
 
         let data = try await get(url)
 
-        return try JellyfinItemsResponseDecoder.decode(data)
+        return try JellyfinItemsResponseDecoder
+            .decode(data)
     }
 
     func search(
@@ -87,7 +117,9 @@ struct JellyfinService {
         includeItemTypes: [String]
     ) async throws -> [JellyfinItem] {
         let trimmed =
-            term.trimmingCharacters(in: .whitespacesAndNewlines)
+            term.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
 
         guard !trimmed.isEmpty else {
             return []
@@ -120,10 +152,16 @@ struct JellyfinService {
                     name: "IncludeItemTypes",
                     value: "Movie,Episode"
                 ),
-                URLQueryItem(name: "Limit", value: String(limit)),
+
+                URLQueryItem(
+                    name: "Limit",
+                    value: String(limit)
+                ),
+
                 URLQueryItem(
                     name: "Fields",
-                    value: "Overview,ProductionYear,Genres,CommunityRating"
+                    value:
+                        "Overview,ProductionYear,Genres,CommunityRating"
                 )
             ]
         )
@@ -132,7 +170,67 @@ struct JellyfinService {
 
         // "/Items/Latest" geeft rechtstreeks een array terug,
         // niet gewrapt in "Items".
-        return try JSONDecoder().decode([JellyfinItem].self, from: data)
+        return try JSONDecoder()
+            .decode(
+                [JellyfinItem].self,
+                from: data
+            )
+    }
+
+    // MARK: - Playback
+
+    func playbackInfo(
+        for item: JellyfinItem
+    ) async throws -> JellyfinPlaybackInfo {
+        let url = endpoint(
+            "Items/\(item.id)/PlaybackInfo"
+        )
+
+        var request =
+            URLRequest(url: url)
+
+        request.httpMethod = "POST"
+
+        request.setValue(
+            "application/json",
+            forHTTPHeaderField: "Content-Type"
+        )
+
+        addAuthorizationHeaders(
+            to: &request
+        )
+
+        request.httpBody =
+            Data("{}".utf8)
+
+        let (data, response) =
+            try await session.data(for: request)
+
+        guard
+            let httpResponse =
+                response as? HTTPURLResponse
+        else {
+            throw JellyfinServiceError
+                .invalidResponse
+        }
+
+        guard
+            (200...299)
+                .contains(
+                    httpResponse.statusCode
+                )
+        else {
+            throw JellyfinServiceError
+                .server(
+                    httpResponse.statusCode
+                )
+        }
+
+        return try JSONDecoder()
+            .decode(
+                JellyfinPlaybackInfo.self,
+                from: data
+            )
     }
 
     // MARK: - Media URLs
@@ -141,35 +239,95 @@ struct JellyfinService {
         for item: JellyfinItem,
         kind: JellyfinImageKind = .primary
     ) -> URL? {
-        var components = URLComponents(
-            url: account.serverURL,
-            resolvingAgainstBaseURL: false
-        )
+        var components =
+            URLComponents(
+                url: account.serverURL,
+                resolvingAgainstBaseURL: false
+            )
 
-        components?.path += "/Items/\(item.id)/Images/\(kind.rawValue)"
+        components?.path +=
+            "/Items/\(item.id)/Images/\(kind.rawValue)"
 
         components?.queryItems = [
-            URLQueryItem(name: "api_key", value: account.accessToken),
-            URLQueryItem(name: "quality", value: "90")
+            URLQueryItem(
+                name: "api_key",
+                value: account.accessToken
+            ),
+
+            URLQueryItem(
+                name: "quality",
+                value: "90"
+            )
         ]
 
         return components?.url
     }
 
-    func streamURL(for item: JellyfinItem) -> URL? {
-        var components = URLComponents(
-            url: account.serverURL,
-            resolvingAgainstBaseURL: false
-        )
+    func streamURL(
+        for item: JellyfinItem,
+        mediaSourceID: String? = nil
+    ) -> URL? {
+        var components =
+            URLComponents(
+                url: account.serverURL,
+                resolvingAgainstBaseURL: false
+            )
 
-        components?.path += "/Videos/\(item.id)/stream"
+        components?.path +=
+            "/Videos/\(item.id)/stream"
 
-        components?.queryItems = [
-            URLQueryItem(name: "static", value: "true"),
-            URLQueryItem(name: "api_key", value: account.accessToken)
+        var queryItems: [URLQueryItem] = [
+            URLQueryItem(
+                name: "static",
+                value: "true"
+            ),
+
+            URLQueryItem(
+                name: "api_key",
+                value: account.accessToken
+            )
         ]
 
+        if
+            let mediaSourceID,
+            !mediaSourceID.isEmpty
+        {
+            queryItems.append(
+                URLQueryItem(
+                    name: "MediaSourceId",
+                    value: mediaSourceID
+                )
+            )
+        }
+
+        components?.queryItems = queryItems
+
         return components?.url
+    }
+
+    func playbackURL(
+        for item: JellyfinItem,
+        mediaSource: JellyfinMediaSource
+    ) -> URL? {
+        if
+            let path = mediaSource.path?
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                ),
+            !path.isEmpty,
+            let url = URL(string: path),
+            let scheme = url.scheme?
+                .lowercased(),
+            scheme == "http"
+                || scheme == "https"
+        {
+            return url
+        }
+
+        return streamURL(
+            for: item,
+            mediaSourceID: mediaSource.id
+        )
     }
 
     // MARK: - Networking
@@ -178,64 +336,100 @@ struct JellyfinService {
         _ path: String,
         queryItems: [URLQueryItem] = []
     ) -> URL {
-        var components = URLComponents(
-            url: account.serverURL,
-            resolvingAgainstBaseURL: false
-        )
+        var components =
+            URLComponents(
+                url: account.serverURL,
+                resolvingAgainstBaseURL: false
+            )
 
-        components?.path += "/\(path)"
+        components?.path +=
+            "/\(path)"
+
         components?.queryItems =
-            queryItems.isEmpty ? nil : queryItems
+            queryItems.isEmpty
+                ? nil
+                : queryItems
 
         return components?.url
-            ?? account.serverURL.appendingPathComponent(path)
+            ?? account.serverURL
+                .appendingPathComponent(path)
     }
 
-    private func get(_ url: URL) async throws -> Data {
-        var request = URLRequest(url: url)
+    private func get(
+        _ url: URL
+    ) async throws -> Data {
+        var request =
+            URLRequest(url: url)
 
-        request.setValue(
-            "MediaBrowser Token=\"\(account.accessToken)\"",
-            forHTTPHeaderField: "X-Emby-Authorization"
+        addAuthorizationHeaders(
+            to: &request
         )
 
-        request.setValue(
-            account.accessToken,
-            forHTTPHeaderField: "X-Emby-Token"
-        )
-
-        let (data, response) = try await session.data(for: request)
+        let (data, response) =
+            try await session.data(for: request)
 
         guard
-            let httpResponse = response as? HTTPURLResponse
+            let httpResponse =
+                response as? HTTPURLResponse
         else {
-            throw JellyfinServiceError.invalidResponse
+            throw JellyfinServiceError
+                .invalidResponse
         }
 
-        guard (200...299).contains(httpResponse.statusCode) else {
-            throw JellyfinServiceError.server(httpResponse.statusCode)
+        guard
+            (200...299)
+                .contains(
+                    httpResponse.statusCode
+                )
+        else {
+            throw JellyfinServiceError
+                .server(
+                    httpResponse.statusCode
+                )
         }
 
         return data
     }
+
+    private func addAuthorizationHeaders(
+        to request: inout URLRequest
+    ) {
+        request.setValue(
+            "MediaBrowser Token=\"\(account.accessToken)\"",
+            forHTTPHeaderField:
+                "X-Emby-Authorization"
+        )
+
+        request.setValue(
+            account.accessToken,
+            forHTTPHeaderField:
+                "X-Emby-Token"
+        )
+    }
 }
 
-enum JellyfinImageKind: String {
+enum JellyfinImageKind:
+    String
+{
     case primary = "Primary"
     case backdrop = "Backdrop/0"
 }
 
-enum JellyfinServiceError: LocalizedError {
+enum JellyfinServiceError:
+    LocalizedError
+{
     case invalidResponse
     case server(Int)
 
     var errorDescription: String? {
         switch self {
         case .invalidResponse:
-            return "De mediaserver gaf een ongeldig antwoord."
+            return
+                "De mediaserver gaf een ongeldig antwoord."
 
         case .server(let code):
-            return "De mediaserver reageerde met een fout (\(code))."
+            return
+                "De mediaserver reageerde met een fout (\(code))."
         }
     }
 }
@@ -243,29 +437,53 @@ enum JellyfinServiceError: LocalizedError {
 // MARK: - Decoding helpers
 
 private enum JellyfinLibrariesResponseDecoder {
-    private struct Response: Decodable {
+    private struct Response:
+        Decodable
+    {
         let items: [JellyfinLibrary]
 
-        enum CodingKeys: String, CodingKey {
+        enum CodingKeys:
+            String,
+            CodingKey
+        {
             case items = "Items"
         }
     }
 
-    static func decode(_ data: Data) throws -> [JellyfinLibrary] {
-        try JSONDecoder().decode(Response.self, from: data).items
+    static func decode(
+        _ data: Data
+    ) throws -> [JellyfinLibrary] {
+        try JSONDecoder()
+            .decode(
+                Response.self,
+                from: data
+            )
+            .items
     }
 }
 
 private enum JellyfinItemsResponseDecoder {
-    private struct Response: Decodable {
+    private struct Response:
+        Decodable
+    {
         let items: [JellyfinItem]
 
-        enum CodingKeys: String, CodingKey {
+        enum CodingKeys:
+            String,
+            CodingKey
+        {
             case items = "Items"
         }
     }
 
-    static func decode(_ data: Data) throws -> [JellyfinItem] {
-        try JSONDecoder().decode(Response.self, from: data).items
+    static func decode(
+        _ data: Data
+    ) throws -> [JellyfinItem] {
+        try JSONDecoder()
+            .decode(
+                Response.self,
+                from: data
+            )
+            .items
     }
 }

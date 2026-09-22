@@ -125,6 +125,11 @@ struct LiveTVView: View {
                 await guide.reload()
             }
             .onReceive(
+                Timer.publish(every: 1_800, on: .main, in: .common).autoconnect()
+            ) { _ in
+                guide.reloadID = UUID()
+            }
+            .onReceive(
                 NotificationCenter.default.publisher(
                     for: .iptvConfigurationDidChange
                 )
@@ -457,10 +462,6 @@ struct LiveTVView: View {
         }
         .buttonStyle(
             VeyraEPGButtonStyle()
-        )
-        .disabled(
-            guide.loadingChannels
-            || guide.loadingGuide
         )
         .accessibilityLabel(
             "Zenders en programmagids vernieuwen"

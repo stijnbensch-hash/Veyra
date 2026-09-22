@@ -126,6 +126,10 @@ enum ChannelNameOverrideStore {
     // MARK: - Sync
 
     static func synchronize() {
+        if VeyraHubSyncService.shared.isActive {
+            NotificationCenter.default.post(name: .channelOverrideChanged, object: nil)
+            return
+        }
         startSyncIfNeeded()
 
         cloudStore
@@ -146,6 +150,7 @@ enum ChannelNameOverrideStore {
     // MARK: - Startup
 
     private static func startSyncIfNeeded() {
+        guard !VeyraHubSyncService.shared.isActive else { return }
         guard
             !hasStartedSync
         else {
@@ -191,6 +196,8 @@ enum ChannelNameOverrideStore {
         -> [String: String]
     {
         startSyncIfNeeded()
+
+        if VeyraHubSyncService.shared.isActive { return localDictionary() }
 
         if let cloud =
             cloudDictionary()
@@ -250,6 +257,11 @@ enum ChannelNameOverrideStore {
                 forKey:
                     localKey
             )
+
+        if VeyraHubSyncService.shared.isActive {
+            NotificationCenter.default.post(name: .channelOverrideChanged, object: nil)
+            return
+        }
 
         cloudStore
             .set(
@@ -313,6 +325,7 @@ enum ChannelNameOverrideStore {
     }
 
     private static func mergeCloudIntoLocal() {
+        guard !VeyraHubSyncService.shared.isActive else { return }
         guard
             let cloud =
                 cloudDictionary()

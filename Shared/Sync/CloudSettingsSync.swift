@@ -49,6 +49,7 @@ final class CloudSettingsSync: ObservableObject {
     private let store = NSUbiquitousKeyValueStore.default
     private let defaults = UserDefaults.standard
     private var started = false
+    private var hubManaged = false
     private var pushWorkItem: DispatchWorkItem?
 
     /// iCloud's eigen limiet voor `NSUbiquitousKeyValueStore` is 1 MB in
@@ -164,12 +165,27 @@ final class CloudSettingsSync: ObservableObject {
 
     private static let dynamicPrefixes: [String] = [metadataPrefix, iptvVisibilityPrefix]
 
+    // Reuse the exact iCloud allowlist for Hub sync. Account credentials and
+    // device-specific settings are intentionally absent from this list.
+    static var hubSyncKeys: [String] {
+        let fixed = simpleKeysAll + dataKeys.map(\.key)
+        let dynamic = UserDefaults.standard.dictionaryRepresentation().keys.filter { key in
+            dynamicPrefixes.contains { key.hasPrefix($0) }
+        }
+        return Array(Set(fixed + dynamic))
+    }
+
+    static func isHubSyncKey(_ key: String) -> Bool {
+        simpleKeysAll.contains(key) || dataKeys.contains { $0.key == key } ||
+        dynamicPrefixes.contains { key.hasPrefix($0) }
+    }
+
     // MARK: - Start
 
     /// Eenmalig aan te roepen bij app-start (zie `VeyraApp`/`Veyra_iOSApp`).
     func start() {
         refreshStatus()
-        guard isEnabled, !started else { return }
+        guard isEnabled, !hubManaged, !started else { return }
         started = true
 
         NotificationCenter.default.addObserver(
@@ -183,6 +199,18 @@ final class CloudSettingsSync: ObservableObject {
         store.synchronize()
         mergeOnFirstRun()
         refreshStatus()
+    }
+
+    func setHubManaged(_ managed: Bool) {
+        guard hubManaged != managed else { return }
+        hubManaged = managed
+        if managed {
+            NotificationCenter.default.removeObserver(self)
+            pushWorkItem?.cancel()
+            started = false
+        } else {
+            start()
+        }
     }
 
     /// Zet de functie aan of uit. Uitzetten stopt alleen het automatisch

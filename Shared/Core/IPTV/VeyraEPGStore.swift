@@ -8,6 +8,21 @@ struct VeyraGuideChannel: Identifiable, Hashable {
     let categoryID: String
 }
 
+nonisolated private struct VeyraLiveCatalog: Codable, Sendable {
+    let channels: [IPTVChannel]
+    let categories: [IPTVCategory]
+}
+
+nonisolated private struct VeyraCatalogSnapshot: Codable, Sendable {
+    let savedAt: Date
+    let catalog: VeyraLiveCatalog
+}
+
+nonisolated private struct VeyraGuideSnapshot: Codable, Sendable {
+    let savedAt: Date
+    let programmes: [String: [VeyraEPGProgramme]]
+}
+
 @MainActor
 final class VeyraEPGStore: ObservableObject {
     @Published private(set) var channels: [VeyraGuideChannel] = []
@@ -175,7 +190,7 @@ final class VeyraEPGStore: ObservableObject {
 
     func reload() async {
         // Haal eventuele wijzigingen van het andere Apple-apparaat op.
-        cloudStore.synchronize()
+        if !VeyraHubSyncService.shared.isActive { cloudStore.synchronize() }
 
         let token = UUID()
         generation = token
@@ -212,6 +227,8 @@ final class VeyraEPGStore: ObservableObject {
                preferences == loadedPreferences,
                let loadedAt,
                Date().timeIntervalSince(loadedAt) < 900 {
+                providerKey = configuration.providerIdentifier
+                loadProviderState()
                 return
             }
 
@@ -225,9 +242,11 @@ final class VeyraEPGStore: ObservableObject {
             providerKey =
                 configuration.providerIdentifier
 
-            channels = []
-            categories = []
-            programmeIndex = [:]
+            if changedProvider {
+                channels = []
+                categories = []
+                programmeIndex = [:]
+            }
 
             channelError = nil
             guideMessage = nil
@@ -241,6 +260,36 @@ final class VeyraEPGStore: ObservableObject {
                 selectedCategory = "favorites"
                 searchText = ""
                 windowStart = Self.currentWindow()
+            }
+
+            let cacheKey = "live-catalog-v1-\(configuration.providerIdentifier)"
+            if let cached = IPTVDiskCache.read(
+                VeyraLiveCatalog.self, key: cacheKey
+            )?.value {
+                applyCatalog(cached, configuration: configuration, preferences: preferences)
+                loadingChannels = false
+            }
+            if let data = UserDefaults.standard.data(
+                forKey: VeyraIPTVSnapshot.catalogPrefix + configuration.providerIdentifier
+            ), let snapshot = VeyraIPTVSnapshot.decode(
+                VeyraCatalogSnapshot.self, from: data
+            ) {
+                applyCatalog(snapshot.catalog, configuration: configuration, preferences: preferences)
+                loadingChannels = false
+            }
+            let guideCacheKey = "live-guide-v1-\(configuration.providerIdentifier)"
+            if let cachedGuide = IPTVDiskCache.read(
+                [String: [VeyraEPGProgramme]].self,
+                key: guideCacheKey
+            )?.value {
+                programmeIndex = cachedGuide
+            }
+            if let data = UserDefaults.standard.data(
+                forKey: VeyraIPTVSnapshot.guidePrefix + configuration.providerIdentifier
+            ), let snapshot = VeyraIPTVSnapshot.decode(
+                VeyraGuideSnapshot.self, from: data
+            ) {
+                programmeIndex = snapshot.programmes
             }
 
             let receivedChannels: [IPTVChannel]
@@ -297,11 +346,73 @@ final class VeyraEPGStore: ObservableObject {
                 return
             }
 
-            var seen = Set<String>()
-            var rows: [VeyraGuideChannel] = []
+            let catalog = VeyraLiveCatalog(
+                channels: receivedChannels,
+                categories: receivedCategories
+            )
+            applyCatalog(
+                catalog,
+                configuration: configuration,
+                preferences: preferences
+            )
+            IPTVDiskCache.write(catalog, key: cacheKey)
+            let visibleCatalog = VeyraLiveCatalog(
+                channels: channels.map(\.channel),
+                categories: categories
+            )
+            if let snapshot = VeyraIPTVSnapshot.encode(
+                VeyraCatalogSnapshot(savedAt: Date(), catalog: visibleCatalog)
+            ) {
+                UserDefaults.standard.set(
+                    snapshot,
+                    forKey: VeyraIPTVSnapshot.catalogPrefix + configuration.providerIdentifier
+                )
+            }
+
+            loadingChannels = false
+
+            loadedConfiguration = configuration
+            loadedPreferences = preferences
+
+            await loadGuide(configuration: configuration, token: token)
+
+            guard generation == token, !Task.isCancelled else { return }
+
+            completedReloadID = requestedReloadID
+            loadedAt = Date()
+
+        } catch {
+            guard generation == token else { return }
+
+            loadingChannels = false
+            loadingGuide = false
+
+            if !Task.isCancelled {
+                if let failure = error as? IPTVServiceError {
+                    channelError = failure.localizedDescription
+                } else if let failure = error as? XtreamError {
+                    channelError = failure.localizedDescription
+                } else {
+                    channelError = "De providers of zenders konden niet worden geladen. Controleer de verbinding en kies Vernieuwen."
+                }
+                if !channels.isEmpty,
+                   let configuration = try? configStore.load() {
+                    await loadGuide(configuration: configuration, token: token)
+                }
+            }
+        }
+    }
+
+    private func applyCatalog(
+        _ catalog: VeyraLiveCatalog,
+        configuration: IPTVStoredConfiguration,
+        preferences: IPTVProviderPreferences
+    ) {
+        var seen = Set<String>()
+        var rows: [VeyraGuideChannel] = []
 
             for channel
-                in receivedChannels
+                in catalog.channels
                 where channel.contentType == .live
             {
                 let groupID: String
@@ -378,8 +489,8 @@ final class VeyraEPGStore: ObservableObject {
             var seenGroups =
                 Set<String>()
 
-            receivedCategories =
-                receivedCategories.filter {
+            let visibleCategories =
+                catalog.categories.filter {
                     preferences
                         .isLiveCategoryVisible(
                             $0.id
@@ -398,7 +509,7 @@ final class VeyraEPGStore: ObservableObject {
                 }
 
             categories =
-                receivedCategories.sorted {
+                visibleCategories.sorted {
                     $0.name
                         .localizedStandardCompare(
                             $1.name
@@ -417,65 +528,12 @@ final class VeyraEPGStore: ObservableObject {
                     "favorites"
             }
 
-            loadingChannels = false
-
-            loadedConfiguration =
-                configuration
-
-            loadedPreferences =
-                preferences
-
-            await loadGuide(
-                configuration: configuration,
-                token: token
-            )
-
-            guard
-                generation == token,
-                !Task.isCancelled
-            else {
-                return
-            }
-
-            completedReloadID =
-                requestedReloadID
-
-            loadedAt =
-                Date()
-
-        } catch {
-            guard generation == token else {
-                return
-            }
-
-            loadingChannels = false
-            loadingGuide = false
-
-            if !Task.isCancelled {
-                if let failure =
-                    error as? IPTVServiceError
-                {
-                    channelError =
-                        failure.localizedDescription
-
-                } else if let failure =
-                    error as? XtreamError
-                {
-                    channelError =
-                        failure.localizedDescription
-
-                } else {
-                    channelError =
-                        "De providers of zenders konden niet worden geladen. Controleer de verbinding en kies Vernieuwen."
-                }
-            }
-        }
     }
 
     // MARK: - Provider-specific state
 
     private func loadProviderState() {
-        cloudStore.synchronize()
+        if !VeyraHubSyncService.shared.isActive { cloudStore.synchronize() }
 
         let localFavorites =
             UserDefaults.standard
@@ -490,6 +548,13 @@ final class VeyraEPGStore: ObservableObject {
                     forKey: favoriteOrderKey
                 )
             ?? []
+
+        if VeyraHubSyncService.shared.isActive {
+            favorites = Set(localFavorites)
+            favoriteOrder = unique(localOrder)
+            recent = Array((UserDefaults.standard.stringArray(forKey: recentKey) ?? []).prefix(40))
+            return
+        }
 
         let cloudFavorites =
             cloudStringArray(
@@ -582,6 +647,8 @@ final class VeyraEPGStore: ObservableObject {
             forKey: favoritesKey
         )
 
+        guard !VeyraHubSyncService.shared.isActive else { return }
+
         cloudStore.set(
             values,
             forKey: cloudFavoritesKey
@@ -603,6 +670,8 @@ final class VeyraEPGStore: ObservableObject {
             forKey: favoriteOrderKey
         )
 
+        guard !VeyraHubSyncService.shared.isActive else { return }
+
         cloudStore.set(
             favoriteOrder,
             forKey: cloudFavoriteOrderKey
@@ -612,18 +681,9 @@ final class VeyraEPGStore: ObservableObject {
     }
 
     private func normalizeFavoriteOrder() {
-        let availableIDs =
-            Set(
-                channels.map(
-                    \.id
-                )
-            )
-
         favoriteOrder =
             favoriteOrder.filter {
                 favorites.contains($0)
-                &&
-                availableIDs.contains($0)
             }
 
         // Favorieten die nog geen orderpositie hebben
@@ -1014,6 +1074,19 @@ final class VeyraEPGStore: ObservableObject {
 
             programmeIndex =
                 result.programmes
+
+            IPTVDiskCache.write(
+                result.programmes,
+                key: "live-guide-v1-\(configuration.providerIdentifier)"
+            )
+            if let snapshot = VeyraIPTVSnapshot.encode(
+                VeyraGuideSnapshot(savedAt: Date(), programmes: result.programmes)
+            ) {
+                UserDefaults.standard.set(
+                    snapshot,
+                    forKey: VeyraIPTVSnapshot.guidePrefix + configuration.providerIdentifier
+                )
+            }
 
             let linked =
                 channels.filter {

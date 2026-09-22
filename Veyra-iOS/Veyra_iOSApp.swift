@@ -43,6 +43,7 @@ struct Veyra_iOSApp: App {
                         // iCloud spiegelen — zie
                         // `Shared/Sync/CloudSettingsSync.swift`.
                         CloudSettingsSync.shared.start()
+                        VeyraHubSyncService.shared.start()
 
                         // Bestaande schermen (LiveTVView, IPTVRecentlyAddedRows)
                         // verversen zichzelf al zodra ze de

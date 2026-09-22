@@ -150,6 +150,25 @@ struct IPTVConfigurationStore {
         )
     }
 
+    // The Hub syncs provider credentials through its authenticated settings
+    // document. Keep the raw payload out of UserDefaults and iCloud KVS.
+    func exportForHub() throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        return try encoder.encode(loadState())
+    }
+
+    func importFromHub(_ data: Data) throws {
+        var state = try JSONDecoder().decode(StoredProvidersPayload.self, from: data)
+        state.normalizeActiveProvider()
+        for provider in state.providers {
+            _ = try provider.configuration.configuration()
+        }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        try writeLocalKeychainData(try encoder.encode(state), account: providersAccount)
+    }
+
     // MARK: - Multiple Providers
 
     func loadProviders()
@@ -376,11 +395,11 @@ struct IPTVConfigurationStore {
                     normalizedState
                 )
 
-        try writeKeychainData(
-            data,
-            account:
-                providersAccount
-        )
+        if VeyraHubSyncService.shared.isActive {
+            try writeLocalKeychainData(data, account: providersAccount)
+        } else {
+            try writeKeychainData(data, account: providersAccount)
+        }
     }
 
     // MARK: - Legacy Migration
@@ -448,6 +467,12 @@ struct IPTVConfigurationStore {
     private func readKeychainData(
         account: String
     ) throws -> Data? {
+        if VeyraHubSyncService.shared.isActive {
+            if let local = try readKeychainData(account: account, synchronizable: false) {
+                return local
+            }
+            return try? readKeychainData(account: account, synchronizable: true)
+        }
         if let synced = try readKeychainData(account: account, synchronizable: true) {
             return synced
         }
@@ -511,6 +536,28 @@ struct IPTVConfigurationStore {
     }
 
     // MARK: - Keychain Write
+
+    private func writeLocalKeychainData(_ data: Data, account: String) throws {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecAttrSynchronizable as String: false
+        ]
+        let status = SecItemUpdate(query as CFDictionary,
+                                   [kSecValueData as String: data] as CFDictionary)
+        if status == errSecSuccess { return }
+        guard status == errSecItemNotFound else {
+            throw IPTVConfigurationStoreError.keychainError(status)
+        }
+        var item = query
+        item[kSecValueData as String] = data
+        item[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+        let addStatus = SecItemAdd(item as CFDictionary, nil)
+        guard addStatus == errSecSuccess else {
+            throw IPTVConfigurationStoreError.keychainError(addStatus)
+        }
+    }
 
     /// Schrijft naar het gesynchroniseerde (iCloud Keychain) item, zodat
     /// IPTV-inloggegevens automatisch meegaan naar andere apparaten met
