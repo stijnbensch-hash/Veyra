@@ -7,6 +7,11 @@ struct JellyfinClient {
         let userID: String
         let accessToken: String
         let serverName: String?
+
+        /// True when the server identified itself as Veyra Hub in
+        /// `/System/Info/Public` (a `VeyraHubVersion` field). See
+        /// `MediaServerAccount.isVeyraHub`.
+        let isVeyraHub: Bool
     }
 
     private let deviceID: String
@@ -107,13 +112,64 @@ struct JellyfinClient {
                 .invalidResponse
         }
 
+        let isVeyraHub =
+            await Self.isVeyraHubServer(
+                serverURL: serverURL
+            )
+
         return AuthResult(
             userID: payload.user.id,
             accessToken:
                 payload.accessToken,
             serverName:
-                payload.serverName
+                payload.serverName,
+            isVeyraHub: isVeyraHub
         )
+    }
+
+    // MARK: - Server identification
+
+    /// Checks `/System/Info/Public` for a `VeyraHubVersion` field, the
+    /// signal that this Jellyfin-compatible server is actually Veyra Hub
+    /// rather than a real Jellyfin/Emby server. Best-effort: any failure
+    /// (network, unexpected response) is treated as "not Veyra Hub" rather
+    /// than surfaced as an error, since this only affects which streaming
+    /// path gets used, not whether sign-in succeeds.
+    private static func isVeyraHubServer(
+        serverURL: URL
+    ) async -> Bool {
+        let endpoint =
+            serverURL.appendingPathComponent(
+                "System/Info/Public"
+            )
+
+        guard
+            let (data, response) =
+                try? await URLSession.shared
+                    .data(from: endpoint),
+            let httpResponse =
+                response as? HTTPURLResponse,
+            httpResponse.statusCode == 200
+        else {
+            return false
+        }
+
+        struct SystemInfo: Decodable {
+            let veyraHubVersion: String?
+
+            enum CodingKeys: String, CodingKey {
+                case veyraHubVersion = "VeyraHubVersion"
+            }
+        }
+
+        let info =
+            try? JSONDecoder()
+                .decode(
+                    SystemInfo.self,
+                    from: data
+                )
+
+        return info?.veyraHubVersion != nil
     }
 
     // MARK: - Header

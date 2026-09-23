@@ -641,7 +641,8 @@ struct MediaServerAddView:
                     serverURL: url,
                     username: trimmedUsername,
                     userID: result.userID,
-                    accessToken: result.accessToken
+                    accessToken: result.accessToken,
+                    isVeyraHub: result.isVeyraHub
                 )
 
                 try store.add(server)
@@ -887,6 +888,7 @@ struct MediaServerEditView:
                 await MainActor.run {
                     server.userID = result.userID
                     server.accessToken = result.accessToken
+                    server.isVeyraHub = result.isVeyraHub
                     isConnecting = false
                     persist()
                 }

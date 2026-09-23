@@ -67,6 +67,15 @@ struct MediaServerAccount:
     var userID: String
     var accessToken: String
 
+    /// True when this Jellyfin-compatible server is actually a Veyra Hub
+    /// instance (detected via `VeyraHubVersion` in its `/System/Info/Public`
+    /// response, at connect/reconnect time — see `JellyfinClient`). Lets
+    /// source resolution skip the Jellyfin bridge's title search, which
+    /// only works for addons with a searchable catalog, and call VeyraHub's
+    /// native, IMDb-id-based API directly instead. See
+    /// `VeyraHubNativeClient`.
+    var isVeyraHub: Bool
+
     init(
         id: UUID = UUID(),
         name: String,
@@ -74,7 +83,8 @@ struct MediaServerAccount:
         serverURL: URL,
         username: String,
         userID: String,
-        accessToken: String
+        accessToken: String,
+        isVeyraHub: Bool = false
     ) {
         self.id = id
         self.name = name
@@ -83,6 +93,26 @@ struct MediaServerAccount:
         self.username = username
         self.userID = userID
         self.accessToken = accessToken
+        self.isVeyraHub = isVeyraHub
+    }
+
+    // Custom Decodable so accounts saved before `isVeyraHub` existed still
+    // decode, defaulting to false (a plain Jellyfin server) instead of
+    // failing to load.
+    enum CodingKeys: String, CodingKey {
+        case id, name, kind, serverURL, username, userID, accessToken, isVeyraHub
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        kind = try container.decode(MediaServerKind.self, forKey: .kind)
+        serverURL = try container.decode(URL.self, forKey: .serverURL)
+        username = try container.decode(String.self, forKey: .username)
+        userID = try container.decode(String.self, forKey: .userID)
+        accessToken = try container.decode(String.self, forKey: .accessToken)
+        isVeyraHub = try container.decodeIfPresent(Bool.self, forKey: .isVeyraHub) ?? false
     }
 
     var host: String {

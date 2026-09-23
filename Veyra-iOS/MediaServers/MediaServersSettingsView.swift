@@ -186,7 +186,8 @@ private struct MediaServerAddView: View {
                     serverURL: url,
                     username: trimmedUsername,
                     userID: result.userID,
-                    accessToken: result.accessToken
+                    accessToken: result.accessToken,
+                    isVeyraHub: result.isVeyraHub
                 )
 
                 try viewModel.add(account)

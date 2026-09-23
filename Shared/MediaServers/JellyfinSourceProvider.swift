@@ -35,6 +35,22 @@ struct JellyfinSourceProvider:
     func resolvedSources(
         for item: MediaItem
     ) async throws -> [ResolvedSource] {
+        // Veyra Hub servers can be asked directly by IMDb id through the
+        // native API, which doesn't depend on the addon having a
+        // searchable catalog the way the Jellyfin title-search path below
+        // does (see VeyraHubNativeClient). Try that first, and only fall
+        // back to title search if it comes back empty — e.g. no IMDb id
+        // was available, or the addon genuinely has nothing for this id.
+        if account.isVeyraHub {
+            let native = await nativeResolvedSources(
+                for: item
+            )
+
+            if !native.isEmpty {
+                return native
+            }
+        }
+
         switch item.type {
         case .movie:
             return try await movieSources(
@@ -49,6 +65,83 @@ struct JellyfinSourceProvider:
         case .liveTV:
             return []
         }
+    }
+
+    // MARK: - Native (Veyra Hub)
+
+    private func nativeResolvedSources(
+        for item: MediaItem
+    ) async -> [ResolvedSource] {
+        guard
+            let mediaID =
+                VeyraHubNativeClient
+                    .nativeMediaID(for: item)
+        else {
+            return []
+        }
+
+        let client =
+            VeyraHubNativeClient(
+                account: account
+            )
+
+        guard
+            let streams =
+                try? await client.streams(
+                    type: item.type,
+                    id: mediaID
+                )
+        else {
+            return []
+        }
+
+        return streams.compactMap { stream in
+            Self.resolvedSource(
+                from: stream,
+                item: item,
+                account: account
+            )
+        }
+    }
+
+    private static func resolvedSource(
+        from stream: VeyraHubNativeClient.NativeStream,
+        item: MediaItem,
+        account: MediaServerAccount
+    ) -> ResolvedSource? {
+        guard
+            let url = URL(string: stream.url)
+        else {
+            return nil
+        }
+
+        let candidates = [
+            stream.name, stream.title,
+        ]
+
+        let displayName =
+            candidates
+                .compactMap {
+                    $0?.trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    )
+                }
+                .first { !$0.isEmpty }
+            ?? "\(account.name) · \(item.title)"
+
+        let source =
+            PlayableSource(
+                name: displayName,
+                description: stream.description,
+                url: url,
+                kind: .direct,
+                providerName: account.name
+            )
+
+        return ResolvedSource(
+            source: source,
+            originName: account.name
+        )
     }
 
     // MARK: - Movies
