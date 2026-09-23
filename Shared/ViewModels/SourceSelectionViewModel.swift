@@ -25,10 +25,14 @@ final class SourceSelectionViewModel: ObservableObject {
         isLoadingAddons = true
         isLoadingIPTV = false
 
-        let addonValues = await resolver.addonSources(for: item)
+        // Addons en mediaservers (bv. VeyraHub/Jellyfin) tegelijk ophalen —
+        // allebei zijn "origin"-bronnen die als eigen filterknop verschijnen.
+        async let addonValuesTask = resolver.addonSources(for: item)
+        async let mediaServerValuesTask = resolver.jellyfinSources(for: item)
+        let (addonValues, mediaServerValues) = await (addonValuesTask, mediaServerValuesTask)
         guard !Task.isCancelled, self.generation == generation else { return }
 
-        sources = SourceResolver.deduplicated(addonValues)
+        sources = SourceResolver.deduplicated(addonValues + mediaServerValues)
         isLoadingAddons = false
 
         // IPTV voor films én series.

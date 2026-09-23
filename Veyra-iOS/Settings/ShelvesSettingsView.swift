@@ -63,7 +63,7 @@ struct ShelvesSettingsView: View {
                                 HStack {
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(shelf.title).foregroundStyle(.primary)
-                                        Text("\(shelf.source.subtitle) · \(shelf.source.kind.label)")
+                                        Text(shelf.source.detailLabel)
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
                                     }

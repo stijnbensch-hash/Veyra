@@ -165,8 +165,6 @@ struct SeriesDetailView: View {
                                             "Seizoen \(season.seasonNumber)"
                                         )
 
-                                        Spacer()
-
                                         if isSeasonWatched(
                                             seasonNumber:
                                                 season.seasonNumber,
@@ -175,6 +173,8 @@ struct SeriesDetailView: View {
                                         ) {
                                             watchedBadge
                                         }
+
+                                        Spacer()
 
                                         Text(
                                             "\(season.episodeCount) afl."

@@ -491,13 +491,20 @@ final class TraktStore: ObservableObject {
             cachedUpNextEntries =
                 cache.upNextEntries
 
+            watchedMovies =
+                cache.watchedMovies
+
+            watchedShows =
+                cache.watchedShows
+
             // Belangrijk:
-            // lastSync NIET herstellen.
+            // lastSync/lastWatchedSync NIET herstellen.
             //
-            // Daardoor toont Home eerst de cache
+            // Daardoor tonen Home en de bekeken-badges eerst de cache
             // en start daarna alsnog een actuele
             // Trakt-sync op de achtergrond.
             lastSync = nil
+            lastWatchedSync = nil
 
         } catch {
             // Beschadigde/oude cache negeren.
@@ -519,6 +526,14 @@ final class TraktStore: ObservableObject {
                     Array(
                         cachedUpNextEntries
                             .prefix(100)
+                    ),
+                watchedMovies:
+                    Array(
+                        watchedMovies.prefix(2000)
+                    ),
+                watchedShows:
+                    Array(
+                        watchedShows.prefix(2000)
                     )
             )
 
@@ -1193,4 +1208,29 @@ private struct TraktHomeCache:
 
     let upNextEntries:
         [TraktEntry]
+
+    // Bekeken-status (films/series) — apart van de "verder kijken"-cache
+    // hierboven, zodat bekeken-badges (bv. bij seizoenen/afleveringen)
+    // ook meteen tonen voordat de live Trakt-sync klaar is.
+    var watchedMovies: [TraktEntry] = []
+    var watchedShows: [TraktEntry] = []
+
+    init(playback: [TraktEntry], upNextEntries: [TraktEntry], watchedMovies: [TraktEntry], watchedShows: [TraktEntry]) {
+        self.playback = playback
+        self.upNextEntries = upNextEntries
+        self.watchedMovies = watchedMovies
+        self.watchedShows = watchedShows
+    }
+
+    // Eigen decoding: watchedMovies/watchedShows zijn later toegevoegd.
+    // Een oudere, al opgeslagen cache zonder die velden mag niet in zijn
+    // geheel als "beschadigd" verworpen worden — anders verdwijnt ook de
+    // bestaande "verder kijken"-cache (playback/upNextEntries) in één keer.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        playback = try container.decode([TraktEntry].self, forKey: .playback)
+        upNextEntries = try container.decode([TraktEntry].self, forKey: .upNextEntries)
+        watchedMovies = try container.decodeIfPresent([TraktEntry].self, forKey: .watchedMovies) ?? []
+        watchedShows = try container.decodeIfPresent([TraktEntry].self, forKey: .watchedShows) ?? []
+    }
 }

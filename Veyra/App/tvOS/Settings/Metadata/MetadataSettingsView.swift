@@ -117,20 +117,21 @@ private struct PosterEnrichmentSettingsView: View {
     var body: some View {
         Form {
             Section {
-                Picker("Bron", selection: $posterEnrichmentSourceRaw) {
-                    ForEach(PosterEnrichmentMode.allCases) { option in
-                        Text(option.title).tag(option.rawValue)
-                    }
-                }
-                // .menu i.p.v. de standaard push-stijl: deze rij wordt
-                // direct gevolgd door secties die in-/uitklappen zodra de
-                // keuze verandert (voorbeeldposter, toggles). Met de
-                // standaard stijl duwt tvOS een apart kiesscherm open en
+                // Blijft een systeem-Picker met .menu (niet de nieuwe
+                // verticale VeyraSettingsChoiceRow): deze rij wordt direct
+                // gevolgd door secties die in-/uitklappen zodra de keuze
+                // verandert (voorbeeldposter, toggles). Met een push-stijl
+                // (NavigationLink) duwt tvOS een apart kiesscherm open en
                 // moet het bij het teruggaan tegelijk de lijst herbouwen
                 // — die combinatie liet de focus-engine soms vastlopen
                 // (de app viel dan terug naar het beginscherm). Een
                 // menu-stijl kiezer verandert de selectie zonder te
                 // navigeren, dus die botsing kan niet meer optreden.
+                Picker("Bron", selection: $posterEnrichmentSourceRaw) {
+                    ForEach(PosterEnrichmentMode.allCases) { option in
+                        Text(option.title).tag(option.rawValue)
+                    }
+                }
                 .pickerStyle(.menu)
 
                 if posterEnrichmentSource != .off {
@@ -151,6 +152,9 @@ private struct PosterEnrichmentSettingsView: View {
                     Toggle("Genre", isOn: $posterShowGenre)
                     Toggle("Beoordeling", isOn: $posterShowRating)
                     if posterShowRating {
+                        // Zelfde reden als "Bron" hierboven: .menu i.p.v.
+                        // push-stijl, om de focus-engine niet te laten
+                        // vastlopen in een sectie die zelf ook in-/uitklapt.
                         Picker("Bron beoordeling", selection: $posterRatingSourceRaw) {
                             ForEach(PosterRatingSource.allCases) { option in
                                 Text(option.title).tag(option.rawValue)
@@ -170,6 +174,7 @@ private struct PosterEnrichmentSettingsView: View {
                 Text("Toont een badge met genre en/of beoordeling op de posters in Films, Series en het startscherm. Genre en Beoordeling via Better Posters werken al echt; Leeftijdsclassificatie, Kwaliteitslabels, Trendlabels en Resterende afleveringen staan klaar maar Veyra haalt die gegevens nog niet op.")
             }
         }
+        .frame(maxWidth: 1000)
         .navigationTitle("Posterverrijking")
     }
 }
@@ -183,15 +188,12 @@ private struct MetadataSourceSettingsView: View {
     var body: some View {
         Form {
             Section {
-                Picker("Metadatabron", selection: $metadataSourceRaw) {
-                    ForEach(MetadataSourceOption.allCases) { option in
-                        Text(option.title).tag(option.rawValue)
-                    }
-                }
+                VeyraSettingsChoiceRow<MetadataSourceOption>("Metadatabron", selection: $metadataSourceRaw)
             } footer: {
                 Text("Bepaalt waar poster, achtergrond en omschrijving vandaan komen voor titels zonder eigen afbeeldingen (bv. Trakt-lijsten). AIOMetadata vereist een addon bij Addons.")
             }
         }
+        .frame(maxWidth: 1000)
         .navigationTitle("Metadatabron")
     }
 }
@@ -225,6 +227,7 @@ private struct MetadataRatingsSettingsView: View {
                 Button("Standaardinstellingen herstellen") { resetDefaults() }
             }
         }
+        .frame(maxWidth: 1000)
         .navigationTitle("Ratings")
     }
 

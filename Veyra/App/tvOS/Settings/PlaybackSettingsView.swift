@@ -27,10 +27,6 @@ struct PlaybackSettingsView: View {
                         subtitle: "Draaien, bronkeuze, verdergaan, resolutie"
                     )
                     categoryCard(
-                        .loadingScreen, icon: "hourglass", title: "Laadscherm",
-                        subtitle: "Voortgangsbalk"
-                    )
-                    categoryCard(
                         .language, icon: "captions.bubble", title: "Taal",
                         subtitle: "Audio- en ondertiteltaal"
                     )
@@ -58,7 +54,6 @@ struct PlaybackSettingsView: View {
         .navigationDestination(item: $destination) { destination in
             switch destination {
             case .general: PlaybackGeneralSettingsView()
-            case .loadingScreen: PlaybackLoadingScreenSettingsView()
             case .language: PlaybackLanguageSettingsView()
             case .skipSegments: PlaybackSkipSegmentsSettingsView()
             case .upNext: PlaybackUpNextSettingsView()
@@ -112,7 +107,7 @@ struct PlaybackSettingsView: View {
 }
 
 private enum PlaybackSettingsDestination: String, Identifiable, Hashable {
-    case general, loadingScreen, language, skipSegments, upNext, player
+    case general, language, skipSegments, upNext, player
 
     var id: String { rawValue }
 }
@@ -144,43 +139,16 @@ private struct PlaybackGeneralSettingsView: View {
                     Toggle("Eerste bron automatisch selecteren", isOn: $autoSelectFirstSource)
                     Toggle("Details overslaan bij verdergaan", isOn: $skipContinueWatchingDetails)
 
-                    Picker("Voorkeursresolutie", selection: $preferredResolutionRaw) {
-                        ForEach(PlaybackResolutionOption.allCases) { option in
-                            Text(option.title).tag(option.rawValue)
-                        }
-                    }
+                    VeyraSettingsChoiceRow<PlaybackResolutionOption>("Voorkeursresolutie", selection: $preferredResolutionRaw)
 
-                    Picker("Resolutie via mobiele data", selection: $cellularResolutionRaw) {
-                        ForEach(PlaybackCellularResolutionOption.allCases) { option in
-                            Text(option.title).tag(option.rawValue)
-                        }
-                    }
+                    VeyraSettingsChoiceRow<PlaybackCellularResolutionOption>("Resolutie via mobiele data", selection: $cellularResolutionRaw)
                 } footer: {
                     Text("HDR en Dolby Vision worden automatisch herkend en afgespeeld door de speler — daar is geen instelling voor nodig. Voorkeursresolutie en resolutie via mobiele data zijn nog niet aangesloten op de speler.")
                 }
             }
+            .frame(maxWidth: 1000)
         }
         .navigationTitle("Afspelen")
-    }
-}
-
-// MARK: - Laadscherm
-
-private struct PlaybackLoadingScreenSettingsView: View {
-    @AppStorage(PlaybackSettingsDefaults.hideProgressBarKey)
-    private var hideProgressBar = false
-
-    var body: some View {
-        ZStack {
-            VeyraBackground().ignoresSafeArea()
-
-            List {
-                Section {
-                    Toggle("Voortgangsbalk verbergen", isOn: $hideProgressBar)
-                }
-            }
-        }
-        .navigationTitle("Laadscherm")
     }
 }
 
@@ -206,50 +174,27 @@ private struct PlaybackLanguageSettingsView: View {
 
             List {
                 Section {
-                    Picker("Audiotaal", selection: $audioLanguageRaw) {
-                        ForEach(PlaybackLanguageOption.allCases) { option in
-                            Text(option.title).tag(option.rawValue)
-                        }
-                    }
-                    Picker("Audiotaal (terugval)", selection: $audioFallbackLanguageRaw) {
-                        ForEach(PlaybackLanguageOption.allCases) { option in
-                            Text(option.title).tag(option.rawValue)
-                        }
-                    }
+                    VeyraSettingsChoiceRow<PlaybackLanguageOption>("Audiotaal", selection: $audioLanguageRaw)
+                    VeyraSettingsChoiceRow<PlaybackLanguageOption>("Audiotaal (terugval)", selection: $audioFallbackLanguageRaw)
                 } header: {
                     Text("Audio")
                 }
 
                 Section {
-                    Picker("Ondertiteltaal", selection: $subtitleLanguageRaw) {
-                        ForEach(PlaybackLanguageOption.allCases) { option in
-                            Text(option.title).tag(option.rawValue)
-                        }
-                    }
-                    Picker("Ondertiteltaal (terugval)", selection: $subtitleFallbackLanguageRaw) {
-                        ForEach(PlaybackLanguageOption.allCases) { option in
-                            Text(option.title).tag(option.rawValue)
-                        }
-                    }
-                    Picker("Ondertitels automatisch selecteren", selection: $autoSelectSubtitlesRaw) {
-                        ForEach(PlaybackAutoSelectSubtitlesOption.allCases) { option in
-                            Text(option.title).tag(option.rawValue)
-                        }
-                    }
+                    VeyraSettingsChoiceRow<PlaybackLanguageOption>("Ondertiteltaal", selection: $subtitleLanguageRaw)
+                    VeyraSettingsChoiceRow<PlaybackLanguageOption>("Ondertiteltaal (terugval)", selection: $subtitleFallbackLanguageRaw)
+                    VeyraSettingsChoiceRow<PlaybackAutoSelectSubtitlesOption>("Ondertitels automatisch selecteren", selection: $autoSelectSubtitlesRaw)
                 } header: {
                     Text("Ondertitels")
                 }
 
                 Section {
-                    Picker("Anime-audio", selection: $animeAudioRaw) {
-                        ForEach(PlaybackAnimeAudioOption.allCases) { option in
-                            Text(option.title).tag(option.rawValue)
-                        }
-                    }
+                    VeyraSettingsChoiceRow<PlaybackAnimeAudioOption>("Anime-audio", selection: $animeAudioRaw)
                 } footer: {
                     Text("Anime-audio is nog niet aangesloten op de speler.")
                 }
             }
+            .frame(maxWidth: 1000)
         }
         .navigationTitle("Taal")
     }
@@ -284,6 +229,7 @@ private struct PlaybackSkipSegmentsSettingsView: View {
                     Text("Tijden komen van TheIntroDB en zijn niet voor elke film of aflevering beschikbaar. Melding na de aftiteling is nog niet aangesloten op de speler.")
                 }
             }
+            .frame(maxWidth: 1000)
         }
         .navigationTitle("Oversla-segmenten")
     }
@@ -305,14 +251,11 @@ private struct PlaybackUpNextSettingsView: View {
                 Section {
                     Toggle("Aftelling voor volgende aflevering", isOn: $autoPlayNextCountdownEnabled)
 
-                    Picker("Duur van de aftelling", selection: $countdownDurationRaw) {
-                        ForEach(PlaybackCountdownDuration.allCases) { option in
-                            Text(option.title).tag(option.rawValue)
-                        }
-                    }
+                    VeyraSettingsChoiceRow<PlaybackCountdownDuration>("Duur van de aftelling", selection: $countdownDurationRaw)
                     .disabled(!autoPlayNextCountdownEnabled)
                 }
             }
+            .frame(maxWidth: 1000)
         }
         .navigationTitle("Hierna")
     }
@@ -330,15 +273,12 @@ private struct PlaybackPlayerSettingsView: View {
 
             List {
                 Section {
-                    Picker("Speler geselecteerd", selection: $selectedPlayerRaw) {
-                        ForEach(PlaybackSelectedPlayer.allCases) { option in
-                            Text(option.title).tag(option.rawValue)
-                        }
-                    }
+                    VeyraSettingsChoiceRow<PlaybackSelectedPlayer>("Speler geselecteerd", selection: $selectedPlayerRaw)
                 } footer: {
                     Text("Externe spelerondersteuning hangt af van wat AetherEngine toestaat en is hier nog niet aangesloten.")
                 }
             }
+            .frame(maxWidth: 1000)
         }
         .navigationTitle("Speler")
     }

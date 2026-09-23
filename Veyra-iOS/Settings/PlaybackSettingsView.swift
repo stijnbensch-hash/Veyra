@@ -23,10 +23,6 @@ struct PlaybackSettingsView: View {
     @AppStorage(PlaybackSettingsDefaults.cellularResolutionKey)
     private var cellularResolutionRaw = PlaybackCellularResolutionOption.fullHD1080.rawValue
 
-    // Loading screen
-    @AppStorage(PlaybackSettingsDefaults.hideProgressBarKey)
-    private var hideProgressBar = false
-
     // Taal
     @AppStorage(PlaybackSettingsDefaults.audioLanguageKey)
     private var audioLanguageRaw = PlaybackLanguageOption.original.rawValue
@@ -89,12 +85,6 @@ struct PlaybackSettingsView: View {
                     Text("Afspelen")
                 } footer: {
                     Text("HDR en Dolby Vision worden automatisch herkend en afgespeeld door de speler — daar is geen instelling voor nodig. Voorkeursresolutie en resolutie via mobiele data zijn nog niet aangesloten op de speler.")
-                }
-
-                Section {
-                    Toggle("Voortgangsbalk verbergen", isOn: $hideProgressBar)
-                } header: {
-                    Text("Laadscherm")
                 }
 
                 Section {

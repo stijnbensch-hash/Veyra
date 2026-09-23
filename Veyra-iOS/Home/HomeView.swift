@@ -146,9 +146,10 @@ struct HomeView: View {
         }
     }
 
-    /// Vult de volledige breedte van het scherm (geen omringende marge en
-    /// geen afgeronde kaartranden meer) zodat de carousel als een echte,
-    /// schermvullende hero-banner aanvoelt in plaats van een rij kaarten.
+    /// Vult de volledige breedte van het scherm (geen omringende marge)
+    /// zodat de carousel als een echte, schermvullende hero-banner aanvoelt
+    /// in plaats van een rij kaarten. Alleen de onderkant is afgerond, als
+    /// overgang naar de rest van Home.
     private func heroPoster(_ movie: TMDBMovie) -> some View {
         AsyncImage(url: posterURL(for: movie)) { phase in
             switch phase {
@@ -164,7 +165,6 @@ struct HomeView: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .clipped()
         .overlay(alignment: .bottom) {
             LinearGradient(
                 colors: [.clear, .black.opacity(0.55)],
@@ -173,6 +173,14 @@ struct HomeView: View {
             )
             .frame(height: 140)
         }
+        // Alleen de onderkant afronden — de bovenkant valt toch al samen
+        // met de rand van het scherm (achter de status balk).
+        .clipShape(
+            UnevenRoundedRectangle(
+                bottomLeadingRadius: 28,
+                bottomTrailingRadius: 28
+            )
+        )
     }
 
     private func releaseYear(_ movie: TMDBMovie) -> String? {

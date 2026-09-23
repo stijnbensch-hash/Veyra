@@ -21,7 +21,7 @@ struct ShelvesSettingsView: View {
                             HStack {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(shelf.title)
-                                    Text("\(shelf.source.subtitle) · \(shelf.source.kind.label)")
+                                    Text(shelf.source.detailLabel)
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }
@@ -46,6 +46,7 @@ struct ShelvesSettingsView: View {
                 Section { Text(errorMessage).foregroundStyle(.orange) }
             }
         }
+        .frame(maxWidth: 1000)
         .navigationTitle("Planken")
         .sheet(isPresented: $showAddSheet, onDismiss: viewModel.reload) {
             NavigationStack { ShelfEditView(shelf: nil, viewModel: viewModel) }

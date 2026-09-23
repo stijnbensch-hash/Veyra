@@ -1851,6 +1851,7 @@ struct AccountView:
                     Text("Ondertitels")
                 }
             }
+            .frame(maxWidth: 1000)
         }
         .navigationTitle("Account")
     }

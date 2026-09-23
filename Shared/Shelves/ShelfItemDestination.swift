@@ -15,6 +15,17 @@ struct ShelfItemDestination: View {
         Group {
             if item.type == .movie {
                 MovieDetailView(movie: item)
+            } else if item.type == .liveTV, let streamURL = item.streamURL {
+                PlayerView(
+                    source: PlayableSource(
+                        name: item.title,
+                        description: item.overview,
+                        url: streamURL,
+                        kind: .liveTV,
+                        providerName: "IPTV"
+                    ),
+                    item: item
+                )
             } else if let resolvedSeries {
                 SeriesDetailView(series: resolvedSeries)
             } else if let errorMessage {

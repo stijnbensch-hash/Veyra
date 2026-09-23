@@ -56,6 +56,7 @@ struct ChannelLogoPickerView: View {
                     searchSection
                     customURLSection
                 }
+                .frame(maxWidth: 1000)
             }
             .navigationTitle(currentNameOverride ?? channelName)
             .toolbar {

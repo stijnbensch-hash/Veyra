@@ -99,6 +99,7 @@ struct CloudSyncSettingsView: View {
                     }
                 }
             }
+            .frame(maxWidth: 1000)
         }
         .onAppear {
             sync.refreshStatus()

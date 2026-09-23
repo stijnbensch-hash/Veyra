@@ -4,6 +4,7 @@ private enum ShelfSourceKind: String, CaseIterable, Hashable {
     case trakt
     case tmdb
     case addon
+    case iptv
 }
 
 private enum TMDBListSourceMode: String, CaseIterable, Hashable {
@@ -32,6 +33,7 @@ struct ShelfEditView: View {
     @State private var selectedCatalog: AIOMetadataCatalog?
     @State private var availableCatalogs: [AIOMetadataCatalog] = []
     @State private var isLoadingCatalogs = false
+    @State private var iptvChannels: [ShelfIPTVChannel] = []
     @State private var title = ""
     @State private var titleEdited = false
     @State private var isEnabled = true
@@ -44,16 +46,19 @@ struct ShelfEditView: View {
     var body: some View {
         Form {
             Section {
-                Picker("Soort", selection: $kind) {
-                    Text("Films").tag(ShelfMediaKind.movie)
-                    Text("Series").tag(ShelfMediaKind.series)
-                }
-                .pickerStyle(.segmented)
+                VeyraSettingsChoiceRow<ShelfMediaKind>("Soort", selection: Binding(
+                    get: { kind.rawValue },
+                    set: { kind = ShelfMediaKind(rawValue: $0) ?? .movie }
+                ))
 
+                // .segmented: deze rij wordt direct gevolgd door een switch
+                // die op basis van sourceKind hele secties in-/uitklapt. Zie
+                // de zelfde fix + toelichting in MetadataSettingsView.swift.
                 Picker("Bron", selection: $sourceKind) {
                     Text("Trakt").tag(ShelfSourceKind.trakt)
                     Text("TMDB").tag(ShelfSourceKind.tmdb)
                     Text("Addon").tag(ShelfSourceKind.addon)
+                    Text("IPTV").tag(ShelfSourceKind.iptv)
                 }
                 .pickerStyle(.segmented)
             }
@@ -65,6 +70,8 @@ struct ShelfEditView: View {
                 tmdbSourceSection
             case .addon:
                 addonSourceSection
+            case .iptv:
+                iptvSourceSection
             }
 
             Section("Titel") {
@@ -89,6 +96,7 @@ struct ShelfEditView: View {
                 }
             }
         }
+        .frame(maxWidth: 1000)
         .navigationTitle(shelf == nil ? "Plank toevoegen" : "Plank bewerken")
         .toolbar {
             ToolbarItem(placement: .cancellationAction) { Button("Annuleren") { dismiss() } }
@@ -139,6 +147,9 @@ struct ShelfEditView: View {
     @ViewBuilder
     private var tmdbSourceSection: some View {
         Section {
+            // .segmented: deze rij wordt direct gevolgd door content die
+            // in-/uitklapt op basis van tmdbListSourceMode zelf. Zie de
+            // zelfde fix + toelichting in MetadataSettingsView.swift.
             Picker("Type lijst", selection: $tmdbListSourceMode) {
                 Text("Standaardlijst").tag(TMDBListSourceMode.standard)
                 Text("Eigen lijst (ID)").tag(TMDBListSourceMode.personal)
@@ -208,6 +219,28 @@ struct ShelfEditView: View {
         }
     }
 
+    @ViewBuilder
+    private var iptvSourceSection: some View {
+        Section("Zenders") {
+            NavigationLink {
+                ShelfIPTVChannelPickerView(selectedChannels: $iptvChannels)
+            } label: {
+                HStack {
+                    Text("Kanalen kiezen")
+                    Spacer()
+                    Text(iptvChannels.isEmpty ? "Geen" : "\(iptvChannels.count)")
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if iptvChannels.isEmpty {
+                Text("Kies zelf welke zenders in deze plank moeten staan — uit één of meerdere providers.")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .onChange(of: iptvChannels) { _, _ in updateDefaultTitleIfNeeded() }
+    }
+
     // MARK: - Setup
 
     private func handleSourceKindChange(_ newValue: ShelfSourceKind) {
@@ -247,6 +280,9 @@ struct ShelfEditView: View {
             selectedAddonID = addonID
             selectedCatalog = AIOMetadataCatalog(type: catalogType, id: catalogID, name: catalogName)
             Task { await loadCatalogs() }
+        case .iptv(let channels):
+            sourceKind = .iptv
+            iptvChannels = channels
         }
     }
 
@@ -259,6 +295,8 @@ struct ShelfEditView: View {
                 return "Addon-catalogus"
             }
             return "\(addon.name) · \(selectedCatalog.displayName)"
+        case .iptv:
+            return "Mijn zenders"
         }
     }
 
@@ -358,6 +396,12 @@ struct ShelfEditView: View {
                 catalogID: selectedCatalog.id,
                 catalogName: selectedCatalog.displayName
             )
+        case .iptv:
+            guard !iptvChannels.isEmpty else {
+                errorMessage = "Kies minstens één zender."
+                return
+            }
+            source = .iptv(channels: iptvChannels)
         }
 
         if let shelf {

@@ -116,16 +116,13 @@ private struct IPTVGuideSettingsView: View {
 
             List {
                 Section {
-                    Picker("Gidsthema", selection: $guideThemeRaw) {
-                        ForEach(IPTVGuideTheme.allCases) { theme in
-                            Text(theme.title).tag(theme.rawValue)
-                        }
-                    }
+                    VeyraSettingsChoiceRow<IPTVGuideTheme>("Gidsthema", selection: $guideThemeRaw)
                     Toggle("Landcode voor zendernaam verbergen", isOn: $hideCountryPrefix)
                 } footer: {
                     Text("Gidsthema past de kleuren van de programmagids aan. Bij ingeschakeld wordt de landcode voor zendernamen weggelaten.")
                 }
             }
+            .frame(maxWidth: 1000)
         }
         .navigationTitle("Zenderguide")
     }
@@ -153,17 +150,9 @@ private struct IPTVEnginePlaybackSettingsView: View {
 
             List {
                 Section {
-                    Picker("Afspeelmotor", selection: $playerEngineRaw) {
-                        ForEach(IPTVPlayerEngineOption.allCases) { option in
-                            Text(option.title).tag(option.rawValue)
-                        }
-                    }
+                    VeyraSettingsChoiceRow<IPTVPlayerEngineOption>("Afspeelmotor", selection: $playerEngineRaw)
 
-                    Picker("Buffering", selection: $bufferDurationRaw) {
-                        ForEach(IPTVBufferDurationOption.allCases) { option in
-                            Text(option.title).tag(option.rawValue)
-                        }
-                    }
+                    VeyraSettingsChoiceRow<IPTVBufferDurationOption>("Buffering", selection: $bufferDurationRaw)
 
                     Picker("Catch-up-tijdcorrectie", selection: $catchUpOffsetModeRaw) {
                         ForEach(IPTVCatchUpOffsetMode.allCases) { mode in
@@ -197,6 +186,7 @@ private struct IPTVEnginePlaybackSettingsView: View {
                     Text("Afspeelmotor bepaalt welke engine live-zenders afspeelt. Buffering: hoeveel live video vooraf klaarstaat. Catch-up-tijdcorrectie volgt normaal de klok van de provider, of stel 'm handmatig in. Nog niet aangesloten op de speler.")
                 }
             }
+            .frame(maxWidth: 1000)
         }
         .navigationTitle("Afspelen")
     }
@@ -218,16 +208,8 @@ private struct IPTVCacheSettingsView: View {
 
             List {
                 Section {
-                    Picker("Zenderlijst verversen", selection: $refreshChannelsIntervalRaw) {
-                        ForEach(IPTVCacheRefreshInterval.allCases) { interval in
-                            Text(interval.title).tag(interval.rawValue)
-                        }
-                    }
-                    Picker("Programmagids verversen", selection: $refreshEPGIntervalRaw) {
-                        ForEach(IPTVCacheRefreshInterval.allCases) { interval in
-                            Text(interval.title).tag(interval.rawValue)
-                        }
-                    }
+                    VeyraSettingsChoiceRow<IPTVCacheRefreshInterval>("Zenderlijst verversen", selection: $refreshChannelsIntervalRaw)
+                    VeyraSettingsChoiceRow<IPTVCacheRefreshInterval>("Programmagids verversen", selection: $refreshEPGIntervalRaw)
 
                     Button("Zenderlijst-cache wissen") {
                         cacheAlertMessage = "Er is nog geen zenderlijst-cache in Veyra om te wissen."
@@ -239,6 +221,7 @@ private struct IPTVCacheSettingsView: View {
                     Text("Veyra heeft nog geen zenderlijst- of gidscache, dus deze instellingen en knoppen doen voorlopig niets.")
                 }
             }
+            .frame(maxWidth: 1000)
         }
         .navigationTitle("Cache & verversen")
         .alert(
@@ -272,6 +255,7 @@ private struct IPTVDeveloperSettingsView: View {
                     Text("Er is nog geen FPS-teller in Veyra; deze schakelaar heeft voorlopig geen effect.")
                 }
             }
+            .frame(maxWidth: 1000)
         }
         .navigationTitle("Ontwikkelaarsopties")
     }

@@ -83,6 +83,12 @@ struct SeasonEpisodesView: View {
                 .frame(width: 140, height: 79)
                 .clipped()
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(alignment: .topTrailing) {
+                    if isEpisodeWatched(episode) {
+                        watchedBadge
+                            .padding(5)
+                    }
+                }
 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
@@ -142,6 +148,32 @@ struct SeasonEpisodesView: View {
             }
         }
         .padding()
+    }
+
+    // MARK: - Bekeken
+
+    /// Klein rond vinkje rechtsboven in het miniatuurkader — alleen een
+    /// symbool, geen tekstballon, zodat de lijst overzichtelijk blijft.
+    private var watchedBadge: some View {
+        ZStack {
+            Circle().fill(.ultraThinMaterial)
+            Circle().stroke(VeyraColors.cyan.opacity(0.95), lineWidth: 1.5)
+            Image(systemName: "checkmark")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(VeyraColors.cyan)
+        }
+        .frame(width: 22, height: 22)
+        .shadow(color: .black.opacity(0.35), radius: 4, y: 1)
+        .accessibilityLabel("Bekeken")
+    }
+
+    private func isEpisodeWatched(_ episode: TMDBEpisode) -> Bool {
+        TraktWatchedStatus.resolve(
+            .episode(show: TraktIDs(tmdb: series.id), season: episode.seasonNumber, number: episode.episodeNumber),
+            movies: traktStore.watchedMovies,
+            shows: traktStore.watchedShows,
+            progress: traktStore.upNext
+        ) == .watched
     }
 
     // MARK: - Voortgang

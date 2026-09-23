@@ -25,21 +25,9 @@ struct SubtitleAppearanceSettingsView: View {
 
             List {
                 Section {
-                    Picker("Tekstgrootte", selection: $subtitleSizeRaw) {
-                        ForEach(VeyraSubtitleSize.allCases) { size in
-                            Text(size.title).tag(size.rawValue)
-                        }
-                    }
-                    Picker("Plaatsing", selection: $subtitlePositionRaw) {
-                        ForEach(VeyraSubtitlePosition.allCases) { position in
-                            Text(position.title).tag(position.rawValue)
-                        }
-                    }
-                    Picker("Achtergrond", selection: $subtitleBackgroundRaw) {
-                        ForEach(VeyraSubtitleBackground.allCases) { background in
-                            Text(background.title).tag(background.rawValue)
-                        }
-                    }
+                    VeyraSettingsChoiceRow<VeyraSubtitleSize>("Tekstgrootte", selection: $subtitleSizeRaw)
+                    VeyraSettingsChoiceRow<VeyraSubtitlePosition>("Plaatsing", selection: $subtitlePositionRaw)
+                    VeyraSettingsChoiceRow<VeyraSubtitleBackground>("Achtergrond", selection: $subtitleBackgroundRaw)
                     Toggle("Schaduw", isOn: $subtitleShadow)
                 } header: {
                     Text("Weergave")
@@ -61,6 +49,7 @@ struct SubtitleAppearanceSettingsView: View {
                     Text(currentOffsetDescription)
                 }
             }
+            .frame(maxWidth: 1000)
         }
         .navigationTitle("Ondertitels")
     }

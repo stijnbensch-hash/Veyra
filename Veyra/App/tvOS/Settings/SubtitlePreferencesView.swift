@@ -34,6 +34,7 @@ struct SubtitlePreferencesView: View {
                     Text("OpenSubtitles")
                 }
             }
+            .frame(maxWidth: 1000)
         }
         .navigationTitle("Ondertitels")
     }

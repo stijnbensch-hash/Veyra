@@ -33,12 +33,19 @@ enum ShelfSource: Codable, Equatable, Hashable {
     case trakt(list: TraktShelfList, kind: ShelfMediaKind)
     case tmdb(list: TMDBShelfList, kind: ShelfMediaKind)
     case addon(addonID: UUID, addonName: String, catalogType: String, catalogID: String, catalogName: String)
+    // Zelf gekozen losse IPTV-kanalen (uit een of meerdere providers) — geen
+    // "lijst" zoals de andere bronnen, dus een losse snapshot van kanalen
+    // i.p.v. een bron die opnieuw bevraagd wordt.
+    case iptv(channels: [ShelfIPTVChannel])
 
     var kind: ShelfMediaKind {
         switch self {
         case .trakt(_, let kind): return kind
         case .tmdb(_, let kind): return kind
         case .addon(_, _, let catalogType, _, _): return catalogType == "series" ? .series : .movie
+        // Niet van toepassing — .iptv-planken tonen hun eigen label via
+        // `detailLabel` in plaats van "<bron> · <kind>".
+        case .iptv: return .movie
         }
     }
 
@@ -47,6 +54,7 @@ enum ShelfSource: Codable, Equatable, Hashable {
         case .trakt(let list, let kind): return list.label(for: kind)
         case .tmdb(let list, let kind): return list.label(for: kind)
         case .addon(_, let addonName, _, _, let catalogName): return "\(addonName) · \(catalogName)"
+        case .iptv: return "Mijn zenders"
         }
     }
 
@@ -55,8 +63,36 @@ enum ShelfSource: Codable, Equatable, Hashable {
         case .trakt: return "Trakt"
         case .tmdb: return "TMDB"
         case .addon(_, let addonName, _, _, _): return addonName
+        case .iptv: return "IPTV"
         }
     }
+
+    /// Label voor het planken-overzicht in Instellingen — voor de meeste
+    /// bronnen "<bron> · <Films/Series>", maar voor IPTV het aantal
+    /// gekozen zenders, want "Films"/"Series" is hier niet van toepassing.
+    var detailLabel: String {
+        switch self {
+        case .iptv(let channels):
+            return channels.count == 1 ? "IPTV · 1 zender" : "IPTV · \(channels.count) zenders"
+        default:
+            return "\(subtitle) · \(kind.label)"
+        }
+    }
+}
+
+/// Eén losstaand IPTV-kanaal zoals het gekozen is voor een plank — een
+/// snapshot van naam, logo en afspeel-URL op het moment van kiezen, zodat
+/// het kanaal direct afgespeeld kan worden zonder de (mogelijk niet actieve)
+/// provider opnieuw te hoeven bevragen.
+struct ShelfIPTVChannel: Codable, Equatable, Hashable, Identifiable {
+    var channelID: String
+    var providerName: String
+    var name: String
+    var streamURL: URL
+    var logoURL: URL?
+    var group: String?
+
+    var id: String { "\(providerName):\(channelID)" }
 }
 
 /// Openbare Trakt-lijsten die als plank gebruikt kunnen worden, of een

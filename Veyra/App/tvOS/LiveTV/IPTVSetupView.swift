@@ -137,6 +137,9 @@ struct IPTVSetupView: View {
                     .cyan.opacity(0.75)
                 )
 
+            // .segmented: deze rij wordt direct gevolgd door xtreamFields/
+            // m3uFields, die in-/uitklappen op basis van setupType zelf. Zie
+            // de zelfde fix + toelichting in MetadataSettingsView.swift.
             Picker(
                 "IPTV-type",
                 selection: $setupType

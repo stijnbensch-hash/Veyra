@@ -23,6 +23,12 @@ struct MediaItem: Identifiable, Hashable {
     let genre: String?
     let rating: Double?
 
+    // Alleen gevuld voor `.liveTV`-items die uit een IPTV-plank komen (zie
+    // `ShelfSource.iptv`) — de kant-en-klare afspeel-URL van het kanaal,
+    // zodat zo'n item direct afgespeeld kan worden zonder de provider
+    // opnieuw te hoeven bevragen.
+    let streamURL: URL?
+
     init(
         id: UUID = UUID(),
         title: String,
@@ -37,7 +43,8 @@ struct MediaItem: Identifiable, Hashable {
         posterURL: URL? = nil,
         backdropURL: URL? = nil,
         genre: String? = nil,
-        rating: Double? = nil
+        rating: Double? = nil,
+        streamURL: URL? = nil
     ) {
         self.id = id
         self.title = title
@@ -53,6 +60,7 @@ struct MediaItem: Identifiable, Hashable {
         self.backdropURL = backdropURL
         self.genre = genre
         self.rating = rating
+        self.streamURL = streamURL
     }
 }
 

@@ -80,6 +80,14 @@ struct ContinueWatchingRow: View {
             // titel vanuit "Verder kijken" geopend staat.
             HomeNavigationState.shared.setActive(newValue != nil, source: "continueWatching")
         }
+        // Ververst zelf, net als tvOS's TraktContinueWatchingView — anders
+        // toont deze rij alleen wat een ander tabblad (Instellingen, Films,
+        // Series) toevallig al heeft opgehaald of wat nog in de lokale
+        // cache staat.
+        .task(id: store.isConnected) {
+            guard store.isConnected else { return }
+            await store.refreshIfNeeded()
+        }
     }
 
     // MARK: - Afleveringsvoortgang (aantal resterende afleveringen)

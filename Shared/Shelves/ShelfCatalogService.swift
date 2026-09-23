@@ -16,7 +16,22 @@ enum ShelfCatalogService {
 
         case .addon(let addonID, _, let catalogType, let catalogID, _):
             return await addonItems(addonID: addonID, catalogType: catalogType, catalogID: catalogID)
+
+        case .iptv(let channels):
+            return channels.map(mediaItem(from:))
         }
+    }
+
+    // MARK: - IPTV
+
+    private static func mediaItem(from channel: ShelfIPTVChannel) -> MediaItem {
+        MediaItem(
+            title: channel.name,
+            type: .liveTV,
+            overview: channel.group,
+            posterURL: channel.logoURL,
+            streamURL: channel.streamURL
+        )
     }
 
     // MARK: - Trakt

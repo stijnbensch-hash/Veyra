@@ -4,6 +4,7 @@ private enum ShelfSourceKind: String, CaseIterable, Hashable {
     case trakt
     case tmdb
     case addon
+    case iptv
 }
 
 private enum TMDBListSourceMode: String, CaseIterable, Hashable {
@@ -32,6 +33,7 @@ struct ShelfEditView: View {
     @State private var selectedCatalog: AIOMetadataCatalog?
     @State private var availableCatalogs: [AIOMetadataCatalog] = []
     @State private var isLoadingCatalogs = false
+    @State private var iptvChannels: [ShelfIPTVChannel] = []
     @State private var title = ""
     @State private var titleEdited = false
     @State private var isEnabled = true
@@ -57,6 +59,7 @@ struct ShelfEditView: View {
                         Text("Trakt").tag(ShelfSourceKind.trakt)
                         Text("TMDB").tag(ShelfSourceKind.tmdb)
                         Text("Addon").tag(ShelfSourceKind.addon)
+                        Text("IPTV").tag(ShelfSourceKind.iptv)
                     }
                     .pickerStyle(.segmented)
                 }
@@ -151,6 +154,24 @@ struct ShelfEditView: View {
                             }
                         }
                     }
+                case .iptv:
+                    Section("Zenders") {
+                        NavigationLink {
+                            ShelfIPTVChannelPickerView(selectedChannels: $iptvChannels)
+                        } label: {
+                            HStack {
+                                Text("Kanalen kiezen")
+                                Spacer()
+                                Text(iptvChannels.isEmpty ? "Geen" : "\(iptvChannels.count)")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+
+                        if iptvChannels.isEmpty {
+                            Text("Kies zelf welke zenders in deze plank moeten staan — uit één of meerdere providers.")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
 
                 Section("Titel") {
@@ -198,6 +219,7 @@ struct ShelfEditView: View {
         }
         .onChange(of: selectedAddonID) { _, _ in Task { await loadCatalogs() } }
         .onChange(of: selectedCatalog) { _, _ in updateDefaultTitleIfNeeded() }
+        .onChange(of: iptvChannels) { _, _ in updateDefaultTitleIfNeeded() }
     }
 
     // MARK: - Setup
@@ -232,6 +254,9 @@ struct ShelfEditView: View {
             selectedAddonID = addonID
             selectedCatalog = AIOMetadataCatalog(type: catalogType, id: catalogID, name: catalogName)
             Task { await loadCatalogs() }
+        case .iptv(let channels):
+            sourceKind = .iptv
+            iptvChannels = channels
         }
     }
 
@@ -244,6 +269,8 @@ struct ShelfEditView: View {
                 return "Addon-catalogus"
             }
             return "\(addon.name) · \(selectedCatalog.displayName)"
+        case .iptv:
+            return "Mijn zenders"
         }
     }
 
@@ -343,6 +370,12 @@ struct ShelfEditView: View {
                 catalogID: selectedCatalog.id,
                 catalogName: selectedCatalog.displayName
             )
+        case .iptv:
+            guard !iptvChannels.isEmpty else {
+                errorMessage = "Kies minstens één zender."
+                return
+            }
+            source = .iptv(channels: iptvChannels)
         }
 
         if let shelf {
