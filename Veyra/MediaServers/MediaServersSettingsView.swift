@@ -65,6 +65,15 @@ struct MediaServersSettingsView:
         ) { _ in
             viewModel.reload()
         }
+        .task {
+            // Periodiek herchecken zolang dit scherm open staat — zie de
+            // iOS-tegenhanger van dit scherm voor dezelfde aanpak.
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(15))
+                guard !Task.isCancelled else { return }
+                viewModel.refreshStatus()
+            }
+        }
         .navigationDestination(
             item: $selectedServer
         ) { server in
@@ -222,6 +231,8 @@ struct MediaServersSettingsView:
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 12) {
+                    statusDot(for: server.id)
+
                     Text(server.name)
                         .font(.system(size: 32, weight: .semibold))
                         .foregroundStyle(.white)
@@ -272,6 +283,21 @@ struct MediaServersSettingsView:
         .onTapGesture {
             selectedServer = server
         }
+    }
+
+    /// Klein bolletje: groen (online), rood (offline), grijs zolang de
+    /// eerste controle nog loopt.
+    private func statusDot(for serverID: UUID) -> some View {
+        let color: Color
+        switch viewModel.onlineStatus[serverID] {
+        case .some(true): color = .green
+        case .some(false): color = .red
+        case .none: color = .white.opacity(0.3)
+        }
+
+        return Circle()
+            .fill(color)
+            .frame(width: 14, height: 14)
     }
 
     private func serverDeleteControl(

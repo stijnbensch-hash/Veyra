@@ -172,6 +172,37 @@ struct JellyfinClient {
         return info?.veyraHubVersion != nil
     }
 
+    // MARK: - Status
+
+    /// Lichte, niet-geauthenticeerde health-check tegen `/System/Info/Public`
+    /// (hetzelfde eindpunt als de Veyra Hub-detectie hierboven) — gebruikt
+    /// om in Instellingen te tonen of een gekoppelde mediaserver bereikbaar
+    /// is. Elke fout (netwerk, timeout, onverwachte status) betekent hier
+    /// gewoon "offline", nooit een geworpen fout.
+    static func ping(
+        serverURL: URL,
+        timeout: TimeInterval = 6
+    ) async -> Bool {
+        let endpoint =
+            serverURL.appendingPathComponent(
+                "System/Info/Public"
+            )
+
+        var request = URLRequest(url: endpoint)
+        request.timeoutInterval = timeout
+
+        guard
+            let (_, response) =
+                try? await URLSession.shared.data(for: request),
+            let httpResponse =
+                response as? HTTPURLResponse
+        else {
+            return false
+        }
+
+        return httpResponse.statusCode == 200
+    }
+
     // MARK: - Header
 
     private var authorizationHeader: String {

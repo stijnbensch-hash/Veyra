@@ -52,7 +52,20 @@ final class VeyraEPGStore: ObservableObject {
     private let preferencesStore = IPTVProviderPreferencesStore()
     private let epgService = VeyraEPGService()
 
-    private let cloudStore = NSUbiquitousKeyValueStore.default
+    /// `UserDefaults`/`CFPreferences` crasht hard op tvOS zodra één sleutel
+    /// >= 1 MB wordt weggeschreven ("byte count limit reached"). De
+    /// catalogus- en gidssnapshots hieronder kunnen met veel zenders/dagen
+    /// aan programmadata makkelijk over die grens gaan. Ruim onder de
+    /// grens blijven (i.p.v. precies op 1 MB toetsen) voorkomt dat een
+    /// snapshot net op het randje alsnog crasht. `IPTVDiskCache` (los
+    /// bestand, geen CFPreferences-limiet) blijft in dat geval de
+    /// betrouwbare cache — deze snapshot in UserDefaults is alleen een
+    /// extra kopie voor snelle herstart en voor VeyraHubSyncService.
+    private static let maxUserDefaultsSnapshotBytes = 900_000
+
+    private func isSafeForUserDefaults(_ data: Data) -> Bool {
+        data.count < Self.maxUserDefaultsSnapshotBytes
+    }
 
     private var providerKey: String?
     private var generation = UUID()
@@ -189,9 +202,6 @@ final class VeyraEPGStore: ObservableObject {
     // MARK: - Reload
 
     func reload() async {
-        // Haal eventuele wijzigingen van het andere Apple-apparaat op.
-        if !VeyraHubSyncService.shared.isActive { cloudStore.synchronize() }
-
         let token = UUID()
         generation = token
 
@@ -362,7 +372,7 @@ final class VeyraEPGStore: ObservableObject {
             )
             if let snapshot = VeyraIPTVSnapshot.encode(
                 VeyraCatalogSnapshot(savedAt: Date(), catalog: visibleCatalog)
-            ) {
+            ), isSafeForUserDefaults(snapshot) {
                 UserDefaults.standard.set(
                     snapshot,
                     forKey: VeyraIPTVSnapshot.catalogPrefix + configuration.providerIdentifier
@@ -536,128 +546,28 @@ final class VeyraEPGStore: ObservableObject {
     // MARK: - Provider-specific state
 
     private func loadProviderState() {
-        if !VeyraHubSyncService.shared.isActive { cloudStore.synchronize() }
+        // Favorieten/volgorde/recent staan lokaal; tussen apparaten gaan
+        // ze mee via de gekoppelde VeyraHub-server (VeyraHubSyncService,
+        // "livetv"-document) — geen directe iCloud-fallback meer (zie
+        // CloudSettingsSync, verwijderd, en ChannelNameOverrideStore).
+        favorites = Set(
+            UserDefaults.standard.stringArray(forKey: favoritesKey) ?? []
+        )
 
-        let localFavorites =
-            UserDefaults.standard
-                .stringArray(
-                    forKey: favoritesKey
-                )
-            ?? []
+        favoriteOrder = unique(
+            UserDefaults.standard.stringArray(forKey: favoriteOrderKey) ?? []
+        )
 
-        let localOrder =
-            UserDefaults.standard
-                .stringArray(
-                    forKey: favoriteOrderKey
-                )
-            ?? []
-
-        if VeyraHubSyncService.shared.isActive {
-            favorites = Set(localFavorites)
-            favoriteOrder = unique(localOrder)
-            recent = Array((UserDefaults.standard.stringArray(forKey: recentKey) ?? []).prefix(40))
-            return
-        }
-
-        let cloudFavorites =
-            cloudStringArray(
-                forKey: cloudFavoritesKey
-            )
-
-        let cloudOrder =
-            cloudStringArray(
-                forKey: cloudFavoriteOrderKey
-            )
-
-        // MARK: Favorieten
-
-        if let cloudFavorites {
-            // Als clouddata bestaat, is dat de gedeelde versie.
-            favorites =
-                Set(cloudFavorites)
-
-            UserDefaults.standard.set(
-                cloudFavorites,
-                forKey: favoritesKey
-            )
-
-        } else {
-            // Eerste migratie:
-            // bestaande lokale favorieten naar iCloud.
-            favorites =
-                Set(localFavorites)
-
-            cloudStore.set(
-                localFavorites,
-                forKey: cloudFavoritesKey
-            )
-        }
-
-        // MARK: Volgorde
-
-        if let cloudOrder {
-            favoriteOrder =
-                unique(cloudOrder)
-
-            UserDefaults.standard.set(
-                favoriteOrder,
-                forKey: favoriteOrderKey
-            )
-
-        } else {
-            if !localOrder.isEmpty {
-                favoriteOrder =
-                    unique(localOrder)
-
-            } else {
-                // Oude installatie had nog geen
-                // aparte order-key.
-                favoriteOrder =
-                    unique(
-                        localFavorites.filter {
-                            favorites.contains($0)
-                        }
-                    )
-            }
-
-            cloudStore.set(
-                favoriteOrder,
-                forKey: cloudFavoriteOrderKey
-            )
-        }
-
-        recent =
-            Array(
-                (
-                    UserDefaults.standard
-                        .stringArray(
-                            forKey: recentKey
-                        )
-                    ?? []
-                )
-                .prefix(40)
-            )
-
-        cloudStore.synchronize()
+        recent = Array(
+            (UserDefaults.standard.stringArray(forKey: recentKey) ?? []).prefix(40)
+        )
     }
 
     private func saveFavorites() {
-        let values =
-            Array(favorites)
-
         UserDefaults.standard.set(
-            values,
+            Array(favorites),
             forKey: favoritesKey
         )
-
-        guard !VeyraHubSyncService.shared.isActive else { return }
-
-        cloudStore.set(
-            values,
-            forKey: cloudFavoritesKey
-        )
-
-        cloudStore.synchronize()
     }
 
     private func saveFavoriteOrder() {
@@ -672,15 +582,6 @@ final class VeyraEPGStore: ObservableObject {
             favoriteOrder,
             forKey: favoriteOrderKey
         )
-
-        guard !VeyraHubSyncService.shared.isActive else { return }
-
-        cloudStore.set(
-            favoriteOrder,
-            forKey: cloudFavoriteOrderKey
-        )
-
-        cloudStore.synchronize()
     }
 
     private func normalizeFavoriteOrder() {
@@ -702,23 +603,6 @@ final class VeyraEPGStore: ObservableObject {
         }
 
         saveFavoriteOrder()
-    }
-
-    private func cloudStringArray(
-        forKey key: String
-    ) -> [String]? {
-        guard
-            cloudStore.object(
-                forKey: key
-            ) != nil
-        else {
-            return nil
-        }
-
-        return cloudStore.array(
-            forKey: key
-        ) as? [String]
-        ?? []
     }
 
     private func unique(
@@ -1084,7 +968,7 @@ final class VeyraEPGStore: ObservableObject {
             )
             if let snapshot = VeyraIPTVSnapshot.encode(
                 VeyraGuideSnapshot(savedAt: Date(), programmes: result.programmes)
-            ) {
+            ), isSafeForUserDefaults(snapshot) {
                 UserDefaults.standard.set(
                     snapshot,
                     forKey: VeyraIPTVSnapshot.guidePrefix + configuration.providerIdentifier
@@ -1214,49 +1098,6 @@ final class VeyraEPGStore: ObservableObject {
         "veyra.epg.recent.\(providerKey ?? "none")"
     }
 
-    // MARK: - iCloud storage keys
-
-    /*
-     De echte providerIdentifier kan bijvoorbeeld
-     URL/configuratiedata bevatten.
-
-     Daarom gebruiken we voor de iCloud-key een
-     stabiele SHA256-hash.
-     */
-    private var cloudProviderID: String {
-        guard let providerKey else {
-            return "none"
-        }
-
-        let hash =
-            SHA256.hash(
-                data:
-                    Data(
-                        providerKey.utf8
-                    )
-            )
-            .map {
-                String(
-                    format: "%02x",
-                    $0
-                )
-            }
-            .joined()
-
-        return String(
-            hash.prefix(
-                24
-            )
-        )
-    }
-
-    private var cloudFavoritesKey: String {
-        "veyra.epg.fav.\(cloudProviderID)"
-    }
-
-    private var cloudFavoriteOrderKey: String {
-        "veyra.epg.order.\(cloudProviderID)"
-    }
 
     // MARK: - Date
 

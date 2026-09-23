@@ -11,8 +11,20 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                VeyraColors.background.ignoresSafeArea()
+                // Net als bij Films/Series: een blijvende, schermvullende
+                // achtergrond van de geselecteerde hero-film, i.p.v. een
+                // vlakke kleur — zo voelt Home's hero even "groot" aan.
+                VeyraArtworkBackground(url: heroBackdropURL)
+                    .id(heroBackdropMovieID)
+                    .animation(.easeInOut(duration: 0.35), value: heroBackdropMovieID)
 
+                // ignoresSafeArea hoort hier op de ScrollView zelf, niet op
+                // heroCarousel als kind erbinnen — dat laatste gaf een
+                // vervormde/afgesneden rand bovenaan doordat de scroll-
+                // transformatie en het negeren van de safe area dan
+                // door elkaar botsen. Zo bepaalt alleen de ScrollView's
+                // eigen grens dat de inhoud tot bovenaan het scherm loopt;
+                // de rest scrollt daarna gewoon normaal mee naar beneden.
                 ScrollView {
                     VStack(alignment: .leading, spacing: 24) {
                         if !viewModel.featuredMovies.isEmpty {
@@ -81,6 +93,7 @@ struct HomeView: View {
                     }
                     .padding(.vertical)
                 }
+                .ignoresSafeArea(edges: .top)
 
                 if isOpeningMovie {
                     ProgressView("Film openen…")
@@ -104,6 +117,20 @@ struct HomeView: View {
 
     private var heroMovies: [TMDBMovie] {
         Array(viewModel.featuredMovies.prefix(10))
+    }
+
+    private var heroBackdropMovie: TMDBMovie? {
+        heroMovies.first(where: { $0.id == heroSelection }) ?? heroMovies.first
+    }
+
+    private var heroBackdropMovieID: Int {
+        heroBackdropMovie?.id ?? -1
+    }
+
+    private var heroBackdropURL: URL? {
+        heroBackdropMovie?.backdropPath.flatMap {
+            URL(string: "https://image.tmdb.org/t/p/w1280" + $0)
+        }
     }
 
     private var heroCarousel: some View {

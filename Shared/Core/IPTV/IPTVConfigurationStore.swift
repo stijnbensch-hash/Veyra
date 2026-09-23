@@ -164,6 +164,40 @@ struct IPTVConfigurationStore {
         for provider in state.providers {
             _ = try provider.configuration.configuration()
         }
+
+        // Bescherming: een Hub-sync mag een werkende lokale provider-lijst
+        // nooit stilzwijgend leegmaken. Als een ander apparaat (nog) geen
+        // providers heeft doorgegeven (bijv. eerste sync, of lokaal net
+        // gewist) terwijl hier al wel een geldige provider actief is, wordt
+        // die import genegeerd — anders verdwijnen de Xtream-inloggegevens
+        // hier zonder foutmelding en breekt live-TV stilletjes.
+        if state.providers.isEmpty {
+            let currentState = try loadState()
+            guard currentState.providers.isEmpty else {
+                #if DEBUG
+                print("[IPTVConfigurationStore] Hub-import genegeerd: externe payload heeft geen providers, lokaal wel (\(currentState.providers.count)).")
+                #endif
+                throw IPTVConfigurationStoreError.invalidStoredData
+            }
+        }
+
+        #if DEBUG
+        let currentForLog = try? loadState()
+        for provider in state.providers {
+            if case .xtream(let config) = try provider.configuration.configuration() {
+                let matchesExisting = currentForLog?.providers.contains {
+                    (try? $0.configuration.configuration()).map {
+                        if case .xtream(let existing) = $0 {
+                            return existing.serverURL == config.serverURL && existing.username == config.username
+                        }
+                        return false
+                    } ?? false
+                } ?? false
+                print("[IPTVConfigurationStore] Hub-import: xtream provider '\(config.displayName)' server=\(config.serverURL.absoluteString) user=\(config.username) alreadyPresentLocally=\(matchesExisting)")
+            }
+        }
+        #endif
+
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
         try writeLocalKeychainData(try encoder.encode(state), account: providersAccount)

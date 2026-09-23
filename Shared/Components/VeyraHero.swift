@@ -4,8 +4,34 @@ struct VeyraActionLabel: View {
     let title: String
     let symbol: String
     var body: some View {
-        Label(title, systemImage: symbol).font(.system(size: 24, weight: .semibold))
-            .foregroundStyle(.white).padding(.horizontal, 26).frame(height: 68)
+        Label(title, systemImage: symbol).font(.system(size: fontSize, weight: .semibold))
+            .foregroundStyle(.white).padding(.horizontal, horizontalPadding).frame(height: height)
+    }
+
+    // Op tvOS blijft dit knopformaat groot genoeg om vanaf de bank te lezen;
+    // op iPhone is diezelfde maat een veel te grote pil naast een kleinere titel.
+    private var fontSize: CGFloat {
+        #if os(tvOS)
+        24
+        #else
+        15
+        #endif
+    }
+
+    private var horizontalPadding: CGFloat {
+        #if os(tvOS)
+        26
+        #else
+        18
+        #endif
+    }
+
+    private var height: CGFloat {
+        #if os(tvOS)
+        68
+        #else
+        40
+        #endif
     }
 }
 
@@ -24,7 +50,7 @@ struct VeyraHero<Actions: View>: View {
                 }
             }
             Text(title)
-                .font(.system(size: 58, weight: .bold, design: .rounded))
+                .font(.system(size: titleFontSize, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
                 .lineLimit(2)
                 .shadow(color: .black.opacity(0.6), radius: 18, y: 8)
@@ -48,6 +74,16 @@ struct VeyraHero<Actions: View>: View {
         .padding(.vertical, 28)
         #if os(tvOS)
         .focusSection()
+        #endif
+    }
+
+    // 58pt is prima op een tv-scherm, maar op iPhone knipt dat titels als
+    // "Spider-Man: Brand New Day" na twee woorden af — daar dus kleiner.
+    private var titleFontSize: CGFloat {
+        #if os(tvOS)
+        58
+        #else
+        34
         #endif
     }
 }

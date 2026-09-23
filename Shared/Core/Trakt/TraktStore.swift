@@ -462,57 +462,60 @@ final class TraktStore: ObservableObject {
     // MARK: - Home cache
 
     private func restoreHomeCache() {
-        guard
-            let data =
-                preferences.data(
-                    forKey:
-                        Self.homeCacheKey
-                )
-        else {
+        // Sinds kort staat deze cache in een los bestand op schijf i.p.v.
+        // UserDefaults — een grote (2000+ bekeken titels) cache in
+        // UserDefaults/CFPreferences kan op tvOS de hele app laten
+        // crashen zodra de totale opslag daar over ~1 MB gaat (zie ook
+        // VeyraEPGStore en VeyraHubSyncService). `IPTVDiskCache` kent die
+        // limiet niet.
+        if let cache = IPTVDiskCache.read(TraktHomeCache.self, key: Self.homeCacheKey)?.value {
+            applyHomeCache(cache)
             return
         }
 
-        do {
-            let cache =
-                try JSONDecoder()
-                    .decode(
-                        TraktHomeCache.self,
-                        from: data
-                    )
-
-            playback =
-                cache.playback
-                    .sorted {
-                        ($0.pausedAt ?? "")
-                            >
-                        ($1.pausedAt ?? "")
-                    }
-
-            cachedUpNextEntries =
-                cache.upNextEntries
-
-            watchedMovies =
-                cache.watchedMovies
-
-            watchedShows =
-                cache.watchedShows
-
-            // Belangrijk:
-            // lastSync/lastWatchedSync NIET herstellen.
-            //
-            // Daardoor tonen Home en de bekeken-badges eerst de cache
-            // en start daarna alsnog een actuele
-            // Trakt-sync op de achtergrond.
-            lastSync = nil
-            lastWatchedSync = nil
-
-        } catch {
-            // Beschadigde/oude cache negeren.
-            preferences.removeObject(
-                forKey:
-                    Self.homeCacheKey
-            )
+        // Eenmalige migratie van een oudere, nog in UserDefaults staande
+        // cache: overnemen, naar schijf schrijven en de oude sleutel
+        // meteen opruimen zodat die niet blijft meetellen voor de
+        // CFPreferences-limiet.
+        guard
+            let data = preferences.data(forKey: Self.homeCacheKey),
+            let cache = try? JSONDecoder().decode(TraktHomeCache.self, from: data)
+        else {
+            preferences.removeObject(forKey: Self.homeCacheKey)
+            return
         }
+
+        preferences.removeObject(forKey: Self.homeCacheKey)
+        applyHomeCache(cache)
+        IPTVDiskCache.write(cache, key: Self.homeCacheKey)
+    }
+
+    private func applyHomeCache(_ cache: TraktHomeCache) {
+        playback =
+            cache.playback
+                .sorted {
+                    ($0.pausedAt ?? "")
+                        >
+                    ($1.pausedAt ?? "")
+                }
+
+        cachedUpNextEntries =
+            cache.upNextEntries
+
+        watchedMovies =
+            cache.watchedMovies
+
+        watchedShows =
+            cache.watchedShows
+
+        // Belangrijk:
+        // lastSync/lastWatchedSync NIET herstellen.
+        //
+        // Daardoor tonen Home en de bekeken-badges eerst de cache
+        // en start daarna alsnog een actuele
+        // Trakt-sync op de achtergrond.
+        lastSync = nil
+        lastWatchedSync = nil
     }
 
     private func saveHomeCache() {
@@ -537,24 +540,13 @@ final class TraktStore: ObservableObject {
                     )
             )
 
-        do {
-            let data =
-                try JSONEncoder()
-                    .encode(cache)
-
-            preferences.set(
-                data,
-                forKey:
-                    Self.homeCacheKey
-            )
-
-        } catch {
-            // Cache is alleen een versnelling.
-            // Een opslagfout mag Trakt zelf niet breken.
-        }
+        IPTVDiskCache.write(cache, key: Self.homeCacheKey)
     }
 
     private func removeHomeCache() {
+        IPTVDiskCache.remove(key: Self.homeCacheKey)
+
+        // Eventuele oude kopie uit UserDefaults ook opruimen.
         preferences.removeObject(
             forKey:
                 Self.homeCacheKey
@@ -1200,8 +1192,15 @@ final class TraktStore: ObservableObject {
 
 // MARK: - Home cache model
 
-private struct TraktHomeCache:
-    Codable
+// `nonisolated`: dit bestand/target isoleert nieuwe types standaard naar
+// de main actor, maar Decodable/Encodable-vereisten (ook de handgeschreven
+// `init(from:)` hieronder) zijn niet-geïsoleerd — zonder deze modifier
+// botst de main-actor-isolatie met die conformance en faalt de build met
+// "Main actor-isolated conformance ... cannot satisfy conformance
+// requirement". Zie ook `VeyraLiveCatalog`/`VeyraGuideSnapshot` in
+// VeyraEPGStore.swift, die dezelfde `nonisolated` nodig hebben.
+nonisolated private struct TraktHomeCache:
+    Codable, Sendable
 {
     let playback:
         [TraktEntry]

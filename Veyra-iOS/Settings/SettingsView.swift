@@ -12,7 +12,6 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
     case playback
     case shelves
     case account
-    case cloudSync
 
     var id: String { rawValue }
 
@@ -29,7 +28,6 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
         case .playback: return "Afspelen"
         case .shelves: return "Planken"
         case .account: return "Account"
-        case .cloudSync: return "Gegevens en opslag"
         }
     }
 
@@ -46,7 +44,6 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
         case .playback: return "Resolutie, taal en oversla-segmenten"
         case .shelves: return "Eigen rijen op het hoofdmenu"
         case .account: return "Trakt, TMDB en API-sleutels"
-        case .cloudSync: return "iCloud-synchronisatie en opslaggebruik"
         }
     }
 
@@ -63,7 +60,6 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
         case .playback: return "play.circle"
         case .shelves: return "rectangle.grid.1x2"
         case .account: return "person.crop.circle"
-        case .cloudSync: return "icloud"
         }
     }
 }
@@ -72,7 +68,6 @@ struct SettingsView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @ObservedObject private var trakt = TraktStore.shared
-    @ObservedObject private var cloudSync = CloudSettingsSync.shared
 
     @State private var iptvProviderCount = 0
     @State private var addonCount = 0
@@ -191,19 +186,6 @@ struct SettingsView: View {
                             .account,
                             status: trakt.isConnected ? "Trakt verbonden" : "Trakt niet gekoppeld",
                             statusColor: trakt.isConnected ? VeyraColors.cyan : VeyraColors.secondary
-                        )
-                    }
-
-                    VStack(alignment: .leading, spacing: 14) {
-                        Text("GEGEVENS EN OPSLAG")
-                            .font(.system(size: 15, weight: .semibold))
-                            .tracking(2)
-                            .foregroundStyle(VeyraColors.secondary)
-
-                        settingsCard(
-                            .cloudSync,
-                            status: cloudSync.isEnabled ? "iCloud-sync aan" : "iCloud-sync uit",
-                            statusColor: cloudSync.isEnabled ? VeyraColors.cyan : VeyraColors.secondary
                         )
                     }
 
@@ -399,7 +381,6 @@ struct SettingsView: View {
         case .playback: PlaybackSettingsView()
         case .shelves: ShelvesSettingsView()
         case .account: AccountView()
-        case .cloudSync: CloudSyncSettingsView()
         }
     }
 

@@ -65,9 +65,9 @@ struct VeyraApp: App {
                     .all
                 )
                 .task {
-                    // Instellingen via iCloud spiegelen — zie
-                    // `Shared/Sync/CloudSettingsSync.swift`.
-                    CloudSettingsSync.shared.start()
+                    // Instellingen spiegelen tussen apparaten via de
+                    // gekoppelde VeyraHub-server — zie
+                    // `Shared/Sync/VeyraHubSyncService.swift`.
                     VeyraHubSyncService.shared.start()
 
                     await TraktStore

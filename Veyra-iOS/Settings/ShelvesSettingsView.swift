@@ -120,8 +120,8 @@ struct ShelvesSettingsView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .veyraShelfConfigurationDidChange)) { _ in
             viewModel.reload()
-            // Ook nodig na een iCloud-sync-pull (CloudSettingsSync) op een
-            // ander apparaat, die dezelfde notificatie post.
+            // Ook nodig na een VeyraHub-sync-pull (VeyraHubSyncService) op
+            // een ander apparaat, die dezelfde notificatie post.
             heroStyle = HeroSettingsStore.loadStyle()
             heroPrimarySource = HeroSettingsStore.loadPrimarySource()
             heroSecondarySource = HeroSettingsStore.loadSecondarySource()

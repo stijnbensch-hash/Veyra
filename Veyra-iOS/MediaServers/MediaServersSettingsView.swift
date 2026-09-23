@@ -24,7 +24,10 @@ struct MediaServersSettingsView: View {
                         } label: {
                             HStack {
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text(server.name).foregroundStyle(.primary)
+                                    HStack(spacing: 6) {
+                                        statusDot(for: server.id)
+                                        Text(server.name).foregroundStyle(.primary)
+                                    }
                                     Text("\(server.kind.displayName) · \(server.host)")
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
@@ -63,6 +66,32 @@ struct MediaServersSettingsView: View {
         }
         .onAppear(perform: viewModel.reload)
         .onReceive(NotificationCenter.default.publisher(for: .veyraMediaServerConfigurationDidChange)) { _ in viewModel.reload() }
+        .task {
+            // Periodiek herchecken zolang dit scherm open staat, zodat het
+            // online/offline-bolletje bijblijft zonder dat de gebruiker
+            // handmatig hoeft te verversen. Stopt vanzelf zodra het scherm
+            // verdwijnt (SwiftUI annuleert `.task` dan).
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(15))
+                guard !Task.isCancelled else { return }
+                viewModel.refreshStatus()
+            }
+        }
+    }
+
+    /// Klein bolletje: groen (online), rood (offline), grijs zolang de
+    /// eerste controle nog loopt.
+    private func statusDot(for serverID: UUID) -> some View {
+        let color: Color
+        switch viewModel.onlineStatus[serverID] {
+        case .some(true): color = .green
+        case .some(false): color = .red
+        case .none: color = .secondary.opacity(0.4)
+        }
+
+        return Circle()
+            .fill(color)
+            .frame(width: 8, height: 8)
     }
 }
 

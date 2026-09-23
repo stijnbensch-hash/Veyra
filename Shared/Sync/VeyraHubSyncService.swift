@@ -1,11 +1,108 @@
 import Foundation
 
-/// Syncs the same settings already mirrored through iCloud, using the existing
-/// VeyraHub media-server session. The local stores remain the UI's cache.
+/// Syncs Veyra's settings, shelves/hero, source order, and addons across
+/// devices through the connected VeyraHub media-server session — the
+/// replacement for the old iCloud key-value sync (`CloudSettingsSync`,
+/// removed). The local stores remain the UI's cache.
 @MainActor
 final class VeyraHubSyncService {
     static let shared = VeyraHubSyncService()
     private(set) var isActive = false
+
+    // MARK: - Synced keys
+    //
+    // Dit is de volledige lijst instellingen die via VeyraHub meegaan
+    // tussen apparaten (voorheen via iCloud's sleutel-waardeopslag).
+    // Bewust NIET gesynchroniseerd: `AddonMigration`'s eenmalige
+    // migratievlag, `JellyfinClient.persistentDeviceID()` (per-installatie
+    // apparaat-ID) en `ChannelLogoOverrideStore`'s bestandsverwijzingen
+    // (zie hieronder, die gaan via hun eigen "livetv"-document mee).
+
+    private static let simpleKeys: [String] = [
+        // Afspelen — zie Shared/Theme/PlaybackSettings.swift
+        "playback.autoRotateLandscape", "playback.autoPlayNextEpisode",
+        "playback.autoSelectFirstSource", "playback.skipContinueWatchingDetails",
+        "playback.preferredResolution", "playback.cellularResolution",
+        "playback.hideProgressBar", "playback.audioLanguage",
+        "playback.audioFallbackLanguage", "playback.subtitleLanguage",
+        "playback.subtitleFallbackLanguage", "playback.autoSelectSubtitles",
+        "playback.animeAudio", "playback.showSkipIntroButton", "playback.autoSkipIntro",
+        "playback.showSkipRecapButton", "playback.showSkipCreditsButton",
+        "playback.postCreditsAlert", "playback.autoPlayNextCountdownEnabled",
+        "playback.countdownDuration", "playback.selectedPlayer",
+    ]
+
+    private static let iptvDisplayKeys: [String] = [
+        // IPTV-weergave — zie Shared/Theme/IPTVPlaybackSettings.swift
+        "iptv.guideTheme", "iptv.hideCountryPrefix", "iptv.playerEngine",
+        "iptv.bufferDuration", "iptv.catchUpOffsetMode", "iptv.catchUpOffsetManualSeconds",
+        "iptv.refreshChannelsInterval", "iptv.refreshEPGInterval", "iptv.showFPSCounter",
+    ]
+
+    private static let subtitleKeys: [String] = [
+        // Ondertitels — zie Shared/Theme/SubtitleAppearanceSettings.swift
+        "veyra.subtitle.size", "veyra.subtitle.position", "veyra.subtitle.background",
+        "veyra.subtitle.shadow", "veyra.subtitle.offset",
+    ]
+
+    private static let generalKeys: [String] = [
+        // Algemeen — zie Shared/Theme/GeneralSettings.swift
+        "general.showContinueWatching", "general.continueWatchingLimit",
+        "general.hideContinueWatchingReleaseDate", "general.showUpcoming",
+        "general.includeWatchlistPremieresInUpcoming", "general.showReleaseYear",
+        "general.hideTitlesUnderPosters", "general.hideEpisodesRemaining",
+        "general.hideScoreSpoilers", "general.chooseChannelOnTap", "general.textSize",
+        // Posterverrijking — zie Shared/Theme/PosterEnrichmentSettings.swift
+        "posterEnrichment.mode", "posterEnrichment.showGenre", "posterEnrichment.showRating",
+        "posterEnrichment.ratingSource", "posterEnrichment.showAgeRating",
+        "posterEnrichment.showQualityLabels", "posterEnrichment.showTrendLabels",
+        "posterEnrichment.showEpisodesRemaining",
+        // Overig
+        "catalog.watchRegion", "openSubtitlesEnabled", "metadata.source.preference",
+        "sports.favoriteTeams",
+    ]
+
+    private static var simpleKeysAll: [String] {
+        simpleKeys + iptvDisplayKeys + subtitleKeys + generalKeys + [HeroSettingsDefaults.styleKey]
+    }
+
+    private static let shelfHeroDataKeys: [String] = [
+        "veyra.shelves.configured",
+        HeroSettingsDefaults.primarySourceKey,
+        HeroSettingsDefaults.secondarySourceKey,
+    ]
+
+    private static let sourceOrderDataKeys: [String] = [
+        "sourceOrder.categoryOrder", "sourceOrder.iptvProviderOrder",
+    ]
+
+    private static let addonDataKeys: [String] = [
+        "veyra.addons.installed",
+    ]
+
+    private static var settingsDataKeys: [String] {
+        shelfHeroDataKeys + sourceOrderDataKeys + addonDataKeys
+    }
+
+    private static let metadataPrefix = "metadata.rating."
+    private static let iptvVisibilityPrefix = "veyra.iptv.provider.preferences."
+    private static let settingsDynamicPrefixes: [String] = [metadataPrefix, iptvVisibilityPrefix]
+
+    private static func isSettingsKey(_ key: String) -> Bool {
+        simpleKeysAll.contains(key) || settingsDataKeys.contains(key) ||
+        settingsDynamicPrefixes.contains { key.hasPrefix($0) }
+    }
+
+    /// `UserDefaults`/`CFPreferences` crasht hard op tvOS zodra één sleutel
+    /// >= 1 MB wordt weggeschreven ("byte count limit reached"). Een
+    /// waarde die van de Hub binnenkomt (bv. een grote EPG-gids) kan die
+    /// grens overschrijden — dan gewoon lokaal niet toepassen in plaats
+    /// van de app te laten crashen; de volgende sync probeert het opnieuw.
+    private static let maxLocalWriteBytes = 900_000
+
+    private func isSafeForLocalWrite(_ data: Data) -> Bool {
+        data.count < Self.maxLocalWriteBytes
+    }
 
     private let defaults = UserDefaults.standard
     private var started = false
@@ -68,7 +165,6 @@ final class VeyraHubSyncService {
         if let activeAccountID, !accounts.contains(where: { $0.id == activeAccountID }) {
             self.activeAccountID = nil
             isActive = false
-            CloudSettingsSync.shared.setHubManaged(false)
         }
         for account in accounts where account.kind == .jellyfin {
             do {
@@ -76,7 +172,6 @@ final class VeyraHubSyncService {
                 let liveTV = try await get("livetv", account: account)
                 isActive = true
                 activeAccountID = account.id
-                CloudSettingsSync.shared.setHubManaged(true)
                 try await reconcile("settings", remote: settings, account: account)
                 try await reconcile("livetv", remote: liveTV, account: account)
                 return
@@ -169,7 +264,13 @@ final class VeyraHubSyncService {
     }
 
     private func keys(_ name: String) -> [String] {
-        if name == "settings" { return CloudSettingsSync.hubSyncKeys }
+        if name == "settings" {
+            let fixed = Self.simpleKeysAll + Self.settingsDataKeys
+            let dynamic = defaults.dictionaryRepresentation().keys.filter { key in
+                Self.settingsDynamicPrefixes.contains { key.hasPrefix($0) }
+            }
+            return Array(Set(fixed + dynamic))
+        }
         return defaults.dictionaryRepresentation().keys.filter {
             $0.hasPrefix("veyra.epg.favorites.") ||
             $0.hasPrefix("veyra.epg.favoriteOrder.") ||
@@ -232,19 +333,19 @@ final class VeyraHubSyncService {
                 guard desired != ChannelLogoOverrideStore.all() else { continue }
                 let encoder = JSONEncoder()
                 encoder.outputFormatting = .sortedKeys
-                guard let data = try? encoder.encode(desired) else { continue }
+                guard let data = try? encoder.encode(desired), isSafeForLocalWrite(data) else { continue }
                 defaults.set(data, forKey: key)
                 changed = true
                 continue
             }
-            guard (name == "settings" ? CloudSettingsSync.isHubSyncKey(key) :
+            guard (name == "settings" ? Self.isSettingsKey(key) :
                     key.hasPrefix("veyra.epg.favorites.") ||
                     key.hasPrefix("veyra.epg.favoriteOrder.") ||
                     key.hasPrefix("veyra.epg.recent.") ||
                     key.hasPrefix(VeyraIPTVSnapshot.catalogPrefix) ||
                     key.hasPrefix(VeyraIPTVSnapshot.guidePrefix) ||
                     key == "veyra.channelNameOverrides"),
-                  let data = Data(base64Encoded: encoded),
+                  let data = Data(base64Encoded: encoded), isSafeForLocalWrite(data),
                   let value = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil)
             else { continue }
             let current = defaults.object(forKey: key)

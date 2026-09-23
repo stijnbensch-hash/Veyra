@@ -14,6 +14,14 @@ final class PlaybackViewModel: ObservableObject {
     private let item: MediaItem?
     private let resumeProgress: Double?
 
+    // Sommige IPTV/live-TV-bronnen laten de onderliggende netwerkverbinding
+    // hangen (time-outs bij de probe/handshake) zonder dat AetherEngine dat
+    // ooit als fout naar boven gooit — dat gaf een permanent zwart scherm
+    // zonder foutmelding. Met deze timeout krijgt `engine.play(...)` een
+    // hard plafond, zodat zo'n hang alsnog als duidelijke afspeelfout
+    // eindigt (met retry-knop) in plaats van oneindig te blijven hangen.
+    private static let playbackStartTimeout: TimeInterval = 20
+
     nonisolated init(source: PlayableSource, item: MediaItem?, resumeProgress: Double?) {
         self.source = source
         self.item = item
@@ -31,7 +39,12 @@ final class PlaybackViewModel: ObservableObject {
                 tracker = TraktPlaybackTracker(item: item, engine: engine.engine)
             }
 
-            try await engine.play(source, resumeProgress: resumeProgress)
+            let playSource = source
+            let playResumeProgress = resumeProgress
+
+            try await Self.withTimeout(seconds: Self.playbackStartTimeout) {
+                try await engine.play(playSource, resumeProgress: playResumeProgress)
+            }
 
             try Task.checkCancellation()
 
@@ -78,6 +91,36 @@ final class PlaybackViewModel: ObservableObject {
             // de positie hangen op het laatst bekende afspeel-/pauze-event.
             tracker?.finish()
             playbackEngine?.stop()
+        }
+    }
+
+    // MARK: - Timeout
+
+    private struct PlaybackTimeoutError: LocalizedError {
+        var errorDescription: String? {
+            "De stream reageert niet. Controleer je internetverbinding of probeer het later opnieuw."
+        }
+    }
+
+    private static func withTimeout<T: Sendable>(
+        seconds: TimeInterval,
+        operation: @escaping @Sendable () async throws -> T
+    ) async throws -> T {
+        try await withThrowingTaskGroup(of: T.self) { group in
+            group.addTask {
+                try await operation()
+            }
+            group.addTask {
+                try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+                throw PlaybackTimeoutError()
+            }
+
+            defer { group.cancelAll() }
+
+            guard let result = try await group.next() else {
+                throw PlaybackTimeoutError()
+            }
+            return result
         }
     }
 }

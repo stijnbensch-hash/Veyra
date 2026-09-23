@@ -1,11 +1,14 @@
 import Foundation
 
-/// Eén logo-resultaat uit de iptv-org-database (github.com/iptv-org/api).
+/// Eén logo-resultaat, uit de iptv-org-database (github.com/iptv-org/api)
+/// of de tv-logo/tv-logos-repo (github.com/tv-logo/tv-logos) — `source`
+/// onderscheidt de twee zodat de UI kan tonen waar een logo vandaan komt.
 struct IPTVOrgLogoResult: Identifiable, Hashable {
     let id: String
     let channelName: String
     let country: String?
     let logoURL: URL
+    var source: String = "iptv-org"
 }
 
 /// Doorzoekbare, gratis logo-database van het open-source iptv-org-project.

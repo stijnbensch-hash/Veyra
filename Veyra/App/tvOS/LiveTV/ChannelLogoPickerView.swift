@@ -132,7 +132,7 @@ struct ChannelLogoPickerView: View {
             if isSearching {
                 HStack(spacing: 12) {
                     ProgressView()
-                    Text("Zoeken in iptv-org…").foregroundStyle(.secondary)
+                    Text("Zoeken in iptv-org + tv-logos…").foregroundStyle(.secondary)
                 }
             } else if let searchError {
                 Text(searchError).foregroundStyle(.red)
@@ -144,7 +144,7 @@ struct ChannelLogoPickerView: View {
                 Text("Geen logo's gevonden voor \"\(query)\".").foregroundStyle(.secondary)
             }
         } header: {
-            Label("Zoeken in logo-database (iptv-org)", systemImage: "magnifyingglass")
+            Label("Zoeken in logo-databases (iptv-org + tv-logos)", systemImage: "magnifyingglass")
         }
     }
 
@@ -165,13 +165,22 @@ struct ChannelLogoPickerView: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(result.channelName)
-                    if let country = result.country {
-                        Text(country).font(.caption).foregroundStyle(.secondary)
+                    if let subtitle = resultSubtitle(result) {
+                        Text(subtitle).font(.caption).foregroundStyle(.secondary)
                     }
                 }
 
                 Spacer()
             }
+        }
+    }
+
+    private func resultSubtitle(_ result: IPTVOrgLogoResult) -> String? {
+        switch (result.country, result.source) {
+        case (let country?, let source):
+            return "\(country) · \(source)"
+        case (nil, let source):
+            return source
         }
     }
 
@@ -230,11 +239,18 @@ struct ChannelLogoPickerView: View {
         searchError = nil
         defer { isSearching = false }
 
-        do {
-            results = try await IPTVOrgLogoDirectory.shared.search(query: trimmed)
-        } catch {
+        // Beide bronnen apart afvangen i.p.v. één gezamenlijke throw: als
+        // er maar één van de twee databases bereikbaar is, tonen we die
+        // resultaten gewoon, i.p.v. helemaal niets te tonen.
+        async let iptvOrgResults = try? IPTVOrgLogoDirectory.shared.search(query: trimmed)
+        async let tvLogosResults = try? TVLogoRepoDirectory.shared.search(query: trimmed)
+        let (fromIPTVOrg, fromTVLogos) = await (iptvOrgResults, tvLogosResults)
+
+        if fromIPTVOrg == nil, fromTVLogos == nil {
             results = []
-            searchError = "Kon de logo-database niet bereiken. Controleer de internetverbinding."
+            searchError = "Kon de logo-databases niet bereiken. Controleer de internetverbinding."
+        } else {
+            results = ((fromIPTVOrg ?? []) + (fromTVLogos ?? [])).sorted { $0.channelName < $1.channelName }
         }
     }
 }

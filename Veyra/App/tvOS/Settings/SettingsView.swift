@@ -6,7 +6,6 @@ import Foundation
 @MainActor
 struct SettingsView: View {
     @ObservedObject private var trakt = TraktStore.shared
-    @ObservedObject private var cloudSync = CloudSettingsSync.shared
 
     @State private var configuration: IPTVStoredConfiguration?
     @State private var errorMessage: String?
@@ -64,10 +63,6 @@ struct SettingsView: View {
                                      subtitle: "Trakt, ondertitels en profiel",
                                      status: trakt.isConnected ? "Trakt verbonden" : "Trakt niet gekoppeld",
                                      statusColor: trakt.isConnected ? VeyraColors.cyan : VeyraColors.secondary)
-                        settingsCard(destination: .cloudSync, icon: "icloud", title: "Gegevens en opslag",
-                                     subtitle: "iCloud-synchronisatie en opslaggebruik",
-                                     status: cloudSync.isEnabled ? "Aan" : "Uit",
-                                     statusColor: cloudSync.isEnabled ? VeyraColors.cyan : VeyraColors.secondary)
                     }
 
                     if let errorMessage {
@@ -140,8 +135,6 @@ struct SettingsView: View {
                 MetadataSettingsView()
             case .shelves:
                 ShelvesSettingsView()
-            case .cloudSync:
-                CloudSyncSettingsView()
             }
         }
     }
@@ -453,7 +446,6 @@ private enum SettingsDestination:
     case playback
     case metadata
     case shelves
-    case cloudSync
 
     var id: String {
         rawValue

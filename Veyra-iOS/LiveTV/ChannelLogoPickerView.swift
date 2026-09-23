@@ -89,7 +89,7 @@ struct ChannelLogoPickerView: View {
                         if isSearching {
                             HStack(spacing: 10) {
                                 ProgressView()
-                                Text("Zoeken in iptv-org…").foregroundStyle(.secondary)
+                                Text("Zoeken in iptv-org + tv-logos…").foregroundStyle(.secondary)
                             }
                         } else if let searchError {
                             Text(searchError).foregroundStyle(.red)
@@ -101,9 +101,9 @@ struct ChannelLogoPickerView: View {
                             Text("Geen logo's gevonden voor \"\(query)\".").foregroundStyle(.secondary)
                         }
                     } header: {
-                        Text("Zoeken in logo-database (iptv-org)")
+                        Text("Zoeken in logo-databases (iptv-org + tv-logos)")
                     } footer: {
-                        Text("Gratis, doorzoekbare verzameling zenderlogo's van het open-source iptv-org-project.")
+                        Text("Gratis, doorzoekbare verzameling zenderlogo's van de open-source projecten iptv-org en tv-logo/tv-logos.")
                     }
 
                     Section {
@@ -213,13 +213,22 @@ struct ChannelLogoPickerView: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(result.channelName).foregroundStyle(.primary)
-                    if let country = result.country {
-                        Text(country).font(.caption).foregroundStyle(.secondary)
+                    if let subtitle = resultSubtitle(result) {
+                        Text(subtitle).font(.caption).foregroundStyle(.secondary)
                     }
                 }
 
                 Spacer()
             }
+        }
+    }
+
+    private func resultSubtitle(_ result: IPTVOrgLogoResult) -> String? {
+        switch (result.country, result.source) {
+        case (let country?, let source):
+            return "\(country) · \(source)"
+        case (nil, let source):
+            return source
         }
     }
 
@@ -246,11 +255,18 @@ struct ChannelLogoPickerView: View {
         searchError = nil
         defer { isSearching = false }
 
-        do {
-            results = try await IPTVOrgLogoDirectory.shared.search(query: trimmed)
-        } catch {
+        // Beide bronnen apart afvangen i.p.v. één gezamenlijke throw: als
+        // er maar één van de twee databases bereikbaar is, tonen we die
+        // resultaten gewoon, i.p.v. helemaal niets te tonen.
+        async let iptvOrgResults = try? IPTVOrgLogoDirectory.shared.search(query: trimmed)
+        async let tvLogosResults = try? TVLogoRepoDirectory.shared.search(query: trimmed)
+        let (fromIPTVOrg, fromTVLogos) = await (iptvOrgResults, tvLogosResults)
+
+        if fromIPTVOrg == nil, fromTVLogos == nil {
             results = []
-            searchError = "Kon de logo-database niet bereiken. Controleer de internetverbinding."
+            searchError = "Kon de logo-databases niet bereiken. Controleer de internetverbinding."
+        } else {
+            results = ((fromIPTVOrg ?? []) + (fromTVLogos ?? [])).sorted { $0.channelName < $1.channelName }
         }
     }
 

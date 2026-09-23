@@ -44,6 +44,10 @@ struct SourceSelectionView: View {
                             } label: {
                                 sourceRow(resolved)
                             }
+                            .buttonStyle(.plain)
+                            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
                         }
 
                         if viewModel.isLoadingIPTV {
@@ -199,22 +203,32 @@ struct SourceSelectionView: View {
     // MARK: - Row
 
     private func sourceRow(_ resolved: ResolvedSource) -> some View {
-        HStack(spacing: 14) {
-            Image(systemName: sourceIconName(resolved.source))
-                .font(.title3)
-                .foregroundStyle(VeyraColors.cyan)
-                .frame(width: 32)
+        HStack(alignment: .top, spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(VeyraColors.cyan.opacity(0.08))
+                Image(systemName: sourceIconName(resolved.source))
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(VeyraColors.cyan)
+            }
+            .frame(width: 44, height: 44)
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 5) {
                 Text(resolved.source.name)
-                    .font(.body.weight(.semibold))
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
 
+                // Geen regelbeperking — anders knipt SwiftUI een tweede/derde
+                // regel (kwaliteit, codec, HDR, grootte…) halverwege af met
+                // een "…", wat er rommelig uitziet. tvOS toont deze tekst ook
+                // altijd volledig.
                 if let description = resolved.source.description?.trimmingCharacters(in: .whitespacesAndNewlines), !description.isEmpty {
                     Text(description)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .lineLimit(2)
+                        .lineSpacing(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 Text(resolved.source.kind == .iptvVOD ? "IPTV VOD" : resolved.originName)
@@ -222,12 +236,22 @@ struct SourceSelectionView: View {
                     .foregroundStyle(VeyraColors.cyan)
             }
 
-            Spacer()
+            Spacer(minLength: 12)
 
             Image(systemName: "play.fill")
+                .font(.subheadline)
                 .foregroundStyle(VeyraColors.cyan)
+                .padding(.top, 10)
         }
-        .padding(.vertical, 4)
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.white.opacity(0.045))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(VeyraColors.cyan.opacity(0.10), lineWidth: 1)
+        )
     }
 
     private func sourceIconName(_ source: PlayableSource) -> String {

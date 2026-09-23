@@ -39,10 +39,9 @@ struct Veyra_iOSApp: App {
                     // `GeneralSettings.swift`.
                     .environment(\.dynamicTypeSize, (GeneralTextSize(rawValue: textSizeRaw) ?? .defaultSize).dynamicTypeSize)
                     .task {
-                        // Instellingen/planken/hero-configuratie via
-                        // iCloud spiegelen — zie
-                        // `Shared/Sync/CloudSettingsSync.swift`.
-                        CloudSettingsSync.shared.start()
+                        // Instellingen/planken/hero/addons spiegelen tussen
+                        // apparaten via de gekoppelde VeyraHub-server — zie
+                        // `Shared/Sync/VeyraHubSyncService.swift`.
                         VeyraHubSyncService.shared.start()
 
                         // Bestaande schermen (LiveTVView, IPTVRecentlyAddedRows)
