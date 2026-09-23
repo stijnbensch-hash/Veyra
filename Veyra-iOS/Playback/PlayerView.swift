@@ -177,12 +177,21 @@ private struct iOSPlayerSurface: View {
     @State private var autoSkippedIntro = false
 
     private var isNearEndOfEpisode: Bool {
-        guard engine.duration.isFinite, engine.duration > 0 else { return false }
+        guard engine.duration.isFinite, engine.duration > 30 else { return false }
+        // Vereis ook een minimale verstreken tijd zodat een kort moment met
+        // nog onbetrouwbare (bv. verouderde) currentTime/duration-waarden
+        // vlak na het laden van een aflevering niet meteen als "einde"
+        // wordt gezien — dat veroorzaakte een veel te snelle doorschakeling
+        // naar de volgende aflevering.
+        guard engine.currentTime > 10 else { return false }
         return engine.currentTime / engine.duration >= 0.95
     }
 
+    // De knop "Volgende aflevering" blijft altijd verschijnen zodra we
+    // bijna aan het einde zijn, ongeacht de "Hierna"-instellingen — die
+    // bepalen alleen of het automatisch (met aftelling) gebeurt of niet.
     private var showNextEpisodeOverlay: Bool {
-        autoPlayNextEpisodeSetting && item?.type == .series && nextEpisode != nil
+        item?.type == .series && nextEpisode != nil
             && isNearEndOfEpisode && !countdownCancelled
     }
 
@@ -555,7 +564,7 @@ private struct iOSPlayerSurface: View {
 
     @ViewBuilder
     private func nextEpisodeOverlayButton(_ next: MediaItem) -> some View {
-        if autoPlayNextCountdownEnabled, let countdownRemaining {
+        if autoPlayNextEpisodeSetting, autoPlayNextCountdownEnabled, let countdownRemaining {
             HStack(spacing: 10) {
                 Button {
                     countdownTask?.cancel()
@@ -602,7 +611,9 @@ private struct iOSPlayerSurface: View {
     }
 
     private func startCountdownIfNeeded(for next: MediaItem) {
-        guard autoPlayNextCountdownEnabled, countdownTask == nil, !countdownCancelled else { return }
+        guard autoPlayNextEpisodeSetting, autoPlayNextCountdownEnabled, countdownTask == nil,
+              !countdownCancelled
+        else { return }
         countdownRemaining = countdownDuration.seconds
         countdownTask = Task {
             while let remaining = countdownRemaining, remaining > 0 {

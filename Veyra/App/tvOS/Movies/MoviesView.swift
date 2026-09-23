@@ -16,6 +16,11 @@ struct MoviesView: View {
 
     @State private var catalogRequestID = UUID()
 
+    // Automatisch roterende hero, zoals op Home: elke paar seconden een
+    // andere titel uit de populairste films, zolang er geen handmatige
+    // focus (heroSpotlight) actief is.
+    @State private var heroRotationIndex = 0
+
     private let posterBaseURL = URL(
         string: "https://image.tmdb.org/t/p/w500"
     )!
@@ -28,7 +33,7 @@ struct MoviesView: View {
     var body: some View {
         ZStack {
             VeyraArtworkBackground(
-                url: heroSpotlight.focused?.backdropURL ?? movies.first?.backdropPath.flatMap {
+                url: heroSpotlight.focused?.backdropURL ?? featured?.backdropPath.flatMap {
                     URL(
                         string:
                             "https://image.tmdb.org/t/p/w1280"
@@ -36,8 +41,9 @@ struct MoviesView: View {
                     )
                 }
             )
-            .id(heroSpotlight.focused?.id ?? "movies-background")
+            .id(heroSpotlight.focused?.id ?? "movie-background:\(featured?.id ?? -1)")
             .animation(.easeInOut(duration: 0.35), value: heroSpotlight.focused?.id)
+            .animation(.easeInOut(duration: 0.35), value: featured?.id)
 
             ScrollView(
                 .vertical,
@@ -47,7 +53,7 @@ struct MoviesView: View {
                     alignment: .leading,
                     spacing: 28
                 ) {
-                    if let featured = movies.first {
+                    if let featured {
                         Group {
                             if let focused = heroSpotlight.focused {
                                 VeyraSpotlightHero(content: focused)
@@ -61,6 +67,7 @@ struct MoviesView: View {
                             alignment: .center
                         )
                         .animation(.easeInOut(duration: 0.35), value: heroSpotlight.focused?.id)
+                        .animation(.easeInOut(duration: 0.35), value: featured.id)
                     }
 
                     VStack(alignment: .leading, spacing: 6) {
@@ -119,6 +126,9 @@ struct MoviesView: View {
         ) {
             await loadPopularMovies()
         }
+        .task(id: heroPool.map(\.id)) {
+            await rotateHeroAutomatically()
+        }
         .onChange(
             of: watchRegion
         ) { _, _ in
@@ -130,6 +140,27 @@ struct MoviesView: View {
             MovieDetailView(
                 movie: movie
             )
+        }
+    }
+
+    // MARK: - Hero rotatie
+
+    private var heroPool: [TMDBMovie] {
+        Array(movies.prefix(10))
+    }
+
+    private var featured: TMDBMovie? {
+        guard !heroPool.isEmpty else { return nil }
+        return heroPool[heroRotationIndex % heroPool.count]
+    }
+
+    private func rotateHeroAutomatically() async {
+        heroRotationIndex = 0
+        guard heroPool.count > 1 else { return }
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(8))
+            guard !Task.isCancelled else { return }
+            heroRotationIndex = (heroRotationIndex + 1) % heroPool.count
         }
     }
 

@@ -6,32 +6,44 @@ struct ShelfRowView: View {
     let shelf: Shelf
 
     @State private var items: [MediaItem] = []
+    @State private var isLoading = true
 
     var body: some View {
-        Group {
-            if !items.isEmpty {
-                VStack(alignment: .leading, spacing: 12) {
-                    VeyraSectionHeader(title: shelf.title, subtitle: shelf.source.subtitle)
-                        .padding(.horizontal)
+        // Toont de plank altijd zodra hij is toegevoegd — met een laadstatus
+        // en, als de bron niets teruggeeft, een duidelijke lege status —
+        // in plaats van stilletjes niets te tonen. Zo lijkt het niet alsof
+        // een net toegevoegde plank nooit is verschenen.
+        VStack(alignment: .leading, spacing: 12) {
+            VeyraSectionHeader(title: shelf.title, subtitle: shelf.source.subtitle)
+                .padding(.horizontal)
 
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(alignment: .top, spacing: VeyraSpacing.rail) {
-                            ForEach(items) { item in
-                                NavigationLink { ShelfItemDestination(item: item) } label: {
-                                    VeyraPosterCard(
-                                        title: item.title,
-                                        url: item.posterURL,
-                                        symbol: item.type == .movie ? "film" : "tv",
-                                        width: 130,
-                                        genre: item.genre,
-                                        rating: item.rating
-                                    )
-                                }
-                                .buttonStyle(.plain)
+            if isLoading {
+                ProgressView()
+                    .padding(.horizontal)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else if items.isEmpty {
+                Text("Geen items gevonden voor deze plank.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .top, spacing: VeyraSpacing.rail) {
+                        ForEach(items) { item in
+                            NavigationLink { ShelfItemDestination(item: item) } label: {
+                                VeyraPosterCard(
+                                    title: item.title,
+                                    url: item.posterURL,
+                                    symbol: item.type == .movie ? "film" : "tv",
+                                    width: 130,
+                                    genre: item.genre,
+                                    rating: item.rating
+                                )
                             }
+                            .buttonStyle(.plain)
                         }
-                        .padding(.horizontal)
                     }
+                    .padding(.horizontal)
                 }
             }
         }
@@ -42,7 +54,9 @@ struct ShelfRowView: View {
     }
 
     private func load() async {
+        isLoading = true
         items = await ShelfCatalogService.items(for: shelf)
+        isLoading = false
     }
 }
 

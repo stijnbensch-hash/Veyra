@@ -24,8 +24,11 @@ struct IPTVAccountsView: View {
             } else {
                 Section {
                     ForEach(viewModel.providers) { provider in
-                        Button {
-                            editingProvider = EditingProviderID(id: provider.id)
+                        NavigationLink {
+                            IPTVProviderManagementLauncherView(
+                                providerID: provider.id,
+                                showsVOD: isXtream(provider)
+                            )
                         } label: {
                             HStack {
                                 VStack(alignment: .leading, spacing: 2) {
@@ -54,6 +57,10 @@ struct IPTVAccountsView: View {
                                 }
                                 .tint(VeyraColors.cyan)
                             }
+                            Button("Bewerken") {
+                                editingProvider = EditingProviderID(id: provider.id)
+                            }
+                            .tint(.blue)
                         }
                     }
                     .onMove { source, destination in
@@ -62,25 +69,9 @@ struct IPTVAccountsView: View {
                 } header: {
                     Text("Providers")
                 } footer: {
-                    Text("Sleep om te herordenen. Dit bepaalt de volgorde in de IPTV-lijst.")
-                }
-            }
-
-            if let activeProvider = viewModel.providers.first(where: { $0.id == activeID }) {
-                Section("Inhoud beheren") {
-                    NavigationLink {
-                        IPTVLiveVisibilityView()
-                    } label: {
-                        Label("Live TV-kanalen", systemImage: "tv")
-                    }
-
-                    if case .xtream = activeProvider.configuration {
-                        NavigationLink {
-                            IPTVVODVisibilityView()
-                        } label: {
-                            Label("VOD-categorieën en titels", systemImage: "film")
-                        }
-                    }
+                    Text(
+                        "Tik op een provider om Live TV en VOD in te stellen. Sleep om te herordenen - dit bepaalt de volgorde in de IPTV-lijst."
+                    )
                 }
             }
 
@@ -140,6 +131,97 @@ struct IPTVAccountsView: View {
 
 private struct EditingProviderID: Identifiable {
     let id: UUID
+}
+
+private func isXtream(_ provider: IPTVStoredProvider) -> Bool {
+    if case .xtream = provider.configuration {
+        return true
+    }
+    return false
+}
+
+/// Temporarily makes the given provider the "active" one so the
+/// (otherwise active-provider-only) Live TV / VOD visibility screens
+/// operate on it, then restores the previously active provider when
+/// this view disappears. Mirrors the tvOS per-provider management launcher.
+private struct IPTVProviderManagementLauncherView: View {
+    let providerID: UUID
+    let showsVOD: Bool
+
+    @State private var isReady = false
+    @State private var errorMessage: String?
+    @State private var previousActiveProviderID: UUID?
+    @State private var showEditSheet = false
+
+    private let configurationStore = IPTVConfigurationStore()
+
+    var body: some View {
+        Group {
+            if isReady {
+                List {
+                    NavigationLink {
+                        IPTVLiveVisibilityView()
+                    } label: {
+                        Label("Live TV beheren", systemImage: "tv")
+                    }
+
+                    if showsVOD {
+                        NavigationLink {
+                            IPTVVODVisibilityView()
+                        } label: {
+                            Label("VOD beheren", systemImage: "film")
+                        }
+                    }
+
+                    Button {
+                        showEditSheet = true
+                    } label: {
+                        Label("Logingegevens bewerken", systemImage: "person.text.rectangle")
+                    }
+                }
+                .scrollContentBackground(.hidden)
+            } else if let errorMessage {
+                ContentUnavailableView(
+                    "Provider kon niet worden geopend",
+                    systemImage: "exclamationmark.triangle",
+                    description: Text(errorMessage)
+                )
+            } else {
+                ProgressView("Provider laden…")
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(VeyraColors.background)
+        .navigationTitle("Beheren")
+        .sheet(isPresented: $showEditSheet) {
+            NavigationStack {
+                IPTVSetupView(providerID: providerID, createsNewProvider: false)
+            }
+        }
+        .task {
+            prepareProvider()
+        }
+        .onDisappear {
+            restorePreviousProvider()
+        }
+    }
+
+    private func prepareProvider() {
+        do {
+            previousActiveProviderID = try configurationStore.activeProviderID()
+            try configurationStore.setActiveProvider(id: providerID)
+            isReady = true
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func restorePreviousProvider() {
+        guard let previousActiveProviderID, previousActiveProviderID != providerID else {
+            return
+        }
+        try? configurationStore.setActiveProvider(id: previousActiveProviderID)
+    }
 }
 
 #Preview {

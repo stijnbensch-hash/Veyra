@@ -17,6 +17,10 @@ struct SeriesView: View {
 
     @State private var catalogRequestID = UUID()
 
+    // Automatisch roterende hero: elke paar seconden een andere titel uit
+    // de populairste series.
+    @State private var heroRotationIndex = 0
+
     private let columns = [
         GridItem(
             .adaptive(minimum: 112),
@@ -31,7 +35,7 @@ struct SeriesView: View {
         NavigationStack {
             ZStack {
                 VeyraArtworkBackground(
-                    url: series.first?.backdropPath.flatMap {
+                    url: featured?.backdropPath.flatMap {
                         URL(
                             string:
                                 "https://image.tmdb.org/t/p/w1280"
@@ -39,6 +43,8 @@ struct SeriesView: View {
                         )
                     }
                 )
+                .id(featured?.id ?? -1)
+                .animation(.easeInOut(duration: 0.35), value: featured?.id)
 
                 ScrollView(
                     .vertical,
@@ -48,7 +54,7 @@ struct SeriesView: View {
                         alignment: .leading,
                         spacing: 24
                     ) {
-                        if let featured = series.first {
+                        if let featured {
                             VeyraHero(
                                 title: featured.name,
                                 eyebrow: "Serie uitgelicht",
@@ -136,6 +142,9 @@ struct SeriesView: View {
                     traktTask
                 )
             }
+            .task(id: heroPool.map(\.id)) {
+                await rotateHeroAutomatically()
+            }
             .navigationDestination(
                 item: $selectedSeries
             ) { series in
@@ -143,6 +152,27 @@ struct SeriesView: View {
                     series: series
                 )
             }
+        }
+    }
+
+    // MARK: - Hero rotatie
+
+    private var heroPool: [TMDBSeries] {
+        Array(series.prefix(10))
+    }
+
+    private var featured: TMDBSeries? {
+        guard !heroPool.isEmpty else { return nil }
+        return heroPool[heroRotationIndex % heroPool.count]
+    }
+
+    private func rotateHeroAutomatically() async {
+        heroRotationIndex = 0
+        guard heroPool.count > 1 else { return }
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(8))
+            guard !Task.isCancelled else { return }
+            heroRotationIndex = (heroRotationIndex + 1) % heroPool.count
         }
     }
 
