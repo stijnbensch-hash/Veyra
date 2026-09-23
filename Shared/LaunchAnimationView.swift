@@ -1,141 +1,158 @@
 import SwiftUI
 
-/// Openingsanimatie bij het opstarten van Veyra: het beeldmerk verschijnt,
-/// blijft eventjes staan, en vliegt dan weg om plaats te maken voor de app
-/// zelf. Gebruikt hetzelfde beeldmerk als het app-icoon (`LaunchBrandmark`
-/// in Assets.xcassets — een uitgesneden versie met transparante
-/// achtergrond, zodat het naadloos over `VeyraColors.background` valt).
-///
-/// Draait één keer per koude start: de App-structs op iOS en tvOS tonen dit
-/// als overlay boven `ContentView` en verbergen het via `onFinished`. Omdat
-/// SwiftUI's `@State` in de App-struct blijft bestaan zolang het proces
-/// leeft, komt de animatie niet terug bij achtergrond/voorgrond-wissels —
-/// alleen bij een echte herstart.
+/// A short, full-screen brand reveal shared by iOS and tvOS.
+/// The app content is already loading underneath this view.
 struct LaunchAnimationView: View {
     var onFinished: () -> Void = {}
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    @State private var logoOpacity: Double = 0
-    @State private var logoScale: CGFloat = 0.86
-    @State private var glowOpacity: Double = 0
-    @State private var wordmarkOpacity: Double = 0
-    @State private var taglineOpacity: Double = 0
-
-    @State private var flightOffset: CGSize = .zero
-    @State private var flightScale: CGFloat = 1
-    @State private var flightRotation: Angle = .zero
-    @State private var flightOpacity: Double = 1
-
+    @State private var started = false
+    @State private var ambientGlow: Double = 0
+    @State private var lineScale: CGFloat = 0
+    @State private var markOpacity: Double = 0
+    @State private var markScale: CGFloat = 0.94
+    @State private var nameOpacity: Double = 0
+    @State private var subtitleOpacity: Double = 0
     @State private var overlayOpacity: Double = 1
 
     var body: some View {
-        ZStack {
-            VeyraColors.background.ignoresSafeArea()
+        GeometryReader { geometry in
+            let size = geometry.size
+            let wide = size.width > size.height
+            let markWidth = wide
+                ? min(size.width * 0.27, 500)
+                : min(size.width * 0.58, 270)
 
-            RadialGradient(
-                colors: [VeyraColors.cyan.opacity(glowOpacity * 0.35), .clear],
-                center: .center,
-                startRadius: 0,
-                endRadius: 260
-            )
-            .ignoresSafeArea()
-            .allowsHitTesting(false)
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.025, green: 0.045, blue: 0.075),
+                        Color(red: 0.045, green: 0.075, blue: 0.115),
+                        Color(red: 0.012, green: 0.025, blue: 0.045)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
 
-            VStack(spacing: 18) {
-                Image("LaunchBrandmark")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 150, height: 150)
-                    .opacity(logoOpacity * flightOpacity)
-                    .scaleEffect(logoScale * flightScale)
-                    .rotationEffect(flightRotation)
-                    .offset(flightOffset)
+                RadialGradient(
+                    colors: [
+                        VeyraColors.cyan.opacity(ambientGlow * 0.18),
+                        VeyraColors.ice.opacity(ambientGlow * 0.05),
+                        .clear
+                    ],
+                    center: UnitPoint(x: 0.5, y: 0.47),
+                    startRadius: 0,
+                    endRadius: max(size.width, size.height) * 0.58
+                )
 
-                VStack(spacing: 6) {
+                Rectangle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                .clear,
+                                VeyraColors.ice.opacity(0.10),
+                                VeyraColors.cyan.opacity(0.65),
+                                VeyraColors.ice.opacity(0.10),
+                                .clear
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(width: size.width * 0.82, height: 1)
+                    .scaleEffect(x: lineScale, y: 1)
+                    .shadow(color: VeyraColors.cyan.opacity(ambientGlow * 0.5), radius: 15)
+                    .offset(y: wide ? markWidth * 0.48 : markWidth * 0.58)
+                    .accessibilityHidden(true)
+
+                VStack(spacing: wide ? 20 : 15) {
+                    Image("LaunchBrandmark")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: markWidth, height: markWidth * 0.9)
+                        .opacity(markOpacity)
+                        .scaleEffect(markScale)
+                        .shadow(
+                            color: VeyraColors.cyan.opacity(ambientGlow * 0.17),
+                            radius: wide ? 48 : 30
+                        )
+
                     Text("VEYRA")
-                        .font(.system(size: 34, weight: .bold, design: .rounded))
-                        .tracking(8)
+                        .font(.system(
+                            size: wide ? min(size.width * 0.032, 54) : min(size.width * 0.082, 36),
+                            weight: .semibold,
+                            design: .rounded
+                        ))
+                        .tracking(wide ? 14 : 8)
                         .foregroundStyle(.white)
-                        .opacity(wordmarkOpacity)
+                        .opacity(nameOpacity)
 
                     Text("ALL YOUR MEDIA. ONE PLACE.")
-                        .font(.system(size: 12, weight: .medium))
-                        .tracking(3)
-                        .foregroundStyle(VeyraColors.secondary)
-                        .opacity(taglineOpacity)
+                        .font(.system(size: wide ? 15 : 11, weight: .medium))
+                        .tracking(wide ? 4 : 2.5)
+                        .foregroundStyle(VeyraColors.ice.opacity(0.75))
+                        .opacity(subtitleOpacity)
                 }
+                .offset(y: wide ? -12 : -20)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Veyra wordt gestart")
             }
+            .frame(width: size.width, height: size.height)
+            .ignoresSafeArea()
         }
+        .ignoresSafeArea()
         .opacity(overlayOpacity)
         .allowsHitTesting(overlayOpacity > 0)
-        .task { await runSequence() }
+        .task {
+            guard !started else { return }
+            started = true
+            await runSequence()
+        }
     }
 
     @MainActor
     private func runSequence() async {
-        guard !reduceMotion else {
-            await runReducedMotionSequence()
+        if reduceMotion {
+            markOpacity = 1
+            markScale = 1
+            nameOpacity = 1
+            subtitleOpacity = 1
+            ambientGlow = 1
+            lineScale = 1
+            try? await Task.sleep(for: .seconds(0.8))
+            withAnimation(.easeOut(duration: 0.25)) { overlayOpacity = 0 }
+            try? await Task.sleep(for: .seconds(0.25))
+            onFinished()
             return
         }
 
-        // 1. Beeldmerk en gloed verschijnen.
-        withAnimation(.spring(response: 0.7, dampingFraction: 0.72)) {
-            logoOpacity = 1
-            logoScale = 1
+        withAnimation(.easeOut(duration: 0.65)) {
+            ambientGlow = 1
+            lineScale = 1
         }
-        withAnimation(.easeOut(duration: 0.9)) {
-            glowOpacity = 1
-        }
-
-        try? await Task.sleep(for: .seconds(0.35))
-        withAnimation(.easeOut(duration: 0.5)) { wordmarkOpacity = 1 }
 
         try? await Task.sleep(for: .seconds(0.15))
-        withAnimation(.easeOut(duration: 0.5)) { taglineOpacity = 1 }
-
-        // 2. Even laten staan.
-        try? await Task.sleep(for: .seconds(0.7))
-
-        // 3. Het beeldmerk vliegt weg: omhoog en opzij, kleiner wordend,
-        // lichtjes draaiend — zoals een vogel die wegschiet. Wordmerk en
-        // tagline vervagen tegelijk.
-        withAnimation(.easeIn(duration: 0.6)) {
-            wordmarkOpacity = 0
-            taglineOpacity = 0
-            glowOpacity = 0
-        }
-        withAnimation(.easeIn(duration: 0.75)) {
-            flightOffset = CGSize(width: 130, height: -260)
-            flightScale = 0.35
-            flightRotation = .degrees(18)
-            flightOpacity = 0
+        withAnimation(.easeOut(duration: 0.7)) {
+            markOpacity = 1
+            markScale = 1
         }
 
-        try? await Task.sleep(for: .seconds(0.55))
-        withAnimation(.easeIn(duration: 0.3)) { overlayOpacity = 0 }
-        try? await Task.sleep(for: .seconds(0.3))
+        try? await Task.sleep(for: .seconds(0.4))
+        withAnimation(.easeOut(duration: 0.45)) {
+            nameOpacity = 1
+        }
 
-        onFinished()
-    }
-
-    /// Eenvoudige fade in/uit zonder beweging, voor "Beweging beperken".
-    @MainActor
-    private func runReducedMotionSequence() async {
+        try? await Task.sleep(for: .seconds(0.2))
         withAnimation(.easeOut(duration: 0.4)) {
-            logoOpacity = 1
-            wordmarkOpacity = 1
-            taglineOpacity = 1
-            glowOpacity = 1
+            subtitleOpacity = 1
         }
 
-        try? await Task.sleep(for: .seconds(0.9))
-
-        withAnimation(.easeIn(duration: 0.35)) {
+        try? await Task.sleep(for: .seconds(0.75))
+        withAnimation(.easeInOut(duration: 0.45)) {
             overlayOpacity = 0
         }
-
-        try? await Task.sleep(for: .seconds(0.35))
+        try? await Task.sleep(for: .seconds(0.45))
         onFinished()
     }
 }

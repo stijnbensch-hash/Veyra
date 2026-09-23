@@ -249,8 +249,13 @@ struct VeyraRecentLiveTVHomeView: View {
         )
         .focusEffectDisabled()
         .onTapGesture {
-            selectedSource =
-                guide.play(row)
+            let directSource = guide.play(row)
+            Task {
+                selectedSource = await VeyraLocalLiveFallback.shared.source(
+                    for: row.channel,
+                    original: directSource
+                )
+            }
         }
         .scaleEffect(
             focused ? 1.012 : 1

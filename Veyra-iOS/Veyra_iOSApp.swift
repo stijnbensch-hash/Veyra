@@ -67,6 +67,8 @@ struct Veyra_iOSApp: App {
                     .zIndex(1)
                 }
             }
+            .statusBarHidden(showLaunchAnimation)
+            .persistentSystemOverlays(showLaunchAnimation ? .hidden : .automatic)
         }
     }
 }

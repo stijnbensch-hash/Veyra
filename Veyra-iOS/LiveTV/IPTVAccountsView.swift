@@ -66,6 +66,24 @@ struct IPTVAccountsView: View {
                 }
             }
 
+            if let activeProvider = viewModel.providers.first(where: { $0.id == activeID }) {
+                Section("Inhoud beheren") {
+                    NavigationLink {
+                        IPTVLiveVisibilityView()
+                    } label: {
+                        Label("Live TV-kanalen", systemImage: "tv")
+                    }
+
+                    if case .xtream = activeProvider.configuration {
+                        NavigationLink {
+                            IPTVVODVisibilityView()
+                        } label: {
+                            Label("VOD-categorieën en titels", systemImage: "film")
+                        }
+                    }
+                }
+            }
+
             if let errorMessage = viewModel.errorMessage {
                 Section {
                     Text(errorMessage).foregroundStyle(.red)

@@ -230,12 +230,14 @@ struct LiveTVView: View {
     private func startLivePlayback(
         _ selected: VeyraEPGSelection
     ) {
-        pendingSource =
-            guide.play(
-                selected.row
+        let directSource = guide.play(selected.row)
+        Task {
+            pendingSource = await VeyraLocalLiveFallback.shared.source(
+                for: selected.row.channel,
+                original: directSource
             )
-
-        selection = nil
+            selection = nil
+        }
     }
 
     // MARK: - Provider dialog
@@ -700,7 +702,7 @@ struct LiveTVView: View {
             geometry in
 
             let channelWidth:
-                CGFloat = 190
+                CGFloat = 250
 
             let timelineWidth =
                 max(
@@ -723,7 +725,7 @@ struct LiveTVView: View {
                     )
                     .font(
                         .system(
-                            size: 13,
+                            size: 15,
                             weight: .medium
                         )
                     )
@@ -945,7 +947,7 @@ struct LiveTVView: View {
                             )
                         }
                         .frame(
-                            height: 88
+                            height: 108
                         )
                         .id(
                             row.id
@@ -998,7 +1000,7 @@ struct LiveTVView: View {
                 )
                 .font(
                     .system(
-                        size: 15,
+                        size: 17,
                         weight: .medium
                     )
                 )
@@ -1087,7 +1089,7 @@ struct LiveTVView: View {
                     )
                     .font(
                         .system(
-                            size: 16,
+                            size: 19,
                             weight: .semibold
                         )
                     )
@@ -1106,7 +1108,7 @@ struct LiveTVView: View {
                         )
                         .font(
                             .system(
-                                size: 12
+                                size: 14
                             )
                         )
                         .foregroundStyle(
@@ -1124,8 +1126,8 @@ struct LiveTVView: View {
             )
             .frame(
                 maxWidth: .infinity,
-                minHeight: 88,
-                maxHeight: 88
+                minHeight: 108,
+                maxHeight: 108
             )
         }
         .buttonStyle(
@@ -1271,7 +1273,7 @@ struct LiveTVView: View {
                 )
                 .font(
                     .system(
-                        size: 26
+                        size: 32
                     )
                 )
                 .foregroundStyle(
@@ -1285,8 +1287,8 @@ struct LiveTVView: View {
             logoOverrideVersion
         )
         .frame(
-            width: 56,
-            height: 50
+            width: 76,
+            height: 68
         )
     }
 
@@ -1350,7 +1352,7 @@ struct LiveTVView: View {
                             )
                             .font(
                                 .system(
-                                    size: 17,
+                                    size: 20,
                                     weight: .semibold
                                 )
                             )
@@ -1390,7 +1392,7 @@ struct LiveTVView: View {
                                 }
                                 .font(
                                     .system(
-                                        size: 12
+                                        size: 14
                                     )
                                 )
                             }
@@ -1416,7 +1418,7 @@ struct LiveTVView: View {
                                 0,
                                 span - 3
                             ),
-                        height: 88,
+                        height: 108,
                         alignment:
                             .topLeading
                     )

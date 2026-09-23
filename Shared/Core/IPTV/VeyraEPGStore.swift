@@ -388,16 +388,19 @@ final class VeyraEPGStore: ObservableObject {
             loadingGuide = false
 
             if !Task.isCancelled {
-                if let failure = error as? IPTVServiceError {
+                if !channels.isEmpty {
+                    // The saved catalog is still usable while the provider is offline.
+                    channelError = nil
+                    guideMessage = "Opgeslagen zenders worden getoond; verversen is tijdelijk niet mogelijk."
+                    if let configuration = try? configStore.load() {
+                        await loadGuide(configuration: configuration, token: token)
+                    }
+                } else if let failure = error as? IPTVServiceError {
                     channelError = failure.localizedDescription
                 } else if let failure = error as? XtreamError {
                     channelError = failure.localizedDescription
                 } else {
                     channelError = "De providers of zenders konden niet worden geladen. Controleer de verbinding en kies Vernieuwen."
-                }
-                if !channels.isEmpty,
-                   let configuration = try? configStore.load() {
-                    await loadGuide(configuration: configuration, token: token)
                 }
             }
         }
