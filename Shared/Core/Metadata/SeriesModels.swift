@@ -73,4 +73,22 @@ struct TMDBEpisode: Decodable, Identifiable, Hashable {
         case airDate = "air_date"
         case voteAverage = "vote_average"
     }
+
+    /// `airDate` (TMDB-formaat "yyyy-MM-dd") als volledige, leesbare datum,
+    /// bv. "15 maart 2024" — gebruikt op de afleveringenschermen (tvOS/iOS).
+    var formattedAirDate: String? {
+        Self.formattedAirDate(from: airDate)
+    }
+
+    static func formattedAirDate(from raw: String?) -> String? {
+        guard let raw, !raw.isEmpty else { return nil }
+        let parser = DateFormatter()
+        parser.locale = Locale(identifier: "en_US_POSIX")
+        parser.dateFormat = "yyyy-MM-dd"
+        guard let date = parser.date(from: raw) else { return raw }
+        let display = DateFormatter()
+        display.locale = Locale(identifier: "nl_BE")
+        display.setLocalizedDateFormatFromTemplate("d MMMM yyyy")
+        return display.string(from: date)
+    }
 }

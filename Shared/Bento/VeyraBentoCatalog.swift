@@ -869,12 +869,12 @@ struct VeyraBentoCatalogView: View {
     private func card(_ title: BentoTMDBTitle) -> some View {
         #if os(tvOS)
         Button { onOpen(title) } label: {
-            VeyraBentoPosterContent(title: title.title, url: title.posterURL, posterHeight: 360, titleSize: 24, watchedID: title.id, watchedKind: title.kind)
+            VeyraBentoPosterContent(title: title.title, url: title.posterURL, kind: title.kind, posterHeight: 360, titleSize: 24, watchedID: title.id, watchedKind: title.kind)
         }
         .buttonStyle(VeyraPosterFocusStyle())
         #else
         Button { onOpen(title) } label: {
-            VeyraBentoPosterContent(title: title.title, url: title.posterURL, compact: true, titleSize: 15, fillWidth: true, watchedID: title.id, watchedKind: title.kind)
+            VeyraBentoPosterContent(title: title.title, url: title.posterURL, compact: true, kind: title.kind, titleSize: 15, fillWidth: true, watchedID: title.id, watchedKind: title.kind)
         }
         .buttonStyle(.plain)
         #endif
@@ -1093,14 +1093,16 @@ struct VeyraCollectionEditorView: View {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 16) {
                                 ForEach(options, id: \.self) { url in
-                                    Button { setImage(url.absoluteString) } label: {
-                                        AsyncImage(url: url) { phase in
-                                            if let image = phase.image { image.resizable().scaledToFill() } else { Color.white.opacity(0.08) }
-                                        }
-                                        .frame(width: 240, height: 135)
-                                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                    AsyncImage(url: url) { phase in
+                                        if let image = phase.image { image.resizable().scaledToFill() } else { Color.white.opacity(0.08) }
                                     }
-                                    .buttonStyle(.plain)
+                                    .frame(width: 240, height: 135)
+                                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                    .contentShape(Rectangle())
+                                    // Een `Button` in een horizontale ScrollView binnenin een Form-rij
+                                    // krijgt op iOS soms geen tikken (de rij "wint" de gesture) — een
+                                    // losse tap-gesture op de afbeelding zelf werkt wel betrouwbaar.
+                                    .onTapGesture { setImage(url.absoluteString) }
                                 }
                             }
                             .padding(8)

@@ -107,6 +107,12 @@ struct SeasonEpisodesView: View {
                         .font(.subheadline.weight(.semibold))
                         .lineLimit(2)
 
+                    if let airDate = episode.formattedAirDate {
+                        Text(airDate)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
                     if let overview = episode.overview, !overview.isEmpty {
                         Text(overview)
                             .font(.caption)

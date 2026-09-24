@@ -74,38 +74,26 @@ struct SourceResolver {
     func sources(
         for item: MediaItem
     ) async -> [PlayableSource] {
-        let addonValues =
-            await addonSources(
-                for: item
-            )
+        // Addons, IPTV en mediaservers zijn onafhankelijke bronnen — parallel
+        // bevragen in plaats van na elkaar scheelt merkbaar in wachttijd.
+        async let addonValues = addonSources(for: item)
+        async let iptvValues = iptvSources(for: item)
+        async let mediaServerValues = jellyfinSources(for: item)
+
+        let (addons, iptv, mediaServers) =
+            await (addonValues, iptvValues, mediaServerValues)
 
         guard
             !Task.isCancelled
         else {
             return []
         }
-
-        let iptvValues =
-            await iptvSources(
-                for: item
-            )
-
-        guard
-            !Task.isCancelled
-        else {
-            return []
-        }
-
-        let mediaServerValues =
-            await jellyfinSources(
-                for: item
-            )
 
         return Self
             .deduplicated(
-                addonValues
-                    + iptvValues
-                    + mediaServerValues
+                addons
+                    + iptv
+                    + mediaServers
             )
             .map(\.source)
     }
@@ -115,40 +103,44 @@ struct SourceResolver {
     func addonSources(
         for item: MediaItem
     ) async -> [ResolvedSource] {
-        var result:
-            [ResolvedSource] = []
+        let registrations =
+            addonRegistry.registeredProviders()
 
-        for registration
-            in addonRegistry.registeredProviders()
-        {
-            do {
-                try Task
-                    .checkCancellation()
+        guard !registrations.isEmpty else { return [] }
 
-                let provider =
-                    registration.provider
+        // Elke addon apart bevragen kost een eigen netwerk-roundtrip; dat
+        // parallel doen (in plaats van op zijn beurt) is de belangrijkste
+        // winst voor "bronnen zoeken" bij meerdere geïnstalleerde addons.
+        let result = await withTaskGroup(
+            of: [ResolvedSource].self
+        ) { group -> [ResolvedSource] in
+            for registration in registrations {
+                group.addTask {
+                    guard !Task.isCancelled else { return [] }
 
-                let addonName =
-                    Self.cleanName(
-                        registration.addonName
-                    )
-                    ?? provider.name
+                    let provider =
+                        registration.provider
 
-                let values =
-                    try await provider
-                        .sources(
-                            for: item
+                    let addonName =
+                        Self.cleanName(
+                            registration.addonName
                         )
+                        ?? provider.name
 
-                // BELANGRIJK:
-                //
-                // Alle streams die deze addon teruggeeft
-                // krijgen DEZELFDE originName.
-                //
-                // We gebruiken dus NIET stream.name.
-                result.append(
-                    contentsOf:
-                        values.map { source in
+                    do {
+                        let values =
+                            try await provider
+                                .sources(
+                                    for: item
+                                )
+
+                        // BELANGRIJK:
+                        //
+                        // Alle streams die deze addon teruggeeft
+                        // krijgen DEZELFDE originName.
+                        //
+                        // We gebruiken dus NIET stream.name.
+                        return values.map { source in
                             ResolvedSource(
                                 source:
                                     source,
@@ -156,16 +148,19 @@ struct SourceResolver {
                                     addonName
                             )
                         }
-                )
-
-            } catch is CancellationError {
-                return []
-
-            } catch {
-                // Een mislukte addon blokkeert
-                // de overige addons niet.
-                continue
+                    } catch {
+                        // Een mislukte addon blokkeert
+                        // de overige addons niet.
+                        return []
+                    }
+                }
             }
+
+            var all: [ResolvedSource] = []
+            for await values in group {
+                all.append(contentsOf: values)
+            }
+            return all
         }
 
         return Self
@@ -225,37 +220,38 @@ struct SourceResolver {
             return []
         }
 
-        var result:
-            [ResolvedSource] = []
+        // Meerdere gekoppelde Jellyfin-servers ook parallel bevragen, om
+        // dezelfde reden als bij de addons hierboven.
+        let result = await withTaskGroup(
+            of: [ResolvedSource].self
+        ) { group -> [ResolvedSource] in
+            for account in accounts {
+                group.addTask {
+                    guard !Task.isCancelled else { return [] }
 
-        for account in accounts {
-            do {
-                try Task
-                    .checkCancellation()
-
-                let provider =
-                    JellyfinSourceProvider(
-                        account: account
-                    )
-
-                let values =
-                    try await provider
-                        .resolvedSources(
-                            for: item
+                    let provider =
+                        JellyfinSourceProvider(
+                            account: account
                         )
 
-                result.append(
-                    contentsOf: values
-                )
-
-            } catch is CancellationError {
-                return []
-
-            } catch {
-                // Een mediaserver die niet bereikbaar is
-                // blokkeert de overige bronnen niet.
-                continue
+                    do {
+                        return try await provider
+                            .resolvedSources(
+                                for: item
+                            )
+                    } catch {
+                        // Een mediaserver die niet bereikbaar is
+                        // blokkeert de overige bronnen niet.
+                        return []
+                    }
+                }
             }
+
+            var all: [ResolvedSource] = []
+            for await values in group {
+                all.append(contentsOf: values)
+            }
+            return all
         }
 
         return Self

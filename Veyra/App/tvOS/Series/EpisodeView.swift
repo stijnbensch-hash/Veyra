@@ -111,8 +111,7 @@ struct EpisodeView: View {
                     Text("Seizoen \(episode.seasonNumber)")
                     Text("Aflevering \(episode.episodeNumber)")
 
-                    if let airDate = episode.airDate,
-                       !airDate.isEmpty {
+                    if let airDate = episode.formattedAirDate {
                         Text(airDate)
                     }
                 }
