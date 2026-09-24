@@ -238,6 +238,13 @@ struct PlayerSubtitleControls: View {
                 guard !panelVisible else { return }
                 // Do not remove the timeline while a slow seek is pending.
                 guard seekController.previewTime == nil else { continue }
+                // Focus niet wegnemen van de "Volgende aflevering"-knop
+                // terwijl die actief in beeld staat. Zonder deze guard
+                // verloor de knop na 6s stilstand zijn remote-focus (ging
+                // naar het onzichtbare `.surface`), terwijl hij zelf wel
+                // gewoon zichtbaar bleef staan tot het einde van de
+                // aflevering -- de knop was dan niet meer selecteerbaar.
+                guard !showNextEpisodeOverlay else { continue }
                 presentation.hideControls()
                 focused = .surface
                 return

@@ -47,16 +47,30 @@ struct StremioAddonProvider:
     func resolvedSources(
         for item: MediaItem
     ) async throws -> [ResolvedSource] {
+        // Gebruik het IMDb-ID wanneer dat er is; anders vallen we terug op
+        // de native catalogus-ID van de bron-addon (`catalogItemID`) — dat
+        // is hoe een eigen Stremio-achtige addon zoals serioussportsync
+        // losse sportwedstrijden identificeert, die geen IMDb-ID hebben.
+        let trimmedImdbID =
+            item.imdbID?
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+
+        let trimmedCatalogItemID =
+            item.catalogItemID?
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+
         guard
             let imdbID =
-                item.imdbID?
-                    .trimmingCharacters(
-                        in: .whitespacesAndNewlines
-                    ),
-            !imdbID.isEmpty
+                [trimmedImdbID, trimmedCatalogItemID]
+                    .compactMap({ $0 })
+                    .first(where: { !$0.isEmpty })
         else {
             debug(
-                "Geen IMDb-ID beschikbaar."
+                "Geen IMDb-ID of catalogus-ID beschikbaar."
             )
 
             return []

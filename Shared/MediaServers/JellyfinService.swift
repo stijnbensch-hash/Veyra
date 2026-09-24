@@ -39,7 +39,8 @@ struct JellyfinService {
         recursive: Bool = true,
         searchTerm: String? = nil,
         sortBy: String = "SortName",
-        limit: Int? = nil
+        limit: Int? = nil,
+        ids: [String]? = nil
     ) async throws -> [JellyfinItem] {
         var queryItems: [URLQueryItem] = [
             URLQueryItem(
@@ -101,6 +102,15 @@ struct JellyfinService {
             )
         }
 
+        if let ids, !ids.isEmpty {
+            queryItems.append(
+                URLQueryItem(
+                    name: "Ids",
+                    value: ids.joined(separator: ",")
+                )
+            )
+        }
+
         let url = endpoint(
             "Users/\(account.userID)/Items",
             queryItems: queryItems
@@ -110,6 +120,17 @@ struct JellyfinService {
 
         return try JellyfinItemsResponseDecoder
             .decode(data)
+    }
+
+    /// Haalt precies één item rechtstreeks op via zijn eigen Jellyfin-ID
+    /// (in plaats van via een titel-zoekopdracht) — betrouwbaarder voor
+    /// items met een wisselvallige of dynamische titel, zoals losse
+    /// sportwedstrijden uit een livetv-bibliotheek.
+    func item(id: String) async throws -> JellyfinItem? {
+        try await items(
+            includeItemTypes: [],
+            ids: [id]
+        ).first
     }
 
     func search(

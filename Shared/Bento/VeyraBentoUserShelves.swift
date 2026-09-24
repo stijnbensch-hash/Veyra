@@ -70,15 +70,26 @@ private struct VeyraBentoUserShelf: View {
             #endif
         } else {
             // Geen TMDB-titel (bv. IPTV) — zelfde generieke doorverwijzing als
-            // de andere planken-rijen (`ShelfRowView`) gebruiken.
+            // de andere planken-rijen (`ShelfRowView`) gebruiken, met een
+            // bron-badge zodat duidelijk is waar de titel vandaan komt.
             #if os(tvOS)
             NavigationLink { ShelfItemDestination(item: item) } label: {
-                VeyraBentoPosterContent(title: item.title, url: item.posterURL, compact: compact)
+                VeyraBentoPosterContent(title: item.title, url: item.posterURL, compact: compact, sourceLabel: shelf.source.subtitle)
             }
             .buttonStyle(VeyraPosterFocusStyle())
             #else
-            NavigationLink { ShelfItemDestination(item: item) } label: {
-                VeyraBentoPosterContent(title: item.title, url: item.posterURL, compact: compact)
+            // Deze tak gaat buiten `HomeDestinations`/`HomeActiveTracking`
+            // om (rechtstreekse push, geen `bentoXxx`-binding) — zonder deze
+            // twee modifiers zou `HomeNavigationState.isAtRoot` hier ten
+            // onrechte `true` blijven en zouden de zwevende zoek-/
+            // instellingenknoppen boven dit scherm blijven hangen, of net
+            // (bij een eerder al verkeerd gebleven status) niet meer
+            // terugkomen na het teruggaan.
+            NavigationLink { ShelfItemDestination(item: item)
+                .onAppear { HomeNavigationState.shared.setActive(true, source: "shelf-item") }
+                .onDisappear { HomeNavigationState.shared.setActive(false, source: "shelf-item") }
+            } label: {
+                VeyraBentoPosterContent(title: item.title, url: item.posterURL, compact: compact, sourceLabel: shelf.source.subtitle)
             }
             .buttonStyle(.plain)
             #endif

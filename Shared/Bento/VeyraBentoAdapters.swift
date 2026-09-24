@@ -431,6 +431,9 @@ nonisolated struct BentoTMDBTitle: Identifiable, Hashable, Sendable {
     let title: String
     let posterURL: URL?
     var backdropURL: URL? = nil
+    // Alleen gebruikt om "nieuwste eerst" te kunnen sorteren op de
+    // streamingdienst-overzichtspagina; niet gevuld door elke bron.
+    var releaseDate: Date? = nil
 }
 
 /// Recent uitgebrachte titels (films ≤ 45 dagen, series ≤ 60 dagen), op populariteit, via TMDB `discover`.

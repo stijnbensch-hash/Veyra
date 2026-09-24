@@ -978,6 +978,15 @@ final class TraktStore: ObservableObject {
             playback.removeAll {
                 $0.matches(item)
             }
+
+            // Alleen een echte stop (niet enkel pauzeren vlak voor het
+            // einde) telt bij Trakt ook als "bekeken" in de
+            // kijkgeschiedenis -- dat lokaal meteen mee bijwerken, anders
+            // duurt het tot de volgende volledige sync voor het
+            // "bekeken"-vinkje verschijnt.
+            if action == "stop" {
+                markWatchedLocally(item)
+            }
         } else if let index = playback.firstIndex(where: {
             $0.matches(item)
         }) {
@@ -993,6 +1002,45 @@ final class TraktStore: ObservableObject {
             )
         }
 
+        saveHomeCache()
+    }
+
+    /// Zet een net afgespeeld item lokaal meteen op "bekeken", in het
+    /// juiste formaat voor `isWatched(_:)`/`TraktWatchedStatus.resolve` --
+    /// voor films een los entry, voor afleveringen de genest-per-seizoen
+    /// vorm die de Trakt "watched shows"-sync gebruikt (`seasons`), niet de
+    /// platte `show`+`episode`-vorm van `makeLocalEntry` (die is voor
+    /// geschiedenis-/afspeel-entries, geen "bekeken"-overzicht).
+    private func markWatchedLocally(_ item: MediaItem) {
+        guard !isWatched(item) else { return }
+
+        if item.type == .movie {
+            watchedMovies.append(makeLocalEntry(for: item, progress: 100, pausedAt: ISO8601DateFormatter().string(from: Date())))
+            saveHomeCache()
+            return
+        }
+
+        guard let season = item.seasonNumber, let episode = item.episodeNumber else { return }
+        let ids = TraktIDs(imdb: item.imdbID, tmdb: item.tmdbID)
+
+        if let index = watchedShows.firstIndex(where: { $0.show?.ids.matches(ids) ?? false }) {
+            var seasons = watchedShows[index].seasons ?? []
+            if let seasonIndex = seasons.firstIndex(where: { $0.number == season }) {
+                if !seasons[seasonIndex].episodes.contains(where: { $0.number == episode }) {
+                    seasons[seasonIndex].episodes.append(TraktWatchedEpisode(number: episode, plays: 1))
+                }
+            } else {
+                seasons.append(TraktWatchedSeason(number: season, episodes: [TraktWatchedEpisode(number: episode, plays: 1)]))
+            }
+            watchedShows[index].seasons = seasons
+        } else {
+            let show = TraktMedia(title: item.title, year: nil, ids: ids, season: nil, number: nil, overview: nil)
+            watchedShows.append(TraktEntry(
+                id: nil, rank: nil, type: "episode", movie: nil, show: show, episode: nil, season: nil,
+                progress: 100, rating: nil, watchedAt: nil, pausedAt: nil, plays: nil,
+                seasons: [TraktWatchedSeason(number: season, episodes: [TraktWatchedEpisode(number: episode, plays: 1)])]
+            ))
+        }
         saveHomeCache()
     }
 
@@ -1077,14 +1125,18 @@ final class TraktStore: ObservableObject {
             item.traktKind != "show",
             progress.isFinite
         else {
+            print("[TraktScrobble] \(action) GEBLOKKEERD door guard: isConnected=\(isConnected) scrobblingEnabled=\(scrobblingEnabled) canSyncTrakt=\(item.canSyncTrakt) traktKind=\(item.traktKind) progress=\(progress) tmdb=\(item.traktIDs.tmdb ?? -1) imdb=\(item.traktIDs.imdb ?? "nil")")
             return
         }
 
         if action != "start",
            progress < 1
         {
+            print("[TraktScrobble] \(action) GEBLOKKEERD: progress \(progress) < 1")
             return
         }
+
+        print("[TraktScrobble] \(action) wordt verstuurd, item=\(item.title) progress=\(progress)")
 
         let boundedProgressForLocalUpdate =
             min(100, max(0, progress))
@@ -1144,6 +1196,8 @@ final class TraktStore: ObservableObject {
                                 ]
                             )
 
+                    print("[TraktScrobble] \(action) GELUKT voor \(item.title) progress=\(boundedProgress)")
+
                     if action == "stop" {
                         await self
                             .refreshAfterMutation()
@@ -1156,15 +1210,18 @@ final class TraktStore: ObservableObject {
                         _
                     )
                 {
+                    print("[TraktScrobble] \(action) 409 (al verwerkt door Trakt) voor \(item.title)")
                     if action == "stop" {
                         await self
                             .refreshAfterMutation()
                     }
 
                 } catch is CancellationError {
+                    print("[TraktScrobble] \(action) GEANNULEERD (nieuwe scrobble kwam ertussen) voor \(item.title)")
                     return
 
                 } catch {
+                    print("[TraktScrobble] \(action) MISLUKT voor \(item.title): \(error)")
                     guard
                         self.revision
                             == snapshot

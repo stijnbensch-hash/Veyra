@@ -42,21 +42,34 @@ final class TraktPlaybackTracker {
         sample()
         switch state {
         case .playing:
-            guard let engine, engine.duration.isFinite, engine.duration > 0 else { return }
+            guard let engine, engine.duration.isFinite, engine.duration > 0 else {
+                print("[TraktTracker] .playing genegeerd (duration nog onbekend): duration=\(engine?.duration ?? -1)")
+                return
+            }
             hasPlayed = true
             if lastEvent != "start" {
+                print("[TraktTracker] -> scrobble(start) item=\(item.title) progress=\(lastProgress) duration=\(engine.duration)")
                 store.scrobble("start", item: item, progress: lastProgress)
                 lastEvent = "start"
             }
         case .paused:
-            guard hasPlayed, lastEvent != "pause" else { return }
+            guard hasPlayed, lastEvent != "pause" else {
+                print("[TraktTracker] .paused genegeerd hasPlayed=\(hasPlayed) lastEvent=\(lastEvent ?? "nil")")
+                return
+            }
+            print("[TraktTracker] -> scrobble(pause) item=\(item.title) progress=\(lastProgress)")
             store.scrobble("pause", item: item, progress: lastProgress)
             lastEvent = "pause"
         case .ended:
-            guard hasPlayed else { return }
+            guard hasPlayed else {
+                print("[TraktTracker] .ended genegeerd, hasPlayed=false (start is dus nooit gelukt)")
+                return
+            }
             lastProgress = 100
+            print("[TraktTracker] .ended -> finish(100)")
             finish(samplePosition: false)
         case .error:
+            print("[TraktTracker] .error -> finish()")
             finish()
         case .idle, .loading, .seeking:
             break
@@ -69,6 +82,11 @@ final class TraktPlaybackTracker {
         if samplePosition { sample() }
         finished = true
         subscriptions.removeAll()
-        if hasPlayed { store.scrobble("stop", item: item, progress: lastProgress) }
+        if hasPlayed {
+            print("[TraktTracker] -> scrobble(stop) item=\(item.title) progress=\(lastProgress)")
+            store.scrobble("stop", item: item, progress: lastProgress)
+        } else {
+            print("[TraktTracker] finish() maar hasPlayed=false, geen stop verstuurd. item=\(item.title)")
+        }
     }
 }

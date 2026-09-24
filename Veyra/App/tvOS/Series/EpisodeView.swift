@@ -76,7 +76,7 @@ struct EpisodeView: View {
                 )
             }
 
-        } else if let mediaItem {
+        } else {
             VStack(
                 alignment: .leading,
                 spacing: 26
@@ -192,17 +192,14 @@ struct EpisodeView: View {
 
     // MARK: - Media item
 
+    // Geen `guard` meer op een aanwezige IMDb-ID — zie de toelichting bij
+    // `loadExternalIDs()` hieronder: zonder deze versoepeling werd de hele
+    // bronnenkiezer overgeslagen (ook IPTV/mediaserver-bronnen) zodra TMDB
+    // zelf geen IMDb-ID voor de serie had geregistreerd.
     private var mediaItem:
-        MediaItem?
+        MediaItem
     {
-        guard
-            let imdbID,
-            !imdbID.isEmpty
-        else {
-            return nil
-        }
-
-        return MediaItem(
+        MediaItem(
             // BELANGRIJK:
             // Voor seriesources moet dit de
             // SERIETITEL zijn, niet de
@@ -357,20 +354,12 @@ struct EpisodeView: View {
             try Task
                 .checkCancellation()
 
-            guard
-                let imdbID =
-                    externalIDs.imdbID,
-                !imdbID.isEmpty
-            else {
-                errorMessage =
-                    "Voor deze serie is geen IMDb-ID beschikbaar."
-
-                isLoading = false
-                return
-            }
-
+            // Ontbreekt TMDB's eigen IMDb-ID voor deze serie (komt vaker
+            // voor bij regionale/Belgische series), dan blijft `imdbID`
+            // gewoon `nil` — dat blokkeert alleen addon-bronnen die er zelf
+            // een nodig hebben, niet de hele bronnenkiezer (zie `mediaItem`).
             self.imdbID =
-                imdbID
+                externalIDs.imdbID
 
         } catch is CancellationError {
             return

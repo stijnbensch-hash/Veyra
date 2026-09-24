@@ -37,7 +37,8 @@ struct ShelfRowView: View {
                                     symbol: item.type == .movie ? "film" : "tv",
                                     width: 130,
                                     genre: item.genre,
-                                    rating: item.rating
+                                    rating: item.rating,
+                                    sourceLabel: item.tmdbID == nil ? shelf.source.subtitle : nil
                                 )
                             }
                             .buttonStyle(.plain)

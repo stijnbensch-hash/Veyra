@@ -47,6 +47,14 @@ nonisolated struct VeyraHomeLayout: Codable, Equatable, Sendable {
         order = tiles.map(\.rawValue)
         preset = nil
     }
+
+    /// Voor `.onMove` op iOS (sleepbalkje in de lijst).
+    mutating func move(fromOffsets offsets: IndexSet, toOffset destination: Int) {
+        var tiles = orderedTiles
+        tiles.move(fromOffsets: offsets, toOffset: destination)
+        order = tiles.map(\.rawValue)
+        preset = nil
+    }
 }
 
 /// Een startpunt voor de indeling, te kiezen bij de eerste start en later in Instellingen.

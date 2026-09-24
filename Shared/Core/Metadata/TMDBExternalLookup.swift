@@ -51,4 +51,48 @@ enum TMDBExternalLookup {
     private struct TMDBFindItem: Decodable {
         let id: Int
     }
+
+    /// Vangnet als er geen (bruikbare) IMDb-ID is: zoekt op titel via TMDB's
+    /// eigen zoekfunctie en pakt het eerste resultaat. Minder betrouwbaar dan
+    /// een ID-opzoeking (kan bij een generieke titel mis grijpen), maar beter
+    /// dan een item dat helemaal niet naar TMDB gelinkt is — vooral nodig
+    /// voor mediaserver-bronnen (VeyraHub) die vooralsnog geen `ProviderIds`
+    /// meesturen voor al hun bibliotheken.
+    static func tmdbID(forTitle title: String, year: Int? = nil, kind: ShelfMediaKind) async -> Int? {
+        guard let token = AppConfiguration.tmdbReadAccessToken else { return nil }
+
+        do {
+            if kind == .movie {
+                let results = try await TMDBClient(readAccessToken: token).searchMovies(query: title)
+                return bestMatch(results.map { ($0.id, $0.releaseDate) }, year: year)
+            } else if let service = SeriesService() {
+                let results = try await service.searchSeries(query: title)
+                return bestMatch(results.map { ($0.id, $0.firstAirDate) }, year: year)
+            }
+            return nil
+        } catch {
+            return nil
+        }
+    }
+
+    /// Verkiest, als er een jaartal bekend is, het eerste zoekresultaat
+    /// waarvan het release-/uitzendjaar overeenkomt — zonder dit kon een
+    /// titel-zoekopdracht een compleet andere, gelijknamige of populairdere
+    /// titel als eerste resultaat teruggeven en dus de verkeerde titel
+    /// linken. Zonder jaartal (of geen match erop) gewoon het eerste
+    /// resultaat, zoals TMDB ze op relevantie sorteert.
+    private static func bestMatch(_ candidates: [(Int, String?)], year: Int?) -> Int? {
+        guard !candidates.isEmpty else { return nil }
+
+        if let year {
+            if let matched = candidates.first(where: { _, date in
+                guard let date, date.count >= 4 else { return false }
+                return Int(date.prefix(4)) == year
+            }) {
+                return matched.0
+            }
+        }
+
+        return candidates.first?.0
+    }
 }

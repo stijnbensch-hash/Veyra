@@ -9,10 +9,12 @@ enum ShelfCatalogService {
         switch shelf.source {
         case .trakt(let list, let kind):
             let raw = await traktItems(list: list, kind: kind)
-            return await enrichWithArtwork(raw, kind: kind)
+            let linked = await linkToTMDB(raw, kind: kind)
+            return await enrichWithArtwork(linked, kind: kind)
 
         case .tmdb(let list, let kind):
-            return await tmdbItems(list: list, kind: kind)
+            let raw = await tmdbItems(list: list, kind: kind)
+            return await linkToTMDB(raw, kind: kind)
 
         case .addon(let addonID, _, let catalogType, let catalogID, _):
             return await addonItems(addonID: addonID, catalogType: catalogType, catalogID: catalogID)
@@ -138,7 +140,8 @@ enum ShelfCatalogService {
                     posterURL: meta.posterURL ?? item.posterURL,
                     backdropURL: meta.backdropURL ?? item.backdropURL,
                     genre: item.genre,
-                    rating: item.rating
+                    rating: item.rating,
+                    catalogItemID: item.catalogItemID
                 )
             }
         }
@@ -158,7 +161,8 @@ enum ShelfCatalogService {
                     posterURL: imageURL(details.posterPath),
                     backdropURL: imageURL(details.backdropPath, size: "w1280"),
                     genre: item.genre,
-                    rating: details.voteAverage ?? item.rating
+                    rating: details.voteAverage ?? item.rating,
+                    catalogItemID: item.catalogItemID
                 )
             }
         } else if kind == .series, let service = SeriesService() {
@@ -174,7 +178,8 @@ enum ShelfCatalogService {
                     posterURL: imageURL(details.posterPath),
                     backdropURL: imageURL(details.backdropPath, size: "w1280"),
                     genre: item.genre,
-                    rating: details.voteAverage ?? item.rating
+                    rating: details.voteAverage ?? item.rating,
+                    catalogItemID: item.catalogItemID
                 )
             }
         }
@@ -329,8 +334,25 @@ enum ShelfCatalogService {
     }
 
     private static func resolveTMDBID(_ item: MediaItem, kind: ShelfMediaKind) async -> MediaItem {
-        guard item.tmdbID == nil, let imdbID = item.imdbID, !imdbID.isEmpty else { return item }
-        guard let found = await TMDBExternalLookup.tmdbID(forIMDbID: imdbID, kind: kind) else { return item }
+        guard item.tmdbID == nil else { return item }
+
+        var found: Int?
+        if let imdbID = item.imdbID, !imdbID.isEmpty {
+            found = await TMDBExternalLookup.tmdbID(forIMDbID: imdbID, kind: kind)
+        }
+        // Geen (bruikbare) IMDb-ID, of de opzoeking daarmee leverde niets op
+        // (bv. VeyraHub-bibliotheken zonder `ProviderIds`) — laatste redmiddel:
+        // op titel zoeken. Geef er een jaartal bij als we dat weten, anders
+        // kan een generieke titel de verkeerde (populairdere, gelijknamige)
+        // titel als match opleveren.
+        if found == nil {
+            let year = item.releaseDate.flatMap { date -> Int? in
+                guard date.count >= 4 else { return nil }
+                return Int(date.prefix(4))
+            }
+            found = await TMDBExternalLookup.tmdbID(forTitle: item.title, year: year, kind: kind)
+        }
+        guard let found else { return item }
 
         return MediaItem(
             id: item.id,
@@ -349,7 +371,8 @@ enum ShelfCatalogService {
             rating: item.rating,
             streamURL: item.streamURL,
             iptvSeriesID: item.iptvSeriesID,
-            iptvProviderName: item.iptvProviderName
+            iptvProviderName: item.iptvProviderName,
+            catalogItemID: item.catalogItemID
         )
     }
 
@@ -390,7 +413,13 @@ enum ShelfCatalogService {
             posterURL: service.imageURL(for: item, kind: .primary),
             backdropURL: service.imageURL(for: item, kind: .backdrop),
             genre: item.primaryGenre,
-            rating: item.communityRating
+            rating: item.communityRating,
+            // Bewaar het eigen Jellyfin/VeyraHub-item-ID — voor items zonder
+            // IMDb-ID (zoals losse sportwedstrijden uit een livetv-bibliotheek)
+            // kan `JellyfinSourceProvider` hiermee het item rechtstreeks
+            // opnieuw opzoeken in plaats van (onbetrouwbaar) op titel te
+            // moeten zoeken.
+            catalogItemID: item.id
         )
     }
 }

@@ -35,6 +35,12 @@ struct MediaItem: Identifiable, Hashable {
     let iptvSeriesID: Int?
     let iptvProviderName: String?
 
+    // Native catalogus-ID van de bron-addon (zoals een Stremio-achtige
+    // catalogus meegeeft), voor items zonder IMDb-ID — bv. losse
+    // sportwedstrijden uit een eigen addon (zoals serioussportsync).
+    // `StremioAddonProvider` valt hierop terug wanneer `imdbID` ontbreekt.
+    let catalogItemID: String?
+
     init(
         id: UUID = UUID(),
         title: String,
@@ -52,7 +58,8 @@ struct MediaItem: Identifiable, Hashable {
         rating: Double? = nil,
         streamURL: URL? = nil,
         iptvSeriesID: Int? = nil,
-        iptvProviderName: String? = nil
+        iptvProviderName: String? = nil,
+        catalogItemID: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -71,6 +78,7 @@ struct MediaItem: Identifiable, Hashable {
         self.streamURL = streamURL
         self.iptvSeriesID = iptvSeriesID
         self.iptvProviderName = iptvProviderName
+        self.catalogItemID = catalogItemID
     }
 }
 

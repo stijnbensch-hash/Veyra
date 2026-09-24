@@ -133,7 +133,8 @@ struct AIOMetaItem: Decodable, Hashable {
             overview: description,
             releaseDate: releaseInfo,
             posterURL: posterURL,
-            backdropURL: backdropURL
+            backdropURL: backdropURL,
+            catalogItemID: id
         )
     }
 }

@@ -416,6 +416,9 @@ struct VeyraBentoPosterContent: View {
     /// TMDB-id + soort om het "bekeken"-vinkje (Trakt) te tonen.
     var watchedID: Int? = nil
     var watchedKind: MediaKind = .movie
+    /// Naam van de bron (addon/mediaserver/IPTV-provider), alleen getoond
+    /// als dit item niet aan TMDB gekoppeld kon worden — zie `VeyraPosterCard`.
+    var sourceLabel: String? = nil
 
     @State private var fallbackURL: URL?
     @State private var failed = false
@@ -440,6 +443,20 @@ struct VeyraBentoPosterContent: View {
             }
             .modifier(PosterBoxModifier(fill: fillWidth, width: width, height: height))
             .clipped()
+            .overlay(alignment: .topLeading) {
+                if let sourceLabel {
+                    Text(sourceLabel.uppercased())
+                        .font(.system(size: compact ? 8 : 10, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .padding(.horizontal, compact ? 5 : 7)
+                        .padding(.vertical, compact ? 2 : 3)
+                        .background(.black.opacity(0.72), in: Capsule())
+                        .padding(compact ? 6 : 12)
+                        .frame(maxWidth: width - (compact ? 12 : 24), alignment: .leading)
+                }
+            }
             .overlay(alignment: .topTrailing) {
                 if let watchedID {
                     VeyraWatchedBadge(target: watchedKind == .movie ? .movie(TraktIDs(tmdb: watchedID)) : .show(TraktIDs(tmdb: watchedID)),
@@ -457,6 +474,13 @@ struct VeyraBentoPosterContent: View {
                 .multilineTextAlignment(.leading)
                 .modifier(PosterTitleBoxModifier(fill: fillWidth, width: width, height: titleFontSize * 2.7))
         }
+        // Zonder deze twee: in een grid (`fillWidth`) rekte de poster-
+        // afbeelding zelf wel over de volle kolombreedte uit, maar bleef de
+        // VStack eromheen (en dus de knop-hittest-zone erbuiten om) op de
+        // intrinsieke breedte van de tekst staan -- links uitgelijnd. Alleen
+        // het uiterste linkerstuk van de kaart was dan nog aantikbaar.
+        .frame(maxWidth: fillWidth ? .infinity : nil, alignment: .leading)
+        .contentShape(Rectangle())
         .task(id: "\(title)|\(url == nil || failed)") {
             guard let kind, (url == nil || failed), fallbackURL == nil else { return }
             fallbackURL = await VeyraPosterSearch.posterURL(title: title, kind: kind)

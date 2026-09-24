@@ -11,7 +11,7 @@ import PhotosUI
 /// Een streamingdienst (logo) of een filmcollectie (poster) op de bento-home.
 nonisolated struct BentoCatalog: Identifiable, Hashable, Sendable {
     nonisolated enum Source: Hashable, Sendable {
-        case provider(Int)
+        case provider(id: Int, region: String?)
         case collection(Int)
         case traktList(Int)
         /// Een catalogus van een geïnstalleerde addon (bv. AIOMetadata): addon-id, type (movie/series), catalogus-id.
@@ -31,7 +31,7 @@ nonisolated struct BentoCatalog: Identifiable, Hashable, Sendable {
 
     var id: String {
         switch source {
-        case .provider(let value): return "p\(value)"
+        case .provider(let id, _): return "p\(id)"
         case .collection(let value): return "c\(value)"
         case .traktList(let value): return "t\(value)"
         case .addonCatalog(let addon, let type, let catalog): return "a\(addon.uuidString)|\(type)|\(catalog)"
@@ -213,12 +213,19 @@ nonisolated struct BentoStreamingEntry: Codable, Hashable, Identifiable, Sendabl
     var catalogType: String?
     var catalogID: String?
     var customLogo: String?       // https-URL of bestandsnaam van een eigen afbeelding (alleen op dit apparaat)
+    /// Land (ISO 3166-1) waaruit deze dienst is toegevoegd -- bepaalt welke
+    /// `watch_region` gebruikt wordt bij het ophalen van de inhoud (zie
+    /// `discover(kind:provider:region:)`). `nil` bij oude, al opgeslagen
+    /// diensten (van vóór de landkiezer) -- die vallen terug op de
+    /// algemene kijkregio.
+    var watchRegion: String?
 
-    init(providerID: Int, name: String, logoPath: String?) {
+    init(providerID: Int, name: String, logoPath: String?, watchRegion: String? = nil) {
         self.id = "p\(providerID)"
         self.name = name
         self.providerID = providerID
         self.logoPath = logoPath
+        self.watchRegion = watchRegion
     }
 
     init(addonID: UUID, catalogType: String, catalogID: String, name: String) {
@@ -304,6 +311,11 @@ nonisolated struct VeyraCatalogSource: Sendable {
         let results: [Item]
     }
 
+    private nonisolated struct TMDBCountry: Decodable {
+        let iso_3166_1: String
+        let native_name: String
+    }
+
     private nonisolated struct CollectionSearch: Decodable {
         nonisolated struct Item: Decodable {
             let id: Int
@@ -345,6 +357,8 @@ nonisolated struct VeyraCatalogSource: Sendable {
             let name: String?
             let poster_path: String?
             let backdrop_path: String?
+            let release_date: String?
+            let first_air_date: String?
         }
         let results: [Item]
     }
@@ -381,6 +395,10 @@ nonisolated struct VeyraCatalogSource: Sendable {
         UserDefaults.standard.string(forKey: "catalog.watchRegion") ?? "BE"
     }
 
+    /// Publieke, alleen-lezen toegang tot de algemene kijkregio -- gebruikt als
+    /// standaardwaarde voor de landkiezer in de streamingdiensten-instellingen.
+    static var currentRegion: String { region }
+
     private static func imageURL(_ path: String?, size: String) -> URL? {
         guard let path, !path.isEmpty else { return nil }
         return URL(string: "https://image.tmdb.org/t/p/\(size)\(path)")
@@ -389,8 +407,11 @@ nonisolated struct VeyraCatalogSource: Sendable {
     // MARK: Streamingdiensten
 
     /// Alle aanbieders in je regio (zonder winkels), op populariteit; voor de standaardlijst en de kiezer in Instellingen.
-    func regionalProviders() async -> [BentoStreamingEntry] {
-        let region = Self.region
+    /// `region` is optioneel: standaard je algemene kijkregio (`catalog.watchRegion`), maar de
+    /// kiezer in Instellingen kan hier ook een ANDER land doorgeven om diensten uit dat land te
+    /// kunnen toevoegen, zonder je eigen regio-instelling te wijzigen.
+    func regionalProviders(region: String? = nil) async -> [BentoStreamingEntry] {
+        let region = region ?? Self.region
         let cached = await VeyraCatalogCache.shared.cachedProviderEntries(region: region)
         if !cached.isEmpty { return cached }
         guard let page = await VeyraTMDBHTTP.get("/watch/providers/movie",
@@ -398,7 +419,7 @@ nonisolated struct VeyraCatalogSource: Sendable {
                                                  as: ProviderPage.self) else { return [] }
         let entries = page.results
             .sorted { ($0.display_priority ?? 999) < ($1.display_priority ?? 999) }
-            .map { BentoStreamingEntry(providerID: $0.provider_id, name: $0.provider_name, logoPath: $0.logo_path) }
+            .map { BentoStreamingEntry(providerID: $0.provider_id, name: $0.provider_name, logoPath: $0.logo_path, watchRegion: region) }
         if !entries.isEmpty { await VeyraCatalogCache.shared.setProviderEntries(entries, region: region) }
         return entries
     }
@@ -422,9 +443,23 @@ nonisolated struct VeyraCatalogSource: Sendable {
         return list
     }
 
-    /// Aanbieders die je nog kunt toevoegen (winkels vallen af).
-    func selectableProviders() async -> [BentoStreamingEntry] {
-        await regionalProviders().filter { !Self.isExcluded($0.name) }
+    /// Aanbieders die je nog kunt toevoegen (winkels vallen af). `region` optioneel: zie `regionalProviders(region:)`.
+    func selectableProviders(region: String? = nil) async -> [BentoStreamingEntry] {
+        await regionalProviders(region: region).filter { !Self.isExcluded($0.name) }
+    }
+
+    /// Landen waaruit je diensten kunt kiezen (ISO 3166-1-code + lokale naam), gesorteerd op naam.
+    /// Gebruikt TMDB's eigen configuratie-endpoint, zodat de lijst exact overeenkomt met de landen
+    /// die TMDB voor `/watch/providers` ondersteunt.
+    func availableProviderCountries() async -> [(code: String, name: String)] {
+        guard let countries = await VeyraTMDBHTTP.get("/configuration/countries", [], as: [TMDBCountry].self) else {
+            return []
+        }
+        let locale = Locale(identifier: "nl_BE")
+        return countries.map { country in
+            let displayName = locale.localizedString(forRegionCode: country.iso_3166_1) ?? country.native_name
+            return (code: country.iso_3166_1, name: displayName)
+        }.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
     /// De eigen lijst van de gebruiker, of anders de standaarddiensten; met breed woordmerk waar dat bekend is.
@@ -466,7 +501,7 @@ nonisolated struct VeyraCatalogSource: Sendable {
                                 imageURL: custom, customLogoURL: custom)
         }
         let providerID = entry.providerID ?? 0
-        return BentoCatalog(source: .provider(providerID), name: entry.name,
+        return BentoCatalog(source: .provider(id: providerID, region: entry.watchRegion), name: entry.name,
                             imageURL: Self.imageURL(entry.logoPath, size: "w154"),
                             brand: Self.networks[providerID]?.brand, customLogoURL: custom)
     }
@@ -558,9 +593,9 @@ nonisolated struct VeyraCatalogSource: Sendable {
 
     func sections(for catalog: BentoCatalog) async -> [BentoCatalogSection] {
         switch catalog.source {
-        case .provider(let id):
-            async let films = discover(kind: .movie, provider: id)
-            async let series = discover(kind: .episode, provider: id)
+        case .provider(let id, let region):
+            async let films = discover(kind: .movie, provider: id, region: region)
+            async let series = discover(kind: .episode, provider: id, region: region)
             let (movieTitles, seriesTitles) = await (films, series)
             var result: [BentoCatalogSection] = []
             if !movieTitles.isEmpty { result.append(BentoCatalogSection(id: "films", heading: "Films", titles: movieTitles)) }
@@ -585,7 +620,17 @@ nonisolated struct VeyraCatalogSource: Sendable {
     }
 
     /// Altijd nieuwste eerst (releasedatum / eerste uitzending, niet in de toekomst).
-    private func discover(kind: MediaKind, provider: Int) async -> [BentoTMDBTitle] {
+    ///
+    /// `sort_by=primary_release_date.desc`/`first_air_date.desc` gecombineerd met
+    /// `with_watch_providers` levert bij TMDB voor veel (vooral kleinere/regionale)
+    /// diensten geregeld 0 resultaten op -- een bekende eigenaardigheid van hun
+    /// discover-API. We sorteren daarom zelf, na het ophalen, en gebruiken
+    /// `sort_by=popularity.desc` om de resultaten betrouwbaar te krijgen. Ook
+    /// `with_watch_monetization_types` stond vast op "flatrate" (alleen betaalde
+    /// abonnementen); gratis/reclame-gefinancierde diensten (bv. publieke omroep-
+    /// apps) worden door TMDB vaak als "free"/"ads" getagd, niet "flatrate" --
+    /// zonder die twee erbij kwamen zulke diensten leeg terug.
+    private func discover(kind: MediaKind, provider: Int, region: String? = nil) async -> [BentoTMDBTitle] {
         let isMovie = kind == .movie
         let path = isMovie ? "/discover/movie" : "/discover/tv"
         let formatter = DateFormatter()
@@ -597,9 +642,9 @@ nonisolated struct VeyraCatalogSource: Sendable {
         for page in 1...3 {
             let query: [URLQueryItem] = [
                 .init(name: "with_watch_providers", value: String(provider)),
-                .init(name: "watch_region", value: Self.region),
-                .init(name: "with_watch_monetization_types", value: "flatrate"),
-                .init(name: "sort_by", value: isMovie ? "primary_release_date.desc" : "first_air_date.desc"),
+                .init(name: "watch_region", value: region ?? Self.region),
+                .init(name: "with_watch_monetization_types", value: "flatrate|free|ads"),
+                .init(name: "sort_by", value: "popularity.desc"),
                 .init(name: isMovie ? "primary_release_date.lte" : "first_air_date.lte", value: today),
                 .init(name: "language", value: "nl-BE"),
                 .init(name: "include_adult", value: "false"),
@@ -608,13 +653,24 @@ nonisolated struct VeyraCatalogSource: Sendable {
             guard let result = await VeyraTMDBHTTP.get(path, query, as: TitlePage.self) else { break }
             for item in result.results {
                 guard let title = item.title ?? item.name, item.poster_path != nil else { continue }
+                let rawDate = isMovie ? item.release_date : item.first_air_date
                 all.append(BentoTMDBTitle(id: item.id, kind: kind, title: title,
                                           posterURL: Self.imageURL(item.poster_path, size: "w342"),
-                                          backdropURL: Self.imageURL(item.backdrop_path, size: "w1280")))
+                                          backdropURL: Self.imageURL(item.backdrop_path, size: "w1280"),
+                                          releaseDate: rawDate.flatMap(formatter.date(from:))))
             }
             if result.results.count < 20 { break }
         }
-        return all
+        // Nieuwste eerst, ongeacht wat TMDB zelf als volgorde teruggaf; titels
+        // zonder (herkenbare) datum komen achteraan i.p.v. de sortering te breken.
+        return all.sorted { lhs, rhs in
+            switch (lhs.releaseDate, rhs.releaseDate) {
+            case let (l?, r?): return l > r
+            case (.some, nil): return true
+            case (nil, .some): return false
+            case (nil, nil): return false
+            }
+        }
     }
 
     private nonisolated struct CollectionImages: Decodable {
@@ -758,33 +814,44 @@ struct VeyraBentoCatalogView: View {
     // MARK: Grote afbeelding
 
     private static func heroImage(catalog: BentoCatalog, sections: [BentoCatalogSection]) -> URL? {
-        if catalog.isService {
-            // Dienst: een willekeurige backdrop uit het aanbod.
-        } else if let url = catalog.imageURL {
+        // Diensten krijgen geen grote achtergrond-hero meer (zie `hero`
+        // hieronder) -- alleen het logo, dus hier ook niet meer de moeite
+        // nemen om er een willekeurige backdrop bij te zoeken.
+        guard !catalog.isService else { return nil }
+        if let url = catalog.imageURL {
             return URL(string: url.absoluteString.replacingOccurrences(of: "/w780/", with: "/w1280/")) ?? url
         }
         let candidates = sections.flatMap { $0.titles }.compactMap { $0.backdropURL }
         return candidates.prefix(12).randomElement()
     }
 
+    @ViewBuilder
     private var hero: some View {
-        ZStack(alignment: .bottomLeading) {
-            Color.white.opacity(0.05)
-            if let heroURL {
-                AsyncImage(url: heroURL) { phase in
-                    if let image = phase.image { image.resizable().scaledToFill() }
-                }
-            }
-            LinearGradient(colors: [.clear, VeyraHomeStyle.ink.opacity(0.92)], startPoint: UnitPoint(x: 0.5, y: 0.25), endPoint: .bottom)
-            LinearGradient(colors: [VeyraHomeStyle.ink.opacity(0.7), .clear], startPoint: .leading, endPoint: UnitPoint(x: 0.7, y: 0.5))
+        if catalog.isService {
+            // Alleen het logo, geen grote achtergrond-afbeelding erboven --
+            // die had toch geen relatie met de dienst zelf (een
+            // willekeurige backdrop uit het aanbod).
             heroTitle
-                .padding(compact ? 16 : 40)
+                .padding(.top, compact ? 4 : 12)
+        } else {
+            ZStack(alignment: .bottomLeading) {
+                Color.white.opacity(0.05)
+                if let heroURL {
+                    AsyncImage(url: heroURL) { phase in
+                        if let image = phase.image { image.resizable().scaledToFill() }
+                    }
+                }
+                LinearGradient(colors: [.clear, VeyraHomeStyle.ink.opacity(0.92)], startPoint: UnitPoint(x: 0.5, y: 0.25), endPoint: .bottom)
+                LinearGradient(colors: [VeyraHomeStyle.ink.opacity(0.7), .clear], startPoint: .leading, endPoint: UnitPoint(x: 0.7, y: 0.5))
+                heroTitle
+                    .padding(compact ? 16 : 40)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: compact ? 220 : 460)
+            .clipShape(RoundedRectangle(cornerRadius: compact ? 20 : 32, style: .continuous))
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(catalog.name)
         }
-        .frame(maxWidth: .infinity)
-        .frame(height: compact ? 220 : 460)
-        .clipShape(RoundedRectangle(cornerRadius: compact ? 20 : 32, style: .continuous))
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(catalog.name)
     }
 
     @ViewBuilder
@@ -905,17 +972,45 @@ struct VeyraCollectionsSettingsView: View {
                 } else if entries.isEmpty {
                     Text("Nog geen collecties.").foregroundStyle(.secondary)
                 }
-                ForEach(entries) { entry in
-                    NavigationLink {
-                        VeyraCollectionEditorView(entryID: entry.id, entries: $entries)
-                    } label: {
-                        row(entry)
+                // Volgorde bepaal je hier rechtstreeks in de lijst (sleepbalkje op
+                // iOS via "Bewerken", knoppen op tvOS) i.p.v. in het deelmenu van
+                // een losse collectie. Op tvOS staan de op/neer-knoppen bewust
+                // NAAST de NavigationLink (niet erin genest) -- een Button genest
+                // in het label van een NavigationLink krijgt op tvOS geen eigen
+                // remote-focus.
+                ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                    HStack(spacing: 14) {
+                        #if !os(iOS)
+                        Image(systemName: "line.3.horizontal")
+                            .foregroundStyle(.secondary)
+                        #endif
+                        NavigationLink {
+                            VeyraCollectionEditorView(entryID: entry.id, entries: $entries)
+                        } label: {
+                            row(entry)
+                        }
+                        #if !os(iOS)
+                        Spacer()
+                        VStack(spacing: 6) {
+                            Button { moveEntry(index, by: -1) } label: {
+                                Image(systemName: "chevron.up")
+                            }.disabled(index == 0)
+                            Button { moveEntry(index, by: 1) } label: {
+                                Image(systemName: "chevron.down")
+                            }.disabled(index >= entries.count - 1)
+                        }
+                        .buttonStyle(.plain)
+                        #endif
                     }
+                }
+                .onMove { offsets, destination in
+                    entries.move(fromOffsets: offsets, toOffset: destination)
+                    VeyraCollectionsStore.save(entries)
                 }
             } header: {
                 Text("Collecties op Home")
             } footer: {
-                Text("Kies een collectie om de volgorde, naam of banner aan te passen, of om hem te verwijderen.")
+                Text("Kies een collectie om de naam of banner aan te passen, of om hem te verwijderen.")
             }
 
             Section {
@@ -967,6 +1062,9 @@ struct VeyraCollectionsSettingsView: View {
             }
         }
         .navigationTitle("Filmcollecties")
+        #if os(iOS)
+        .toolbar { EditButton() }
+        #endif
         .task { await load() }
     }
 
@@ -989,6 +1087,15 @@ struct VeyraCollectionsSettingsView: View {
             }
         }
     }
+
+    #if !os(iOS)
+    private func moveEntry(_ index: Int, by offset: Int) {
+        let target = index + offset
+        guard entries.indices.contains(index), entries.indices.contains(target) else { return }
+        entries.swapAt(index, target)
+        VeyraCollectionsStore.save(entries)
+    }
+    #endif
 
     private func load() async {
         loading = true
@@ -1070,13 +1177,6 @@ struct VeyraCollectionEditorView: View {
                 }
 
                 Section {
-                    Button("Naar boven") { move(index, by: -1) }.disabled(index == 0)
-                    Button("Naar beneden") { move(index, by: 1) }.disabled(index >= entries.count - 1)
-                } header: {
-                    Text("Volgorde (positie \(index + 1) van \(entries.count))")
-                }
-
-                Section {
                     AsyncImage(url: VeyraCollectionsStore.imageURL(for: entries[index])) { phase in
                         if let image = phase.image { image.resizable().scaledToFill() } else { Color.white.opacity(0.08) }
                     }
@@ -1148,13 +1248,6 @@ struct VeyraCollectionEditorView: View {
                 entries[index].name = newValue
                 VeyraCollectionsStore.save(entries)
             })
-    }
-
-    private func move(_ index: Int, by offset: Int) {
-        let target = index + offset
-        guard entries.indices.contains(target) else { return }
-        entries.swapAt(index, target)
-        VeyraCollectionsStore.save(entries)
     }
 
     private func setImage(_ value: String?) {

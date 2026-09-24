@@ -63,19 +63,35 @@ struct VeyraHubNativeClient {
 
     /// Builds the id VeyraHub's native API expects for a media item: the
     /// plain IMDb id for a movie, or "imdbID:season:episode" for an
-    /// episode. Returns nil when there isn't enough information to build a
-    /// lookup id (no IMDb id, or a series item missing season/episode).
+    /// episode. Falls back to the item's own `catalogItemID` when there's
+    /// no IMDb id — e.g. a live sports event from an addon like
+    /// SeriousSportSync, which VeyraHub's `/api/v1/items/.../streams`
+    /// aggregation happily accepts (it just forwards whatever id it's
+    /// given to each addon's own `stream` endpoint; it doesn't require an
+    /// IMDb-shaped id). Without this fallback such items never even reach
+    /// that endpoint, so VeyraHub never calls the addon at all. Returns nil
+    /// only when neither id is available (or a series item is missing
+    /// season/episode).
     static func nativeMediaID(for item: MediaItem) -> String? {
+        let imdbID =
+            item.imdbID?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        let catalogItemID =
+            item.catalogItemID?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+
         guard
-            let imdbID = item.imdbID,
-            !imdbID.isEmpty
+            let id =
+                [imdbID, catalogItemID]
+                    .compactMap({ $0 })
+                    .first(where: { !$0.isEmpty })
         else {
             return nil
         }
 
         switch item.type {
         case .movie:
-            return imdbID
+            return id
 
         case .series:
             guard
@@ -85,7 +101,7 @@ struct VeyraHubNativeClient {
                 return nil
             }
 
-            return "\(imdbID):\(season):\(episode)"
+            return "\(id):\(season):\(episode)"
 
         case .liveTV, .iptvSeries:
             return nil

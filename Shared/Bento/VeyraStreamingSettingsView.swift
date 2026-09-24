@@ -18,17 +18,45 @@ struct VeyraStreamingSettingsView: View {
                 } else if entries.isEmpty {
                     Text("Nog geen streamingdiensten.").foregroundStyle(.secondary)
                 }
-                ForEach(entries) { entry in
-                    NavigationLink {
-                        VeyraStreamingEditorView(entryID: entry.id, entries: $entries)
-                    } label: {
-                        row(entry)
+                // Volgorde bepaal je hier rechtstreeks in de lijst (sleepbalkje op
+                // iOS via "Bewerken", knoppen op tvOS) i.p.v. in het deelmenu van
+                // een losse dienst. Op tvOS staan de op/neer-knoppen bewust NAAST
+                // de NavigationLink (niet erin genest) -- een Button genest in het
+                // label van een NavigationLink krijgt op tvOS geen eigen
+                // remote-focus en zou dus onbruikbaar zijn.
+                ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                    HStack(spacing: 14) {
+                        #if !os(iOS)
+                        Image(systemName: "line.3.horizontal")
+                            .foregroundStyle(.secondary)
+                        #endif
+                        NavigationLink {
+                            VeyraStreamingEditorView(entryID: entry.id, entries: $entries)
+                        } label: {
+                            row(entry)
+                        }
+                        #if !os(iOS)
+                        Spacer()
+                        VStack(spacing: 6) {
+                            Button { moveEntry(index, by: -1) } label: {
+                                Image(systemName: "chevron.up")
+                            }.disabled(index == 0)
+                            Button { moveEntry(index, by: 1) } label: {
+                                Image(systemName: "chevron.down")
+                            }.disabled(index >= entries.count - 1)
+                        }
+                        .buttonStyle(.plain)
+                        #endif
                     }
+                }
+                .onMove { offsets, destination in
+                    entries.move(fromOffsets: offsets, toOffset: destination)
+                    VeyraStreamingStore.save(entries)
                 }
             } header: {
                 Text("Streamingdiensten op Home")
             } footer: {
-                Text("Kies een dienst om de volgorde, naam of het logo aan te passen, of om hem te verwijderen.")
+                Text("Kies een dienst om de naam of het logo aan te passen, of om hem te verwijderen.")
             }
 
             Section {
@@ -49,6 +77,9 @@ struct VeyraStreamingSettingsView: View {
             }
         }
         .navigationTitle("Streamingdiensten")
+        #if os(iOS)
+        .toolbar { EditButton() }
+        #endif
         .task { await load() }
     }
 
@@ -65,6 +96,15 @@ struct VeyraStreamingSettingsView: View {
             }
         }
     }
+
+    #if !os(iOS)
+    private func moveEntry(_ index: Int, by offset: Int) {
+        let target = index + offset
+        guard entries.indices.contains(index), entries.indices.contains(target) else { return }
+        entries.swapAt(index, target)
+        VeyraStreamingStore.save(entries)
+    }
+    #endif
 
     @ViewBuilder
     private func logo(_ entry: BentoStreamingEntry) -> some View {
@@ -98,17 +138,46 @@ struct VeyraStreamingProviderPickerView: View {
     @State private var options: [BentoStreamingEntry] = []
     @State private var loading = true
 
+    // Landkiezer: standaard je algemene kijkregio, maar je kunt hier een
+    // ander land kiezen om diensten van DAT land toe te voegen -- dit
+    // wijzigt alleen wat je hier ziet, niet je algemene regio-instelling.
+    // Diensten van meerdere landen kun je zo naast elkaar toevoegen; de
+    // lijst wordt nooit vervangen, alleen aangevuld (`add(_:)` hieronder).
+    @State private var countries: [(code: String, name: String)] = []
+    @State private var selectedCountryCode: String = VeyraCatalogSource.currentRegion
+    @State private var loadingCountries = true
+
     private var available: [BentoStreamingEntry] {
         options.filter { option in !entries.contains(where: { $0.id == option.id }) }
+    }
+
+    private var selectedCountryName: String {
+        countries.first { $0.code == selectedCountryCode }?.name ?? selectedCountryCode
     }
 
     var body: some View {
         Form {
             Section {
+                if loadingCountries {
+                    ProgressView()
+                } else {
+                    Picker("Land", selection: $selectedCountryCode) {
+                        ForEach(countries, id: \.code) { country in
+                            Text(country.name).tag(country.code)
+                        }
+                    }
+                }
+            } header: {
+                Text("Land")
+            } footer: {
+                Text("Je algemene kijkregio (bij de algemene instellingen) blijft ongewijzigd -- dit kiest alleen uit welk land je hier diensten toevoegt.")
+            }
+
+            Section {
                 if loading {
                     ProgressView()
                 } else if available.isEmpty {
-                    Text("Alle diensten in jouw regio staan al op Home.").foregroundStyle(.secondary)
+                    Text("Alle diensten in \(selectedCountryName) staan al op Home.").foregroundStyle(.secondary)
                 }
                 ForEach(available) { option in
                     Button { add(option) } label: {
@@ -124,20 +193,38 @@ struct VeyraStreamingProviderPickerView: View {
                         }
                     }
                 }
+            } header: {
+                Text("Diensten in \(selectedCountryName)")
             } footer: {
-                Text("De regio stel je in bij de algemene instellingen (standaard België).")
+                Text("Toevoegen vult je bestaande lijst op Home aan -- niets wordt vervangen.")
             }
         }
         .navigationTitle("Diensten in jouw regio")
         .task {
-            options = await VeyraCatalogSource().selectableProviders()
-            loading = false
+            countries = await VeyraCatalogSource().availableProviderCountries()
+            loadingCountries = false
+            await loadProviders()
         }
+        .onChange(of: selectedCountryCode) { _, _ in
+            Task { await loadProviders() }
+        }
+    }
+
+    private func loadProviders() async {
+        loading = true
+        options = await VeyraCatalogSource().selectableProviders(region: selectedCountryCode)
+        loading = false
     }
 
     private func add(_ option: BentoStreamingEntry) {
         guard !entries.contains(where: { $0.id == option.id }) else { return }
-        entries.append(option)
+        // `option` komt uit `selectableProviders(region: selectedCountryCode)`, dus
+        // die is al voor dit land opgehaald -- expliciet meegeven zodat de inhoud
+        // van deze dienst later met de JUISTE `watch_region` wordt opgevraagd
+        // i.p.v. altijd de algemene kijkregio (zie `BentoStreamingEntry.watchRegion`).
+        var entry = option
+        entry.watchRegion = selectedCountryCode
+        entries.append(entry)
         VeyraStreamingStore.save(entries)
     }
 }
@@ -236,13 +323,6 @@ struct VeyraStreamingEditorView: View {
                 }
 
                 Section {
-                    Button("Naar boven") { move(index, by: -1) }.disabled(index == 0)
-                    Button("Naar beneden") { move(index, by: 1) }.disabled(index >= entries.count - 1)
-                } header: {
-                    Text("Volgorde (positie \(index + 1) van \(entries.count))")
-                }
-
-                Section {
                     preview(entries[index])
                         .frame(maxWidth: .infinity)
                         .frame(height: 110)
@@ -298,13 +378,6 @@ struct VeyraStreamingEditorView: View {
                 entries[index].name = newValue
                 VeyraStreamingStore.save(entries)
             })
-    }
-
-    private func move(_ index: Int, by offset: Int) {
-        let target = index + offset
-        guard entries.indices.contains(target) else { return }
-        entries.swapAt(index, target)
-        VeyraStreamingStore.save(entries)
     }
 
     private func setLogo(_ value: String?) {

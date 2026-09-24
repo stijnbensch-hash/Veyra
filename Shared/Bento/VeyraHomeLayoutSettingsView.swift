@@ -77,16 +77,43 @@ struct VeyraHomeLayoutSettingsView: View {
             }
 
             Section {
-                ForEach(layout.orderedTiles, id: \.self) { tile in
-                    NavigationLink {
-                        VeyraHomeTileEditorView(tile: tile, layout: $layout)
-                    } label: {
-                        HStack {
-                            Label(tile.title, systemImage: tile.symbol)
-                            Spacer()
-                            Text(layout.isVisible(tile) ? "Aan" : "Uit").foregroundStyle(.secondary)
+                // Volgorde bepaal je hier rechtstreeks in de lijst (sleepbalkje
+                // op iOS via "Bewerken", knoppen op tvOS) i.p.v. in het
+                // deelmenu van een los blok. Op tvOS staan de op/neer-knoppen
+                // bewust NAAST de NavigationLink (niet erin genest) -- een
+                // Button genest in het label van een NavigationLink krijgt op
+                // tvOS geen eigen remote-focus.
+                ForEach(Array(layout.orderedTiles.enumerated()), id: \.element) { index, tile in
+                    HStack {
+                        #if !os(iOS)
+                        Image(systemName: "line.3.horizontal")
+                            .foregroundStyle(.secondary)
+                        #endif
+                        NavigationLink {
+                            VeyraHomeTileEditorView(tile: tile, layout: $layout)
+                        } label: {
+                            HStack {
+                                Label(tile.title, systemImage: tile.symbol)
+                                Spacer()
+                                Text(layout.isVisible(tile) ? "Aan" : "Uit").foregroundStyle(.secondary)
+                            }
                         }
+                        #if !os(iOS)
+                        VStack(spacing: 6) {
+                            Button { moveTile(index, by: -1) } label: {
+                                Image(systemName: "chevron.up")
+                            }.disabled(index == 0)
+                            Button { moveTile(index, by: 1) } label: {
+                                Image(systemName: "chevron.down")
+                            }.disabled(index >= layout.orderedTiles.count - 1)
+                        }
+                        .buttonStyle(.plain)
+                        #endif
                     }
+                }
+                .onMove { offsets, destination in
+                    layout.move(fromOffsets: offsets, toOffset: destination)
+                    persist()
                 }
             } header: {
                 Text("Blokken op Home (in volgorde)")
@@ -109,6 +136,9 @@ struct VeyraHomeLayoutSettingsView: View {
             }
         }
         .navigationTitle("Indeling")
+        #if os(iOS)
+        .toolbar { EditButton() }
+        #endif
         .onReceive(NotificationCenter.default.publisher(for: .veyraHomeLayoutDidChange)) { _ in
             let fresh = VeyraHomeLayoutStore.load()
             if fresh != layout { layout = fresh }
@@ -116,14 +146,20 @@ struct VeyraHomeLayoutSettingsView: View {
     }
 
     private func persist() { VeyraHomeLayoutStore.save(layout) }
+
+    #if !os(iOS)
+    private func moveTile(_ index: Int, by offset: Int) {
+        let tiles = layout.orderedTiles
+        guard tiles.indices.contains(index) else { return }
+        layout.move(tiles[index], by: offset)
+        persist()
+    }
+    #endif
 }
 
 struct VeyraHomeTileEditorView: View {
     let tile: BentoTile
     @Binding var layout: VeyraHomeLayout
-
-    private var position: Int { layout.orderedTiles.firstIndex(of: tile) ?? 0 }
-    private var count: Int { layout.orderedTiles.count }
 
     var body: some View {
         Form {
@@ -134,21 +170,7 @@ struct VeyraHomeTileEditorView: View {
             } footer: {
                 Text(tile.detail)
             }
-
-            Section {
-                Button("Naar boven") { move(-1) }.disabled(position == 0)
-                Button("Naar beneden") { move(1) }.disabled(position >= count - 1)
-            } header: {
-                Text("Volgorde (positie \(position + 1) van \(count))")
-            } footer: {
-                Text("Blokken die naast elkaar passen delen een rij; de rest schuift automatisch op.")
-            }
         }
         .navigationTitle(tile.title)
-    }
-
-    private func move(_ offset: Int) {
-        layout.move(tile, by: offset)
-        VeyraHomeLayoutStore.save(layout)
     }
 }

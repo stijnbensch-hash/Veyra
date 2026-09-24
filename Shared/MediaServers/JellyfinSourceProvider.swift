@@ -35,6 +35,33 @@ struct JellyfinSourceProvider:
     func resolvedSources(
         for item: MediaItem
     ) async throws -> [ResolvedSource] {
+        // Items die rechtstreeks uit een mediaserver-plank komen (zie
+        // `ShelfCatalogService.mediaItem(from: JellyfinItem, ...)`) dragen
+        // hun eigen Jellyfin-item-ID mee via `catalogItemID`. Zoek daar
+        // eerst op, rechtstreeks bij ID — betrouwbaarder dan titel-zoeken
+        // en werkt ook voor items zonder IMDb-ID, zoals losse
+        // sportwedstrijden uit een livetv-bibliotheek.
+        if let catalogItemID = item.catalogItemID?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !catalogItemID.isEmpty {
+            debug("catalogItemID lookup: \(catalogItemID)")
+            do {
+                if let byID = try await service.item(id: catalogItemID) {
+                    debug("item(id:) gevonden: \(byID.id) · \(byID.name)")
+                    let results = try await playableResults(for: byID)
+                    debug("playableResults via catalogItemID: \(results.count)")
+                    if !results.isEmpty {
+                        return results
+                    }
+                } else {
+                    debug("item(id:) leverde niets op voor \(catalogItemID)")
+                }
+            } catch {
+                debug("item(id:) FOUT: \(error.localizedDescription)")
+            }
+        } else {
+            debug("Geen catalogItemID op dit MediaItem.")
+        }
+
         // Veyra Hub servers can be asked directly by IMDb id through the
         // native API, which doesn't depend on the addon having a
         // searchable catalog the way the Jellyfin title-search path below
@@ -443,4 +470,18 @@ struct JellyfinSourceProvider:
             releaseDate.prefix(4)
         )
     }
+
+
+    // MARK: - Debug
+
+    private func debug(
+        _ message: String
+    ) {
+        #if DEBUG
+        print(
+            "[JellyfinSourceProvider][\(name)] \(message)"
+        )
+        #endif
+    }
+
 }

@@ -128,17 +128,7 @@ struct SeasonEpisodesView: View {
 
     @ViewBuilder
     private func destination(for episode: TMDBEpisode) -> some View {
-        if let mediaItem = mediaItem(for: episode) {
-            SourceSelectionView(item: mediaItem)
-        } else {
-            ContentUnavailableView(
-                "Deze aflevering kan niet worden afgespeeld",
-                systemImage: "exclamationmark.triangle",
-                description: Text(
-                    "Voor deze serie is geen IMDb-ID beschikbaar."
-                )
-            )
-        }
+        SourceSelectionView(item: mediaItem(for: episode))
     }
 
     // MARK: - Error
@@ -209,12 +199,14 @@ struct SeasonEpisodesView: View {
 
     // MARK: - Media item
 
-    private func mediaItem(for episode: TMDBEpisode) -> MediaItem? {
-        guard let imdbID, !imdbID.isEmpty else {
-            return nil
-        }
-
-        return MediaItem(
+    // Geen `guard` meer op een aanwezige IMDb-ID: TMDB heeft die niet voor
+    // elke (vooral regionale/Belgische) serie geregistreerd, en zonder deze
+    // waarde werd de hele bronnenkiezer overgeslagen — ook IPTV- en
+    // mediaserver-bronnen, die geen IMDb-ID nodig hebben. `imdbID` mag hier
+    // dus gewoon `nil` zijn; addon-bronnen die er wél een nodig hebben
+    // leveren dan simpelweg niets op, andere bronnen werken gewoon door.
+    private func mediaItem(for episode: TMDBEpisode) -> MediaItem {
+        MediaItem(
             // Voor seriebronnen moet dit de serietitel zijn,
             // niet de afleveringstitel.
             title: series.name,

@@ -33,7 +33,8 @@ struct ShelfRowView: View {
                                     symbol: item.type == .movie ? "film" : "tv",
                                     width: 220,
                                     genre: item.genre,
-                                    rating: item.rating
+                                    rating: item.rating,
+                                    sourceLabel: item.tmdbID == nil ? shelf.source.subtitle : nil
                                 )
                             }
                             .buttonStyle(VeyraFocusButtonStyle(radius: VeyraRadius.poster))

@@ -10,6 +10,10 @@ struct VeyraPosterCard: View {
     var genre: String? = nil
     /// TMDB-score (0-10), bv. 7.2. `nil` als onbekend.
     var rating: Double? = nil
+    /// Naam van de bron (addon/mediaserver/IPTV-provider), alleen getoond
+    /// als dit item niet aan TMDB gekoppeld kon worden — zodat duidelijk is
+    /// waar de titel vandaan komt als de rijke TMDB-info ontbreekt.
+    var sourceLabel: String? = nil
 
     @AppStorage(PosterEnrichmentDefaults.modeKey)
     private var enrichmentSourceRaw = PosterEnrichmentMode.off.rawValue
@@ -87,6 +91,20 @@ struct VeyraPosterCard: View {
 #if !os(tvOS)
             .shadow(color: .black.opacity(0.28), radius: 6, y: 3)
 #endif
+            .overlay(alignment: .topLeading) {
+                if let sourceLabel {
+                    Text(sourceLabel.uppercased())
+                        .font(.system(size: enrichmentFontSize, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .padding(.horizontal, enrichmentHPadding)
+                        .padding(.vertical, enrichmentVPadding)
+                        .background(.black.opacity(0.72), in: Capsule())
+                        .padding(6)
+                        .frame(maxWidth: width - 12, alignment: .leading)
+                }
+            }
             .overlay(alignment: .bottom) {
                 if let enrichmentText {
                     Text(enrichmentText)
