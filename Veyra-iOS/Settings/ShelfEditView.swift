@@ -457,8 +457,13 @@ struct ShelfEditView: View {
 
         do {
             let libraries = try await JellyfinService(account: account).libraries()
-            let wantedType = kind == .movie ? "movies" : "tvshows"
-            availableLibraries = libraries.filter { $0.collectionType == wantedType }
+            // VeyraHub geeft sport/live-tv-catalogi door als CollectionType
+            // "livetv" (geen eigen Films/Series-knop in deze plankeditor),
+            // maar levert hun items zelf altijd als "Movie" af — dus die
+            // bibliotheken horen bij de "Films"-kant van de toggle, naast de
+            // echte "movies"-bibliotheken.
+            let wantedTypes: Set<String> = kind == .movie ? ["movies", "livetv"] : ["tvshows"]
+            availableLibraries = libraries.filter { $0.collectionType.map(wantedTypes.contains) ?? false }
 
             // Bij het bewerken van een bestaande plank staat `selectedLibrary`
             // eerst nog op een kale placeholder (alleen id/naam, geen groep) —
