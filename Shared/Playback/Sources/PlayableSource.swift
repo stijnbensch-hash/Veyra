@@ -21,6 +21,14 @@ struct PlayableSource: Identifiable, Hashable {
 
     let requiresSoftwareVideo: Bool
 
+    /// Present only for a source that came from a VeyraHub server's native
+    /// API — carries what's needed to read back and report this title's
+    /// resume position to that same hub. nil for every other source
+    /// (addons, IPTV, a "real" Jellyfin/Emby server): those aren't
+    /// VeyraHub-progress-synced (Trakt-based resume, via `TraktStore`,
+    /// still covers them independently of this).
+    let progressSync: VeyraHubProgressSync?
+
     init(
         id: UUID = UUID(),
         name: String,
@@ -29,7 +37,8 @@ struct PlayableSource: Identifiable, Hashable {
         url: URL,
         kind: SourceKind,
         providerName: String? = nil,
-        requiresSoftwareVideo: Bool = false
+        requiresSoftwareVideo: Bool = false,
+        progressSync: VeyraHubProgressSync? = nil
     ) {
         self.id = id
         self.name = name
@@ -40,6 +49,7 @@ struct PlayableSource: Identifiable, Hashable {
         self.providerName = providerName
         self.requiresSoftwareVideo =
             requiresSoftwareVideo
+        self.progressSync = progressSync
     }
 }
 
@@ -49,4 +59,12 @@ enum SourceKind: String, Hashable {
     case liveTV
     case direct
     case iptvVOD
+}
+
+/// What a `PlayableSource` needs to sync its resume position with the
+/// VeyraHub server it came from — see `PlayableSource.progressSync`.
+struct VeyraHubProgressSync: Hashable {
+    let account: MediaServerAccount
+    let mediaType: MediaType
+    let mediaID: String
 }

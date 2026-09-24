@@ -59,6 +59,16 @@ struct VeyraHubNativeClient {
         let subtitles: [NativeSubtitle]
     }
 
+    /// One stored resume position, as VeyraHub's `/progress` endpoint
+    /// returns it. `found == false` means the hub has no (resumable)
+    /// position for this title — either it was never reported, or the
+    /// hub already marked it finished.
+    struct NativeProgress: Decodable, Hashable {
+        let found: Bool
+        let positionSeconds: Double?
+        let durationSeconds: Double?
+    }
+
     // MARK: - Lookup id
 
     /// Builds the id VeyraHub's native API expects for a media item: the
@@ -148,6 +158,49 @@ struct VeyraHubNativeClient {
             .subtitles
     }
 
+    // MARK: - Progress (resume-where-you-left-off)
+
+    /// Reads back the stored resume position for one title, if any.
+    func progress(
+        type: MediaType,
+        id: String
+    ) async throws -> NativeProgress {
+        let data =
+            try await get(
+                nativeType(type),
+                id,
+                "progress"
+            )
+
+        return try JSONDecoder()
+            .decode(
+                NativeProgress.self,
+                from: data
+            )
+    }
+
+    /// Reports the client's current playback position for one title. This
+    /// is best-effort by design (see call sites): a failed report should
+    /// never interrupt playback, so callers swallow the thrown error
+    /// rather than surfacing it.
+    func setProgress(
+        type: MediaType,
+        id: String,
+        positionSeconds: Double,
+        durationSeconds: Double
+    ) async throws {
+        _ = try await send(
+            method: "PUT",
+            pathComponents: [
+                nativeType(type), id, "progress",
+            ],
+            body: [
+                "positionSeconds": positionSeconds,
+                "durationSeconds": durationSeconds,
+            ]
+        )
+    }
+
     // MARK: - Networking
 
     private func nativeType(
@@ -158,6 +211,21 @@ struct VeyraHubNativeClient {
 
     private func get(
         _ pathComponents: String...
+    ) async throws -> Data {
+        try await send(
+            method: "GET",
+            pathComponents: pathComponents,
+            body: nil
+        )
+    }
+
+    /// Shared request builder for both the read-only `get` calls above and
+    /// the JSON-body `setProgress` write, so only one place constructs the
+    /// `.../api/v1/items/...` URL and applies the Bearer token.
+    private func send(
+        method: String,
+        pathComponents: [String],
+        body: [String: Double]?
     ) async throws -> Data {
         var url =
             account.serverURL
@@ -170,11 +238,21 @@ struct VeyraHubNativeClient {
         }
 
         var request = URLRequest(url: url)
+        request.httpMethod = method
 
         request.setValue(
             "Bearer \(account.accessToken)",
             forHTTPHeaderField: "Authorization"
         )
+
+        if let body {
+            request.setValue(
+                "application/json",
+                forHTTPHeaderField: "Content-Type"
+            )
+            request.httpBody =
+                try JSONEncoder().encode(body)
+        }
 
         let (data, response) =
             try await session.data(for: request)

@@ -288,14 +288,14 @@ struct VeyraBentoHomeView: View {
                                 VeyraBentoCollectionMiniContent(title: collection.name, url: collection.imageURL, compact: true, showName: showCollectionNames)
                             }
                             .buttonStyle(.plain)
-                            .frame(width: regular ? 340 : 270, height: (regular ? 116 : 92) + (showCollectionNames ? 22 : 0))
+                            .frame(width: regular ? 385 : 298, height: (regular ? 180 : 141) + (showCollectionNames ? 22 : 0))
                         }
                     }
                 }
                 .scrollIndicators(.hidden)
-                // Ruimte boven de banners zit in het blok zelf (en in de blokhoogte), zodat de afstand
-                // tot het blok erboven gelijk blijft wanneer het blok verplaatst wordt.
-                .padding(.top, 14)
+                // Even veel ruimte boven en onder de banners (in het blok zelf en in de blokhoogte), zodat ze
+                // gecentreerd tussen de kaders staan, ook wanneer het blok verplaatst wordt.
+                .padding(.vertical, 8)
                 .veyraHomeTileMenu(.collecties)
                 .bentoCell(profile.cell(.collecties))
             }

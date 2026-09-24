@@ -9,6 +9,7 @@ final class PlaybackViewModel: ObservableObject {
     @Published private(set) var playbackError: String?
 
     private var tracker: TraktPlaybackTracker?
+    private var veyraHubTracker: VeyraHubPlaybackTracker?
 
     private let source: PlayableSource
     private let item: MediaItem?
@@ -39,8 +40,15 @@ final class PlaybackViewModel: ObservableObject {
                 tracker = TraktPlaybackTracker(item: item, engine: engine.engine)
             }
 
+            if let sync = source.progressSync {
+                veyraHubTracker = VeyraHubPlaybackTracker(sync: sync, engine: engine.engine)
+            }
+
             let playSource = source
-            let playResumeProgress = resumeProgress
+            let playResumeProgress = await Self.resolveResumeProgress(
+                source: source,
+                fallback: resumeProgress
+            )
 
             try await Self.withTimeout(seconds: Self.playbackStartTimeout) {
                 try await engine.play(playSource, resumeProgress: playResumeProgress)
@@ -57,11 +65,13 @@ final class PlaybackViewModel: ObservableObject {
 
         } catch is CancellationError {
             tracker?.finish()
+            veyraHubTracker?.finish()
             playbackEngine?.stop()
             SubtitleService.shared.reset()
 
         } catch {
             tracker?.finish()
+            veyraHubTracker?.finish()
             playbackEngine?.stop()
             SubtitleService.shared.reset()
 
@@ -77,10 +87,12 @@ final class PlaybackViewModel: ObservableObject {
 
     func stopForDisappear() {
         tracker?.finish()
+        veyraHubTracker?.finish()
         playbackEngine?.stop()
         SubtitleService.shared.reset()
 
         tracker = nil
+        veyraHubTracker = nil
         playbackEngine = nil
     }
 
@@ -90,7 +102,46 @@ final class PlaybackViewModel: ObservableObject {
             // de kijkvoortgang meteen afronden/versturen, anders blijft
             // de positie hangen op het laatst bekende afspeel-/pauze-event.
             tracker?.finish()
+            veyraHubTracker?.finish()
             playbackEngine?.stop()
+        }
+    }
+
+    // MARK: - VeyraHub resume
+
+    /// Prefers VeyraHub's own stored resume position (synced across every
+    /// device signed into the same account) over the Trakt-derived
+    /// `resumeProgress` this view model was handed, for a source that came
+    /// from a VeyraHub server. `AetherPlaybackEngine` expects a 0–100
+    /// percentage (see `resolveStartPosition`), so a stored
+    /// positionSeconds/durationSeconds pair is converted here rather than
+    /// changing that engine-side contract for one source type. Falls back
+    /// to `fallback` whenever VeyraHub has no stored position, or the
+    /// lookup fails — a resume-position lookup must never block or break
+    /// starting playback.
+    private static func resolveResumeProgress(
+        source: PlayableSource,
+        fallback: Double?
+    ) async -> Double? {
+        guard let sync = source.progressSync else { return fallback }
+
+        do {
+            let progress = try await VeyraHubNativeClient(account: sync.account)
+                .progress(type: sync.mediaType, id: sync.mediaID)
+
+            guard
+                progress.found,
+                let position = progress.positionSeconds,
+                let duration = progress.durationSeconds,
+                duration > 0, position > 0
+            else {
+                return fallback
+            }
+
+            return min(100, max(0, position / duration * 100))
+        } catch {
+            print("[PlaybackViewModel] VeyraHub resume-opzoeking mislukt: \(error.localizedDescription)")
+            return fallback
         }
     }
 

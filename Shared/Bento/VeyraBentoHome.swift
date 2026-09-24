@@ -344,13 +344,14 @@ struct VeyraBentoHomeView: View {
                             }
                             .buttonStyle(VeyraBannerFocusStyle())
                             .focused($focus, equals: .shelf("col-\(collection.id)"))
-                            .frame(width: 520, height: 178 + (showCollectionNames ? 34 : 0))
+                            .frame(width: 550, height: 248 + (showCollectionNames ? 34 : 0))
                         }
                     }
                     .padding(12)
                 }
                 .scrollClipDisabled()
-                .padding(.top, 24)
+                // Even veel ruimte boven en onder de banners, zodat ze gecentreerd tussen de kaders staan.
+                .frame(maxHeight: .infinity, alignment: .center)
                 .bentoCell(profile.cell(.collecties))
             }
 

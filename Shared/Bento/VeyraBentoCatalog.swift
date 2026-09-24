@@ -1202,7 +1202,7 @@ struct VeyraCollectionEditorView: View {
     private var index: Int? { entries.firstIndex { $0.id == entryID } }
 
     /// Breedte : hoogte van de collectiebanner op Home (270 x 92 op iPhone).
-    private static let bannerAspect: CGFloat = 270.0 / 92.0
+    private static let bannerAspect: CGFloat = 1536.0 / 1024.0
 
     var body: some View {
         Form {
@@ -1236,7 +1236,7 @@ struct VeyraCollectionEditorView: View {
                             HStack(spacing: 16) {
                                 ForEach(options, id: \.self) { url in
                                     Color.white.opacity(0.08)
-                                        .frame(width: 270, height: 270 / Self.bannerAspect)
+                                        .frame(width: 260, height: 260 / Self.bannerAspect)
                                         .overlay {
                                             AsyncImage(url: url) { phase in
                                                 if let image = phase.image { image.resizable().scaledToFill() } else { Color.clear }

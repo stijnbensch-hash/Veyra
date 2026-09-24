@@ -50,6 +50,8 @@ struct SettingsView: View {
                                      subtitle: "Standaardtaal en OpenSubtitles", status: "", statusColor: VeyraColors.cyan)
                         settingsCard(destination: .subtitleAppearance, icon: "textformat.size", title: "Ondertitelweergave",
                                      subtitle: "Grootte, plaatsing, achtergrond", status: "", statusColor: VeyraColors.secondary)
+                        settingsCard(destination: .general, icon: "gearshape", title: "Algemeen",
+                                     subtitle: "Sport en favoriete teams", status: "", statusColor: VeyraColors.secondary)
                         settingsCard(destination: .playback, icon: "play.circle", title: "Afspelen",
                                      subtitle: "Resolutie, taal en oversla-segmenten", status: "", statusColor: VeyraColors.secondary)
                         settingsCard(destination: .metadata, icon: "star.leadinghalf.filled", title: "Metadata",
@@ -129,6 +131,8 @@ struct SettingsView: View {
                 SubtitlePreferencesView()
             case .subtitleAppearance:
                 SubtitleAppearanceSettingsView()
+            case .general:
+                TVGeneralSettingsView()
             case .playback:
                 PlaybackSettingsView()
             case .metadata:
@@ -447,6 +451,7 @@ private enum SettingsDestination:
     case account
     case subtitles
     case subtitleAppearance
+    case general
     case playback
     case metadata
     case shelves

@@ -193,7 +193,7 @@ extension BentoTile {
             case .live, .vandaag: return 520
             case .iptvFilms, .iptvSeries: return 450
             case .streaming: return 156
-            case .collecties: return names ? 260 : 226
+            case .collecties: return names ? 306 : 272
             default: return 300
             }
         case .tablet:
@@ -204,7 +204,7 @@ extension BentoTile {
             case .vandaag: return 308
             case .iptvFilms, .iptvSeries: return 280
             case .streaming: return 76
-            case .collecties: return names ? 152 : 130
+            case .collecties: return names ? 216 : 194
             default: return 200
             }
         case .phone:
@@ -215,7 +215,7 @@ extension BentoTile {
             case .releasesFilms, .releasesSeries: return 300
             case .iptvFilms, .iptvSeries: return 270
             case .streaming: return 60
-            case .collecties: return names ? 128 : 106
+            case .collecties: return names ? 177 : 155
             case .vandaag: return 308
             default: return 200
             }

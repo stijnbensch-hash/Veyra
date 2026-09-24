@@ -745,14 +745,18 @@ struct VeyraBentoCollectionMiniContent: View {
     // Kleur bepaalt de maat (het kader van de aanroeper); het beeld ligt er als overlay op,
     // zodat een breed backdrop-beeld de banner niet breder maakt en over de buren heen loopt.
     private var banner: some View {
-        Color.clear
+        Color.white.opacity(0.05)
             .overlay {
+                // Het kader (deze hele Color-laag) blijft de maat van de aanroeper; de afbeelding zelf
+                // krijgt wat marge zodat ze iets kleiner dan het kader oogt in plaats van het strak te vullen.
                 if let url {
                     AsyncImage(url: url) { phase in
                         if let image = phase.image { image.resizable().scaledToFill() } else { Color.clear }
                     }
+                    .padding(compact ? 3 : 5)
                 } else {
                     VeyraArt(url: nil, seed: title)
+                        .padding(compact ? 3 : 5)
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: compact ? 16 : 22, style: .continuous))

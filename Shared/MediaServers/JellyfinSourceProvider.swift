@@ -143,7 +143,8 @@ struct JellyfinSourceProvider:
             Self.resolvedSource(
                 from: stream,
                 item: item,
-                account: account
+                account: account,
+                mediaID: mediaID
             )
         }
     }
@@ -151,7 +152,8 @@ struct JellyfinSourceProvider:
     private static func resolvedSource(
         from stream: VeyraHubNativeClient.NativeStream,
         item: MediaItem,
-        account: MediaServerAccount
+        account: MediaServerAccount,
+        mediaID: String
     ) -> ResolvedSource? {
         guard
             let url = URL(string: stream.url)
@@ -179,7 +181,12 @@ struct JellyfinSourceProvider:
                 description: stream.description,
                 url: url,
                 kind: .direct,
-                providerName: account.name
+                providerName: account.name,
+                progressSync: VeyraHubProgressSync(
+                    account: account,
+                    mediaType: item.type,
+                    mediaID: mediaID
+                )
             )
 
         // Groepeer net als een lokaal geïnstalleerde addon: op de naam van
