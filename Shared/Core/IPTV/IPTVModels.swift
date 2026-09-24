@@ -65,6 +65,9 @@ nonisolated struct IPTVVODItem: Identifiable, Hashable, Codable, Sendable {
     let categoryID: String?
     let containerExtension: String?
     let sourceType: IPTVSourceType
+    // Wanneer de provider deze titel heeft toegevoegd (Xtream "added") — voor
+    // het sorteren van vers toegevoegde VOD-planken op nieuwste eerst.
+    let added: Date?
 
     init(
         id: String,
@@ -73,7 +76,8 @@ nonisolated struct IPTVVODItem: Identifiable, Hashable, Codable, Sendable {
         posterURL: URL? = nil,
         categoryID: String? = nil,
         containerExtension: String? = nil,
-        sourceType: IPTVSourceType
+        sourceType: IPTVSourceType,
+        added: Date? = nil
     ) {
         self.id = id
         self.name = name
@@ -82,6 +86,7 @@ nonisolated struct IPTVVODItem: Identifiable, Hashable, Codable, Sendable {
         self.categoryID = categoryID
         self.containerExtension = containerExtension
         self.sourceType = sourceType
+        self.added = added
     }
 
     var playableSource: PlayableSource {

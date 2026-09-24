@@ -161,6 +161,9 @@ struct ShelfIPTVChannelPickerView: View {
         let streamURL: URL
         let logoURL: URL?
         let group: String?
+        // Wanneer de provider deze titel heeft toegevoegd (Xtream "added") —
+        // `nil` voor zenders en M3U (geen datum beschikbaar).
+        var addedAt: Date? = nil
     }
 
     private func itemRow(_ item: PickerItem) -> some View {
@@ -375,7 +378,8 @@ struct ShelfIPTVChannelPickerView: View {
                             name: item.name,
                             streamURL: item.streamURL,
                             logoURL: item.posterURL,
-                            group: categoryID
+                            group: categoryID,
+                            addedAt: item.added
                         )
                     )
                 }
@@ -539,7 +543,8 @@ struct ShelfIPTVChannelPickerView: View {
                                 streamURL: item.streamURL,
                                 logoURL: item.logoURL,
                                 group: item.group,
-                                kind: .vod
+                                kind: .vod,
+                                addedAt: item.addedAt
                             )
                         } else {
                             byID.removeValue(forKey: key)
@@ -558,7 +563,8 @@ struct ShelfIPTVChannelPickerView: View {
                                 streamURL: nil,
                                 logoURL: item.coverURL,
                                 group: item.categoryID,
-                                kind: .series
+                                kind: .series,
+                                addedAt: item.added
                             )
                         } else {
                             byID.removeValue(forKey: key)
@@ -571,6 +577,18 @@ struct ShelfIPTVChannelPickerView: View {
             }
         }
 
-        selectedChannels = Array(byID.values)
+        // Nieuwste-toegevoegd-eerst: een `Dictionary`'s `.values` heeft geen
+        // vaste volgorde, dus zonder deze sortering zou de plank in een
+        // willekeurige volgorde staan. Items zonder datum (zenders, M3U, of
+        // planken van vóór dit veld) komen achteraan, in hun bestaande
+        // volgorde t.o.v. elkaar.
+        selectedChannels = Array(byID.values).sorted { lhs, rhs in
+            switch (lhs.addedAt, rhs.addedAt) {
+            case let (l?, r?): return l > r
+            case (.some, nil): return true
+            case (nil, .some): return false
+            case (nil, nil): return false
+            }
+        }
     }
 }

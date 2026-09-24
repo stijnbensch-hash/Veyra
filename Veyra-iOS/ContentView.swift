@@ -88,12 +88,14 @@ struct ContentView: View {
                 }
                 sidebarDetailContent
             }
+            // Het systeem-eigen zijbalk-knopje zit in de toolbar van de
+            // detail-kolom (niet die van de zijbalk zelf) — hier verwijderen
+            // is dus waar het werkt. We tonen al zelf een vaste knop
+            // (`sidebarToggleBar`) zodra de zijbalk ingeklapt is, dus het
+            // automatische knopje zou een tweede, overbodige knop geven.
+            .toolbar(removing: .sidebarToggle)
         }
         .navigationSplitViewStyle(.balanced)
-        // Verwijdert het systeem-eigen zijbalk-knopje — we tonen zelf al een
-        // vaste knop (`sidebarToggleBar`) zodra de zijbalk ingeklapt is, dus
-        // het automatische knopje zou een tweede, overbodige knop geven.
-        .toolbar(removing: .sidebarToggle)
         .tint(VeyraColors.cyan)
         .onChange(of: selectedTab) { _, _ in
             // Een item kiezen in de zijbalk klapt hem meteen weer in, zoals

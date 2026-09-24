@@ -113,6 +113,12 @@ struct ShelfIPTVChannel: Codable, Equatable, Hashable, Identifiable {
     var logoURL: URL?
     var group: String?
     var kind: ShelfIPTVItemKind?
+    // Wanneer de provider deze titel heeft toegevoegd (Xtream "added") — voor
+    // het sorteren van de plank op nieuwste eerst. `nil` bij oudere planken
+    // (van vóór dit veld), bij zenders en bij M3U (geen "added"-datum
+    // beschikbaar). Standaard `nil` zodat bestaande aanroepen van het
+    // memberwise `init` (zonder dit veld) blijven compileren.
+    var addedAt: Date? = nil
 
     var id: String { "\((kind ?? .live).rawValue):\(providerName):\(channelID)" }
 }

@@ -97,24 +97,29 @@ struct SettingsView: View {
                     sidebarList
                         .navigationSplitViewColumnWidth(min: 340, ideal: 400, max: 460)
                 } detail: {
-                    if let selection {
-                        destinationView(selection)
-                    } else {
-                        ZStack {
-                            VeyraColors.background.ignoresSafeArea()
-                            ContentUnavailableView(
-                                "Kies een instelling",
-                                systemImage: "gearshape",
-                                description: Text("Selecteer een onderdeel in de zijbalk.")
-                            )
+                    Group {
+                        if let selection {
+                            destinationView(selection)
+                        } else {
+                            ZStack {
+                                VeyraColors.background.ignoresSafeArea()
+                                ContentUnavailableView(
+                                    "Kies een instelling",
+                                    systemImage: "gearshape",
+                                    description: Text("Selecteer een onderdeel in de zijbalk.")
+                                )
+                            }
                         }
                     }
+                    // Het systeem-eigen zijbalk-knopje zit in de toolbar
+                    // van de detail-kolom, dus daar (en niet op de hele
+                    // NavigationSplitView) moet het verwijderd worden. Dit
+                    // is Instellingen's eigen (geneste) zijbalk, niet de
+                    // hoofd-zijbalk uit ContentView — het systeem-eigen
+                    // knopje daarvoor zou hier als een extra, verwarrende
+                    // tweede zijbalk-knop verschijnen.
+                    .toolbar(removing: .sidebarToggle)
                 }
-                // Dit is Instellingen's eigen (geneste) zijbalk, niet de
-                // hoofd-zijbalk uit ContentView — het systeem-eigen
-                // knopje daarvoor zou hier als een extra, verwarrende
-                // tweede zijbalk-knop verschijnen.
-                .toolbar(removing: .sidebarToggle)
             } else {
                 // iPhone: klassieke gestapelde navigatie.
                 //

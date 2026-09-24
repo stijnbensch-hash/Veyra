@@ -118,6 +118,12 @@ struct VeyraBentoHomeView: View {
         .task { await model.load() }
         .onReceive(NotificationCenter.default.publisher(for: .veyraHomeLayoutDidChange)) { _ in reloadLayout() }
         .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in reloadLayout() }
+        // Anders blijven "IPTV films"/"IPTV series" de oude, al-in-memory
+        // lijst tonen totdat je handmatig ververst (pull-to-refresh) of de
+        // app herstart, ook als je net iets verborgen hebt bij "VOD beheren".
+        .onReceive(NotificationCenter.default.publisher(for: .iptvConfigurationDidChange)) { _ in
+            Task { await model.load(force: true) }
+        }
         .onAppear { askPreset = !VeyraHomeLayoutStore.hasChosen }
         .sheet(isPresented: $askPreset, onDismiss: { VeyraHomeLayoutStore.markChosen() }) {
             VeyraHomePresetPickerView { askPreset = false }

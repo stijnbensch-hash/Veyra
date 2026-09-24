@@ -12,6 +12,15 @@ struct XtreamClient {
         self.session = session
     }
 
+    /// Zet Xtream's "added" veld (unix-timestamp als string, soms "0" of
+    /// leeg als de provider het niet invult) om naar een `Date`.
+    static func date(fromUnixString value: String?) -> Date? {
+        guard let value, let seconds = TimeInterval(value), seconds > 0 else {
+            return nil
+        }
+        return Date(timeIntervalSince1970: seconds)
+    }
+
     // MARK: - Live TV
 
     func liveCategories() async throws -> [IPTVCategory] {
@@ -120,7 +129,8 @@ struct XtreamClient {
                 ),
                 categoryID: stream.categoryID,
                 containerExtension: fileExtension,
-                sourceType: .xtream
+                sourceType: .xtream,
+                added: XtreamClient.date(fromUnixString: stream.added)
             )
         }
     }
@@ -166,7 +176,8 @@ struct XtreamClient {
                 categoryID: value.categoryID,
                 coverURL: URL(
                     string: value.cover ?? ""
-                )
+                ),
+                added: XtreamClient.date(fromUnixString: value.added)
             )
         }
     }
@@ -493,6 +504,9 @@ nonisolated struct XtreamSeriesItem:
     let name: String
     let categoryID: String?
     let coverURL: URL?
+    // Wanneer de provider deze serie heeft toegevoegd (Xtream "added") —
+    // voor het sorteren van vers toegevoegde VOD-planken op nieuwste eerst.
+    let added: Date?
 }
 
 struct XtreamSeriesInfo:
@@ -583,6 +597,8 @@ private struct XtreamVODStreamResponse:
     let streamIcon: String?
     let categoryID: String?
     let containerExtension: String?
+    // Unix-timestamp als string, zoals Xtream "added" teruggeeft.
+    let added: String?
 
     enum CodingKeys:
         String,
@@ -601,6 +617,8 @@ private struct XtreamVODStreamResponse:
 
         case containerExtension =
             "container_extension"
+
+        case added
     }
 }
 
@@ -611,6 +629,8 @@ private struct XtreamSeriesResponse:
     let name: String
     let cover: String?
     let categoryID: String?
+    // Unix-timestamp als string, zoals Xtream "added" teruggeeft.
+    let added: String?
 
     enum CodingKeys:
         String,
@@ -624,6 +644,8 @@ private struct XtreamSeriesResponse:
 
         case categoryID =
             "category_id"
+
+        case added
     }
 }
 
