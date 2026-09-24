@@ -1822,17 +1822,23 @@ struct AccountView:
                     NavigationLink {
                         TraktView()
                     } label: {
-                        Label(
-                            trakt.isConnected ? "Trakt — verbonden" : "Trakt — niet gekoppeld",
-                            systemImage: "checkmark.circle"
-                        )
+                        VeyraSettingsCardRowLabel(
+                            icon: "checkmark.circle",
+                            title: trakt.isConnected ? "Trakt — verbonden" : "Trakt — niet gekoppeld"
+                        ) {
+                            VeyraSettingsCardRowValue(value: nil)
+                        }
                     }
+                    .veyraCardRow()
 
                     NavigationLink {
                         TraktPrivacyView()
                     } label: {
-                        Label("Privacy en gedeelde kijkgegevens", systemImage: "hand.raised")
+                        VeyraSettingsCardRowLabel(icon: "hand.raised", title: "Privacy en gedeelde kijkgegevens") {
+                            VeyraSettingsCardRowValue(value: nil)
+                        }
                     }
+                    .veyraCardRow()
                 } header: {
                     Text("Trakt-account")
                 }
@@ -1843,8 +1849,11 @@ struct AccountView:
                     NavigationLink {
                         SubtitlePreferencesView()
                     } label: {
-                        Label("Taal en ondertitelvoorkeuren", systemImage: "captions.bubble")
+                        VeyraSettingsCardRowLabel(icon: "captions.bubble", title: "Taal en ondertitelvoorkeuren") {
+                            VeyraSettingsCardRowValue(value: nil)
+                        }
                     }
+                    .veyraCardRow()
                 } header: {
                     Text("Ondertitels")
                 }

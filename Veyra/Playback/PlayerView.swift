@@ -100,6 +100,14 @@ struct PlayerView: View {
                         dismiss()
                     },
                     onPlayNextEpisode: { next in
+                        // Stop de tracker/engine van de HUIDIGE aflevering
+                        // hier expliciet, i.p.v. te wachten op onDisappear
+                        // (dat bij een push naar de volgende afspeler niet
+                        // betrouwbaar/direct afgaat) — anders wordt de
+                        // net afgelopen aflevering niet als "bekeken"
+                        // geregistreerd bij Trakt wanneer je op "Volgende"
+                        // drukt i.p.v. de aflevering te laten uitspelen.
+                        viewModel.stopForDisappear()
                         nextEpisodeRequest = next
                     }
                 )

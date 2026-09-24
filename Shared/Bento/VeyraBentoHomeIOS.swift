@@ -32,6 +32,8 @@ struct VeyraBentoHomeView: View {
 
     @AppStorage(GeneralSettingsDefaults.showContinueWatchingKey) private var showContinueWatching = true
     @AppStorage(GeneralSettingsDefaults.showUpcomingKey) private var showUpcoming = true
+    @State private var layout = VeyraHomeLayoutStore.load()
+    @State private var askPreset = false
 
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var sizeClass
@@ -82,14 +84,14 @@ struct VeyraBentoHomeView: View {
                         VeyraStatusMessage(text: message) { Task { await model.load(force: true) } }
                     }
 
-                    if let sportModel, !sportModel.events.isEmpty {
+                    if layout.showSport, let sportModel, !sportModel.events.isEmpty {
                         SportSection(
                             model: sportModel,
                             regular: regular,
                             onPlay: onPlaySport,
                             onToggleReminder: onToggleSportReminder,
                             onOpenCompetition: onOpenCompetition)
-                    } else if let sportModel, sportModel.phase != .idle, sportModel.phase != .loading {
+                    } else if layout.showSport, let sportModel, sportModel.phase != .idle, sportModel.phase != .loading {
                         Button { onOpenCompetition(SportCompetition(name: "Sport", liveCount: 0, eventCount: 0, nextStart: nil)) } label: {
                             VeyraStatusMessage(text: "Sport: geen wedstrijden gevonden. Tik om het Sport-menu te openen.")
                         }
@@ -100,7 +102,7 @@ struct VeyraBentoHomeView: View {
                         bento(now: context.date)
                     }
 
-                    VeyraBentoUserShelves(compact: true, onOpen: onOpenTMDBTitle)
+                    if layout.showShelves { VeyraBentoUserShelves(compact: true, onOpen: onOpenTMDBTitle) }
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
@@ -114,6 +116,12 @@ struct VeyraBentoHomeView: View {
             await sportModel?.load()
         }
         .task { await model.load() }
+        .onReceive(NotificationCenter.default.publisher(for: .veyraHomeLayoutDidChange)) { _ in reloadLayout() }
+        .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in reloadLayout() }
+        .onAppear { askPreset = !VeyraHomeLayoutStore.hasChosen }
+        .sheet(isPresented: $askPreset, onDismiss: { VeyraHomeLayoutStore.markChosen() }) {
+            VeyraHomePresetPickerView { askPreset = false }
+        }
         .task { if let sportModel, sportModel.phase == .idle { await sportModel.load() } }
         .task {
             while !Task.isCancelled {
@@ -143,20 +151,23 @@ struct VeyraBentoHomeView: View {
 
     @ViewBuilder
     private func bento(now: Date) -> some View {
-        let profile: BentoProfile = regular ? .tablet : .phone
         let live = model.liveRows(at: now)
-        let today = model.today(at: now, limit: regular ? 4 : 3)
+        let today = showUpcoming ? model.today(at: now, limit: regular ? 4 : 3) : nil
+        let items = showContinueWatching ? model.home.continueItems : []
+        let present = presentTiles(items: items, live: live, hasToday: today != nil)
+        let profile = BentoProfile.make(regular ? .tablet : .phone, order: layout.orderedTiles.filter { present.contains($0) })
+        let rest = present.contains(.verder) ? Array(items.dropFirst()) : items
 
         VeyraBentoGrid(profile: profile) {
-            if showContinueWatching, let first = model.home.continueItems.first {
+            if present.contains(.verder), let first = items.first {
                 continueButton(first) { VeyraBentoContinueHeroContent(item: first, compact: true) }
                     .bentoCell(profile.cell(.verder))
+            }
 
-                let others = Array(model.home.continueItems.dropFirst())
-                if !others.isEmpty {
+            if present.contains(.volgende) {
                     ScrollView(.horizontal) {
                         HStack(spacing: 10) {
-                            ForEach(others) { item in
+                            ForEach(rest) { item in
                                 continueButton(item, radius: 16) { VeyraBentoContinueMiniContent(item: item, compact: true) }
                                     .frame(width: regular ? 340 : 270, height: regular ? 116 : 92)
                             }
@@ -164,10 +175,9 @@ struct VeyraBentoHomeView: View {
                     }
                     .scrollIndicators(.hidden)
                     .bentoCell(profile.cell(.volgende))
-                }
             }
 
-            if !model.releaseFilms.isEmpty {
+            if present.contains(.releasesFilms) {
                 VeyraBentoShelf(title: "Nieuwe films", subtitle: "Nieuw uitgebracht", compact: true, contentHeight: (regular ? 240 : 190) + 36) {
                     ForEach(model.releaseFilms) { title in
                         Button { onOpenTMDBTitle(title) } label: {
@@ -176,10 +186,11 @@ struct VeyraBentoHomeView: View {
                         .buttonStyle(.plain)
                     }
                 }
+                .veyraHomeTileMenu(.releasesFilms)
                 .bentoCell(profile.cell(.releasesFilms))
             }
 
-            if !model.releaseSeries.isEmpty {
+            if present.contains(.releasesSeries) {
                 VeyraBentoShelf(title: "Nieuwe series", subtitle: "Nieuw uitgebracht", compact: true, contentHeight: (regular ? 240 : 190) + 36) {
                     ForEach(model.releaseSeries) { title in
                         Button { onOpenTMDBTitle(title) } label: {
@@ -188,10 +199,11 @@ struct VeyraBentoHomeView: View {
                         .buttonStyle(.plain)
                     }
                 }
+                .veyraHomeTileMenu(.releasesSeries)
                 .bentoCell(profile.cell(.releasesSeries))
             }
 
-            if !live.isEmpty {
+            if present.contains(.live) {
                 VeyraBentoLiveList(compact: true) {
                     ForEach(live) { row in
                         Button { onPlayChannel(row.channelID) } label: {
@@ -200,15 +212,11 @@ struct VeyraBentoHomeView: View {
                         .buttonStyle(.plain)
                     }
                 }
-                .bentoCell(profile.cell(.live))
-            } else {
-                cell(action: { onOpenLiveTV(nil) }) {
-                    VeyraBentoLiveEmptyContent(compact: true)
-                }
+                .veyraHomeTileMenu(.live)
                 .bentoCell(profile.cell(.live))
             }
 
-            if !model.iptvFilms.isEmpty {
+            if present.contains(.iptvFilms) {
                 VeyraBentoShelf(title: "IPTV films", subtitle: "Nieuw toegevoegd", compact: true) {
                     ForEach(model.iptvFilms) { film in
                         Button { onOpenIPTVFilm(film) } label: {
@@ -217,10 +225,11 @@ struct VeyraBentoHomeView: View {
                         .buttonStyle(.plain)
                     }
                 }
+                .veyraHomeTileMenu(.iptvFilms)
                 .bentoCell(profile.cell(.iptvFilms))
             }
 
-            if !model.iptvSeries.isEmpty {
+            if present.contains(.iptvSeries) {
                 VeyraBentoShelf(title: "IPTV series", subtitle: "Nieuw toegevoegd", compact: true) {
                     ForEach(model.iptvSeries) { series in
                         Button { onOpenIPTVSeries(series) } label: {
@@ -229,10 +238,11 @@ struct VeyraBentoHomeView: View {
                         .buttonStyle(.plain)
                     }
                 }
+                .veyraHomeTileMenu(.iptvSeries)
                 .bentoCell(profile.cell(.iptvSeries))
             }
 
-            if !model.providers.isEmpty {
+            if present.contains(.streaming) {
                 ScrollView(.horizontal) {
                     HStack(spacing: 10) {
                         ForEach(model.providers) { provider in
@@ -248,10 +258,11 @@ struct VeyraBentoHomeView: View {
                     .padding(.vertical, 2)
                 }
                 .scrollIndicators(.hidden)
+                .veyraHomeTileMenu(.streaming)
                 .bentoCell(profile.cell(.streaming))
             }
 
-            if !model.collections.isEmpty {
+            if present.contains(.collecties) {
                 VeyraBentoShelf(title: "Filmcollecties", subtitle: "Complete filmreeksen", compact: true, contentHeight: 134) {
                     ForEach(model.collections) { collection in
                         Button { onOpenCatalog(collection) } label: {
@@ -260,10 +271,11 @@ struct VeyraBentoHomeView: View {
                         .buttonStyle(.plain)
                     }
                 }
+                .veyraHomeTileMenu(.collecties)
                 .bentoCell(profile.cell(.collecties))
             }
 
-            if showUpcoming, let today {
+            if present.contains(.vandaag), let today {
                 cell(action: { if let first = today.items.first { toggle(first) } }) {
                     VeyraBentoTodayContent(today: today, now: now, reminders: model.home.reminderIDs, compact: true)
                 }
@@ -280,6 +292,30 @@ struct VeyraBentoHomeView: View {
                 .bentoCell(profile.cell(.vandaag))
             }
         }
+    }
+
+    /// Welke blokken nu getoond worden: door de gebruiker aangezet én er is iets om te tonen.
+    private func presentTiles(items: [ContinueItem], live: [BentoLiveRow], hasToday: Bool) -> Set<BentoTile> {
+        var present = Set<BentoTile>()
+        func add(_ tile: BentoTile, _ hasContent: Bool) {
+            if layout.isVisible(tile), hasContent { present.insert(tile) }
+        }
+        add(.verder, !items.isEmpty)
+        add(.volgende, items.count > (layout.isVisible(.verder) ? 1 : 0))
+        add(.releasesFilms, !model.releaseFilms.isEmpty)
+        add(.releasesSeries, !model.releaseSeries.isEmpty)
+        add(.live, !live.isEmpty)
+        add(.vandaag, hasToday)
+        add(.iptvFilms, !model.iptvFilms.isEmpty)
+        add(.iptvSeries, !model.iptvSeries.isEmpty)
+        add(.streaming, !model.providers.isEmpty)
+        add(.collecties, !model.collections.isEmpty)
+        return present
+    }
+
+    private func reloadLayout() {
+        let fresh = VeyraHomeLayoutStore.load()
+        if fresh != layout { layout = fresh }
     }
 
     private func cell<Content: View>(action: @escaping () -> Void, @ViewBuilder label: () -> Content) -> some View {

@@ -62,7 +62,7 @@ nonisolated struct VeyraTMDBArtwork: ArtworkProviding {
         guard let token, !token.isEmpty else { return nil }
 
         let path = kind == .movie ? "movie" : "tv"
-        guard var components = URLComponents(string: "https://api.themoviedb.org/3/\(path)/\(tmdbID)/images") else { return nil }
+        guard var components = URLComponents(string: "\(VeyraEndpoints.tmdb)/\(path)/\(tmdbID)/images") else { return nil }
         components.queryItems = [URLQueryItem(name: "include_image_language", value: "nl,en,null")]
         guard let url = components.url else { return nil }
 
@@ -107,7 +107,7 @@ nonisolated struct VeyraTMDBArtwork: ArtworkProviding {
         var identifier = tmdbID
         var path = "movies"
         if kind == .episode {
-            guard let url = URL(string: "https://api.themoviedb.org/3/tv/\(tmdbID)/external_ids") else { return nil }
+            guard let url = URL(string: "\(VeyraEndpoints.tmdb)/tv/\(tmdbID)/external_ids") else { return nil }
             var request = URLRequest(url: url)
             request.timeoutInterval = 10
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -119,7 +119,7 @@ nonisolated struct VeyraTMDBArtwork: ArtworkProviding {
             path = "tv"
         }
 
-        guard let url = URL(string: "https://webservice.fanart.tv/v3/\(path)/\(identifier)?api_key=\(key)") else { return nil }
+        guard let url = URL(string: "\(VeyraEndpoints.fanart)/\(path)/\(identifier)?api_key=\(key)") else { return nil }
         var request = URLRequest(url: url)
         request.timeoutInterval = 10
         guard let (data, response) = try? await URLSession.shared.data(for: request),
@@ -252,7 +252,7 @@ actor VeyraLeagueLogos {
 
     func logo(path: String) async -> URL? {
         if let cached = cache[path] { return cached }
-        guard let url = URL(string: "https://site.api.espn.com/apis/site/v2/sports/\(path)/scoreboard?limit=1") else { return nil }
+        guard let url = URL(string: "\(VeyraEndpoints.sports)/\(path)/scoreboard?limit=1") else { return nil }
         var request = URLRequest(url: url)
         request.timeoutInterval = 12
         guard let (data, response) = try? await URLSession.shared.data(for: request),
@@ -459,7 +459,7 @@ nonisolated struct VeyraTMDBReleases: Sendable {
         let isMovie = kind == .movie
         let from = today.addingTimeInterval(-(isMovie ? 45 : 60) * 86_400)
 
-        guard var components = URLComponents(string: "https://api.themoviedb.org/3/discover/\(isMovie ? "movie" : "tv")") else { return [] }
+        guard var components = URLComponents(string: "\(VeyraEndpoints.tmdb)/discover/\(isMovie ? "movie" : "tv")") else { return [] }
         var items: [URLQueryItem] = [
             .init(name: "language", value: "nl-BE"),
             .init(name: "sort_by", value: "popularity.desc"),
@@ -521,7 +521,7 @@ actor VeyraPosterSearch {
 
         let token: String? = await MainActor.run { AppConfiguration.tmdbReadAccessToken }
         guard let token, !token.isEmpty,
-              var components = URLComponents(string: "https://api.themoviedb.org/3/search/\(kind == .movie ? "movie" : "tv")") else { return nil }
+              var components = URLComponents(string: "\(VeyraEndpoints.tmdb)/search/\(kind == .movie ? "movie" : "tv")") else { return nil }
         components.queryItems = [.init(name: "query", value: query), .init(name: "language", value: "nl-BE"),
                                  .init(name: "include_adult", value: "false")]
         guard let url = components.url else { return nil }

@@ -15,7 +15,7 @@ import SwiftUI
 
 // MARK: - Tegels
 
-enum BentoTile: CaseIterable, Hashable {
+nonisolated enum BentoTile: String, CaseIterable, Hashable, Sendable {
     case verder      // Verder kijken (Trakt)
     case live        // Live nu (EPG + bronstatus)
     case vandaag     // Vandaag (Trakt-kalender)
@@ -29,6 +29,61 @@ enum BentoTile: CaseIterable, Hashable {
     case releasesSeries  // Nieuw uitgebrachte series (TMDB)
     case streaming   // Streamingdiensten (logo's)
     case collecties  // Filmcollecties (franchises)
+}
+
+extension BentoTile {
+    /// De blokken die de gebruiker kan aan- of uitzetten en herschikken.
+    static let configurable: [BentoTile] = [
+        .verder, .releasesFilms, .releasesSeries, .volgende, .live, .vandaag,
+        .iptvFilms, .iptvSeries, .streaming, .collecties
+    ]
+
+    var title: String {
+        switch self {
+        case .verder: return "Verder kijken"
+        case .volgende: return "Verder kijken (rij)"
+        case .releasesFilms: return "Nieuwe films"
+        case .releasesSeries: return "Nieuwe series"
+        case .live: return "Live nu"
+        case .vandaag: return "Binnenkort"
+        case .iptvFilms: return "IPTV films"
+        case .iptvSeries: return "IPTV series"
+        case .streaming: return "Streamingdiensten"
+        case .collecties: return "Filmcollecties"
+        case .tijd, .nieuw, .bronnen: return rawValue
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .verder: return "De titel die je nu kijkt, via Trakt"
+        case .volgende: return "De rest van Verder kijken als kleine kaders"
+        case .releasesFilms: return "Nieuw uitgebrachte films (TMDB)"
+        case .releasesSeries: return "Nieuw uitgebrachte series (TMDB)"
+        case .live: return "Wat er nu op je IPTV-zenders loopt"
+        case .vandaag: return "Aankomende afleveringen en films (Trakt)"
+        case .iptvFilms: return "Nieuw toegevoegde films van je IPTV-provider"
+        case .iptvSeries: return "Nieuw toegevoegde series van je IPTV-provider"
+        case .streaming: return "Netflix, Disney+ en andere diensten"
+        case .collecties: return "Franchises en eigen lijsten"
+        case .tijd, .nieuw, .bronnen: return ""
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .verder, .volgende: return "play.circle"
+        case .releasesFilms: return "film"
+        case .releasesSeries: return "tv"
+        case .live: return "dot.radiowaves.left.and.right"
+        case .vandaag: return "calendar"
+        case .iptvFilms: return "film.stack"
+        case .iptvSeries: return "rectangle.stack"
+        case .streaming: return "play.rectangle.on.rectangle"
+        case .collecties: return "square.stack"
+        case .tijd, .nieuw, .bronnen: return "square"
+        }
+    }
 }
 
 // MARK: - Cel
@@ -108,6 +163,103 @@ struct BentoProfile {
             .collecties:     BentoCell(column: 0, row: 10, columns: 2, rows: 1),
             .vandaag:        BentoCell(column: 0, row: 11, columns: 2, rows: 1),
         ])
+}
+
+// MARK: - Dynamisch raster (volgorde en zichtbaarheid komen van de gebruiker)
+
+enum BentoDevice { case tv, tablet, phone }
+
+extension BentoTile {
+    /// Natuurlijke breedte in kolommen (van 12; op de telefoon altijd de volle 2).
+    fileprivate func span(_ device: BentoDevice) -> Int {
+        if device == .phone { return 2 }
+        switch self {
+        case .verder, .live, .vandaag, .iptvFilms, .iptvSeries: return 6
+        case .releasesFilms, .releasesSeries: return 3
+        default: return 12
+        }
+    }
+
+    /// Hoogte van het blok in punten.
+    fileprivate func height(_ device: BentoDevice) -> CGFloat {
+        switch device {
+        case .tv:
+            switch self {
+            case .verder, .releasesFilms, .releasesSeries: return 504
+            case .volgende: return 206
+            case .live, .vandaag: return 520
+            case .iptvFilms, .iptvSeries: return 450
+            case .streaming: return 168
+            case .collecties: return 372
+            default: return 300
+            }
+        case .tablet:
+            switch self {
+            case .verder, .releasesFilms, .releasesSeries: return 392
+            case .volgende: return 136
+            case .live, .vandaag: return 290
+            case .iptvFilms, .iptvSeries: return 280
+            case .streaming: return 96
+            case .collecties: return 220
+            default: return 200
+            }
+        case .phone:
+            switch self {
+            case .verder, .live: return 292
+            case .volgende: return 112
+            case .releasesFilms, .releasesSeries: return 300
+            case .iptvFilms, .iptvSeries: return 270
+            case .streaming: return 76
+            case .collecties: return 210
+            case .vandaag: return 150
+            default: return 200
+            }
+        }
+    }
+}
+
+extension BentoProfile {
+    /// Legt de opgegeven blokken op volgorde in rijen: blokken die samen in 12 kolommen passen delen een rij,
+    /// en de overgebleven kolommen worden over de blokken van die rij verdeeld (zodat er geen gaten vallen).
+    static func make(_ device: BentoDevice, order: [BentoTile]) -> BentoProfile {
+        let columns = device == .phone ? 2 : 12
+        let spacing: CGFloat = device == .tv ? 24 : 12
+
+        var rows: [[(tile: BentoTile, span: Int)]] = []
+        var current: [(tile: BentoTile, span: Int)] = []
+        var used = 0
+        for tile in order {
+            let span = min(tile.span(device), columns)
+            if used + span > columns, !current.isEmpty {
+                rows.append(current)
+                current = []
+                used = 0
+            }
+            current.append((tile, span))
+            used += span
+        }
+        if !current.isEmpty { rows.append(current) }
+
+        var heights: [CGFloat] = []
+        var cells: [BentoTile: BentoCell] = [:]
+        for (rowIndex, row) in rows.enumerated() {
+            var spans = row.map(\.span)
+            var extra = columns - spans.reduce(0, +)
+            var i = 0
+            while extra > 0, !spans.isEmpty {
+                spans[i % spans.count] += 1
+                extra -= 1
+                i += 1
+            }
+            var column = 0
+            for (index, entry) in row.enumerated() {
+                cells[entry.tile] = BentoCell(column: column, row: rowIndex, columns: spans[index], rows: 1)
+                column += spans[index]
+            }
+            heights.append(row.map { $0.tile.height(device) }.max() ?? 0)
+        }
+        return BentoProfile(columns: columns, rowHeights: heights, spacing: spacing, cells: cells)
+    }
 }
 
 // MARK: - Layout

@@ -25,10 +25,10 @@ struct SubtitleAppearanceSettingsView: View {
 
             List {
                 Section {
-                    VeyraSettingsChoiceRow<VeyraSubtitleSize>("Tekstgrootte", selection: $subtitleSizeRaw)
-                    VeyraSettingsChoiceRow<VeyraSubtitlePosition>("Plaatsing", selection: $subtitlePositionRaw)
-                    VeyraSettingsChoiceRow<VeyraSubtitleBackground>("Achtergrond", selection: $subtitleBackgroundRaw)
-                    Toggle("Schaduw", isOn: $subtitleShadow)
+                    VeyraSettingsChoiceRow<VeyraSubtitleSize>(icon: "textformat.size", "Tekstgrootte", selection: $subtitleSizeRaw)
+                    VeyraSettingsChoiceRow<VeyraSubtitlePosition>(icon: "arrow.up.arrow.down", "Plaatsing", selection: $subtitlePositionRaw)
+                    VeyraSettingsChoiceRow<VeyraSubtitleBackground>(icon: "square.on.square", "Achtergrond", selection: $subtitleBackgroundRaw)
+                    VeyraSettingsToggleRow(icon: "circle.bottomhalf.filled", title: "Schaduw", isOn: $subtitleShadow)
                 } header: {
                     Text("Weergave")
                 } footer: {
@@ -36,12 +36,41 @@ struct SubtitleAppearanceSettingsView: View {
                 }
 
                 Section {
-                    Button("10 sec vroeger") { adjustOffset(by: -10) }
-                    Button("0,1 sec vroeger") { adjustOffset(by: -0.1) }
-                    Button("0,1 sec later") { adjustOffset(by: 0.1) }
-                    Button("10 sec later") { adjustOffset(by: 10) }
+                    Button {
+                        adjustOffset(by: -10)
+                    } label: {
+                        VeyraSettingsCardRowLabel(icon: "gobackward.10", title: "10 sec vroeger")
+                    }
+                    .veyraCardRow()
+
+                    Button {
+                        adjustOffset(by: -0.1)
+                    } label: {
+                        VeyraSettingsCardRowLabel(icon: "arrow.left", title: "0,1 sec vroeger")
+                    }
+                    .veyraCardRow()
+
+                    Button {
+                        adjustOffset(by: 0.1)
+                    } label: {
+                        VeyraSettingsCardRowLabel(icon: "arrow.right", title: "0,1 sec later")
+                    }
+                    .veyraCardRow()
+
+                    Button {
+                        adjustOffset(by: 10)
+                    } label: {
+                        VeyraSettingsCardRowLabel(icon: "goforward.10", title: "10 sec later")
+                    }
+                    .veyraCardRow()
+
                     if subtitleOffset != 0 {
-                        Button("Terugzetten naar 0,0s") { subtitleOffset = 0 }
+                        Button {
+                            subtitleOffset = 0
+                        } label: {
+                            VeyraSettingsCardRowLabel(icon: "arrow.counterclockwise", title: "Terugzetten naar 0,0s")
+                        }
+                        .veyraCardRow()
                     }
                 } header: {
                     Text("Synchronisatie")

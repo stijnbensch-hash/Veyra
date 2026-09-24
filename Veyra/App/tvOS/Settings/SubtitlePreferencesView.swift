@@ -13,14 +13,14 @@ struct SubtitlePreferencesView: View {
                         Button {
                             language = option.rawValue
                         } label: {
-                            HStack {
-                                Text(option.title)
-                                Spacer()
+                            VeyraSettingsCardRowLabel(icon: "globe", title: option.title) {
                                 if language == option.rawValue {
                                     Image(systemName: "checkmark")
+                                        .foregroundStyle(VeyraColors.cyan)
                                 }
                             }
                         }
+                        .veyraCardRow()
                     }
                 } header: {
                     Text("Standaardtaal")
@@ -76,8 +76,17 @@ struct OpenSubtitlesConfigurationCard: View {
                 )
             }
 
-            Toggle("Online ondertitels gebruiken", isOn: $enabled)
-                .disabled(!configured)
+            Button {
+                enabled.toggle()
+            } label: {
+                HStack {
+                    Text("Online ondertitels gebruiken")
+                    Spacer()
+                    VeyraSettingsCardRowSwitch(isOn: enabled)
+                }
+            }
+            .buttonStyle(.plain)
+            .disabled(!configured)
 
             Text("Veyra zoekt hiermee ondertitels in je standaardtaal wanneer een stream die taal niet bevat. Vanuit de speler kun je ook handmatig zoeken. OpenSubtitles ontvangt hiervoor de IMDb-identificatie en, bij series, het seizoen en afleveringsnummer.")
                 .font(.caption)

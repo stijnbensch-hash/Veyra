@@ -134,14 +134,14 @@ private struct PlaybackGeneralSettingsView: View {
 
             List {
                 Section {
-                    Toggle("Automatisch draaien naar liggend", isOn: $autoRotateLandscape)
-                    Toggle("Volgende aflevering automatisch afspelen", isOn: $autoPlayNextEpisode)
-                    Toggle("Eerste bron automatisch selecteren", isOn: $autoSelectFirstSource)
-                    Toggle("Details overslaan bij verdergaan", isOn: $skipContinueWatchingDetails)
+                    VeyraSettingsToggleRow(icon: "rotate.right", title: "Automatisch draaien naar liggend", isOn: $autoRotateLandscape)
+                    VeyraSettingsToggleRow(icon: "play.fill", title: "Volgende aflevering automatisch afspelen", isOn: $autoPlayNextEpisode)
+                    VeyraSettingsToggleRow(icon: "checkmark.circle", title: "Eerste bron automatisch selecteren", isOn: $autoSelectFirstSource)
+                    VeyraSettingsToggleRow(icon: "forward.end", title: "Details overslaan bij verdergaan", isOn: $skipContinueWatchingDetails)
 
-                    VeyraSettingsChoiceRow<PlaybackResolutionOption>("Voorkeursresolutie", selection: $preferredResolutionRaw)
+                    VeyraSettingsChoiceRow<PlaybackResolutionOption>(icon: "rectangle.expand.vertical", "Voorkeursresolutie", selection: $preferredResolutionRaw)
 
-                    VeyraSettingsChoiceRow<PlaybackCellularResolutionOption>("Resolutie via mobiele data", selection: $cellularResolutionRaw)
+                    VeyraSettingsChoiceRow<PlaybackCellularResolutionOption>(icon: "antenna.radiowaves.left.and.right", "Resolutie via mobiele data", selection: $cellularResolutionRaw)
                 } footer: {
                     Text("HDR en Dolby Vision worden automatisch herkend en afgespeeld door de speler — daar is geen instelling voor nodig. Voorkeursresolutie en resolutie via mobiele data zijn nog niet aangesloten op de speler.")
                 }
@@ -174,22 +174,22 @@ private struct PlaybackLanguageSettingsView: View {
 
             List {
                 Section {
-                    VeyraSettingsChoiceRow<PlaybackLanguageOption>("Audiotaal", selection: $audioLanguageRaw)
-                    VeyraSettingsChoiceRow<PlaybackLanguageOption>("Audiotaal (terugval)", selection: $audioFallbackLanguageRaw)
+                    VeyraSettingsChoiceRow<PlaybackLanguageOption>(icon: "waveform", "Audiotaal", selection: $audioLanguageRaw)
+                    VeyraSettingsChoiceRow<PlaybackLanguageOption>(icon: "waveform", "Audiotaal (terugval)", selection: $audioFallbackLanguageRaw)
                 } header: {
                     Text("Audio")
                 }
 
                 Section {
-                    VeyraSettingsChoiceRow<PlaybackLanguageOption>("Ondertiteltaal", selection: $subtitleLanguageRaw)
-                    VeyraSettingsChoiceRow<PlaybackLanguageOption>("Ondertiteltaal (terugval)", selection: $subtitleFallbackLanguageRaw)
-                    VeyraSettingsChoiceRow<PlaybackAutoSelectSubtitlesOption>("Ondertitels automatisch selecteren", selection: $autoSelectSubtitlesRaw)
+                    VeyraSettingsChoiceRow<PlaybackLanguageOption>(icon: "captions.bubble", "Ondertiteltaal", selection: $subtitleLanguageRaw)
+                    VeyraSettingsChoiceRow<PlaybackLanguageOption>(icon: "captions.bubble", "Ondertiteltaal (terugval)", selection: $subtitleFallbackLanguageRaw)
+                    VeyraSettingsChoiceRow<PlaybackAutoSelectSubtitlesOption>(icon: "checkmark.bubble", "Ondertitels automatisch selecteren", selection: $autoSelectSubtitlesRaw)
                 } header: {
                     Text("Ondertitels")
                 }
 
                 Section {
-                    VeyraSettingsChoiceRow<PlaybackAnimeAudioOption>("Anime-audio", selection: $animeAudioRaw)
+                    VeyraSettingsChoiceRow<PlaybackAnimeAudioOption>(icon: "sparkles", "Anime-audio", selection: $animeAudioRaw)
                 } footer: {
                     Text("Anime-audio is nog niet aangesloten op de speler.")
                 }
@@ -220,11 +220,11 @@ private struct PlaybackSkipSegmentsSettingsView: View {
 
             List {
                 Section {
-                    Toggle("Knop 'Intro overslaan' tonen", isOn: $showSkipIntroButton)
-                    Toggle("Intro automatisch overslaan", isOn: $autoSkipIntro)
-                    Toggle("Knop 'Samenvatting overslaan' tonen", isOn: $showSkipRecapButton)
-                    Toggle("Knop 'Aftiteling overslaan' tonen", isOn: $showSkipCreditsButton)
-                    Toggle("Melding na de aftiteling", isOn: $postCreditsAlert)
+                    VeyraSettingsToggleRow(icon: "forward.frame", title: "Knop 'Intro overslaan' tonen", isOn: $showSkipIntroButton)
+                    VeyraSettingsToggleRow(icon: "bolt.fill", title: "Intro automatisch overslaan", isOn: $autoSkipIntro)
+                    VeyraSettingsToggleRow(icon: "arrow.uturn.forward", title: "Knop 'Samenvatting overslaan' tonen", isOn: $showSkipRecapButton)
+                    VeyraSettingsToggleRow(icon: "text.below.photo", title: "Knop 'Aftiteling overslaan' tonen", isOn: $showSkipCreditsButton)
+                    VeyraSettingsToggleRow(icon: "bell", title: "Melding na de aftiteling", isOn: $postCreditsAlert)
                 } footer: {
                     Text("Tijden komen van TheIntroDB en zijn niet voor elke film of aflevering beschikbaar. Melding na de aftiteling is nog niet aangesloten op de speler.")
                 }
@@ -249,9 +249,9 @@ private struct PlaybackUpNextSettingsView: View {
 
             List {
                 Section {
-                    Toggle("Aftelling voor volgende aflevering", isOn: $autoPlayNextCountdownEnabled)
+                    VeyraSettingsToggleRow(icon: "timer", title: "Aftelling voor volgende aflevering", isOn: $autoPlayNextCountdownEnabled)
 
-                    VeyraSettingsChoiceRow<PlaybackCountdownDuration>("Duur van de aftelling", selection: $countdownDurationRaw)
+                    VeyraSettingsChoiceRow<PlaybackCountdownDuration>(icon: "timer", "Duur van de aftelling", selection: $countdownDurationRaw)
                     .disabled(!autoPlayNextCountdownEnabled)
                 }
             }
@@ -273,7 +273,7 @@ private struct PlaybackPlayerSettingsView: View {
 
             List {
                 Section {
-                    VeyraSettingsChoiceRow<PlaybackSelectedPlayer>("Speler geselecteerd", selection: $selectedPlayerRaw)
+                    VeyraSettingsChoiceRow<PlaybackSelectedPlayer>(icon: "play.rectangle", "Speler geselecteerd", selection: $selectedPlayerRaw)
                 } footer: {
                     Text("Externe spelerondersteuning hangt af van wat AetherEngine toestaat en is hier nog niet aangesloten.")
                 }

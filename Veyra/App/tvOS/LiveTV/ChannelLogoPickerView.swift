@@ -71,21 +71,28 @@ struct ChannelLogoPickerView: View {
 
     private var nameSection: some View {
         Section {
-            TextField("Zendernaam", text: $nameText)
+            VeyraSettingsCardRowLabel(icon: "textformat", title: "Zendernaam") {
+                TextField("Zendernaam", text: $nameText)
+                    .multilineTextAlignment(.trailing)
+            }
 
-            HStack(spacing: 20) {
-                Button("Naam opslaan") {
-                    saveName()
-                }
-                .disabled(isNameUnchanged || trimmedName.isEmpty)
+            Button {
+                saveName()
+            } label: {
+                VeyraSettingsCardRowLabel(icon: "checkmark.circle", title: "Naam opslaan")
+            }
+            .veyraCardRow()
+            .disabled(isNameUnchanged || trimmedName.isEmpty)
 
-                if currentNameOverride != nil {
-                    Button("Terugzetten naar origineel", role: .destructive) {
-                        ChannelNameOverrideStore.removeOverride(forChannelID: channelID)
-                        nameText = channelName
-                        onSaved()
-                    }
+            if currentNameOverride != nil {
+                Button(role: .destructive) {
+                    ChannelNameOverrideStore.removeOverride(forChannelID: channelID)
+                    nameText = channelName
+                    onSaved()
+                } label: {
+                    VeyraSettingsCardRowLabel(icon: "arrow.uturn.backward", title: "Terugzetten naar origineel")
                 }
+                .veyraCardRow()
             }
         } header: {
             Label("Naam", systemImage: "textformat")
@@ -99,10 +106,13 @@ struct ChannelLogoPickerView: View {
             currentLogoPreview
 
             if currentOverrideURL != nil {
-                Button("Terugzetten naar standaardlogo", role: .destructive) {
+                Button(role: .destructive) {
                     ChannelLogoOverrideStore.removeOverride(forChannelID: channelID)
                     onSaved()
+                } label: {
+                    VeyraSettingsCardRowLabel(icon: "arrow.uturn.backward", title: "Terugzetten naar standaardlogo")
                 }
+                .veyraCardRow()
             }
         } header: {
             Label("Logo", systemImage: "photo")
@@ -126,8 +136,11 @@ struct ChannelLogoPickerView: View {
 
     private var searchSection: some View {
         Section {
-            TextField("Zoek zendernaam (bv. \"BBC One\")", text: $query)
-                .onSubmit { Task { await search() } }
+            VeyraSettingsCardRowLabel(icon: "magnifyingglass", title: "Zoeken") {
+                TextField("bv. \"BBC One\"", text: $query)
+                    .multilineTextAlignment(.trailing)
+                    .onSubmit { Task { await search() } }
+            }
 
             if isSearching {
                 HStack(spacing: 12) {
@@ -172,7 +185,10 @@ struct ChannelLogoPickerView: View {
 
                 Spacer()
             }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 10)
         }
+        .veyraCardRow()
     }
 
     private func resultSubtitle(_ result: IPTVOrgLogoResult) -> String? {
@@ -188,10 +204,17 @@ struct ChannelLogoPickerView: View {
 
     private var customURLSection: some View {
         Section {
-            TextField("https://…/logo.png", text: $customURLString)
-            Button("Eigen URL gebruiken") {
-                applyCustomURL()
+            VeyraSettingsCardRowLabel(icon: "link", title: "Logo-URL") {
+                TextField("https://…/logo.png", text: $customURLString)
+                    .multilineTextAlignment(.trailing)
             }
+
+            Button {
+                applyCustomURL()
+            } label: {
+                VeyraSettingsCardRowLabel(icon: "checkmark.circle", title: "Eigen URL gebruiken")
+            }
+            .veyraCardRow()
             .disabled(URL(string: customURLString.trimmingCharacters(in: .whitespaces))?.host == nil)
         } header: {
             Label("Eigen logo-URL", systemImage: "link")

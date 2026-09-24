@@ -116,8 +116,8 @@ private struct IPTVGuideSettingsView: View {
 
             List {
                 Section {
-                    VeyraSettingsChoiceRow<IPTVGuideTheme>("Gidsthema", selection: $guideThemeRaw)
-                    Toggle("Landcode voor zendernaam verbergen", isOn: $hideCountryPrefix)
+                    VeyraSettingsChoiceRow<IPTVGuideTheme>(icon: "paintpalette", "Gidsthema", selection: $guideThemeRaw)
+                    VeyraSettingsToggleRow(icon: "flag", title: "Landcode voor zendernaam verbergen", isOn: $hideCountryPrefix)
                 } footer: {
                     Text("Gidsthema past de kleuren van de programmagids aan. Bij ingeschakeld wordt de landcode voor zendernamen weggelaten.")
                 }
@@ -150,37 +150,41 @@ private struct IPTVEnginePlaybackSettingsView: View {
 
             List {
                 Section {
-                    VeyraSettingsChoiceRow<IPTVPlayerEngineOption>("Afspeelmotor", selection: $playerEngineRaw)
+                    VeyraSettingsChoiceRow<IPTVPlayerEngineOption>(icon: "gearshape.2", "Afspeelmotor", selection: $playerEngineRaw)
 
-                    VeyraSettingsChoiceRow<IPTVBufferDurationOption>("Buffering", selection: $bufferDurationRaw)
+                    VeyraSettingsChoiceRow<IPTVBufferDurationOption>(icon: "hourglass", "Buffering", selection: $bufferDurationRaw)
 
-                    Picker("Catch-up-tijdcorrectie", selection: $catchUpOffsetModeRaw) {
+                    Picker(selection: $catchUpOffsetModeRaw) {
                         ForEach(IPTVCatchUpOffsetMode.allCases) { mode in
                             Text(mode.title).tag(mode.rawValue)
                         }
+                    } label: {
+                        VeyraSettingsCardRowLabel(icon: "clock.arrow.2.circlepath", title: "Catch-up-tijdcorrectie")
                     }
                     // .menu: deze rij wordt direct gevolgd door een rij die
                     // in-/uitklapt zodra de keuze verandert. Zie de zelfde
                     // fix + toelichting in MetadataSettingsView.swift.
                     .pickerStyle(.menu)
+                    .veyraCardRow()
 
                     if catchUpOffsetMode == .manual {
                         // `Stepper` bestaat niet op tvOS — hier vervangen
                         // door een eigen +/- rij.
-                        HStack {
-                            Text("Correctie: \(catchUpOffsetManualSeconds) sec")
-                            Spacer()
-                            Button {
-                                catchUpOffsetManualSeconds = max(-3600, catchUpOffsetManualSeconds - 60)
-                            } label: {
-                                Image(systemName: "minus.circle")
-                            }
-                            Button {
-                                catchUpOffsetManualSeconds = min(3600, catchUpOffsetManualSeconds + 60)
-                            } label: {
-                                Image(systemName: "plus.circle")
+                        VeyraSettingsCardRowLabel(icon: "plusminus.circle", title: "Correctie: \(catchUpOffsetManualSeconds) sec") {
+                            HStack(spacing: 20) {
+                                Button {
+                                    catchUpOffsetManualSeconds = max(-3600, catchUpOffsetManualSeconds - 60)
+                                } label: {
+                                    Image(systemName: "minus.circle")
+                                }
+                                Button {
+                                    catchUpOffsetManualSeconds = min(3600, catchUpOffsetManualSeconds + 60)
+                                } label: {
+                                    Image(systemName: "plus.circle")
+                                }
                             }
                         }
+                        .veyraCardRow()
                     }
                 } footer: {
                     Text("Afspeelmotor bepaalt welke engine live-zenders afspeelt. Buffering: hoeveel live video vooraf klaarstaat. Catch-up-tijdcorrectie volgt normaal de klok van de provider, of stel 'm handmatig in. Nog niet aangesloten op de speler.")
@@ -208,15 +212,22 @@ private struct IPTVCacheSettingsView: View {
 
             List {
                 Section {
-                    VeyraSettingsChoiceRow<IPTVCacheRefreshInterval>("Zenderlijst verversen", selection: $refreshChannelsIntervalRaw)
-                    VeyraSettingsChoiceRow<IPTVCacheRefreshInterval>("Programmagids verversen", selection: $refreshEPGIntervalRaw)
+                    VeyraSettingsChoiceRow<IPTVCacheRefreshInterval>(icon: "list.bullet.rectangle", "Zenderlijst verversen", selection: $refreshChannelsIntervalRaw)
+                    VeyraSettingsChoiceRow<IPTVCacheRefreshInterval>(icon: "calendar", "Programmagids verversen", selection: $refreshEPGIntervalRaw)
 
-                    Button("Zenderlijst-cache wissen") {
+                    Button {
                         cacheAlertMessage = "Er is nog geen zenderlijst-cache in Veyra om te wissen."
+                    } label: {
+                        VeyraSettingsCardRowLabel(icon: "trash", title: "Zenderlijst-cache wissen")
                     }
-                    Button("Gidscache wissen") {
+                    .veyraCardRow()
+
+                    Button {
                         cacheAlertMessage = "Er is nog geen gidscache in Veyra om te wissen."
+                    } label: {
+                        VeyraSettingsCardRowLabel(icon: "trash", title: "Gidscache wissen")
                     }
+                    .veyraCardRow()
                 } footer: {
                     Text("Veyra heeft nog geen zenderlijst- of gidscache, dus deze instellingen en knoppen doen voorlopig niets.")
                 }
@@ -250,7 +261,7 @@ private struct IPTVDeveloperSettingsView: View {
 
             List {
                 Section {
-                    Toggle("FPS-teller tonen", isOn: $showFPSCounter)
+                    VeyraSettingsToggleRow(icon: "speedometer", title: "FPS-teller tonen", isOn: $showFPSCounter)
                 } footer: {
                     Text("Er is nog geen FPS-teller in Veyra; deze schakelaar heeft voorlopig geen effect.")
                 }

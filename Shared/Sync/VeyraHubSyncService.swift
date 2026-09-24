@@ -69,7 +69,7 @@ final class VeyraHubSyncService {
     private static let shelfHeroDataKeys: [String] = [
         "veyra.shelves.configured",
         // Home: filmcollecties en streamingdiensten (volgorde, namen, banners/logo's als https-adres)
-        "veyra.bento.collections", "veyra.bento.streaming",
+        "veyra.bento.collections", "veyra.bento.streaming", "veyra.home.layout", "veyra.home.presetChosen",
         HeroSettingsDefaults.primarySourceKey,
         HeroSettingsDefaults.secondarySourceKey,
     ]

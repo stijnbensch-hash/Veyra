@@ -145,7 +145,7 @@ enum VeyraHeroBackdropLookup {
         guard
             tmdbID > 0,
             let token = AppConfiguration.tmdbReadAccessToken,
-            let url = URL(string: "https://api.themoviedb.org/3/\(isMovie ? "movie" : "tv")/\(tmdbID)")
+            let url = URL(string: "\(VeyraEndpoints.tmdb)/\(isMovie ? "movie" : "tv")/\(tmdbID)")
         else {
             return nil
         }

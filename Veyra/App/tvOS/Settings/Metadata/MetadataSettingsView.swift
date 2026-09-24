@@ -149,8 +149,8 @@ private struct PosterEnrichmentSettingsView: View {
                 }
 
                 if posterEnrichmentSource == .betterPosters {
-                    Toggle("Genre", isOn: $posterShowGenre)
-                    Toggle("Beoordeling", isOn: $posterShowRating)
+                    VeyraSettingsToggleRow(icon: "tag", title: "Genre", isOn: $posterShowGenre)
+                    VeyraSettingsToggleRow(icon: "star", title: "Beoordeling", isOn: $posterShowRating)
                     if posterShowRating {
                         // Zelfde reden als "Bron" hierboven: .menu i.p.v.
                         // push-stijl, om de focus-engine niet te laten
@@ -162,10 +162,10 @@ private struct PosterEnrichmentSettingsView: View {
                         }
                         .pickerStyle(.menu)
                     }
-                    Toggle("Leeftijdsclassificatie", isOn: $posterShowAgeRating)
-                    Toggle("Kwaliteitslabels", isOn: $posterShowQuality)
-                    Toggle("Trendlabels", isOn: $posterShowTrending)
-                    Toggle("Resterende afleveringen", isOn: $posterShowEpisodesRemaining)
+                    VeyraSettingsToggleRow(icon: "checkmark.seal", title: "Leeftijdsclassificatie", isOn: $posterShowAgeRating)
+                    VeyraSettingsToggleRow(icon: "rosette", title: "Kwaliteitslabels", isOn: $posterShowQuality)
+                    VeyraSettingsToggleRow(icon: "chart.line.uptrend.xyaxis", title: "Trendlabels", isOn: $posterShowTrending)
+                    VeyraSettingsToggleRow(icon: "list.number", title: "Resterende afleveringen", isOn: $posterShowEpisodesRemaining)
                 } else if posterEnrichmentSource == .rpdb {
                     Text("RPDB (ratingposterdb.com) is een externe dienst waarvoor nog geen integratie bestaat — deze keuze doet nog niets. Kies Better Posters voor werkende genre-/beoordelingslabels.")
                         .foregroundStyle(.secondary)
@@ -188,7 +188,7 @@ private struct MetadataSourceSettingsView: View {
     var body: some View {
         Form {
             Section {
-                VeyraSettingsChoiceRow<MetadataSourceOption>("Metadatabron", selection: $metadataSourceRaw)
+                VeyraSettingsChoiceRow<MetadataSourceOption>(icon: "text.book.closed", "Metadatabron", selection: $metadataSourceRaw)
             } footer: {
                 Text("Bepaalt waar poster, achtergrond en omschrijving vandaan komen voor titels zonder eigen afbeeldingen (bv. Trakt-lijsten). AIOMetadata vereist een addon bij Addons.")
             }
@@ -211,20 +211,37 @@ private struct MetadataRatingsSettingsView: View {
     var body: some View {
         Form {
             Section {
-                Toggle(isOn: $imdb) { providerRow(.imdb) }
-                Toggle(isOn: $tmdb) { providerRow(.tmdb) }
-                Toggle(isOn: $tomatometer) { providerRow(.tomatometer) }
-                Toggle(isOn: $metacritic) { providerRow(.metacritic) }
-                Toggle(isOn: $trakt) { providerRow(.trakt) }
-                Toggle(isOn: $popcornmeter) { providerRow(.popcornmeter) }
+                ratingToggleRow(providerRow(.imdb), isOn: $imdb)
+                ratingToggleRow(providerRow(.tmdb), isOn: $tmdb)
+                ratingToggleRow(providerRow(.tomatometer), isOn: $tomatometer)
+                ratingToggleRow(providerRow(.metacritic), isOn: $metacritic)
+                ratingToggleRow(providerRow(.trakt), isOn: $trakt)
+                ratingToggleRow(providerRow(.popcornmeter), isOn: $popcornmeter)
             } footer: {
                 Text("Kies welke ratings zichtbaar zijn op film- en seriepagina's.")
             }
 
             Section {
-                Button("Alle ratings inschakelen") { enableAll() }
-                Button("Alle ratings uitschakelen") { disableAll() }
-                Button("Standaardinstellingen herstellen") { resetDefaults() }
+                Button {
+                    enableAll()
+                } label: {
+                    VeyraSettingsCardRowLabel(icon: "checkmark.circle", title: "Alle ratings inschakelen")
+                }
+                .veyraCardRow()
+
+                Button {
+                    disableAll()
+                } label: {
+                    VeyraSettingsCardRowLabel(icon: "xmark.circle", title: "Alle ratings uitschakelen")
+                }
+                .veyraCardRow()
+
+                Button {
+                    resetDefaults()
+                } label: {
+                    VeyraSettingsCardRowLabel(icon: "arrow.counterclockwise", title: "Standaardinstellingen herstellen")
+                }
+                .veyraCardRow()
             }
         }
         .frame(maxWidth: 1000)
@@ -232,6 +249,25 @@ private struct MetadataRatingsSettingsView: View {
     }
 
     // MARK: - Provider Row
+
+    /// Rijversie van een rating-toggle: eigen kleuren-icoon van
+    /// `providerRow(_:)` + een eigen aan/uit-indicator i.p.v. een systeem-
+    /// `Toggle` (die legt op tvOS binnen een List zijn eigen felwitte
+    /// focus-highlight over de hele rij, zie `VeyraSettingsCardRow.swift`).
+    private func ratingToggleRow<Label: View>(_ label: Label, isOn: Binding<Bool>) -> some View {
+        Button {
+            isOn.wrappedValue.toggle()
+        } label: {
+            HStack(spacing: 16) {
+                label
+                Spacer()
+                VeyraSettingsCardRowSwitch(isOn: isOn.wrappedValue)
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 14)
+        }
+        .veyraCardRow()
+    }
 
     @ViewBuilder
     private func providerRow(_ provider: MetadataRatingProvider) -> some View {

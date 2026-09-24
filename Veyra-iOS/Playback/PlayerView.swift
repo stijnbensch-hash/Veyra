@@ -72,7 +72,14 @@ struct PlayerView: View {
                 iOSPlayerSurface(
                     engine: playbackEngine.engine, title: item?.title, item: item,
                     onClose: { dismiss() },
-                    onPlayNextEpisode: { next in nextEpisodeRequest = next }
+                    onPlayNextEpisode: { next in
+                        // Zie de zelfde fix + toelichting in de tvOS
+                        // PlayerView: zonder dit werd de net afgelopen
+                        // aflevering niet als "bekeken" geregistreerd bij
+                        // Trakt wanneer je op "Volgende" drukt.
+                        viewModel.stopForDisappear()
+                        nextEpisodeRequest = next
+                    }
                 )
 
             } else {

@@ -46,7 +46,7 @@ struct ShelfEditView: View {
     var body: some View {
         Form {
             Section {
-                VeyraSettingsChoiceRow<ShelfMediaKind>("Soort", selection: Binding(
+                VeyraSettingsChoiceRow<ShelfMediaKind>(icon: "square.stack.3d.up", "Soort", selection: Binding(
                     get: { kind.rawValue },
                     set: { kind = ShelfMediaKind(rawValue: $0) ?? .movie }
                 ))
@@ -75,12 +75,15 @@ struct ShelfEditView: View {
             }
 
             Section("Titel") {
-                TextField("Titel", text: $title)
-                    .onChange(of: title) { _, _ in titleEdited = true }
+                VeyraSettingsCardRowLabel(icon: "textformat", title: "Titel") {
+                    TextField("Titel", text: $title)
+                        .multilineTextAlignment(.trailing)
+                }
+                .onChange(of: title) { _, _ in titleEdited = true }
             }
 
             Section {
-                Toggle("Ingeschakeld", isOn: $isEnabled)
+                VeyraSettingsToggleRow(icon: "power", title: "Ingeschakeld", isOn: $isEnabled)
             }
 
             if let errorMessage {
@@ -89,10 +92,13 @@ struct ShelfEditView: View {
 
             if shelf != nil {
                 Section {
-                    Button("Plank verwijderen", role: .destructive) {
+                    Button(role: .destructive) {
                         if let shelf { viewModel.remove(shelf) }
                         dismiss()
+                    } label: {
+                        VeyraSettingsCardRowLabel(icon: "trash", title: "Plank verwijderen")
                     }
+                    .veyraCardRow()
                 }
             }
         }
@@ -163,13 +169,21 @@ struct ShelfEditView: View {
                     }
                 }
             } else {
-                TextField("TMDB-lijst-ID", text: $tmdbPersonalListIDInput)
+                VeyraSettingsCardRowLabel(icon: "number", title: "TMDB-lijst-ID") {
+                    TextField("bv. 12345", text: $tmdbPersonalListIDInput)
+                        .multilineTextAlignment(.trailing)
+                }
 
-                Button("Lijst ophalen") { Task { await fetchTMDBPersonalList() } }
-                    .disabled(
-                        tmdbPersonalListIDInput.trimmingCharacters(in: .whitespaces).isEmpty
-                            || isFetchingTMDBPersonalList
-                    )
+                Button {
+                    Task { await fetchTMDBPersonalList() }
+                } label: {
+                    VeyraSettingsCardRowLabel(icon: "arrow.down.circle", title: "Lijst ophalen")
+                }
+                .veyraCardRow()
+                .disabled(
+                    tmdbPersonalListIDInput.trimmingCharacters(in: .whitespaces).isEmpty
+                        || isFetchingTMDBPersonalList
+                )
 
                 if isFetchingTMDBPersonalList {
                     ProgressView("Lijst controleren…")
@@ -225,13 +239,11 @@ struct ShelfEditView: View {
             NavigationLink {
                 ShelfIPTVChannelPickerView(selectedChannels: $iptvChannels)
             } label: {
-                HStack {
-                    Text("Kanalen kiezen")
-                    Spacer()
-                    Text(iptvChannels.isEmpty ? "Geen" : "\(iptvChannels.count)")
-                        .foregroundStyle(.secondary)
+                VeyraSettingsCardRowLabel(icon: "tv", title: "Kanalen kiezen") {
+                    VeyraSettingsCardRowValue(value: iptvChannels.isEmpty ? "Geen" : "\(iptvChannels.count)")
                 }
             }
+            .veyraCardRow()
 
             if iptvChannels.isEmpty {
                 Text("Kies zelf welke zenders in deze plank moeten staan — uit één of meerdere providers.")

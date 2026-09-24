@@ -23,7 +23,7 @@ struct ESPNScoreProvider: SportsScoreProvider {
         var matches: [SportsMatch] = []
         for key in keys.sorted() {
             try Task.checkCancellation()
-            var components = URLComponents(string: "https://site.api.espn.com/apis/site/v2/sports/\(league.path)/scoreboard")!
+            var components = URLComponents(string: "\(VeyraEndpoints.sports)/\(league.path)/scoreboard")!
             components.queryItems = [URLQueryItem(name: "dates", value: key), URLQueryItem(name: "limit", value: "1000")]
             if league.id == "college-football" { components.queryItems?.append(URLQueryItem(name: "groups", value: "80")) }
             var request = URLRequest(url: components.url!)

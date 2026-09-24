@@ -279,7 +279,7 @@ private nonisolated enum VeyraTMDBHTTP {
     static func get<T: Decodable>(_ path: String, _ query: [URLQueryItem] = [], as type: T.Type) async -> T? {
         let token: String? = await MainActor.run { AppConfiguration.tmdbReadAccessToken }
         guard let token, !token.isEmpty,
-              var components = URLComponents(string: "https://api.themoviedb.org/3" + path) else { return nil }
+              var components = URLComponents(string: VeyraEndpoints.tmdb + path) else { return nil }
         if !query.isEmpty { components.queryItems = query }
         guard let url = components.url else { return nil }
         var request = URLRequest(url: url)

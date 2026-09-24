@@ -17,11 +17,18 @@ where RawValue == String, ID == String {
 /// die doorlinkt naar een verticale lijst met een vinkje bij de actieve
 /// keuze — net als de andere keuzeschermen in de app (bv. HeroSourcePickerView).
 struct VeyraSettingsChoiceRow<Option: VeyraSettingsOption>: View {
+    let icon: String
     let title: String
     let options: [Option]
     @Binding var selectionRaw: String
 
-    init(_ title: String, options: [Option] = Array(Option.allCases), selection: Binding<String>) {
+    init(
+        icon: String,
+        _ title: String,
+        options: [Option] = Array(Option.allCases),
+        selection: Binding<String>
+    ) {
+        self.icon = icon
         self.title = title
         self.options = options
         self._selectionRaw = selection
@@ -35,15 +42,11 @@ struct VeyraSettingsChoiceRow<Option: VeyraSettingsOption>: View {
         NavigationLink {
             VeyraSettingsChoiceListView(title: title, options: options, selectionRaw: $selectionRaw)
         } label: {
-            HStack {
-                Text(title)
-                Spacer()
-                if let current {
-                    Text(current.title)
-                        .foregroundStyle(.secondary)
-                }
+            VeyraSettingsCardRowLabel(icon: icon, title: title) {
+                VeyraSettingsCardRowValue(value: current?.title)
             }
         }
+        .veyraCardRow()
     }
 }
 
@@ -64,16 +67,12 @@ private struct VeyraSettingsChoiceListView<Option: VeyraSettingsOption>: View {
                             selectionRaw = option.rawValue
                             dismiss()
                         } label: {
-                            HStack {
-                                Text(option.title)
-                                    .foregroundStyle(.white)
-                                Spacer()
-                                if option.rawValue == selectionRaw {
-                                    Image(systemName: "checkmark")
-                                        .foregroundStyle(VeyraColors.cyan)
-                                }
-                            }
+                            VeyraSettingsCardRowLabel(
+                                icon: option.rawValue == selectionRaw ? "checkmark.circle.fill" : "circle",
+                                title: option.title
+                            )
                         }
+                        .veyraCardRow()
                     }
                 }
             }

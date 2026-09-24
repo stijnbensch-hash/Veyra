@@ -18,18 +18,15 @@ struct ShelvesSettingsView: View {
                         Button {
                             editingShelf = shelf
                         } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(shelf.title)
-                                    Text(shelf.source.detailLabel)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                Text(shelf.isEnabled ? "Aan" : "Uit")
-                                    .foregroundStyle(.secondary)
+                            VeyraSettingsCardRowLabel(
+                                icon: "rectangle.grid.1x2",
+                                title: shelf.title,
+                                subtitle: shelf.source.detailLabel
+                            ) {
+                                VeyraSettingsCardRowValue(value: shelf.isEnabled ? "Aan" : "Uit")
                             }
                         }
+                        .veyraCardRow()
                     }
                 } header: {
                     Text("Planken")
@@ -39,7 +36,12 @@ struct ShelvesSettingsView: View {
             }
 
             Section {
-                Button("Plank toevoegen") { showAddSheet = true }
+                Button {
+                    showAddSheet = true
+                } label: {
+                    VeyraSettingsCardRowLabel(icon: "plus.circle", title: "Plank toevoegen")
+                }
+                .veyraCardRow()
             }
 
             if let errorMessage = viewModel.errorMessage {
