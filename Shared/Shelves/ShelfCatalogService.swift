@@ -17,6 +17,9 @@ enum ShelfCatalogService {
         case .addon(let addonID, _, let catalogType, let catalogID, _):
             return await addonItems(addonID: addonID, catalogType: catalogType, catalogID: catalogID)
 
+        case .mediaServer(let serverID, _, let libraryID, _, let kind):
+            return await mediaServerItems(serverID: serverID, libraryID: libraryID, kind: kind)
+
         case .iptv(let channels):
             return channels.map(mediaItem(from:))
         }
@@ -290,9 +293,104 @@ enum ShelfCatalogService {
         do {
             let client = AIOMetadataClient(baseURL: addon.baseURL)
             let metas = try await client.catalog(type: catalogType, catalogID: catalogID)
-            return metas.map { $0.mediaItem() }
+            let kind: ShelfMediaKind = catalogType == "series" ? .series : .movie
+            let items = metas.map { $0.mediaItem() }
+            // Addon-items komen met een IMDb-ID maar geen TMDB-ID mee — zonder
+            // TMDB-ID werken de bestaande detailschermen niet (series lukken
+            // dan helemaal niet, zie `ShelfItemDestination`), dus die koppelen
+            // we hier alsnog via TMDB's "find by external id".
+            return await linkToTMDB(items, kind: kind)
         } catch {
             return []
         }
+    }
+
+    // MARK: - TMDB-koppeling voor bronnen zonder eigen TMDB-ID (addon,
+    // mediaserver) — vult `tmdbID` in via een IMDb-ID-opzoeking, zodat zulke
+    // items dezelfde detailschermen kunnen gebruiken als Trakt/TMDB-items.
+    // Items die al een TMDB-ID hebben, of geen IMDb-ID, blijven ongewijzigd.
+
+    private static func linkToTMDB(_ items: [MediaItem], kind: ShelfMediaKind) async -> [MediaItem] {
+        guard !items.isEmpty else { return items }
+
+        return await withTaskGroup(of: (Int, MediaItem).self) { group in
+            for (index, item) in items.enumerated() {
+                group.addTask {
+                    (index, await resolveTMDBID(item, kind: kind))
+                }
+            }
+
+            var results = items
+            for await (index, resolved) in group {
+                results[index] = resolved
+            }
+            return results
+        }
+    }
+
+    private static func resolveTMDBID(_ item: MediaItem, kind: ShelfMediaKind) async -> MediaItem {
+        guard item.tmdbID == nil, let imdbID = item.imdbID, !imdbID.isEmpty else { return item }
+        guard let found = await TMDBExternalLookup.tmdbID(forIMDbID: imdbID, kind: kind) else { return item }
+
+        return MediaItem(
+            id: item.id,
+            title: item.title,
+            type: item.type,
+            imdbID: item.imdbID,
+            tmdbID: found,
+            episodeTMDBID: item.episodeTMDBID,
+            seasonNumber: item.seasonNumber,
+            episodeNumber: item.episodeNumber,
+            overview: item.overview,
+            releaseDate: item.releaseDate,
+            posterURL: item.posterURL,
+            backdropURL: item.backdropURL,
+            genre: item.genre,
+            rating: item.rating,
+            streamURL: item.streamURL,
+            iptvSeriesID: item.iptvSeriesID,
+            iptvProviderName: item.iptvProviderName
+        )
+    }
+
+    // MARK: - Mediaserver-bibliotheek (Jellyfin / VeyraHub)
+
+    private static func mediaServerItems(
+        serverID: UUID,
+        libraryID: String,
+        kind: ShelfMediaKind
+    ) async -> [MediaItem] {
+        guard let account = MediaServerStore().load().first(where: { $0.id == serverID }) else { return [] }
+
+        let service = JellyfinService(account: account)
+
+        do {
+            let items = try await service.items(
+                parentID: libraryID,
+                includeItemTypes: [kind == .movie ? "Movie" : "Series"]
+            )
+            let mediaItems = items.map { mediaItem(from: $0, service: service, kind: kind) }
+            // Als de server geen TMDB-ID meegaf via `ProviderIds` (bv. een
+            // echte Jellyfin-server zonder TMDB-metadata-provider), maar wel
+            // een IMDb-ID, proberen we die alsnog aan TMDB te koppelen.
+            return await linkToTMDB(mediaItems, kind: kind)
+        } catch {
+            return []
+        }
+    }
+
+    private static func mediaItem(from item: JellyfinItem, service: JellyfinService, kind: ShelfMediaKind) -> MediaItem {
+        MediaItem(
+            title: item.displayTitle,
+            type: kind == .movie ? .movie : .series,
+            imdbID: item.imdbID,
+            tmdbID: item.tmdbID,
+            overview: item.overview,
+            releaseDate: item.productionYear.map(String.init),
+            posterURL: service.imageURL(for: item, kind: .primary),
+            backdropURL: service.imageURL(for: item, kind: .backdrop),
+            genre: item.primaryGenre,
+            rating: item.communityRating
+        )
     }
 }

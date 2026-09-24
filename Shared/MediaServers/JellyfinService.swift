@@ -67,7 +67,7 @@ struct JellyfinService {
             URLQueryItem(
                 name: "Fields",
                 value:
-                    "Overview,ProductionYear,Genres,CommunityRating"
+                    "Overview,ProductionYear,Genres,CommunityRating,ProviderIds"
             )
         ]
 
@@ -161,7 +161,7 @@ struct JellyfinService {
                 URLQueryItem(
                     name: "Fields",
                     value:
-                        "Overview,ProductionYear,Genres,CommunityRating"
+                        "Overview,ProductionYear,Genres,CommunityRating,ProviderIds"
                 )
             ]
         )

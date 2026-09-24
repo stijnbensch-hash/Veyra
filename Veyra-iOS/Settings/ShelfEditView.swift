@@ -4,6 +4,7 @@ private enum ShelfSourceKind: String, CaseIterable, Hashable {
     case trakt
     case tmdb
     case addon
+    case mediaServer
     case iptv
 }
 
@@ -33,6 +34,11 @@ struct ShelfEditView: View {
     @State private var selectedCatalog: AIOMetadataCatalog?
     @State private var availableCatalogs: [AIOMetadataCatalog] = []
     @State private var isLoadingCatalogs = false
+    @State private var selectedServerID: UUID?
+    @State private var selectedGroupID: String?
+    @State private var selectedLibrary: JellyfinLibrary?
+    @State private var availableLibraries: [JellyfinLibrary] = []
+    @State private var isLoadingLibraries = false
     @State private var iptvChannels: [ShelfIPTVChannel] = []
     @State private var title = ""
     @State private var titleEdited = false
@@ -41,6 +47,44 @@ struct ShelfEditView: View {
 
     private var metadataAddons: [AddonManifest] {
         AddonStore().load().filter { $0.kind == .aioMetadata }
+    }
+
+    private var mediaServers: [MediaServerAccount] {
+        MediaServerStore().load()
+    }
+
+    /// Unieke groepen (addon, of "Slimme collecties"/"Lokaal & WebDAV") in
+    /// `availableLibraries`, in de volgorde waarin ze voorkomen — zodat de
+    /// "Categorie"-picker niet elke bibliotheek los toont, maar eerst laat
+    /// kiezen wáár die vandaan komt, net als bij het "Addon"-tabblad.
+    private var libraryGroups: [(id: String, name: String)] {
+        var seen = Set<String>()
+        var result: [(id: String, name: String)] = []
+        for library in availableLibraries {
+            let groupID = library.groupID ?? "_"
+            guard seen.insert(groupID).inserted else { continue }
+            result.append((groupID, library.groupName ?? "Overig"))
+        }
+        return result
+    }
+
+    private var librariesInSelectedGroup: [JellyfinLibrary] {
+        availableLibraries.filter { ($0.groupID ?? "_") == selectedGroupID }
+    }
+
+    /// Zet `titleEdited` alleen bij een echte gebruikersaanpassing van het
+    /// titelveld, niet bij de programmatische update in
+    /// `updateDefaultTitleIfNeeded()` — anders zou die ene automatische
+    /// toewijzing de auto-titel meteen en blijvend blokkeren (zie ook de
+    /// tvOS-versie van dit scherm, waar dezelfde fix is toegepast).
+    private var titleBinding: Binding<String> {
+        Binding(
+            get: { title },
+            set: { newValue in
+                title = newValue
+                titleEdited = true
+            }
+        )
     }
 
     var body: some View {
@@ -59,6 +103,7 @@ struct ShelfEditView: View {
                         Text("Trakt").tag(ShelfSourceKind.trakt)
                         Text("TMDB").tag(ShelfSourceKind.tmdb)
                         Text("Addon").tag(ShelfSourceKind.addon)
+                        Text("Server").tag(ShelfSourceKind.mediaServer)
                         Text("IPTV").tag(ShelfSourceKind.iptv)
                     }
                     .pickerStyle(.segmented)
@@ -154,6 +199,43 @@ struct ShelfEditView: View {
                             }
                         }
                     }
+                case .mediaServer:
+                    Section("Mediaserver") {
+                        if mediaServers.isEmpty {
+                            Text("Voeg eerst een mediaserver toe bij Mediaservers.")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Picker("Server", selection: $selectedServerID) {
+                                ForEach(mediaServers) { server in
+                                    Text(server.name).tag(server.id as UUID?)
+                                }
+                            }
+
+                            if isLoadingLibraries {
+                                ProgressView("Bibliotheken laden…")
+                            } else if availableLibraries.isEmpty {
+                                Text("Geen bibliotheken gevonden voor deze server.")
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                Picker("Categorie", selection: $selectedGroupID) {
+                                    ForEach(libraryGroups, id: \.id) { group in
+                                        Text(group.name).tag(group.id as String?)
+                                    }
+                                }
+
+                                if librariesInSelectedGroup.isEmpty {
+                                    Text("Geen bibliotheken gevonden in deze categorie.")
+                                        .foregroundStyle(.secondary)
+                                } else {
+                                    Picker("Bibliotheek", selection: $selectedLibrary) {
+                                        ForEach(librariesInSelectedGroup) { library in
+                                            Text(library.name).tag(library as JellyfinLibrary?)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 case .iptv:
                     Section("Zenders") {
                         NavigationLink {
@@ -175,8 +257,7 @@ struct ShelfEditView: View {
                 }
 
                 Section("Titel") {
-                    TextField("Titel", text: $title)
-                        .onChange(of: title) { _, _ in titleEdited = true }
+                    TextField("Titel", text: titleBinding)
                 }
 
                 Section {
@@ -204,12 +285,19 @@ struct ShelfEditView: View {
             ToolbarItem(placement: .confirmationAction) { Button("Opslaan") { save() } }
         }
         .onAppear { setupFromExisting() }
-        .onChange(of: kind) { _, _ in updateDefaultTitleIfNeeded() }
+        .onChange(of: kind) { _, _ in
+            updateDefaultTitleIfNeeded()
+            Task { await loadLibraries() }
+        }
         .onChange(of: sourceKind) { _, newValue in
             if newValue == .addon, selectedAddonID == nil {
                 selectedAddonID = metadataAddons.first?.id
             }
+            if newValue == .mediaServer, selectedServerID == nil {
+                selectedServerID = mediaServers.first?.id
+            }
             updateDefaultTitleIfNeeded()
+            Task { await loadLibraries() }
         }
         .onChange(of: traktList) { _, _ in updateDefaultTitleIfNeeded() }
         .onChange(of: tmdbList) { _, _ in updateDefaultTitleIfNeeded() }
@@ -219,6 +307,14 @@ struct ShelfEditView: View {
         }
         .onChange(of: selectedAddonID) { _, _ in Task { await loadCatalogs() } }
         .onChange(of: selectedCatalog) { _, _ in updateDefaultTitleIfNeeded() }
+        .onChange(of: selectedServerID) { _, _ in Task { await loadLibraries() } }
+        .onChange(of: selectedGroupID) { _, newValue in
+            guard sourceKind == .mediaServer else { return }
+            if let current = selectedLibrary, (current.groupID ?? "_") == newValue { return }
+            selectedLibrary = availableLibraries.first { ($0.groupID ?? "_") == newValue }
+            updateDefaultTitleIfNeeded()
+        }
+        .onChange(of: selectedLibrary) { _, _ in updateDefaultTitleIfNeeded() }
         .onChange(of: iptvChannels) { _, _ in updateDefaultTitleIfNeeded() }
     }
 
@@ -254,6 +350,12 @@ struct ShelfEditView: View {
             selectedAddonID = addonID
             selectedCatalog = AIOMetadataCatalog(type: catalogType, id: catalogID, name: catalogName)
             Task { await loadCatalogs() }
+        case .mediaServer(let serverID, _, let libraryID, let libraryName, let mediaKind):
+            kind = mediaKind
+            sourceKind = .mediaServer
+            selectedServerID = serverID
+            selectedLibrary = JellyfinLibrary(id: libraryID, name: libraryName, collectionType: nil, groupID: nil, groupName: nil)
+            Task { await loadLibraries() }
         case .iptv(let channels):
             sourceKind = .iptv
             iptvChannels = channels
@@ -269,6 +371,11 @@ struct ShelfEditView: View {
                 return "Addon-catalogus"
             }
             return "\(addon.name) · \(selectedCatalog.displayName)"
+        case .mediaServer:
+            guard let selectedLibrary else { return "Mediaserver-bibliotheek" }
+            let groupName = selectedLibrary.groupName ?? mediaServers.first(where: { $0.id == selectedServerID })?.name
+            guard let groupName else { return selectedLibrary.name }
+            return "\(groupName) · \(selectedLibrary.name)"
         case .iptv:
             return "Mijn zenders"
         }
@@ -334,6 +441,50 @@ struct ShelfEditView: View {
         }
     }
 
+    // MARK: - Mediaserver-bibliotheken
+
+    private func loadLibraries() async {
+        guard sourceKind == .mediaServer, let serverID = selectedServerID,
+              let account = mediaServers.first(where: { $0.id == serverID })
+        else {
+            availableLibraries = []
+            selectedGroupID = nil
+            return
+        }
+
+        isLoadingLibraries = true
+        defer { isLoadingLibraries = false }
+
+        do {
+            let libraries = try await JellyfinService(account: account).libraries()
+            let wantedType = kind == .movie ? "movies" : "tvshows"
+            availableLibraries = libraries.filter { $0.collectionType == wantedType }
+
+            // Bij het bewerken van een bestaande plank staat `selectedLibrary`
+            // eerst nog op een kale placeholder (alleen id/naam, geen groep) —
+            // zoek 'm hier op onder de echte, net opgehaalde bibliotheken zodat
+            // de groep meteen goed staat.
+            if let currentID = selectedLibrary?.id, let match = availableLibraries.first(where: { $0.id == currentID }) {
+                selectedLibrary = match
+                selectedGroupID = match.groupID ?? "_"
+            } else if let currentGroup = selectedGroupID,
+                      availableLibraries.contains(where: { ($0.groupID ?? "_") == currentGroup }) {
+                let stillValid = selectedLibrary.map(availableLibraries.contains) ?? false
+                if !stillValid {
+                    selectedLibrary = availableLibraries.first { ($0.groupID ?? "_") == currentGroup }
+                }
+            } else {
+                selectedGroupID = availableLibraries.first.map { $0.groupID ?? "_" }
+                selectedLibrary = availableLibraries.first
+            }
+            updateDefaultTitleIfNeeded()
+        } catch {
+            availableLibraries = []
+            selectedGroupID = nil
+            errorMessage = error.localizedDescription
+        }
+    }
+
     // MARK: - Opslaan
 
     private func save() {
@@ -369,6 +520,21 @@ struct ShelfEditView: View {
                 catalogType: selectedCatalog.type,
                 catalogID: selectedCatalog.id,
                 catalogName: selectedCatalog.displayName
+            )
+        case .mediaServer:
+            guard let serverID = selectedServerID,
+                  let server = mediaServers.first(where: { $0.id == serverID }),
+                  let selectedLibrary
+            else {
+                errorMessage = "Kies een mediaserver en een bibliotheek."
+                return
+            }
+            source = .mediaServer(
+                serverID: serverID,
+                serverName: server.name,
+                libraryID: selectedLibrary.id,
+                libraryName: selectedLibrary.name,
+                kind: kind
             )
         case .iptv:
             guard !iptvChannels.isEmpty else {

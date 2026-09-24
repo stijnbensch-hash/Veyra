@@ -33,6 +33,11 @@ enum ShelfSource: Codable, Equatable, Hashable {
     case trakt(list: TraktShelfList, kind: ShelfMediaKind)
     case tmdb(list: TMDBShelfList, kind: ShelfMediaKind)
     case addon(addonID: UUID, addonName: String, catalogType: String, catalogID: String, catalogName: String)
+    // Een bibliotheek van een gekoppelde mediaserver (Jellyfin, of een
+    // Jellyfin-compatibele VeyraHub-instantie) — dezelfde soort bron als
+    // `.addon`, maar de catalogus komt uit `Users/{userID}/Views` /
+    // `Users/{userID}/Items` van die server in plaats van een Stremio-addon.
+    case mediaServer(serverID: UUID, serverName: String, libraryID: String, libraryName: String, kind: ShelfMediaKind)
     // Zelf gekozen losse IPTV-kanalen (uit een of meerdere providers) — geen
     // "lijst" zoals de andere bronnen, dus een losse snapshot van kanalen
     // i.p.v. een bron die opnieuw bevraagd wordt.
@@ -43,6 +48,7 @@ enum ShelfSource: Codable, Equatable, Hashable {
         case .trakt(_, let kind): return kind
         case .tmdb(_, let kind): return kind
         case .addon(_, _, let catalogType, _, _): return catalogType == "series" ? .series : .movie
+        case .mediaServer(_, _, _, _, let kind): return kind
         // Niet van toepassing — .iptv-planken tonen hun eigen label via
         // `detailLabel` in plaats van "<bron> · <kind>".
         case .iptv: return .movie
@@ -54,6 +60,7 @@ enum ShelfSource: Codable, Equatable, Hashable {
         case .trakt(let list, let kind): return list.label(for: kind)
         case .tmdb(let list, let kind): return list.label(for: kind)
         case .addon(_, let addonName, _, _, let catalogName): return "\(addonName) · \(catalogName)"
+        case .mediaServer(_, let serverName, _, let libraryName, _): return "\(serverName) · \(libraryName)"
         case .iptv: return "Mijn zenders"
         }
     }
@@ -63,6 +70,7 @@ enum ShelfSource: Codable, Equatable, Hashable {
         case .trakt: return "Trakt"
         case .tmdb: return "TMDB"
         case .addon(_, let addonName, _, _, _): return addonName
+        case .mediaServer(_, let serverName, _, _, _): return serverName
         case .iptv: return "IPTV"
         }
     }

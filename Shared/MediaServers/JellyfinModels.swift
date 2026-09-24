@@ -11,10 +11,22 @@ struct JellyfinLibrary:
     let name: String
     let collectionType: String?
 
+    /// Waar deze bibliotheek vandaan komt — een addon-id/naam voor een
+    /// addon-catalogus, of een vaste synthetische groep ("Slimme
+    /// collecties", "Lokaal & WebDAV") voor de andere soorten. Een
+    /// Veyra-Hub-specifieke uitbreiding op de Jellyfin-Views-response; een
+    /// echte Jellyfin/Emby-server stuurt deze velden niet mee, vandaar
+    /// optioneel. Laat een client (zoals `ShelfEditView`) bibliotheken
+    /// groeperen net zoals bij het losse "Addon"-tabblad.
+    let groupID: String?
+    let groupName: String?
+
     enum CodingKeys: String, CodingKey {
         case id = "Id"
         case name = "Name"
         case collectionType = "CollectionType"
+        case groupID = "GroupId"
+        case groupName = "GroupName"
     }
 
     var symbol: String {
@@ -58,6 +70,15 @@ struct JellyfinItem:
     let genres: [String]?
     let communityRating: Double?
 
+    /// Externe IDs (TMDB, IMDb, ...) — alleen gevuld als de aanroep dit
+    /// expliciet opvraagt via `Fields=ProviderIds`. Standaard-Jellyfin-veld
+    /// (`{"Tmdb": "...", "Imdb": "tt..."}`); VeyraHub vult dit al voor zijn
+    /// TMDB-gebaseerde catalogi, een echte Jellyfin/Emby-server als de
+    /// gebruiker die zelf heeft ingesteld met TMDB/IMDb-metadata. Gebruikt
+    /// om plank-items uit een mediaserver alsnog aan TMDB te kunnen linken
+    /// (zie `ShelfCatalogService`).
+    let providerIds: [String: String]?
+
     enum CodingKeys: String, CodingKey {
         case id = "Id"
         case name = "Name"
@@ -72,6 +93,17 @@ struct JellyfinItem:
         case backdropImageTags = "BackdropImageTags"
         case genres = "Genres"
         case communityRating = "CommunityRating"
+        case providerIds = "ProviderIds"
+    }
+
+    /// TMDB-ID uit `ProviderIds`, indien de server dat meelevert.
+    var tmdbID: Int? {
+        providerIds?["Tmdb"].flatMap(Int.init)
+    }
+
+    /// IMDb-ID uit `ProviderIds`, indien de server dat meelevert.
+    var imdbID: String? {
+        providerIds?["Imdb"]
     }
 
     /// Eerste genre, voor dezelfde badge als TMDB-gebaseerde posters.
