@@ -13,7 +13,32 @@ struct ResolvedSource:
     ///
     /// Voor een addon komt deze naam uit AddonManifest.name.
     /// Voor IPTV gebruiken we "IPTV".
+    /// Voor een VeyraHub-bron is dit de naam van de addon zoals VeyraHub
+    /// die zelf doorgeeft (bv. "NinjaCentral"), niet de naam van de
+    /// VeyraHub-server zelf — zo groepeert deze bron net als een lokaal
+    /// geïnstalleerde addon, met `isFromHub` als onderscheid.
     let originName: String
+
+    /// True wanneer deze bron via een VeyraHub-server is opgehaald (i.p.v.
+    /// een lokaal geïnstalleerde addon, IPTV, of een "echte" Jellyfin/Emby-
+    /// server). SourceSelectionView toont hiervoor een aparte indicator,
+    /// zodat een VeyraHub-addon met dezelfde naam als een lokale addon toch
+    /// herkenbaar blijft.
+    let isFromHub: Bool
+
+    // Expliciete init (i.p.v. op de synthesized memberwise init leunen)
+    // zodat `isFromHub` overal een gewone, overschrijfbare parameter met
+    // default `false` is — bestaande aanroepen zonder dat argument blijven
+    // gewoon compileren.
+    init(
+        source: PlayableSource,
+        originName: String,
+        isFromHub: Bool = false
+    ) {
+        self.source = source
+        self.originName = originName
+        self.isFromHub = isFromHub
+    }
 
     var id: UUID {
         source.id

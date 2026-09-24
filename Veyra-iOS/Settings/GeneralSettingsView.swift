@@ -69,6 +69,11 @@ struct GeneralSettingsView: View {
                 Section {
                     Toggle("Uitslag verbergen tot tik", isOn: $hideScoreSpoilers)
                     Toggle("Zender kiezen bij tik", isOn: $chooseChannelOnTap)
+                    NavigationLink {
+                        SportsFavoritesSettingsView()
+                    } label: {
+                        Label("Favoriete teams", systemImage: "star")
+                    }
                 } header: {
                     sectionHeader("Sport", symbol: "sportscourt", tint: VeyraColors.red)
                 } footer: {

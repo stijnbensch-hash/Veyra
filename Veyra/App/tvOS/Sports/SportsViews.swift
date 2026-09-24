@@ -375,6 +375,25 @@ struct SportsView: View {
             selectedMatch =
                 match
         }
+        .contextMenu {
+            Button {
+                store.toggle(match.home)
+            } label: {
+                Label(
+                    match.home.name,
+                    systemImage: store.isFavoriteTeam(match.home) ? "star.fill" : "star"
+                )
+            }
+
+            Button {
+                store.toggle(match.away)
+            } label: {
+                Label(
+                    match.away.name,
+                    systemImage: store.isFavoriteTeam(match.away) ? "star.fill" : "star"
+                )
+            }
+        }
         .accessibilityElement(
             children: .ignore
         )
@@ -608,6 +627,25 @@ struct SportsHomeView: View {
         .onTapGesture {
             selectedMatch =
                 match
+        }
+        .contextMenu {
+            Button {
+                store.toggle(match.home)
+            } label: {
+                Label(
+                    match.home.name,
+                    systemImage: store.isFavoriteTeam(match.home) ? "star.fill" : "star"
+                )
+            }
+
+            Button {
+                store.toggle(match.away)
+            } label: {
+                Label(
+                    match.away.name,
+                    systemImage: store.isFavoriteTeam(match.away) ? "star.fill" : "star"
+                )
+            }
         }
         .accessibilityElement(
             children: .ignore
@@ -969,6 +1007,12 @@ private struct SportsMatchView:
     @Environment(\.scenePhase)
     private var scenePhase
 
+    @State
+    private var channelQuery: SportChannelQuery?
+
+    @State
+    private var playing: PlayableSource?
+
     private var current:
         SportsMatch
     {
@@ -1078,6 +1122,18 @@ private struct SportsMatchView:
                 )
             }
 
+            Text(
+                "Tik op een team om het favoriet te maken"
+            )
+            .font(
+                .system(
+                    size: 21
+                )
+            )
+            .foregroundStyle(
+                .secondary
+            )
+
             HStack(
                 spacing: 30
             ) {
@@ -1088,6 +1144,22 @@ private struct SportsMatchView:
                 favoriteButton(
                     current.away
                 )
+            }
+
+            if current.phase != .finished {
+                Button {
+                    channelQuery = SportChannelQuery(
+                        title: "\(current.home.name) – \(current.away.name)",
+                        teams: [current.home.name, current.away.name],
+                        start: current.date
+                    )
+                } label: {
+                    Label(
+                        "Waar kijken?",
+                        systemImage:
+                            "play.tv"
+                    )
+                }
             }
 
             NavigationLink {
@@ -1138,6 +1210,13 @@ private struct SportsMatchView:
             )
             .ignoresSafeArea()
         )
+        .sportChannelSheet($channelQuery) { playing = $0 }
+        .navigationDestination(item: $playing) { source in
+            PlayerView(
+                source: source,
+                item: MediaItem(title: source.name, type: .liveTV)
+            )
+        }
         .task(id: scenePhase) {
             guard
                 scenePhase == .active

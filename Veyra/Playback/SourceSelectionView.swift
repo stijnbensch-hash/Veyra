@@ -199,6 +199,20 @@ struct SourceSelectionView: View {
         return result
     }
 
+    /// True als er onder deze originName (filtertab) minstens één bron zit
+    /// die via VeyraHub is opgehaald — bepaalt of de filterknop het kleine
+    /// hub-icoon toont.
+    private func isHubOrigin(
+        _ name: String
+    ) -> Bool {
+        sources.contains {
+            $0.isFromHub
+                && $0.originName
+                    .caseInsensitiveCompare(name)
+                    == .orderedSame
+        }
+    }
+
     private var filteredSources:
         [ResolvedSource]
     {
@@ -326,11 +340,29 @@ struct SourceSelectionView: View {
             focusedFilterID
                 == filter.id
 
-        return Text(
-            filterTitle(
-                filter
+        // Een addonbron die via VeyraHub loopt krijgt hier een klein
+        // hub-icoon, zodat "NinjaCentral" (bv.) herkenbaar blijft als een
+        // VeyraHub-addon en niet lijkt op een gelijknamige, lokaal
+        // geïnstalleerde addon.
+        let showsHubIcon: Bool = {
+            if case .origin(let name) = filter {
+                return isHubOrigin(name)
+            }
+            return false
+        }()
+
+        return HStack(spacing: 8) {
+            if showsHubIcon {
+                Image(systemName: "server.rack")
+                    .font(.system(size: 15, weight: .semibold))
+            }
+
+            Text(
+                filterTitle(
+                    filter
+                )
             )
-        )
+        }
         .font(
             .system(
                 size: 21,
@@ -1134,6 +1166,15 @@ struct SourceSelectionView: View {
         {
             return
                 "IPTV VOD"
+        }
+
+        // Naast de addonnaam ook vermelden dat dit via VeyraHub loopt, zo
+        // blijft dat op elke afzonderlijke kaart zichtbaar — niet alleen in
+        // de filterbalk — ook wanneer een lokale addon toevallig dezelfde
+        // naam heeft.
+        if resolved.isFromHub {
+            return
+                "\(resolved.originName) · via VeyraHub"
         }
 
         return

@@ -180,40 +180,43 @@ extension BentoTile {
         }
     }
 
-    /// Hoogte van het blok in punten.
+    /// Hoogte van het blok in punten. Rijen sluiten aan op hun inhoud, zodat de afstand tussen alle blokken
+    /// overal gelijk is (het raster-`spacing`) en er geen lege stroken tussen blokken vallen.
     fileprivate func height(_ device: BentoDevice) -> CGFloat {
+        // Naam onder de collectiebanners (Instellingen → Home → Filmcollecties) kost een extra regel.
+        let names = (UserDefaults.standard.object(forKey: "veyra.bento.collectionNames") as? Bool) ?? true
         switch device {
         case .tv:
             switch self {
             case .verder, .releasesFilms, .releasesSeries: return 504
-            case .volgende: return 206
+            case .volgende: return 202
             case .live, .vandaag: return 520
             case .iptvFilms, .iptvSeries: return 450
-            case .streaming: return 168
-            case .collecties: return 274
+            case .streaming: return 156
+            case .collecties: return names ? 260 : 226
             default: return 300
             }
         case .tablet:
             switch self {
             case .verder, .releasesFilms, .releasesSeries: return 392
-            case .volgende: return 136
+            case .volgende: return 116
             case .live: return 300
-            case .vandaag: return 290
+            case .vandaag: return 308
             case .iptvFilms, .iptvSeries: return 280
-            case .streaming: return 96
-            case .collecties: return 178
+            case .streaming: return 76
+            case .collecties: return names ? 152 : 130
             default: return 200
             }
         case .phone:
             switch self {
             case .verder: return 292
             case .live: return 300
-            case .volgende: return 112
+            case .volgende: return 92
             case .releasesFilms, .releasesSeries: return 300
             case .iptvFilms, .iptvSeries: return 270
-            case .streaming: return 76
-            case .collecties: return 148
-            case .vandaag: return 150
+            case .streaming: return 60
+            case .collecties: return names ? 128 : 106
+            case .vandaag: return 308
             default: return 200
             }
         }

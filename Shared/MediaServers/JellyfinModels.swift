@@ -182,6 +182,13 @@ struct JellyfinMediaSource:
     let supportsDirectStream: Bool?
     let supportsTranscoding: Bool?
 
+    /// Naam (en id) van de VeyraHub-addon die deze bron leverde. Een
+    /// Veyra-Hub-specifieke uitbreiding op de Jellyfin-MediaSource-vorm
+    /// (zelfde patroon als `groupID`/`groupName` op `JellyfinLibrary`); een
+    /// echte Jellyfin/Emby-server stuurt dit niet mee, vandaar optioneel.
+    let addonID: String?
+    let addonName: String?
+
     enum CodingKeys: String, CodingKey {
         case id = "Id"
         case name = "Name"
@@ -194,5 +201,7 @@ struct JellyfinMediaSource:
         case supportsDirectPlay = "SupportsDirectPlay"
         case supportsDirectStream = "SupportsDirectStream"
         case supportsTranscoding = "SupportsTranscoding"
+        case addonID = "AddonId"
+        case addonName = "AddonName"
     }
 }

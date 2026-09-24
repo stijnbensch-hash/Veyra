@@ -14,12 +14,14 @@ struct HomeView: View {
     @State private var bentoSeries: XtreamSeriesItem?
     @State private var bentoRelease: BentoTMDBTitle?
     @State private var bentoCatalog: BentoCatalog?
+    @State private var sportQuery: SportChannelQuery?
 
     var body: some View {
         NavigationStack {
             homeContent
                 .overlay(alignment: .top) { floatingBar }
                 .toolbar(.hidden, for: .navigationBar)
+                .sportChannelSheet($sportQuery) { bentoChannel = $0 }
                 .modifier(HomeDestinations(
                     title: $bentoTitle, channel: $bentoChannel, film: $bentoFilm,
                     series: $bentoSeries, release: $bentoRelease, catalog: $bentoCatalog))
@@ -55,7 +57,7 @@ struct HomeView: View {
             onOpenIPTVSeries: { bentoSeries = $0 },
             onOpenTMDBTitle: { bentoRelease = $0 },
             onOpenCatalog: { bentoCatalog = $0 },
-            onPlaySport: { _, _ in openTab(.live) },
+            onPlaySport: { event, _ in sportQuery = SportChannelQuery(event: event) },
             onOpenCompetition: { _ in openTab(.sports) }
         )
     }

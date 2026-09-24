@@ -340,12 +340,32 @@ final class VeyraLiveGuideSource {
         return guide.play(row)
     }
 
-    func channels() async -> [EPGChannel] {
+    private func reloadIfNeeded() async {
         if lastReload == nil || Date().timeIntervalSince(lastReload ?? .distantPast) > 600 {
             guide.reloadID = UUID()
             await guide.reload()
             lastReload = Date()
         }
+    }
+
+    /// Zenders waarvan de gids rond de aftrap een programma met deze teams heeft (zie `SportChannelMatcher`).
+    func sportChannels(teams: [String], start: Date) async -> [SportChannelMatch] {
+        await reloadIfNeeded()
+        let index = guide.programmeIndex
+        let channels = guide.channels.map { row in
+            SportGuideChannel(
+                id: row.id,
+                name: ChannelNameOverrideStore.effectiveName(channelID: row.channel.id, defaultName: row.channel.name),
+                logoURL: ChannelLogoOverrideStore.effectiveLogoURL(channelID: row.channel.id, defaultLogoURL: row.channel.logoURL),
+                tvgID: (row.channel.tvgID ?? "").trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        return await Task.detached(priority: .userInitiated) {
+            SportChannelMatcher.matches(teams: teams, start: start, index: index, channels: channels)
+        }.value
+    }
+
+    func channels() async -> [EPGChannel] {
+        await reloadIfNeeded()
 
         var rows = guide.favoriteRows
         var seen = Set(rows.map(\.id))
@@ -649,6 +669,10 @@ final class VeyraBentoServices {
 
     func playableSource(forChannelID id: String) -> PlayableSource? {
         liveGuide.playableSource(forChannelID: id)
+    }
+
+    func sportChannels(teams: [String], start: Date) async -> [SportChannelMatch] {
+        await liveGuide.sportChannels(teams: teams, start: start)
     }
 
     private init() {

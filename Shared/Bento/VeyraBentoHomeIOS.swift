@@ -99,11 +99,15 @@ struct VeyraBentoHomeView: View {
                         .buttonStyle(.plain)
                     }
 
-                    TimelineView(.periodic(from: .now, by: 30)) { context in
-                        bento(now: context.date)
-                    }
+                    // Raster en eigen planken delen dezelfde tussenruimte (12) als de blokken in het raster zelf,
+                    // zodat de streamingdiensten (vaak het laatste blok) even ver van het blok erboven als eronder staan.
+                    VStack(alignment: .leading, spacing: 12) {
+                        TimelineView(.periodic(from: .now, by: 30)) { context in
+                            bento(now: context.date)
+                        }
 
-                    if layout.showShelves { VeyraBentoUserShelves(compact: true, onOpen: onOpenTMDBTitle) }
+                        if layout.showShelves { VeyraBentoUserShelves(compact: true, onOpen: onOpenTMDBTitle) }
+                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
@@ -163,7 +167,7 @@ struct VeyraBentoHomeView: View {
     @ViewBuilder
     private func bento(now: Date) -> some View {
         let live = model.liveRows(at: now, limit: 4, recentFirst: true)
-        let today = showUpcoming ? model.today(at: now, limit: regular ? 4 : 3) : nil
+        let today = showUpcoming ? model.today(at: now, limit: 5) : nil
         let items = showContinueWatching ? model.home.continueItems : []
         let present = presentTiles(items: items, live: live, hasToday: today != nil)
         let profile = BentoProfile.make(regular ? .tablet : .phone, order: layout.orderedTiles.filter { present.contains($0) })
@@ -272,6 +276,8 @@ struct VeyraBentoHomeView: View {
                 .scrollIndicators(.hidden)
                 .veyraHomeTileMenu(.streaming)
                 .bentoCell(profile.cell(.streaming))
+                // Iets hoger: dichter bij het blok erboven, meer lucht boven "Verder kijken".
+                .offset(y: -10)
             }
 
             if present.contains(.collecties) {

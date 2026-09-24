@@ -182,10 +182,34 @@ struct JellyfinSourceProvider:
                 providerName: account.name
             )
 
+        // Groepeer net als een lokaal geïnstalleerde addon: op de naam van
+        // de addon die VeyraHub zelf aanroept, niet op de servernaam. Die
+        // naam komt altijd mee (HubStream.AddonName is nooit leeg), maar
+        // val voor de zekerheid terug op de servernaam.
+        let originName =
+            Self.cleanOriginName(stream.addonName)
+                ?? account.name
+
         return ResolvedSource(
             source: source,
-            originName: account.name
+            originName: originName,
+            isFromHub: true
         )
+    }
+
+    private static func cleanOriginName(
+        _ value: String?
+    ) -> String? {
+        guard
+            let trimmed =
+                value?.trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                ),
+            !trimmed.isEmpty
+        else {
+            return nil
+        }
+        return trimmed
     }
 
     // MARK: - Movies
@@ -351,12 +375,24 @@ struct JellyfinSourceProvider:
                         account.name
                 )
 
+            // Zelfde groepering als het native pad hierboven: op de naam
+            // van de VeyraHub-addon (als de server dat meestuurt), niet op
+            // de servernaam. Een echte Jellyfin/Emby-server stuurt geen
+            // AddonName mee, dus die blijft gewoon op de servernaam vallen.
+            let originName =
+                Self.cleanOriginName(
+                    mediaSource.addonName
+                )
+                ?? account.name
+
             results.append(
                 ResolvedSource(
                     source:
                         source,
                     originName:
-                        account.name
+                        originName,
+                    isFromHub:
+                        account.isVeyraHub
                 )
             )
         }

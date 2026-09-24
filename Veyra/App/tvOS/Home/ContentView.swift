@@ -10,6 +10,7 @@ struct ContentView: View {
     @State private var bentoSeries: XtreamSeriesItem?
     @State private var bentoRelease: BentoTMDBTitle?
     @State private var bentoCatalog: BentoCatalog?
+    @State private var sportQuery: SportChannelQuery?
 
     var body: some View {
         NavigationStack {
@@ -33,7 +34,7 @@ struct ContentView: View {
                         onOpenIPTVSeries: { bentoSeries = $0 },
                         onOpenTMDBTitle: { bentoRelease = $0 },
                         onOpenCatalog: { bentoCatalog = $0 },
-                        onPlaySport: { _, _ in destination = .liveTV },
+                        onPlaySport: { event, _ in sportQuery = SportChannelQuery(event: event) },
                         onOpenCompetition: { _ in destination = .sport }
                     )
                 }
@@ -53,6 +54,7 @@ struct ContentView: View {
             .navigationDestination(item: $bentoTitle) { item in
                 VeyraBentoTitleDestination(item: item)
             }
+            .sportChannelSheet($sportQuery) { bentoChannel = $0 }
             .navigationDestination(item: $bentoChannel) { source in
                 PlayerView(source: source, item: MediaItem(title: source.name, type: .liveTV))
             }

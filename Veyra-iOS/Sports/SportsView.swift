@@ -37,9 +37,13 @@ struct SportsView: View {
 
                 content
             }
+            .onAppear { store.reloadFavorites() }
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(item: $selectedMatch) { match in
                 SportsMatchDetailIOS(match: match)
+            }
+            .onChange(of: selectedMatch) { _, new in
+                if new == nil { store.reloadFavorites() }
             }
         }
         .task(id: date) {
@@ -84,7 +88,7 @@ struct SportsView: View {
             .padding(.horizontal)
             .padding(.top, 8)
 
-            Toggle("Alleen favorieten", isOn: $favoritesOnly)
+            Toggle("Alleen mijn favoriete teams", isOn: $favoritesOnly)
                 .padding(.horizontal)
                 .padding(.top, 8)
 
@@ -245,10 +249,13 @@ private struct SportsMatchRowIOS: View {
         HStack(spacing: 8) {
             Button(action: onToggle) {
                 Image(systemName: favorite ? "star.fill" : "star")
-                    .font(.caption)
+                    .font(.body)
                     .foregroundStyle(favorite ? .yellow : .secondary)
+                    .frame(width: 32, height: 32)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(favorite ? "Verwijder uit favoriete teams" : "Maak favoriet team")
 
             AsyncImage(url: team.logoURL ?? SportsTeam.fallbackLogoURL(abbreviation: team.abbreviation)) { phase in
                 switch phase {

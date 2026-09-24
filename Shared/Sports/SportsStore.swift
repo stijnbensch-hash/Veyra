@@ -58,6 +58,12 @@ final class SportsStore: ObservableObject {
     func toggle(_ team: SportsTeam) {
         if favorites.contains(team.id) { favorites.remove(team.id) } else { favorites.insert(team.id) }
         defaults.set(Array(favorites), forKey: "sports.favoriteTeams")
+        SportsFavorites.record(team, isFavorite: favorites.contains(team.id), defaults: defaults)
+    }
+
+    /// Herlaadt de favorieten uit UserDefaults (bv. nadat ze in een detailscherm gewijzigd zijn).
+    func reloadFavorites() {
+        favorites = Set(defaults.stringArray(forKey: "sports.favoriteTeams") ?? [])
     }
 
     func isFavorite(_ match: SportsMatch) -> Bool { favorites.contains(match.home.id) || favorites.contains(match.away.id) }

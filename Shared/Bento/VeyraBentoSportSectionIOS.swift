@@ -56,20 +56,35 @@ struct SportSection: View {
             }
 
             if !competitions.isEmpty {
-                ScrollView(.horizontal) {
+                if competitions.count <= (regular ? 4 : 2) {
+                    // Weinig competities: gelijk verdeeld over de volle breedte.
                     HStack(spacing: 10) {
                         ForEach(competitions) { competition in
-                            Button { onOpenCompetition(competition) } label: {
-                                VeyraCompetitionContent(competition: competition, now: now, compact: true)
-                            }
-                            .buttonStyle(VeyraPressStyle(cornerRadius: 18))
-                            .frame(width: 150, height: 96)
+                            competitionButton(competition, now: now)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 96)
                         }
                     }
+                } else {
+                    ScrollView(.horizontal) {
+                        HStack(spacing: 10) {
+                            ForEach(competitions) { competition in
+                                competitionButton(competition, now: now)
+                                    .frame(width: 150, height: 96)
+                            }
+                        }
+                    }
+                    .scrollIndicators(.hidden)
                 }
-                .scrollIndicators(.hidden)
             }
         }
+    }
+
+    private func competitionButton(_ competition: SportCompetition, now: Date) -> some View {
+        Button { onOpenCompetition(competition) } label: {
+            VeyraCompetitionContent(competition: competition, now: now, compact: true)
+        }
+        .buttonStyle(VeyraPressStyle(cornerRadius: 18))
     }
 
     // MARK: Kaart

@@ -331,6 +331,8 @@ struct VeyraBentoHomeView: View {
                 }
                 .scrollClipDisabled()
                 .bentoCell(profile.cell(.streaming))
+                // Iets hoger geplaatst.
+                .offset(y: -14)
             }
 
             if present.contains(.collecties) {
