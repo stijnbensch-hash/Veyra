@@ -70,4 +70,25 @@ struct VeyraPosterFocusStyle: ButtonStyle {
         }
     }
 }
+
+/// Focus zonder eigen rand: alleen een lichte vergroting. De rand tekent de inhoud zelf (bv. enkel om de banner,
+/// niet om de naam eronder) via `@Environment(\.isFocused)`.
+struct VeyraBannerFocusStyle: ButtonStyle {
+    func makeBody(configuration: ButtonStyleConfiguration) -> some View {
+        Inner(configuration: configuration)
+            .focusEffectDisabled()
+    }
+
+    private struct Inner: View {
+        let configuration: ButtonStyleConfiguration
+        @Environment(\.isFocused) private var isFocused
+
+        var body: some View {
+            configuration.label
+                .scaleEffect(isFocused ? 1.05 : (configuration.isPressed ? 0.98 : 1))
+                .zIndex(isFocused ? 1 : 0)
+                .animation(.easeOut(duration: 0.16), value: isFocused)
+        }
+    }
+}
 #endif

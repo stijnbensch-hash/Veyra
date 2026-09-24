@@ -237,7 +237,7 @@ final class VeyraBentoViewModel {
     }
 
     /// Maximaal `limit` zenders die nu iets uitzenden: één live sportwedstrijd, dan favorieten, dan de rest.
-    func liveRows(at now: Date, limit: Int = 3) -> [BentoLiveRow] {
+    func liveRows(at now: Date, limit: Int = 3, recentFirst: Bool = false) -> [BentoLiveRow] {
         let live = channels.compactMap { channel -> (EPGChannel, EPGProgram)? in
             guard channel.health != .down, let program = channel.currentProgram(at: now) else { return nil }
             return (channel, program)
@@ -248,13 +248,21 @@ final class VeyraBentoViewModel {
             if picked.count < limit, !picked.contains(where: { $0.0.id == pair.0.id }) { picked.append(pair) }
         }
 
-        if let sport = live.filter({ $0.1.isSports }).min(by: {
+        if recentFirst {
+            // Laatst bekeken zenders eerst (nieuwste bovenaan); daarna pas de gewone selectie als er te weinig zijn.
+            live.filter { $0.0.recentRank != nil }
+                .sorted { ($0.0.recentRank ?? .max) < ($1.0.recentRank ?? .max) }
+                .forEach(add)
+        } else if let sport = live.filter({ $0.1.isSports }).min(by: {
             (Self.rank($0.0.health), $0.0.number) < (Self.rank($1.0.health), $1.0.number)
         }) { add(sport) }
         live.filter { $0.0.isFavorite }.sorted { $0.0.number < $1.0.number }.forEach(add)
         live.sorted { $0.0.number < $1.0.number }.forEach(add)
 
-        return picked.sorted { $0.0.number < $1.0.number }.map { channel, program in
+        let ordered = recentFirst && picked.contains(where: { $0.0.recentRank != nil })
+            ? picked
+            : picked.sorted { $0.0.number < $1.0.number }
+        return ordered.map { channel, program in
             BentoLiveRow(
                 id: program.id, channelID: channel.id, channelNumber: channel.number, channelName: channel.name,
                 title: program.title,

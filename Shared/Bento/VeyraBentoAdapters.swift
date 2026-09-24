@@ -371,6 +371,7 @@ final class VeyraLiveGuideSource {
                 name: ChannelNameOverrideStore.effectiveName(channelID: row.channel.id, defaultName: row.channel.name),
                 logoURL: ChannelLogoOverrideStore.effectiveLogoURL(channelID: row.channel.id, defaultLogoURL: row.channel.logoURL),
                 health: .good, isFavorite: guide.favorites.contains(row.id),
+                recentRank: guide.recent.firstIndex(of: row.id),
                 programs: programmes.map { p in
                     EPGProgram(id: p.id, title: p.title, subtitle: p.subtitle.isEmpty ? nil : p.subtitle,
                                description: p.summary.isEmpty ? nil : p.summary, start: p.start, end: p.end,

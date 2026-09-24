@@ -190,27 +190,29 @@ extension BentoTile {
             case .live, .vandaag: return 520
             case .iptvFilms, .iptvSeries: return 450
             case .streaming: return 168
-            case .collecties: return 372
+            case .collecties: return 274
             default: return 300
             }
         case .tablet:
             switch self {
             case .verder, .releasesFilms, .releasesSeries: return 392
             case .volgende: return 136
-            case .live, .vandaag: return 290
+            case .live: return 300
+            case .vandaag: return 290
             case .iptvFilms, .iptvSeries: return 280
             case .streaming: return 96
-            case .collecties: return 220
+            case .collecties: return 178
             default: return 200
             }
         case .phone:
             switch self {
-            case .verder, .live: return 292
+            case .verder: return 292
+            case .live: return 300
             case .volgende: return 112
             case .releasesFilms, .releasesSeries: return 300
             case .iptvFilms, .iptvSeries: return 270
             case .streaming: return 76
-            case .collecties: return 210
+            case .collecties: return 148
             case .vandaag: return 150
             default: return 200
             }
@@ -221,7 +223,17 @@ extension BentoTile {
 extension BentoProfile {
     /// Legt de opgegeven blokken op volgorde in rijen: blokken die samen in 12 kolommen passen delen een rij,
     /// en de overgebleven kolommen worden over de blokken van die rij verdeeld (zodat er geen gaten vallen).
-    static func make(_ device: BentoDevice, order: [BentoTile]) -> BentoProfile {
+    static func make(_ device: BentoDevice, order requested: [BentoTile]) -> BentoProfile {
+        var order = requested
+        // Op tv en iPad staan Nieuwe films en Nieuwe series naast het grote Verder kijken (6 + 3 + 3 kolommen),
+        // ook als de volgorde (bv. via iPhone gesynchroniseerd) ze ergens anders heeft gezet.
+        if device != .phone, order.contains(.verder) {
+            let pair = order.filter { $0 == .releasesFilms || $0 == .releasesSeries }
+            order.removeAll { pair.contains($0) }
+            if let verder = order.firstIndex(of: .verder) {
+                order.insert(contentsOf: pair, at: verder + 1)
+            }
+        }
         let columns = device == .phone ? 2 : 12
         let spacing: CGFloat = device == .tv ? 24 : 12
 

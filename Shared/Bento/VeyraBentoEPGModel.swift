@@ -64,6 +64,8 @@ nonisolated struct EPGChannel: Identifiable, Equatable {
     let logoURL: URL?
     let health: SourceHealth
     let isFavorite: Bool
+    /// Plek in "recent bekeken" (0 = laatst bekeken); `nil` = niet recent bekeken.
+    var recentRank: Int? = nil
     let programs: [EPGProgram]   // gesorteerd op start
 
     func currentProgram(at now: Date) -> EPGProgram? {

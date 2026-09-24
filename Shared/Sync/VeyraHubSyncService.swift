@@ -60,6 +60,8 @@ final class VeyraHubSyncService {
         // Overig
         "catalog.watchRegion", "openSubtitlesEnabled", "metadata.source.preference",
         "sports.favoriteTeams",
+        // Home: namen onder de filmcollectie-banners tonen of verbergen
+        "veyra.bento.collectionNames",
     ]
 
     private static var simpleKeysAll: [String] {

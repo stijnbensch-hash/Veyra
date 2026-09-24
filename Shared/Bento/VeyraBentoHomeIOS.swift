@@ -31,6 +31,7 @@ struct VeyraBentoHomeView: View {
     var onOpenCompetition: (SportCompetition) -> Void
 
     @AppStorage(GeneralSettingsDefaults.showContinueWatchingKey) private var showContinueWatching = true
+    @AppStorage(VeyraCollectionNames.key) private var showCollectionNames = true
     @AppStorage(GeneralSettingsDefaults.showUpcomingKey) private var showUpcoming = true
     @State private var layout = VeyraHomeLayoutStore.load()
     @State private var askPreset = false
@@ -124,6 +125,10 @@ struct VeyraBentoHomeView: View {
         .onReceive(NotificationCenter.default.publisher(for: .iptvConfigurationDidChange)) { _ in
             Task { await model.load(force: true) }
         }
+        // Aflevering/film afgekeken (Trakt-stop): "Verder kijken" meteen opnieuw ophalen.
+        .onReceive(NotificationCenter.default.publisher(for: .veyraTraktHistoryDidChange)) { _ in
+            Task { await model.load(force: true) }
+        }
         .onAppear { askPreset = !VeyraHomeLayoutStore.hasChosen }
         .sheet(isPresented: $askPreset, onDismiss: { VeyraHomeLayoutStore.markChosen() }) {
             VeyraHomePresetPickerView { askPreset = false }
@@ -157,7 +162,7 @@ struct VeyraBentoHomeView: View {
 
     @ViewBuilder
     private func bento(now: Date) -> some View {
-        let live = model.liveRows(at: now)
+        let live = model.liveRows(at: now, limit: 4, recentFirst: true)
         let today = showUpcoming ? model.today(at: now, limit: regular ? 4 : 3) : nil
         let items = showContinueWatching ? model.home.continueItems : []
         let present = presentTiles(items: items, live: live, hasToday: today != nil)
@@ -261,7 +266,8 @@ struct VeyraBentoHomeView: View {
                             .frame(width: regular ? 190 : 150, height: regular ? 76 : 60)
                         }
                     }
-                    .padding(.vertical, 2)
+                    // Verticaal gecentreerd in het blok, zodat de afstand tot de kaders erboven en eronder gelijk is.
+                    .frame(maxHeight: .infinity, alignment: .center)
                 }
                 .scrollIndicators(.hidden)
                 .veyraHomeTileMenu(.streaming)
@@ -269,14 +275,21 @@ struct VeyraBentoHomeView: View {
             }
 
             if present.contains(.collecties) {
-                VeyraBentoShelf(title: "Filmcollecties", subtitle: "Complete filmreeksen", compact: true, contentHeight: 134) {
-                    ForEach(model.collections) { collection in
-                        Button { onOpenCatalog(collection) } label: {
-                            VeyraBentoLandscapeContent(title: collection.name, url: collection.imageURL, compact: true)
+                ScrollView(.horizontal) {
+                    HStack(spacing: 10) {
+                        ForEach(model.collections) { collection in
+                            Button { onOpenCatalog(collection) } label: {
+                                VeyraBentoCollectionMiniContent(title: collection.name, url: collection.imageURL, compact: true, showName: showCollectionNames)
+                            }
+                            .buttonStyle(.plain)
+                            .frame(width: regular ? 340 : 270, height: (regular ? 116 : 92) + (showCollectionNames ? 22 : 0))
                         }
-                        .buttonStyle(.plain)
                     }
                 }
+                .scrollIndicators(.hidden)
+                // Ruimte boven de banners zit in het blok zelf (en in de blokhoogte), zodat de afstand
+                // tot het blok erboven gelijk blijft wanneer het blok verplaatst wordt.
+                .padding(.top, 14)
                 .veyraHomeTileMenu(.collecties)
                 .bentoCell(profile.cell(.collecties))
             }

@@ -31,7 +31,10 @@ struct ContentView: View {
 
     private var tabViewContent: some View {
         TabView(selection: $selectedTab) {
-            Tab("Home", systemImage: "house.fill", value: AppTab.home) { HomeView() }
+            Tab("Home", systemImage: "house.fill", value: AppTab.home) {
+                HomeView(floatingButtons: true, showsSettings: !isRegular,
+                         onSearch: { showSearch = true }, onSettings: { showSettings = true })
+            }
             Tab("Films", systemImage: "film.fill", value: AppTab.movies) { MoviesView() }
             Tab("Series", systemImage: "tv.fill", value: AppTab.series) { SeriesView() }
             Tab("Live", systemImage: "antenna.radiowaves.left.and.right", value: AppTab.live) { LiveTVView() }
@@ -156,30 +159,6 @@ struct ContentView: View {
         ZStack(alignment: .top) {
             styledTabView
                 .tint(VeyraColors.cyan)
-
-            // Losse, zwevende knoppen bovenin: vergrootglas linksboven
-            // (Zoeken), tandwiel rechtsboven (Instellingen) — enkel op het
-            // Home-tabblad, nergens anders. Bij de zijbalk-stijl op iPad
-            // blijft dit weg: Instellingen zit dan al als eigen item in de
-            // zijbalk, en deze balk zou boven de zijbalk een tweede,
-            // overbodige menubalk vormen.
-            if selectedTab == .home && homeNavigation.isAtRoot
-                && !(isRegular && ipadNavigationStyle == .sidebar) {
-                HStack {
-                    FloatingIconButton(symbol: "magnifyingglass", accessibilityLabel: "Zoeken") {
-                        showSearch = true
-                    }
-                    Spacer()
-                    if !isRegular {
-                        FloatingIconButton(symbol: "gearshape.fill", accessibilityLabel: "Instellingen") {
-                            showSettings = true
-                        }
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
-            }
-
         }
         .preferredColorScheme(.dark)
         .onChange(of: homeNavigation.requestedTab) { _, tab in
@@ -204,7 +183,7 @@ struct ContentView: View {
 /// Glazen, zwevende rondje-knop voor de losse Instellingen-/Zoeken-toegang
 /// bovenin het scherm — vervaagd glasmateriaal met een dunne cyaan rand, in
 /// stijl met de rest van de app.
-private struct FloatingIconButton: View {
+struct FloatingIconButton: View {
     let symbol: String
     let accessibilityLabel: String
     let action: () -> Void

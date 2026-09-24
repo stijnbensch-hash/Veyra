@@ -104,20 +104,37 @@ struct JellyfinSourceProvider:
                 VeyraHubNativeClient
                     .nativeMediaID(for: item)
         else {
+            debug("native: geen mediaID kunnen bouwen (geen imdbID of catalogItemID).")
             return []
         }
+
+        debug("native REQUEST type=\(item.type) id=\(mediaID)")
 
         let client =
             VeyraHubNativeClient(
                 account: account
             )
 
+        var thrownError: Error?
+        let streams: [VeyraHubNativeClient.NativeStream]?
+        do {
+            streams = try await client.streams(
+                type: item.type,
+                id: mediaID
+            )
+        } catch {
+            thrownError = error
+            streams = nil
+        }
+
+        if let thrownError {
+            debug("native FOUT: \(thrownError.localizedDescription)")
+        } else {
+            debug("native Aantal streams: \(streams?.count ?? 0)")
+        }
+
         guard
-            let streams =
-                try? await client.streams(
-                    type: item.type,
-                    id: mediaID
-                )
+            let streams
         else {
             return []
         }

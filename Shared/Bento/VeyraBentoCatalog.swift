@@ -172,8 +172,13 @@ enum VeyraTraktListSource {
         let shelf = Shelf(title: "", source: .trakt(list: .personal(id: listID, slug: "", name: ""), kind: kind))
         let items = await ShelfCatalogService.items(for: shelf)
         var result: [BentoTMDBTitle] = []
+        // Verschillende Trakt-items kunnen (bij een mislukte/onduidelijke titel-
+        // koppeling) toevallig op hetzelfde TMDB-id uitkomen -- zonder deze check
+        // krijgt de rij twee kaarten met hetzelfde `id`, wat SwiftUI's ForEach in
+        // de war brengt (verkeerde/geen tikrespons, dubbel getoonde tegel).
+        var seenIDs = Set<Int>()
         for item in items {
-            guard let id = item.tmdbID else { continue }
+            guard let id = item.tmdbID, seenIDs.insert(id).inserted else { continue }
             result.append(BentoTMDBTitle(id: id, kind: kind == .movie ? .movie : .episode, title: item.title,
                                          posterURL: item.posterURL, backdropURL: item.backdropURL))
         }
@@ -194,8 +199,9 @@ enum VeyraAddonCatalogSource {
                                                     catalogID: catalogID, catalogName: ""))
         let items = await ShelfCatalogService.items(for: shelf)
         var result: [BentoTMDBTitle] = []
+        var seenIDs = Set<Int>()
         for item in items {
-            guard let id = item.tmdbID else { continue }
+            guard let id = item.tmdbID, seenIDs.insert(id).inserted else { continue }
             result.append(BentoTMDBTitle(id: id, kind: kind == .movie ? .movie : .episode, title: item.title,
                                          posterURL: item.posterURL, backdropURL: item.backdropURL))
         }
@@ -787,8 +793,12 @@ struct VeyraBentoCatalogView: View {
                 }
 
                 if let current {
+                    // `id: \.offset` i.p.v. het TMDB-id zelf: als twee titels
+                    // (door een mislukte koppeling) toch hetzelfde id hebben,
+                    // blijft elke kaart een eigen, stabiele identiteit houden
+                    // zodat tikken altijd de juiste kaart opent.
                     LazyVGrid(columns: gridColumns, alignment: .leading, spacing: compact ? 18 : 34) {
-                        ForEach(current.titles) { title in card(title) }
+                        ForEach(Array(current.titles.enumerated()), id: \.offset) { _, title in card(title) }
                     }
                 }
             }
@@ -834,18 +844,27 @@ struct VeyraBentoCatalogView: View {
             heroTitle
                 .padding(.top, compact ? 4 : 12)
         } else {
-            ZStack(alignment: .bottomLeading) {
-                Color.white.opacity(0.05)
-                if let heroURL {
-                    AsyncImage(url: heroURL) { phase in
-                        if let image = phase.image { image.resizable().scaledToFill() }
+            // Kleur bepaalt de maat; het (brede) beeld ligt er als overlay op, anders rekt
+            // `scaledToFill` de hele pagina -- en dus de poster-kolommen -- breder dan het scherm.
+            Color.white.opacity(0.05)
+                .overlay {
+                    if let heroURL {
+                        AsyncImage(url: heroURL) { phase in
+                            if let image = phase.image { image.resizable().scaledToFill() }
+                        }
                     }
                 }
-                LinearGradient(colors: [.clear, VeyraHomeStyle.ink.opacity(0.92)], startPoint: UnitPoint(x: 0.5, y: 0.25), endPoint: .bottom)
-                LinearGradient(colors: [VeyraHomeStyle.ink.opacity(0.7), .clear], startPoint: .leading, endPoint: UnitPoint(x: 0.7, y: 0.5))
-                heroTitle
-                    .padding(compact ? 16 : 40)
-            }
+                .clipped()
+                .overlay {
+                    LinearGradient(colors: [.clear, VeyraHomeStyle.ink.opacity(0.92)], startPoint: UnitPoint(x: 0.5, y: 0.25), endPoint: .bottom)
+                }
+                .overlay {
+                    LinearGradient(colors: [VeyraHomeStyle.ink.opacity(0.7), .clear], startPoint: .leading, endPoint: UnitPoint(x: 0.7, y: 0.5))
+                }
+                .overlay(alignment: .bottomLeading) {
+                    heroTitle
+                        .padding(compact ? 16 : 40)
+                }
             .frame(maxWidth: .infinity)
             .frame(height: compact ? 220 : 460)
             .clipShape(RoundedRectangle(cornerRadius: compact ? 20 : 32, style: .continuous))
@@ -951,7 +970,13 @@ struct VeyraBentoCatalogView: View {
 // MARK: - Instellingen: filmcollecties
 
 /// Collecties op Home: volgorde, banner, toevoegen (zoeken of eigen Trakt-lijst), verwijderen, standaardlijst herstellen.
+/// Instelling: namen onder de collectiebanners op Home (standaard aan).
+enum VeyraCollectionNames {
+    static let key = "veyra.bento.collectionNames"
+}
+
 struct VeyraCollectionsSettingsView: View {
+    @AppStorage(VeyraCollectionNames.key) private var showNames = true
     @State private var entries: [BentoCollectionEntry] = []
     @State private var loading = true
     @State private var query = ""
@@ -966,6 +991,12 @@ struct VeyraCollectionsSettingsView: View {
 
     var body: some View {
         Form {
+            Section {
+                Toggle("Namen onder banners tonen", isOn: $showNames)
+            } footer: {
+                Text("Toont of verbergt de naam onder elke collectiebanner op Home.")
+            }
+
             Section {
                 if loading {
                     ProgressView()
@@ -1074,11 +1105,14 @@ struct VeyraCollectionsSettingsView: View {
 
     private func row(_ entry: BentoCollectionEntry) -> some View {
         HStack(spacing: 14) {
-            AsyncImage(url: VeyraCollectionsStore.imageURL(for: entry)) { phase in
-                if let image = phase.image { image.resizable().scaledToFill() } else { Color.white.opacity(0.08) }
-            }
-            .frame(width: 96, height: 54)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            Color.white.opacity(0.08)
+                .frame(width: 108, height: 37)
+                .overlay {
+                    AsyncImage(url: VeyraCollectionsStore.imageURL(for: entry)) { phase in
+                        if let image = phase.image { image.resizable().scaledToFill() } else { Color.clear }
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.name)
                 Text(entry.isTraktList ? "Trakt-lijst" : "TMDB-collectie")
@@ -1167,6 +1201,9 @@ struct VeyraCollectionEditorView: View {
 
     private var index: Int? { entries.firstIndex { $0.id == entryID } }
 
+    /// Breedte : hoogte van de collectiebanner op Home (270 x 92 op iPhone).
+    private static let bannerAspect: CGFloat = 270.0 / 92.0
+
     var body: some View {
         Form {
             if let index {
@@ -1177,12 +1214,17 @@ struct VeyraCollectionEditorView: View {
                 }
 
                 Section {
-                    AsyncImage(url: VeyraCollectionsStore.imageURL(for: entries[index])) { phase in
-                        if let image = phase.image { image.resizable().scaledToFill() } else { Color.white.opacity(0.08) }
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 180)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    // Zelfde verhouding als de banner op Home (ongeveer 3:1), zodat je precies ziet wat
+                    // er getoond wordt; het beeld ligt als overlay zodat het de rij niet oprekt.
+                    Color.white.opacity(0.08)
+                        .frame(maxWidth: .infinity)
+                        .aspectRatio(Self.bannerAspect, contentMode: .fit)
+                        .overlay {
+                            AsyncImage(url: VeyraCollectionsStore.imageURL(for: entries[index])) { phase in
+                                if let image = phase.image { image.resizable().scaledToFill() } else { Color.clear }
+                            }
+                        }
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
                     Button(loadingOptions ? "Laden…" : "Kies uit bronnen (TMDB, fanart)") { Task { await loadOptions() } }
                         .disabled(loadingOptions)
@@ -1193,11 +1235,14 @@ struct VeyraCollectionEditorView: View {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 16) {
                                 ForEach(options, id: \.self) { url in
-                                    AsyncImage(url: url) { phase in
-                                        if let image = phase.image { image.resizable().scaledToFill() } else { Color.white.opacity(0.08) }
-                                    }
-                                    .frame(width: 240, height: 135)
-                                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                    Color.white.opacity(0.08)
+                                        .frame(width: 270, height: 270 / Self.bannerAspect)
+                                        .overlay {
+                                            AsyncImage(url: url) { phase in
+                                                if let image = phase.image { image.resizable().scaledToFill() } else { Color.clear }
+                                            }
+                                        }
+                                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                                     .contentShape(Rectangle())
                                     // Een `Button` in een horizontale ScrollView binnenin een Form-rij
                                     // krijgt op iOS soms geen tikken (de rij "wint" de gesture) — een

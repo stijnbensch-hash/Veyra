@@ -1138,6 +1138,9 @@ final class TraktStore: ObservableObject {
 
         print("[TraktScrobble] \(action) wordt verstuurd, item=\(item.title) progress=\(progress)")
 
+        // Home-cache van "voortgang per serie" is na elke scrobble verouderd.
+        TraktHomeThrottle.shared.invalidate()
+
         let boundedProgressForLocalUpdate =
             min(100, max(0, progress))
 
@@ -1201,6 +1204,8 @@ final class TraktStore: ObservableObject {
                     if action == "stop" {
                         await self
                             .refreshAfterMutation()
+                        TraktHomeThrottle.shared.invalidate()
+                        NotificationCenter.default.post(name: .veyraTraktHistoryDidChange, object: nil)
                     }
 
                 } catch TraktError
@@ -1214,6 +1219,8 @@ final class TraktStore: ObservableObject {
                     if action == "stop" {
                         await self
                             .refreshAfterMutation()
+                        TraktHomeThrottle.shared.invalidate()
+                        NotificationCenter.default.post(name: .veyraTraktHistoryDidChange, object: nil)
                     }
 
                 } catch is CancellationError {

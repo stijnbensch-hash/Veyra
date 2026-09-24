@@ -245,6 +245,11 @@ nonisolated struct TraktCalendarMovieDTO: Decodable, Sendable {
 // MARK: - Live Trakt-implementatie
 
 /// Deelt voortgangsresultaten (15 min) en pauzeert extra calls na een 429, zodat Home de Trakt-limiet niet steeds opnieuw raakt.
+extension Notification.Name {
+    /// Trakt-kijkgeschiedenis is net gewijzigd (bv. aflevering afgekeken): Home moet "Verder kijken" opnieuw ophalen.
+    static let veyraTraktHistoryDidChange = Notification.Name("veyra.trakt.historyDidChange")
+}
+
 nonisolated final class TraktHomeThrottle: @unchecked Sendable {
     static let shared = TraktHomeThrottle()
     private let lock = NSLock()
@@ -265,6 +270,13 @@ nonisolated final class TraktHomeThrottle: @unchecked Sendable {
     func store(_ value: TraktShowProgressDTO, for showID: Int) {
         lock.lock(); defer { lock.unlock() }
         progress[showID] = (Date(), value)
+    }
+
+    /// Gooit de gecachete voortgang weg (na een scrobble/afgekeken aflevering), anders blijft
+    /// "Verder kijken" tot 15 minuten de net bekeken aflevering als volgende tonen.
+    func invalidate() {
+        lock.lock(); defer { lock.unlock() }
+        progress.removeAll()
     }
 
     func block(for seconds: TimeInterval) {

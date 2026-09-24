@@ -497,9 +497,12 @@ private struct PosterBoxModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         if fill {
-            content
+            // Maat komt van een lege kleur (2:3 op de kolombreedte); de afbeelding ligt er als
+            // overlay op en kan de kolom dus nooit breder rekken.
+            Color.clear
                 .frame(maxWidth: .infinity)
                 .aspectRatio(2.0 / 3.0, contentMode: .fit)
+                .overlay { content }
         } else {
             content.frame(width: width, height: height)
         }
@@ -710,5 +713,56 @@ struct VeyraBentoLandscapeContent: View {
         .clipShape(RoundedRectangle(cornerRadius: compact ? 14 : 20, style: .continuous))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(title)
+    }
+}
+
+/// Kleine landscape balk voor een filmcollectie (zelfde stijl als de kleine "Verder kijken"-balken):
+/// het beeld vult de balk, de naam staat er klein linksonder overheen. Vult de maat die de aanroeper geeft.
+struct VeyraBentoCollectionMiniContent: View {
+    let title: String
+    let url: URL?
+    var compact = false
+    /// Naam onder de banner (Instellingen → Home → Filmcollecties).
+    var showName = true
+    @Environment(\.isFocused) private var isFocused
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: compact ? 5 : 8) {
+            banner
+            if showName {
+            Text(title)
+                .font(.system(size: compact ? 12 : 20, weight: .medium))
+                .foregroundStyle(.white.opacity(0.85))
+                .lineLimit(1)
+                .padding(.horizontal, compact ? 4 : 6)
+                .frame(height: compact ? 17 : 26, alignment: .leading)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+    }
+
+    // Kleur bepaalt de maat (het kader van de aanroeper); het beeld ligt er als overlay op,
+    // zodat een breed backdrop-beeld de banner niet breder maakt en over de buren heen loopt.
+    private var banner: some View {
+        Color.clear
+            .overlay {
+                if let url {
+                    AsyncImage(url: url) { phase in
+                        if let image = phase.image { image.resizable().scaledToFill() } else { Color.clear }
+                    }
+                } else {
+                    VeyraArt(url: nil, seed: title)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: compact ? 16 : 22, style: .continuous))
+            // Cyaan-rode rand enkel om de banner (net als bij "Verder kijken"); de naam eronder blijft erbuiten.
+            .overlay {
+                // Rand (en focus-gloed op tvOS) enkel om de banner; de naam eronder blijft erbuiten.
+                RoundedRectangle(cornerRadius: compact ? 16 : 22, style: .continuous)
+                    .strokeBorder(isFocused ? VeyraFrame.active : VeyraFrame.resting, lineWidth: isFocused ? 3 : 1.5)
+            }
+            .shadow(color: isFocused ? VeyraColors.cyan.opacity(0.35) : .clear, radius: 16, x: -4)
+            .shadow(color: isFocused ? VeyraColors.red.opacity(0.22) : .clear, radius: 16, x: 6)
     }
 }

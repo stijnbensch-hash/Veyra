@@ -1,6 +1,13 @@
 import SwiftUI
 
 struct HomeView: View {
+    /// Zoek-/instellingenknoppen horen enkel op dit hoofdscherm: ze zitten als overlay op de
+    /// root van de NavigationStack, dus elk gepusht subscherm ligt er vanzelf overheen.
+    var floatingButtons = false
+    var showsSettings = true
+    var onSearch: () -> Void = {}
+    var onSettings: () -> Void = {}
+
     @State private var bentoTitle: ContinueItem?
     @State private var bentoChannel: PlayableSource?
     @State private var bentoFilm: IPTVVODItem?
@@ -11,6 +18,7 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             homeContent
+                .overlay(alignment: .top) { floatingBar }
                 .toolbar(.hidden, for: .navigationBar)
                 .modifier(HomeDestinations(
                     title: $bentoTitle, channel: $bentoChannel, film: $bentoFilm,
@@ -18,6 +26,21 @@ struct HomeView: View {
                 .modifier(HomeActiveTracking(
                     title: bentoTitle, channel: bentoChannel, film: bentoFilm,
                     series: bentoSeries, release: bentoRelease, catalog: bentoCatalog))
+        }
+    }
+
+    @ViewBuilder
+    private var floatingBar: some View {
+        if floatingButtons {
+            HStack {
+                FloatingIconButton(symbol: "magnifyingglass", accessibilityLabel: "Zoeken", action: onSearch)
+                Spacer()
+                if showsSettings {
+                    FloatingIconButton(symbol: "gearshape.fill", accessibilityLabel: "Instellingen", action: onSettings)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
         }
     }
 

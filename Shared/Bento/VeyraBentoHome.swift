@@ -41,6 +41,7 @@ struct VeyraBentoHomeView: View {
     @AppStorage(GeneralSettingsDefaults.showContinueWatchingKey) private var showContinueWatching = true
     @AppStorage(GeneralSettingsDefaults.showUpcomingKey) private var showUpcoming = true
     @State private var layout = VeyraHomeLayoutStore.load()
+    @AppStorage(VeyraCollectionNames.key) private var showCollectionNames = true
     @State private var askPreset = false
 
     @FocusState private var focus: VeyraHomeFocus?
@@ -183,6 +184,10 @@ struct VeyraBentoHomeView: View {
         .onReceive(NotificationCenter.default.publisher(for: .iptvConfigurationDidChange)) { _ in
             Task { await model.load(force: true) }
         }
+        // Aflevering/film afgekeken (Trakt-stop): "Verder kijken" meteen opnieuw ophalen.
+        .onReceive(NotificationCenter.default.publisher(for: .veyraTraktHistoryDidChange)) { _ in
+            Task { await model.load(force: true) }
+        }
         .onAppear { askPreset = !VeyraHomeLayoutStore.hasChosen }
         .sheet(isPresented: $askPreset, onDismiss: { VeyraHomeLayoutStore.markChosen() }) {
             VeyraHomePresetPickerView { askPreset = false }
@@ -198,11 +203,26 @@ struct VeyraBentoHomeView: View {
         }
     }
 
+    @ViewBuilder
+    private func liveColumn(_ rows: [BentoLiveRow]) -> some View {
+        VStack(spacing: 4) {
+            ForEach(rows) { row in
+                Button { onPlayChannel(row.channelID) } label: {
+                    VeyraBentoLiveRowContent(row: row)
+                }
+                .buttonStyle(VeyraRowStyle())
+                .focused($focus, equals: .channel(row.channelID))
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, alignment: .top)
+    }
+
     // MARK: Raster
 
     @ViewBuilder
     private func bento(now: Date) -> some View {
-        let live = model.liveRows(at: now, limit: 4)
+        let live = model.liveRows(at: now, limit: 8, recentFirst: true)
         let today = showUpcoming ? model.today(at: now) : nil
         let items = showContinueWatching ? model.home.continueItems : []
         let present = presentTiles(items: items, live: live, hasToday: today != nil)
@@ -257,13 +277,11 @@ struct VeyraBentoHomeView: View {
             }
 
             if present.contains(.live) {
+                // De 8 laatst bekeken zenders in twee kolommen van 4, zodat het blok op zijn vaste hoogte blijft.
                 VeyraBentoLiveList {
-                    ForEach(live) { row in
-                        Button { onPlayChannel(row.channelID) } label: {
-                            VeyraBentoLiveRowContent(row: row)
-                        }
-                        .buttonStyle(VeyraRowStyle())
-                        .focused($focus, equals: .channel(row.channelID))
+                    HStack(alignment: .top, spacing: 24) {
+                        liveColumn(Array(live.prefix(4)))
+                        liveColumn(Array(live.dropFirst(4).prefix(4)))
                     }
                 }
                 .bentoCell(profile.cell(.live))
@@ -316,15 +334,21 @@ struct VeyraBentoHomeView: View {
             }
 
             if present.contains(.collecties) {
-                VeyraBentoShelf(title: "Filmcollecties", subtitle: "Complete filmreeksen", contentHeight: 232) {
-                    ForEach(model.collections) { collection in
-                        Button { onOpenCatalog(collection) } label: {
-                            VeyraBentoLandscapeContent(title: collection.name, url: collection.imageURL)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 24) {
+                        ForEach(model.collections) { collection in
+                            Button { onOpenCatalog(collection) } label: {
+                                VeyraBentoCollectionMiniContent(title: collection.name, url: collection.imageURL, showName: showCollectionNames)
+                            }
+                            .buttonStyle(VeyraBannerFocusStyle())
+                            .focused($focus, equals: .shelf("col-\(collection.id)"))
+                            .frame(width: 520, height: 178 + (showCollectionNames ? 34 : 0))
                         }
-                        .buttonStyle(VeyraPosterFocusStyle(cornerRadius: 20))
-                        .focused($focus, equals: .shelf("col-\(collection.id)"))
                     }
+                    .padding(12)
                 }
+                .scrollClipDisabled()
+                .padding(.top, 24)
                 .bentoCell(profile.cell(.collecties))
             }
 
