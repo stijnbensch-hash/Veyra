@@ -291,10 +291,23 @@ struct PlayerSubtitleControls: View {
 
     // MARK: - Next episode overlay
 
+    // Belangrijk: de "Volgende aflevering"-knop hieronder is bewust EEN
+    // stabiele Button, niet twee losse if/else-takken (zoals voorheen).
+    // Zodra het aftellen start (`countdownRemaining` gaat van nil naar een
+    // getal) herschreef de oude if/else-versie de hele knop-view (Button ->
+    // HStack met 2 Buttons), wat op tvOS de focus-engine de net gezette
+    // `focused = .nextEpisode` liet verliezen -- de knop kreeg daardoor
+    // NOOIT automatisch focus. Door dezelfde Button-identiteit aan te
+    // houden (alleen het label-tekstje en de losse annuleerknop ernaast
+    // veranderen) blijft de focus op `.nextEpisode` behouden.
     @ViewBuilder
     private func nextEpisodeOverlayButton(_ next: MediaItem) -> some View {
-        if autoPlayNextEpisodeSetting, autoPlayNextCountdownEnabled, let countdownRemaining {
-            HStack(spacing: 14) {
+        let showsCountdown =
+            autoPlayNextEpisodeSetting && autoPlayNextCountdownEnabled
+            && countdownRemaining != nil
+
+        HStack(spacing: 14) {
+            if showsCountdown {
                 Button {
                     countdownTask?.cancel()
                     countdownTask = nil
@@ -305,34 +318,25 @@ struct PlayerSubtitleControls: View {
                 }.buttonStyle(VeyraFocusButtonStyle(radius: VeyraRadius.pill)).focused(
                     $focused, equals: .cancelNextEpisode
                 )
+            }
 
-                Button {
-                    countdownTask?.cancel()
-                    onPlayNextEpisode(next)
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: "forward.end.fill")
-                        Text("Volgende aflevering over \(countdownRemaining)s")
-                            .font(.system(size: 18, weight: .semibold)).monospacedDigit()
-                    }.padding(.horizontal, 24).padding(.vertical, 16)
-                }.buttonStyle(VeyraFocusButtonStyle(radius: VeyraRadius.pill)).focused(
-                    $focused, equals: .nextEpisode
-                )
-            }.focusSection()
-
-        } else {
             Button {
                 countdownTask?.cancel()
                 onPlayNextEpisode(next)
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "forward.end.fill")
-                    Text("Volgende aflevering").font(.system(size: 18, weight: .semibold))
+                    if showsCountdown, let countdownRemaining {
+                        Text("Volgende aflevering over \(countdownRemaining)s")
+                            .font(.system(size: 18, weight: .semibold)).monospacedDigit()
+                    } else {
+                        Text("Volgende aflevering").font(.system(size: 18, weight: .semibold))
+                    }
                 }.padding(.horizontal, 24).padding(.vertical, 16)
             }.buttonStyle(VeyraFocusButtonStyle(radius: VeyraRadius.pill)).focused(
                 $focused, equals: .nextEpisode
-            ).focusSection()
-        }
+            )
+        }.focusSection()
     }
 
     private func startCountdownIfNeeded(for next: MediaItem) {
