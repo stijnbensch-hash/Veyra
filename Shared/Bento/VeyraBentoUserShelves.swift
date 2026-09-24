@@ -28,14 +28,17 @@ private struct VeyraBentoUserShelf: View {
     let compact: Bool
     let onOpen: (BentoTMDBTitle) -> Void
 
-    @State private var titles: [BentoTMDBTitle] = []
+    // Planken kunnen ook niet-TMDB-items bevatten (bv. IPTV-films/series uit
+    // een gekozen categorie) — daarom hier `MediaItem`s i.p.v. alleen
+    // `BentoTMDBTitle`, zodat zulke items niet stilletjes wegvallen.
+    @State private var items: [MediaItem] = []
     @State private var loaded = false
 
     var body: some View {
         Group {
-            if !loaded || !titles.isEmpty {
+            if !loaded || !items.isEmpty {
                 VeyraBentoShelf(title: shelf.title, subtitle: shelf.source.subtitle, compact: compact) {
-                    ForEach(titles) { title in card(title) }
+                    ForEach(items) { item in card(item) }
                 }
                 .frame(height: compact ? 270 : 440)
             }
@@ -47,29 +50,43 @@ private struct VeyraBentoUserShelf: View {
     }
 
     @ViewBuilder
-    private func card(_ title: BentoTMDBTitle) -> some View {
-        #if os(tvOS)
-        Button { onOpen(title) } label: {
-            VeyraBentoPosterContent(title: title.title, url: title.posterURL, compact: compact, watchedID: title.id, watchedKind: title.kind)
+    private func card(_ item: MediaItem) -> some View {
+        if let tmdbID = item.tmdbID, item.type == .movie || item.type == .series {
+            let kind: MediaKind = item.type == .movie ? .movie : .episode
+            #if os(tvOS)
+            Button {
+                onOpen(BentoTMDBTitle(id: tmdbID, kind: kind, title: item.title, posterURL: item.posterURL))
+            } label: {
+                VeyraBentoPosterContent(title: item.title, url: item.posterURL, compact: compact, watchedID: tmdbID, watchedKind: kind)
+            }
+            .buttonStyle(VeyraPosterFocusStyle())
+            #else
+            Button {
+                onOpen(BentoTMDBTitle(id: tmdbID, kind: kind, title: item.title, posterURL: item.posterURL))
+            } label: {
+                VeyraBentoPosterContent(title: item.title, url: item.posterURL, compact: compact, watchedID: tmdbID, watchedKind: kind)
+            }
+            .buttonStyle(.plain)
+            #endif
+        } else {
+            // Geen TMDB-titel (bv. IPTV) — zelfde generieke doorverwijzing als
+            // de andere planken-rijen (`ShelfRowView`) gebruiken.
+            #if os(tvOS)
+            NavigationLink { ShelfItemDestination(item: item) } label: {
+                VeyraBentoPosterContent(title: item.title, url: item.posterURL, compact: compact)
+            }
+            .buttonStyle(VeyraPosterFocusStyle())
+            #else
+            NavigationLink { ShelfItemDestination(item: item) } label: {
+                VeyraBentoPosterContent(title: item.title, url: item.posterURL, compact: compact)
+            }
+            .buttonStyle(.plain)
+            #endif
         }
-        .buttonStyle(VeyraPosterFocusStyle())
-        #else
-        Button { onOpen(title) } label: {
-            VeyraBentoPosterContent(title: title.title, url: title.posterURL, compact: compact, watchedID: title.id, watchedKind: title.kind)
-        }
-        .buttonStyle(.plain)
-        #endif
     }
 
     private func load() async {
-        let items = await ShelfCatalogService.items(for: shelf)
-        var result: [BentoTMDBTitle] = []
-        for item in items {
-            guard let id = item.tmdbID, item.type == .movie || item.type == .series else { continue }
-            result.append(BentoTMDBTitle(id: id, kind: item.type == .movie ? .movie : .episode,
-                                         title: item.title, posterURL: item.posterURL))
-        }
-        titles = result
+        items = await ShelfCatalogService.items(for: shelf)
         loaded = true
     }
 }

@@ -38,6 +38,7 @@ struct SeasonEpisodesView: View {
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
+                .veyraReadableWidth(860)
             }
             }
         }

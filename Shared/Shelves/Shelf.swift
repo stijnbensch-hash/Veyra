@@ -74,11 +74,13 @@ enum ShelfSource: Codable, Equatable, Hashable {
         switch self {
         case .iptv(let channels):
             let liveCount = channels.filter { ($0.kind ?? .live) == .live }.count
-            let vodCount = channels.count - liveCount
+            let vodCount = channels.filter { $0.kind == .vod }.count
+            let seriesCount = channels.filter { $0.kind == .series }.count
 
             var parts: [String] = []
             if liveCount > 0 { parts.append(liveCount == 1 ? "1 zender" : "\(liveCount) zenders") }
             if vodCount > 0 { parts.append(vodCount == 1 ? "1 film" : "\(vodCount) films") }
+            if seriesCount > 0 { parts.append(seriesCount == 1 ? "1 serie" : "\(seriesCount) series") }
 
             return parts.isEmpty ? "IPTV" : "IPTV · \(parts.joined(separator: ", "))"
         default:
@@ -92,6 +94,7 @@ enum ShelfSource: Codable, Equatable, Hashable {
 enum ShelfIPTVItemKind: String, Codable, Equatable, Hashable {
     case live
     case vod
+    case series
 }
 
 /// Eén losstaand IPTV-kanaal of VOD-titel zoals het gekozen is voor een
@@ -104,7 +107,9 @@ struct ShelfIPTVChannel: Codable, Equatable, Hashable, Identifiable {
     var channelID: String
     var providerName: String
     var name: String
-    var streamURL: URL
+    // `nil` voor `.series`-items: een serie heeft geen eigen afspeel-URL,
+    // je kiest eerst een seizoen/aflevering (zie `ShelfIPTVSeriesEpisodesView`).
+    var streamURL: URL?
     var logoURL: URL?
     var group: String?
     var kind: ShelfIPTVItemKind?

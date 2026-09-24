@@ -22,6 +22,9 @@ struct LiveTVView: View {
     @State
     private var displayMode: LiveTVDisplayMode = .channels
 
+    @Environment(\.horizontalSizeClass)
+    private var sizeClass
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -288,7 +291,67 @@ struct LiveTVView: View {
 
     // MARK: - Channel list
 
+    @ViewBuilder
     private var channelList: some View {
+        if sizeClass == .regular {
+            channelGrid
+        } else {
+            channelPlainList
+        }
+    }
+
+    /// iPad: kanalen als kaarten in meerdere kolommen in plaats van één lange lijst.
+    private var channelGrid: some View {
+        ScrollView {
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 320), spacing: 14)],
+                spacing: 14
+            ) {
+                ForEach(guide.visibleChannels) { row in
+                    Button {
+                        selectedSource = guide.play(row)
+                    } label: {
+                        HStack(spacing: 14) {
+                            channelLogo(row)
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(
+                                    ChannelNameOverrideStore.effectiveName(
+                                        channelID: row.channel.id,
+                                        defaultName: row.channel.name
+                                    )
+                                )
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
+
+                                if guide.favorites.contains(row.id) {
+                                    Label("Favoriet", systemImage: "star.fill")
+                                        .font(.caption2)
+                                        .foregroundStyle(VeyraColors.cyan)
+                                }
+                            }
+
+                            Spacer()
+
+                            Image(systemName: "play.fill")
+                                .foregroundStyle(VeyraColors.cyan)
+                        }
+                        .padding(14)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .fill(VeyraColors.surface)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 24)
+        }
+    }
+
+    private var channelPlainList: some View {
         List(
             guide.visibleChannels
         ) { row in

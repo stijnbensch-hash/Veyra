@@ -29,6 +29,12 @@ struct MediaItem: Identifiable, Hashable {
     // opnieuw te hoeven bevragen.
     let streamURL: URL?
 
+    // Alleen gevuld voor `.iptvSeries`-items — de Xtream-serie-ID en de
+    // naam van de opgeslagen provider, om de seizoenen/afleveringen op te
+    // kunnen halen (zie `ShelfIPTVSeriesEpisodesView`).
+    let iptvSeriesID: Int?
+    let iptvProviderName: String?
+
     init(
         id: UUID = UUID(),
         title: String,
@@ -44,7 +50,9 @@ struct MediaItem: Identifiable, Hashable {
         backdropURL: URL? = nil,
         genre: String? = nil,
         rating: Double? = nil,
-        streamURL: URL? = nil
+        streamURL: URL? = nil,
+        iptvSeriesID: Int? = nil,
+        iptvProviderName: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -61,6 +69,8 @@ struct MediaItem: Identifiable, Hashable {
         self.genre = genre
         self.rating = rating
         self.streamURL = streamURL
+        self.iptvSeriesID = iptvSeriesID
+        self.iptvProviderName = iptvProviderName
     }
 }
 
@@ -68,4 +78,8 @@ enum MediaType: String, Hashable {
     case movie
     case series
     case liveTV
+    // Een IPTV-serie uit een plank (`ShelfSource.iptv`) — anders dan
+    // `.series` (TMDB) heeft dit geen tmdbID; seizoenen/afleveringen komen
+    // rechtstreeks van de Xtream-provider (`iptvSeriesID`/`iptvProviderName`).
+    case iptvSeries
 }

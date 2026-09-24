@@ -6,6 +6,8 @@ struct SeriesDetailView: View {
     @ObservedObject private var trakt =
         TraktStore.shared
 
+    @Environment(\.horizontalSizeClass) private var sizeClass
+
     @StateObject private var viewModel:
         SeriesDetailViewModel
 
@@ -221,6 +223,7 @@ struct SeriesDetailView: View {
                 .bottom,
                 40
             )
+            .veyraReadableWidth()
         }
         .background(
             VeyraColors
@@ -296,7 +299,7 @@ struct SeriesDetailView: View {
             }
         }
         .frame(
-            height: 220
+            height: VeyraPosterMetrics(regular: sizeClass == .regular).backdropHeight
         )
         .clipped()
     }

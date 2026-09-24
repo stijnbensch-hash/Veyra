@@ -856,6 +856,13 @@ struct SourceSelectionView: View {
         .contentShape(
             Rectangle()
         )
+        // Zonder dit wordt de vulling en de rand (`.background`/`.overlay`
+        // hierboven) elk apart geschaald door `.scaleEffect` hieronder —
+        // op tvOS gaf dat een render-glitch waarbij de linkerrand van de
+        // rand (`strokeBorder`) wegviel zodra een bron gefocust werd.
+        // `.compositingGroup()` platst kaart + rand eerst tot één laag,
+        // die daarna als geheel geschaald wordt.
+        .compositingGroup()
         .focusable(true)
         .focused(
             $focusedSourceID,
@@ -1112,7 +1119,7 @@ struct SourceSelectionView: View {
             return
                 "Beschikbare seriebronnen"
 
-        case .liveTV:
+        case .liveTV, .iptvSeries:
             return
                 "Beschikbare livebron"
         }

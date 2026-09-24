@@ -36,6 +36,7 @@ struct SportsMatchDetailIOS: View {
             Spacer()
         }
         .padding(.top, 32)
+        .veyraReadableWidth(720)
         .navigationTitle("Wedstrijd")
         .navigationBarTitleDisplayMode(.inline)
         .background(VeyraBackground())

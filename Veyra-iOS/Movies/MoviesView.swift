@@ -22,12 +22,10 @@ struct MoviesView: View {
     // de populairste films.
     @State private var heroRotationIndex = 0
 
-    private let columns = [
-        GridItem(
-            .adaptive(minimum: 112),
-            spacing: 12
-        )
-    ]
+    @Environment(\.horizontalSizeClass) private var sizeClass
+
+    private var metrics: VeyraPosterMetrics { VeyraPosterMetrics(regular: sizeClass == .regular) }
+    private var columns: [GridItem] { metrics.columns }
 
     private let posterBaseURL =
         URL(string: "https://image.tmdb.org/t/p/w500")!
@@ -300,7 +298,7 @@ struct MoviesView: View {
         } else {
             LazyVGrid(
                 columns: columns,
-                spacing: 14
+                spacing: metrics.rowSpacing
             ) {
                 ForEach(movies) {
                     movie in
@@ -324,7 +322,7 @@ struct MoviesView: View {
                                         for:
                                             movie
                                     ),
-                                width: 112,
+                                width: metrics.posterWidth,
                                 genre:
                                     TMDBGenreNames
                                     .firstMovieName(

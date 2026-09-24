@@ -121,6 +121,17 @@ struct IPTVService {
 
     // MARK: - Xtream Series
 
+    func loadXtreamSeriesCategories(
+        configuration: XtreamConfiguration
+    ) async throws -> [IPTVCategory] {
+        let client = XtreamClient(
+            configuration: configuration,
+            session: session
+        )
+
+        return try await client.seriesCategories()
+    }
+
     func loadXtreamSeries(
         configuration: XtreamConfiguration,
         categoryID: String? = nil

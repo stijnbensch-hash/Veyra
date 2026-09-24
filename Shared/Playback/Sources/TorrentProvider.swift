@@ -56,7 +56,7 @@ struct TorrentProvider:
             mediaID =
                 "\(imdbID):\(seasonNumber):\(episodeNumber)"
 
-        case .liveTV:
+        case .liveTV, .iptvSeries:
             return []
         }
 

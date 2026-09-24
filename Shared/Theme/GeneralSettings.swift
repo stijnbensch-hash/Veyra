@@ -26,6 +26,27 @@ enum GeneralSettingsDefaults {
 
     // Weergave
     static let textSizeKey = "general.textSize"
+
+    // iPad-navigatie
+    static let ipadNavigationStyleKey = "general.ipadNavigationStyle"
+}
+
+/// Hoe de hoofdnavigatie op iPad (brede/regular schermbreedte) wordt
+/// getoond — als vaste keuze in plaats van het door het systeem geboden
+/// wissel-knopje tussen beide weergaven (`.sidebarAdaptable` laat anders
+/// altijd omschakelen), zodat er maar één van de twee tegelijk te zien is.
+enum IPadNavigationStyle: String, CaseIterable, Identifiable {
+    case sidebar
+    case topBar
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .sidebar: return "Zijbalk"
+        case .topBar: return "Menubalk boven"
+        }
+    }
 }
 
 enum GeneralTextSize: String, CaseIterable, Identifiable {

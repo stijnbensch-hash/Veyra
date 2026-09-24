@@ -32,10 +32,48 @@ enum VeyraAPIKey: String, CaseIterable {
     }
 }
 
+extension Notification.Name {
+    /// Gepost telkens een API-sleutel (Trakt, TMDB, OMDb, ...) lokaal
+    /// wordt gewijzigd, zodat `VeyraHubSyncService` dat meteen naar de
+    /// andere apparaten kan doorsturen.
+    static let veyraAPIKeysDidChange = Notification.Name("veyra.apiKeys.didChange")
+}
+
 enum VeyraAPIKeyStore {
     private static let service =
         Bundle.main.bundleIdentifier
         ?? "Veyra"
+
+    // MARK: - Hub sync
+    //
+    // De sleutels staan lokaal in de keychain (nooit in UserDefaults/iCloud),
+    // maar gaan via VeyraHub's "settings"-document mee tussen apparaten —
+    // zelfde aanpak als de IPTV-providergegevens in `IPTVConfigurationStore`.
+
+    static func exportForHub() -> [String: String] {
+        var values: [String: String] = [:]
+        for key in VeyraAPIKey.allCases {
+            if let value = value(for: key) {
+                values[key.rawValue] = value
+            }
+        }
+        return values
+    }
+
+    /// Past inkomende Hub-waarden lokaal toe. Een lege/ontbrekende
+    /// waarde op de Hub wist hier nooit een al ingevulde sleutel —
+    /// zo kan een apparaat dat een sleutel nog niet kent nooit een
+    /// werkende sleutel op een ander apparaat overschrijven met niets.
+    static func importFromHub(_ values: [String: String]) {
+        for key in VeyraAPIKey.allCases {
+            guard let incoming = values[key.rawValue]?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !incoming.isEmpty,
+                  incoming != value(for: key)
+            else { continue }
+
+            try? set(incoming, for: key)
+        }
+    }
 
     static func value(
         for key: VeyraAPIKey
@@ -138,6 +176,7 @@ enum VeyraAPIKeyStore {
             )
 
         if updateStatus == errSecSuccess {
+            NotificationCenter.default.post(name: .veyraAPIKeysDidChange, object: nil)
             return
         }
 
@@ -171,6 +210,8 @@ enum VeyraAPIKeyStore {
                 addStatus
             )
         }
+
+        NotificationCenter.default.post(name: .veyraAPIKeysDidChange, object: nil)
     }
 
     static func remove(
@@ -191,6 +232,10 @@ enum VeyraAPIKeyStore {
             SecItemDelete(
                 query as CFDictionary
             )
+
+        if status == errSecSuccess {
+            NotificationCenter.default.post(name: .veyraAPIKeysDidChange, object: nil)
+        }
 
         guard
             status == errSecSuccess

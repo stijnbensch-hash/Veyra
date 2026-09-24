@@ -10,9 +10,12 @@ struct LiveTVGuideView: View {
 
     @State private var selection: ProgrammeSelection?
 
-    private let channelWidth: CGFloat = 118
-    private let timelineWidth: CGFloat = 720
-    private let rowHeight: CGFloat = 82
+    @Environment(\.horizontalSizeClass) private var sizeClass
+
+    // iPad: bredere kanaalkolom, ruimere tijdlijn en hogere rijen.
+    private var channelWidth: CGFloat { sizeClass == .regular ? 168 : 118 }
+    private var timelineWidth: CGFloat { sizeClass == .regular ? 1200 : 720 }
+    private var rowHeight: CGFloat { sizeClass == .regular ? 96 : 82 }
 
     var body: some View {
         VStack(spacing: 0) {

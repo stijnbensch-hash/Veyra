@@ -139,7 +139,7 @@ actor OpenSubtitlesClient {
                 )
             )
 
-        case .liveTV:
+        case .liveTV, .iptvSeries:
             return []
         }
 

@@ -26,6 +26,15 @@ struct ShelfItemDestination: View {
                     ),
                     item: item
                 )
+            } else if item.type == .iptvSeries,
+                      let seriesID = item.iptvSeriesID,
+                      let providerName = item.iptvProviderName {
+                ShelfIPTVSeriesEpisodesView(
+                    seriesID: seriesID,
+                    providerName: providerName,
+                    title: item.title,
+                    posterURL: item.posterURL
+                )
             } else if let resolvedSeries {
                 SeriesDetailView(series: resolvedSeries)
             } else if let errorMessage {

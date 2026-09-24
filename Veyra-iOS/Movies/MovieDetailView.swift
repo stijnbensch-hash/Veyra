@@ -4,6 +4,7 @@ struct MovieDetailView: View {
     let movie: MediaItem
 
     @State private var ratings = MetadataRatings()
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     var body: some View {
         ScrollView {
@@ -46,6 +47,7 @@ struct MovieDetailView: View {
                 .padding(.horizontal)
             }
             .padding(.bottom, 40)
+            .veyraReadableWidth()
         }
         .background(VeyraColors.background.ignoresSafeArea())
         .navigationTitle(movie.title)
@@ -66,7 +68,7 @@ struct MovieDetailView: View {
                 VeyraColors.surface
             }
         }
-        .frame(height: 220)
+        .frame(height: VeyraPosterMetrics(regular: sizeClass == .regular).backdropHeight)
         .clipped()
     }
 

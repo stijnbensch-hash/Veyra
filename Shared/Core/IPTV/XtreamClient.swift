@@ -127,6 +127,23 @@ struct XtreamClient {
 
     // MARK: - Series
 
+    func seriesCategories() async throws -> [IPTVCategory] {
+        let url = try apiURL(
+            action: "get_series_categories"
+        )
+
+        let categories: [XtreamCategoryResponse] =
+            try await request(url: url)
+
+        return categories.map { category in
+            IPTVCategory(
+                id: category.categoryID,
+                name: category.categoryName,
+                contentType: .series
+            )
+        }
+    }
+
     func series(
         categoryID: String? = nil
     ) async throws -> [XtreamSeriesItem] {

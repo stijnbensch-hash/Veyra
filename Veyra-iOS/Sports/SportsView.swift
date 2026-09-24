@@ -8,6 +8,7 @@ import SwiftUI
 struct SportsView: View {
     @StateObject private var store = SportsStore()
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     @State private var date = Calendar.current.startOfDay(for: Date())
     @State private var filter = SportsFilterIOS.all
@@ -93,12 +94,23 @@ struct SportsView: View {
                 Spacer()
             } else {
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 20) {
-                        ForEach(groupedByLeague, id: \.league.id) { group in
-                            leagueSection(group.league, matches: group.matches)
+                    if sizeClass == .regular {
+                        // iPad: competities naast elkaar in twee kolommen.
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 420), spacing: 24, alignment: .top)],
+                                  alignment: .leading, spacing: 24) {
+                            ForEach(groupedByLeague, id: \.league.id) { group in
+                                leagueSection(group.league, matches: group.matches)
+                            }
                         }
+                        .padding()
+                    } else {
+                        LazyVStack(alignment: .leading, spacing: 20) {
+                            ForEach(groupedByLeague, id: \.league.id) { group in
+                                leagueSection(group.league, matches: group.matches)
+                            }
+                        }
+                        .padding()
                     }
-                    .padding()
                 }
             }
         }

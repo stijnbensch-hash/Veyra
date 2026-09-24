@@ -62,7 +62,7 @@ struct JellyfinSourceProvider:
                 for: item
             )
 
-        case .liveTV:
+        case .liveTV, .iptvSeries:
             return []
         }
     }

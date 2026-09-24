@@ -93,6 +93,24 @@ struct MediaServerStore {
         try save(servers)
     }
 
+    // MARK: - Hub sync
+    //
+    // Net als bij `IPTVConfigurationStore`/`VeyraAPIKeyStore`: de lijst
+    // staat lokaal in de keychain, maar gaat via VeyraHub's "settings"-
+    // document mee tussen apparaten, zodat een toegevoegde of verwijderde
+    // mediaserver automatisch op alle apparaten meekomt.
+
+    func exportForHub() throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        return try encoder.encode(load())
+    }
+
+    func importFromHub(_ data: Data) throws {
+        let servers = try JSONDecoder().decode([MediaServerAccount].self, from: data)
+        try save(servers)
+    }
+
     // MARK: - Keychain
 
     private func readKeychainData()

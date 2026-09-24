@@ -25,7 +25,18 @@ enum ShelfCatalogService {
     // MARK: - IPTV
 
     private static func mediaItem(from channel: ShelfIPTVChannel) -> MediaItem {
-        MediaItem(
+        if channel.kind == .series {
+            return MediaItem(
+                title: channel.name,
+                type: .iptvSeries,
+                overview: channel.group,
+                posterURL: channel.logoURL,
+                iptvSeriesID: Int(channel.channelID),
+                iptvProviderName: channel.providerName
+            )
+        }
+
+        return MediaItem(
             title: channel.name,
             type: .liveTV,
             overview: channel.group,

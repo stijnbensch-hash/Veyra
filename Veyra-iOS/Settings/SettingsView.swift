@@ -110,6 +110,11 @@ struct SettingsView: View {
                         }
                     }
                 }
+                // Dit is Instellingen's eigen (geneste) zijbalk, niet de
+                // hoofd-zijbalk uit ContentView — het systeem-eigen
+                // knopje daarvoor zou hier als een extra, verwarrende
+                // tweede zijbalk-knop verschijnen.
+                .toolbar(removing: .sidebarToggle)
             } else {
                 // iPhone: klassieke gestapelde navigatie.
                 //

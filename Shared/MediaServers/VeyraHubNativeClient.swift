@@ -87,7 +87,7 @@ struct VeyraHubNativeClient {
 
             return "\(imdbID):\(season):\(episode)"
 
-        case .liveTV:
+        case .liveTV, .iptvSeries:
             return nil
         }
     }

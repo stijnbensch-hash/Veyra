@@ -34,6 +34,10 @@ struct GeneralSettingsView: View {
     @AppStorage(GeneralSettingsDefaults.textSizeKey)
     private var textSizeRaw = GeneralTextSize.defaultSize.rawValue
 
+    // iPad-navigatie
+    @AppStorage(GeneralSettingsDefaults.ipadNavigationStyleKey)
+    private var ipadNavigationStyleRaw = IPadNavigationStyle.sidebar.rawValue
+
     var body: some View {
         ZStack {
             VeyraColors.background.ignoresSafeArea()
@@ -91,6 +95,18 @@ struct GeneralSettingsView: View {
                     sectionHeader("Toegankelijkheid", symbol: "textformat.size", tint: VeyraColors.secondary)
                 } footer: {
                     Text("Past tekst aan die Dynamic Type volgt. De meeste titels en koppen in Veyra gebruiken een vaste grootte en reageren hier nog niet op.")
+                }
+
+                Section {
+                    Picker("Navigatie", selection: $ipadNavigationStyleRaw) {
+                        ForEach(IPadNavigationStyle.allCases) { style in
+                            Text(style.title).tag(style.rawValue)
+                        }
+                    }
+                } header: {
+                    sectionHeader("iPad-navigatie", symbol: "sidebar.left", tint: VeyraColors.cyan)
+                } footer: {
+                    Text("Kies of Veyra op de iPad een zijbalk of een menubalk bovenaan gebruikt — nooit allebei tegelijk. Op iPhone heeft dit geen effect (altijd een tabbalk onderaan).")
                 }
             }
             .scrollContentBackground(.hidden)

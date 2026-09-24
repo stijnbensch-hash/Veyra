@@ -129,6 +129,9 @@ final class VeyraHubSyncService {
         NotificationCenter.default.addObserver(
             self, selector: #selector(changed),
             name: .iptvConfigurationDidChange, object: nil)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(changed),
+            name: .veyraAPIKeysDidChange, object: nil)
         schedule(after: 0)
     }
 
@@ -306,12 +309,23 @@ final class VeyraHubSyncService {
         if name == "settings", let credentials = try? IPTVConfigurationStore().exportForHub() {
             result["veyra.iptv.providers"] = credentials.base64EncodedString()
         }
+        if name == "settings" {
+            let apiKeys = VeyraAPIKeyStore.exportForHub()
+            if !apiKeys.isEmpty,
+               let data = try? JSONEncoder().encode(apiKeys) {
+                result["veyra.apiKeys"] = data.base64EncodedString()
+            }
+        }
+        if name == "settings", let servers = try? MediaServerStore().exportForHub() {
+            result["veyra.mediaServers"] = servers.base64EncodedString()
+        }
         return result
     }
 
     private func apply(_ values: [String: String], name: String) {
         var changed = false
         var iptvChanged = false
+        var mediaServersChanged = false
         for (key, encoded) in values {
             if name == "settings", key == "veyra.iptv.providers" {
                 guard let data = Data(base64Encoded: encoded) else { continue }
@@ -321,6 +335,29 @@ final class VeyraHubSyncService {
                     try IPTVConfigurationStore().importFromHub(data)
                     changed = true
                     iptvChanged = true
+                } catch { }
+                continue
+            }
+            if name == "settings", key == "veyra.apiKeys" {
+                guard let data = Data(base64Encoded: encoded),
+                      let remoteKeys = try? JSONDecoder().decode([String: String].self, from: data)
+                else { continue }
+                let localKeys = VeyraAPIKeyStore.exportForHub()
+                guard remoteKeys != localKeys else { continue }
+                // Nooit een lokale sleutel wissen op basis van de Hub — zie
+                // `VeyraAPIKeyStore.importFromHub`: alleen ontbrekende of
+                // afwijkende, niet-lege waarden worden overgenomen.
+                VeyraAPIKeyStore.importFromHub(remoteKeys)
+                changed = true
+                continue
+            }
+            if name == "settings", key == "veyra.mediaServers" {
+                guard let data = Data(base64Encoded: encoded) else { continue }
+                if let local = try? MediaServerStore().exportForHub(), sameJSON(local, data) { continue }
+                do {
+                    try MediaServerStore().importFromHub(data)
+                    changed = true
+                    mediaServersChanged = true
                 } catch { }
                 continue
             }
@@ -363,6 +400,9 @@ final class VeyraHubSyncService {
                 NotificationCenter.default.post(name: .veyraAddonConfigurationDidChange, object: nil)
                 if iptvChanged {
                     NotificationCenter.default.post(name: .iptvConfigurationDidChange, object: nil)
+                }
+                if mediaServersChanged {
+                    NotificationCenter.default.post(name: .veyraMediaServerConfigurationDidChange, object: nil)
                 }
             }
         }
