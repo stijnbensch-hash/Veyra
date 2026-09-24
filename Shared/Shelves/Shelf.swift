@@ -73,17 +73,33 @@ enum ShelfSource: Codable, Equatable, Hashable {
     var detailLabel: String {
         switch self {
         case .iptv(let channels):
-            return channels.count == 1 ? "IPTV · 1 zender" : "IPTV · \(channels.count) zenders"
+            let liveCount = channels.filter { ($0.kind ?? .live) == .live }.count
+            let vodCount = channels.count - liveCount
+
+            var parts: [String] = []
+            if liveCount > 0 { parts.append(liveCount == 1 ? "1 zender" : "\(liveCount) zenders") }
+            if vodCount > 0 { parts.append(vodCount == 1 ? "1 film" : "\(vodCount) films") }
+
+            return parts.isEmpty ? "IPTV" : "IPTV · \(parts.joined(separator: ", "))"
         default:
             return "\(subtitle) · \(kind.label)"
         }
     }
 }
 
-/// Eén losstaand IPTV-kanaal zoals het gekozen is voor een plank — een
-/// snapshot van naam, logo en afspeel-URL op het moment van kiezen, zodat
-/// het kanaal direct afgespeeld kan worden zonder de (mogelijk niet actieve)
-/// provider opnieuw te hoeven bevragen.
+/// Live zender of VOD-titel (film) uit dezelfde IPTV-provider — beide
+/// worden op dezelfde manier gekozen en rechtstreeks afgespeeld.
+enum ShelfIPTVItemKind: String, Codable, Equatable, Hashable {
+    case live
+    case vod
+}
+
+/// Eén losstaand IPTV-kanaal of VOD-titel zoals het gekozen is voor een
+/// plank — een snapshot van naam, logo en afspeel-URL op het moment van
+/// kiezen, zodat het item direct afgespeeld kan worden zonder de (mogelijk
+/// niet actieve) provider opnieuw te hoeven bevragen. `kind` is optioneel om
+/// planken die al bestonden vóór VOD-ondersteuning geldig te laten inlezen
+/// (ontbrekend = `.live`).
 struct ShelfIPTVChannel: Codable, Equatable, Hashable, Identifiable {
     var channelID: String
     var providerName: String
@@ -91,8 +107,9 @@ struct ShelfIPTVChannel: Codable, Equatable, Hashable, Identifiable {
     var streamURL: URL
     var logoURL: URL?
     var group: String?
+    var kind: ShelfIPTVItemKind?
 
-    var id: String { "\(providerName):\(channelID)" }
+    var id: String { "\((kind ?? .live).rawValue):\(providerName):\(channelID)" }
 }
 
 /// Openbare Trakt-lijsten die als plank gebruikt kunnen worden, of een

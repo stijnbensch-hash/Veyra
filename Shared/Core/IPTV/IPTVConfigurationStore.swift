@@ -21,6 +21,18 @@ struct IPTVStoredProvider: Identifiable, Hashable {
             return configuration.displayName
         }
     }
+
+    /// Korte omschrijving van het soort provider, om providers met
+    /// gelijkaardige namen in een keuzemenu uit elkaar te houden.
+    var kindLabel: String {
+        switch configuration {
+        case .m3u:
+            return "M3U-playlist"
+
+        case .xtream:
+            return "Xtream Codes"
+        }
+    }
 }
 
 // MARK: - Configuration Store

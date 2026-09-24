@@ -5,49 +5,11 @@ struct ShelvesSettingsView: View {
     @State private var showAddSheet = false
     @State private var editingShelf: Shelf?
 
-    // Hero-instellingen (featured banner bovenaan Home). Zie
-    // `Shared/Shelves/HeroSettings.swift`.
-    @State private var heroStyle: HeroStyle = .fullScreen
-    @State private var heroPrimarySource: HeroSourceSelection = .defaultPrimary
-    @State private var heroSecondarySource: HeroSourceSelection = .defaultSecondary
-
     var body: some View {
         ZStack {
             VeyraColors.background.ignoresSafeArea()
 
             List {
-                Section {
-                    Picker("Stijl", selection: $heroStyle) {
-                        ForEach(HeroStyle.allCases) { style in
-                            Text(style.label).tag(style)
-                        }
-                    }
-
-                    NavigationLink {
-                        HeroSourcePickerView(title: "Primaire bron", selection: $heroPrimarySource)
-                    } label: {
-                        HStack {
-                            Text("Primaire bron")
-                            Spacer()
-                            Text(heroPrimarySource.label).foregroundStyle(.secondary)
-                        }
-                    }
-
-                    NavigationLink {
-                        HeroSourcePickerView(title: "Secundaire bron", selection: $heroSecondarySource)
-                    } label: {
-                        HStack {
-                            Text("Secundaire bron")
-                            Spacer()
-                            Text(heroSecondarySource.label).foregroundStyle(.secondary)
-                        }
-                    }
-                } header: {
-                    Text("Hero")
-                } footer: {
-                    Text(heroStyle.description)
-                }
-
                 if viewModel.shelves.isEmpty {
                     ContentUnavailableView(
                         "Geen planken",
@@ -114,29 +76,9 @@ struct ShelvesSettingsView: View {
         }
         .onAppear {
             viewModel.reload()
-            heroStyle = HeroSettingsStore.loadStyle()
-            heroPrimarySource = HeroSettingsStore.loadPrimarySource()
-            heroSecondarySource = HeroSettingsStore.loadSecondarySource()
         }
         .onReceive(NotificationCenter.default.publisher(for: .veyraShelfConfigurationDidChange)) { _ in
             viewModel.reload()
-            // Ook nodig na een VeyraHub-sync-pull (VeyraHubSyncService) op
-            // een ander apparaat, die dezelfde notificatie post.
-            heroStyle = HeroSettingsStore.loadStyle()
-            heroPrimarySource = HeroSettingsStore.loadPrimarySource()
-            heroSecondarySource = HeroSettingsStore.loadSecondarySource()
-        }
-        .onChange(of: heroStyle) { _, newValue in
-            HeroSettingsStore.saveStyle(newValue)
-            NotificationCenter.default.post(name: .veyraShelfConfigurationDidChange, object: nil)
-        }
-        .onChange(of: heroPrimarySource) { _, newValue in
-            HeroSettingsStore.savePrimarySource(newValue)
-            NotificationCenter.default.post(name: .veyraShelfConfigurationDidChange, object: nil)
-        }
-        .onChange(of: heroSecondarySource) { _, newValue in
-            HeroSettingsStore.saveSecondarySource(newValue)
-            NotificationCenter.default.post(name: .veyraShelfConfigurationDidChange, object: nil)
         }
     }
 }

@@ -15,7 +15,7 @@ where RawValue == String, ID == String {
 /// aansluit bij de rest van de "Veyra-stijl" (grote verticale, focusbare
 /// rijen). Dit toont in plaats daarvan een gewone rij met de huidige waarde,
 /// die doorlinkt naar een verticale lijst met een vinkje bij de actieve
-/// keuze — net als de andere keuzeschermen in de app (bv. HeroSourcePickerView).
+/// keuze — net als de andere keuzeschermen in de app.
 struct VeyraSettingsChoiceRow<Option: VeyraSettingsOption>: View {
     let icon: String
     let title: String

@@ -63,15 +63,13 @@ final class VeyraHubSyncService {
     ]
 
     private static var simpleKeysAll: [String] {
-        simpleKeys + iptvDisplayKeys + subtitleKeys + generalKeys + [HeroSettingsDefaults.styleKey]
+        simpleKeys + iptvDisplayKeys + subtitleKeys + generalKeys
     }
 
     private static let shelfHeroDataKeys: [String] = [
         "veyra.shelves.configured",
         // Home: filmcollecties en streamingdiensten (volgorde, namen, banners/logo's als https-adres)
         "veyra.bento.collections", "veyra.bento.streaming", "veyra.home.layout", "veyra.home.presetChosen",
-        HeroSettingsDefaults.primarySourceKey,
-        HeroSettingsDefaults.secondarySourceKey,
     ]
 
     private static let sourceOrderDataKeys: [String] = [
