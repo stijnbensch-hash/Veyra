@@ -58,6 +58,11 @@ struct ContentView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .onChange(of: homeNavigation.requestedTab) { _, tab in
+            guard let tab else { return }
+            selectedTab = tab == .live ? .live : .sports
+            homeNavigation.requestedTab = nil
+        }
         .sheet(isPresented: $showSettings) {
             SettingsView()
         }

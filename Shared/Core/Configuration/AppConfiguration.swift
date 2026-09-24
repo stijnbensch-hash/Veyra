@@ -36,6 +36,15 @@ enum AppConfiguration {
         )
     }
 
+    static var fanartAPIKey: String? {
+        VeyraAPIKeyStore.value(
+            for: .fanartAPIKey
+        )
+        ?? configuredValue(
+            "FanartAPIKey"
+        )
+    }
+
     static var privacyPolicyURL: URL? {
         guard
             let value =
@@ -119,6 +128,17 @@ enum AppConfiguration {
                 value,
                 for:
                     .omdbAPIKey
+            )
+    }
+
+    static func setFanartAPIKey(
+        _ value: String?
+    ) throws {
+        try VeyraAPIKeyStore
+            .set(
+                value,
+                for:
+                    .fanartAPIKey
             )
     }
 

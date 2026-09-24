@@ -203,6 +203,18 @@ final class AetherPlaybackEngine:
         var options =
             LoadOptions()
 
+        // Live IPTV-kanalen zijn oneindige, niet-seekbare .ts-streams
+        // zonder geldige Content-Length/Range-ondersteuning. Zonder
+        // `isLive` behandelt AetherEngine ze als VOD en doet het eerst
+        // HTTP HEAD-/Range-probes om de duur/seekbaarheid te bepalen —
+        // iets wat veel Xtream live-origins niet netjes beantwoorden
+        // (soms HTTP 502, soms een timeout, soms lukt de forward-only
+        // terugval toch nog). Met `isLive = true` slaat de engine die
+        // probes voor live-kanalen meteen over en gaat hij direct
+        // forward-only streamen, zoals andere IPTV-spelers al deden.
+        options.isLive =
+            source.kind == .liveTV
+
         if source.requiresSoftwareVideo {
             options.preferredDecodePath =
                 .software

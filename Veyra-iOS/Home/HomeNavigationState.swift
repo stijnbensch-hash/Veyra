@@ -12,9 +12,14 @@ import Foundation
 /// gedeelde `NavigationPath` te volgen zijn. Elke bron meldt zich hier apart
 /// aan/af; zolang minstens één bron actief is, staat Home niet op het
 /// hoofdscherm.
+/// Tab die Home (bv. de bento-tegels Live nu en Sport) wil openen; `ContentView` handelt dit af en wist de waarde.
+enum HomeRequestedTab { case live, sports }
+
 @MainActor
 final class HomeNavigationState: ObservableObject {
     static let shared = HomeNavigationState()
+
+    @Published var requestedTab: HomeRequestedTab?
 
     @Published private var activePushSources: Set<String> = []
 

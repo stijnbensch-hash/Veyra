@@ -54,8 +54,8 @@ struct SettingsView: View {
                                      subtitle: "Resolutie, taal en oversla-segmenten", status: "", statusColor: VeyraColors.secondary)
                         settingsCard(destination: .metadata, icon: "star.leadinghalf.filled", title: "Metadata",
                                      subtitle: "Ratings op film- en seriepagina's", status: "", statusColor: VeyraColors.secondary)
-                        settingsCard(destination: .shelves, icon: "rectangle.grid.1x2", title: "Planken",
-                                     subtitle: "Eigen rijen op het hoofdmenu", status: "", statusColor: VeyraColors.secondary)
+                        settingsCard(destination: .home, icon: "house", title: "Home",
+                                     subtitle: "Filmcollecties en planken op het hoofdmenu", status: "", statusColor: VeyraColors.secondary)
                     }
 
                     settingsSection(title: "Account") {
@@ -135,6 +135,10 @@ struct SettingsView: View {
                 MetadataSettingsView()
             case .shelves:
                 ShelvesSettingsView()
+            case .collections:
+                VeyraCollectionsSettingsView()
+            case .home:
+                VeyraHomeSettingsView()
             }
         }
     }
@@ -446,6 +450,8 @@ private enum SettingsDestination:
     case playback
     case metadata
     case shelves
+    case collections
+    case home
 
     var id: String {
         rawValue
@@ -1841,6 +1847,14 @@ struct AccountView:
                     }
                 } header: {
                     Text("Ondertitels")
+                }
+
+                Section {
+                    FanartConfigurationCard()
+                } header: {
+                    Text("fanart.tv")
+                } footer: {
+                    Text("Optioneel: echte banners in de kleine Verder kijken-kaartjes op Home.")
                 }
             }
             .frame(maxWidth: 1000)

@@ -50,6 +50,14 @@ struct AccountView: View {
                 }
 
                 Section {
+                    FanartConfigurationCard()
+                } header: {
+                    Text("fanart.tv")
+                } footer: {
+                    Text("Optioneel: echte banners in de kleine Verder kijken-kaartjes op Home.")
+                }
+
+                Section {
                     TraktConfigurationCard()
                 } header: {
                     Text("Trakt API-sleutels")

@@ -230,14 +230,19 @@ struct LiveTVView: View {
     private func startLivePlayback(
         _ selected: VeyraEPGSelection
     ) {
+        // BELANGRIJK: geen `VeyraLocalLiveFallback` meer proactief vóór het
+        // afspelen aanroepen. Die wisselde hier tot voor kort *altijd* stil
+        // naar een andere geconfigureerde provider zodra er een kanaal met
+        // dezelfde naam bestond — ook als de eigenlijk geselecteerde/actieve
+        // provider prima werkte. Bij overlappende zenderlijsten (zeer
+        // gebruikelijk bij IPTV-resellers) kon dat een werkend kanaal van de
+        // actieve provider stilletjes vervangen door een kapotte/instabiele
+        // kopie bij een andere provider — precies het willekeurige
+        // afspeelgedrag dat hiermee werd waargenomen. Nu wordt gewoon de
+        // bron van de daadwerkelijk geselecteerde/actieve provider gebruikt.
         let directSource = guide.play(selected.row)
-        Task {
-            pendingSource = await VeyraLocalLiveFallback.shared.source(
-                for: selected.row.channel,
-                original: directSource
-            )
-            selection = nil
-        }
+        pendingSource = directSource
+        selection = nil
     }
 
     // MARK: - Provider dialog

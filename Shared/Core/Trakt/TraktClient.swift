@@ -162,6 +162,10 @@ final class TraktClient {
         }
     }
 
+    /// Voor de bento-home: een geldig access-token (ververst zo nodig via dezelfde sessie) en het client-ID.
+    func validAccessToken() async throws -> String { try await accessToken() }
+    var clientID: String? { credentials?.clientID }
+
     private func oauth<T: Decodable>(_ path: String, body: [String: Any]) async throws -> T {
         let response = try await send(path: "oauth/\(path)", host: "auth.trakt.tv", method: "POST", body: body)
         return try decoder.decode(T.self, from: response.0)
