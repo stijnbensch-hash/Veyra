@@ -40,6 +40,10 @@ struct GeneralSettingsView: View {
     @AppStorage(GeneralSettingsDefaults.ipadNavigationStyleKey)
     private var ipadNavigationStyleRaw = IPadNavigationStyle.sidebar.rawValue
 
+    // VeyraHub Recorder
+    @AppStorage(RecorderSettingsDefaults.autoDeleteAfterWatchedKey)
+    private var autoDeleteAfterWatched = false
+
     var body: some View {
         ZStack {
             VeyraColors.background.ignoresSafeArea()
@@ -125,6 +129,14 @@ struct GeneralSettingsView: View {
                     sectionHeader("iPad-navigatie", symbol: "sidebar.left", tint: VeyraColors.cyan)
                 } footer: {
                     Text("Kies of Veyra op de iPad een zijbalk of een menubalk bovenaan gebruikt — nooit allebei tegelijk. Op iPhone heeft dit geen effect (altijd een tabbalk onderaan).")
+                }
+
+                Section {
+                    Toggle("Verwijder automatisch na kijken", isOn: $autoDeleteAfterWatched)
+                } header: {
+                    sectionHeader("VeyraHub Recorder", symbol: "record.circle", tint: VeyraColors.red)
+                } footer: {
+                    Text("Verwijdert een opname van VeyraHub zodra je hem in Veyra helemaal (of bijna) hebt uitgekeken. Geldt alleen voor opnames die je via Veyra zelf afspeelt.")
                 }
             }
             .scrollContentBackground(.hidden)

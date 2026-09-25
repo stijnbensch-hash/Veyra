@@ -6,6 +6,8 @@ struct TVGeneralSettingsView: View {
     private var hideScoreSpoilers = false
     @AppStorage(TMDBCatalogLanguageFilter.key)
     private var catalogLanguages = "nl-en"
+    @AppStorage(RecorderSettingsDefaults.autoDeleteAfterWatchedKey)
+    private var autoDeleteAfterWatched = false
 
     var body: some View {
         ZStack {
@@ -39,6 +41,14 @@ struct TVGeneralSettingsView: View {
                     .veyraCardRow()
                 } header: {
                     Text("Sport")
+                }
+
+                Section {
+                    VeyraSettingsToggleRow(icon: "record.circle", title: "Verwijder automatisch na kijken",
+                                           subtitle: "Verwijdert een VeyraHub-opname zodra je hem hebt uitgekeken",
+                                           isOn: $autoDeleteAfterWatched)
+                } header: {
+                    Text("VeyraHub Recorder")
                 }
             }
             .frame(maxWidth: 1000)

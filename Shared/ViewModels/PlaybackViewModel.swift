@@ -10,6 +10,7 @@ final class PlaybackViewModel: ObservableObject {
 
     private var tracker: TraktPlaybackTracker?
     private var veyraHubTracker: VeyraHubPlaybackTracker?
+    private var recorderCleanupTracker: VeyraHubRecorderCleanupTracker?
 
     private let source: PlayableSource
     private let item: MediaItem?
@@ -44,6 +45,10 @@ final class PlaybackViewModel: ObservableObject {
                 veyraHubTracker = VeyraHubPlaybackTracker(sync: sync, engine: engine.engine)
             }
 
+            if let cleanup = source.recorderCleanup {
+                recorderCleanupTracker = VeyraHubRecorderCleanupTracker(cleanup: cleanup, engine: engine.engine)
+            }
+
             let playSource = source
             let playResumeProgress = await Self.resolveResumeProgress(
                 source: source,
@@ -66,12 +71,14 @@ final class PlaybackViewModel: ObservableObject {
         } catch is CancellationError {
             tracker?.finish()
             veyraHubTracker?.finish()
+            recorderCleanupTracker?.finish()
             playbackEngine?.stop()
             SubtitleService.shared.reset()
 
         } catch {
             tracker?.finish()
             veyraHubTracker?.finish()
+            recorderCleanupTracker?.finish()
             playbackEngine?.stop()
             SubtitleService.shared.reset()
 
@@ -88,11 +95,13 @@ final class PlaybackViewModel: ObservableObject {
     func stopForDisappear() {
         tracker?.finish()
         veyraHubTracker?.finish()
+        recorderCleanupTracker?.finish()
         playbackEngine?.stop()
         SubtitleService.shared.reset()
 
         tracker = nil
         veyraHubTracker = nil
+        recorderCleanupTracker = nil
         playbackEngine = nil
     }
 
@@ -103,6 +112,7 @@ final class PlaybackViewModel: ObservableObject {
             // de positie hangen op het laatst bekende afspeel-/pauze-event.
             tracker?.finish()
             veyraHubTracker?.finish()
+            recorderCleanupTracker?.finish()
             playbackEngine?.stop()
         }
     }

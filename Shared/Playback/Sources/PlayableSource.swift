@@ -29,6 +29,12 @@ struct PlayableSource: Identifiable, Hashable {
     /// still covers them independently of this).
     let progressSync: VeyraHubProgressSync?
 
+    /// Present only for a source that plays back a VeyraHub Recorder
+    /// recording — lets `PlaybackViewModel` delete the recording from the
+    /// hub once playback finishes, when "Verwijder automatisch na kijken"
+    /// is on. nil for every other source.
+    let recorderCleanup: VeyraHubRecorderCleanup?
+
     init(
         id: UUID = UUID(),
         name: String,
@@ -38,7 +44,8 @@ struct PlayableSource: Identifiable, Hashable {
         kind: SourceKind,
         providerName: String? = nil,
         requiresSoftwareVideo: Bool = false,
-        progressSync: VeyraHubProgressSync? = nil
+        progressSync: VeyraHubProgressSync? = nil,
+        recorderCleanup: VeyraHubRecorderCleanup? = nil
     ) {
         self.id = id
         self.name = name
@@ -50,6 +57,7 @@ struct PlayableSource: Identifiable, Hashable {
         self.requiresSoftwareVideo =
             requiresSoftwareVideo
         self.progressSync = progressSync
+        self.recorderCleanup = recorderCleanup
     }
 }
 
@@ -67,4 +75,11 @@ struct VeyraHubProgressSync: Hashable {
     let account: MediaServerAccount
     let mediaType: MediaType
     let mediaID: String
+}
+
+/// What a `PlayableSource` needs to delete its recording from the VeyraHub
+/// Recorder it came from — see `PlayableSource.recorderCleanup`.
+struct VeyraHubRecorderCleanup: Hashable {
+    let account: MediaServerAccount
+    let recordingID: String
 }
