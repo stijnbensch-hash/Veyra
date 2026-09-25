@@ -61,6 +61,8 @@ final class VeyraHubSyncService {
         "sports.favoriteTeams",
         // Home: namen onder de filmcollectie-banners tonen of verbergen
         "veyra.bento.collectionNames",
+        // VeyraHub Recorder — zie Shared/Theme/RecorderSettings.swift
+        "recorder.autoDeleteAfterWatched",
     ]
 
     private static var simpleKeysAll: [String] {
@@ -81,6 +83,12 @@ final class VeyraHubSyncService {
         "veyra.addons.installed",
     ]
 
+    private static let recorderDataKeys: [String] = [
+        // Welke series er als geheel worden opgenomen — zie
+        // Shared/Theme/RecorderSettings.swift / VeyraHubRecorderScheduler.
+        "recorder.seriesRules",
+    ]
+
     private static let sourceBadgeDataKeys: [String] = [
         // Bronbadges — zie Shared/Theme/SourceBadges.swift. Beide sleutels
         // zijn JSON-gecodeerde `Data` (geladen pakketten + actieve modus),
@@ -89,7 +97,7 @@ final class VeyraHubSyncService {
     ]
 
     private static var settingsDataKeys: [String] {
-        shelfHeroDataKeys + sourceOrderDataKeys + addonDataKeys + sourceBadgeDataKeys
+        shelfHeroDataKeys + sourceOrderDataKeys + addonDataKeys + sourceBadgeDataKeys + recorderDataKeys
     }
 
     private static let metadataPrefix = "metadata.rating."

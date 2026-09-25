@@ -12,6 +12,8 @@ struct LiveTVGuideView: View {
     @State private var recorderMessage = ""
     @State private var showRecorderAlert = false
     @State private var schedulingRecording = false
+    @State private var seriesRuleVersion = 0
+    @State private var showRecordings = false
 
     @Environment(\.horizontalSizeClass) private var sizeClass
 
@@ -58,6 +60,9 @@ struct LiveTVGuideView: View {
             details(for: selected)
                 .presentationDetents([.medium, .large])
         }
+        .sheet(isPresented: $showRecordings) {
+            NavigationStack { VeyraRecordingsView() }
+        }
     }
 
     private var controls: some View {
@@ -99,6 +104,13 @@ struct LiveTVGuideView: View {
                 Image(systemName: "arrow.clockwise")
             }
             .accessibilityLabel("Programmagids vernieuwen")
+
+            Button {
+                showRecordings = true
+            } label: {
+                Image(systemName: "list.bullet.rectangle")
+            }
+            .accessibilityLabel("Mijn opnames")
         }
         .foregroundStyle(VeyraColors.cyan)
         .padding(.horizontal, 16)
@@ -259,11 +271,24 @@ struct LiveTVGuideView: View {
                         Button {
                             Task { await scheduleRecording(selected.row, programme: programme) }
                         } label: {
-                            Label("Neem op met VeyraHub", systemImage: "record.circle")
+                            Label("Neem deze aflevering op", systemImage: "record.circle")
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.bordered)
                         .disabled(schedulingRecording)
+
+                        let seriesActive = isRecordingWholeSeries(selected.row, programme: programme)
+                        Button {
+                            toggleSeriesRecording(selected.row, programme: programme)
+                        } label: {
+                            Label(
+                                seriesActive ? "Stop met hele serie opnemen" : "Neem hele serie op",
+                                systemImage: seriesActive ? "record.circle.fill" : "tv.badge.wifi"
+                            )
+                            .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(seriesActive ? VeyraColors.red : nil)
                     }
 
                     Button {
@@ -318,6 +343,33 @@ struct LiveTVGuideView: View {
             recorderMessage = error.localizedDescription
         }
         showRecorderAlert = true
+    }
+
+    private func isRecordingWholeSeries(_ row: VeyraGuideChannel, programme: VeyraEPGProgramme) -> Bool {
+        _ = seriesRuleVersion
+        return SeriesRecordingDefaults.isRecordingWholeSeries(channelID: row.id, title: programme.title)
+    }
+
+    private func toggleSeriesRecording(_ row: VeyraGuideChannel, programme: VeyraEPGProgramme) {
+        let enabling = !isRecordingWholeSeries(row, programme: programme)
+        let rule = SeriesRecordingDefaults.setRecordingWholeSeries(
+            enabling, channelID: row.id, title: programme.title
+        )
+        seriesRuleVersion += 1
+
+        guard let rule else { return }
+        recorderMessage = "Hele serie \"\(programme.title)\" wordt vanaf nu automatisch opgenomen."
+        showRecorderAlert = true
+
+        // Meteen scannen met de al geladen gids, zodat toekomstige
+        // afleveringen die er nu al in staan niet wachten tot de volgende
+        // gidsverversing.
+        Task {
+            await VeyraHubRecorderScheduler.scheduleUpcomingEpisodes(
+                programmeIndex: [row.channel.tvgID?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "": guide.programmes(for: row)],
+                channels: [row]
+            )
+        }
     }
 
     private struct ProgrammeSelection: Identifiable {

@@ -16,6 +16,9 @@ struct LiveTVView: View {
     private var showFavoriteOrder = false
 
     @State
+    private var showRecordings = false
+
+    @State
     private var selection: VeyraEPGSelection?
 
     @State
@@ -102,6 +105,11 @@ struct LiveTVView: View {
                 LiveTVFavoritesOrderView(
                     guide: guide
                 )
+            }
+            .sheet(
+                isPresented: $showRecordings
+            ) {
+                NavigationStack { TVRecordingsView() }
             }
     }
 
@@ -301,6 +309,8 @@ struct LiveTVView: View {
 
             searchButton
 
+            recordingsButton
+
             refreshButton
 
             settingsButton
@@ -449,6 +459,28 @@ struct LiveTVView: View {
         )
         .accessibilityLabel(
             "Zoeken"
+        )
+    }
+
+    private var recordingsButton: some View {
+        Button {
+            showRecordings = true
+
+        } label: {
+            Image(
+                systemName:
+                    "list.bullet.rectangle"
+            )
+            .frame(
+                width: 48,
+                height: 48
+            )
+        }
+        .buttonStyle(
+            VeyraEPGButtonStyle()
+        )
+        .accessibilityLabel(
+            "Mijn opnames"
         )
     }
 
@@ -1703,6 +1735,7 @@ private struct VeyraEPGDetails: View {
     @State private var recorderMessage = ""
     @State private var showRecorderAlert = false
     @State private var schedulingRecording = false
+    @State private var seriesRuleVersion = 0
 
     @Environment(\.dismiss)
     private var dismiss
@@ -1917,11 +1950,23 @@ private struct VeyraEPGDetails: View {
                         Button {
                             Task { await scheduleRecording(programme) }
                         } label: {
-                            Label("Neem op met VeyraHub", systemImage: "record.circle")
+                            Label("Neem deze aflevering op", systemImage: "record.circle")
                                 .padding(16)
                         }
                         .buttonStyle(VeyraEPGButtonStyle())
                         .disabled(schedulingRecording)
+
+                        let seriesActive = isRecordingWholeSeries(programme)
+                        Button {
+                            toggleSeriesRecording(programme)
+                        } label: {
+                            Label(
+                                seriesActive ? "Stop met hele serie opnemen" : "Neem hele serie op",
+                                systemImage: seriesActive ? "record.circle.fill" : "tv.badge.wifi"
+                            )
+                            .padding(16)
+                        }
+                        .buttonStyle(VeyraEPGButtonStyle(selected: seriesActive))
                     }
                 }
                 .frame(
@@ -1968,6 +2013,33 @@ private struct VeyraEPGDetails: View {
             recorderMessage = error.localizedDescription
         }
         showRecorderAlert = true
+    }
+
+    private func isRecordingWholeSeries(_ programme: VeyraEPGProgramme) -> Bool {
+        _ = seriesRuleVersion
+        return SeriesRecordingDefaults.isRecordingWholeSeries(
+            channelID: selection.row.id, title: programme.title
+        )
+    }
+
+    private func toggleSeriesRecording(_ programme: VeyraEPGProgramme) {
+        let enabling = !isRecordingWholeSeries(programme)
+        let rule = SeriesRecordingDefaults.setRecordingWholeSeries(
+            enabling, channelID: selection.row.id, title: programme.title
+        )
+        seriesRuleVersion += 1
+
+        guard rule != nil else { return }
+        recorderMessage = "Hele serie \"\(programme.title)\" wordt vanaf nu automatisch opgenomen."
+        showRecorderAlert = true
+
+        let row = selection.row
+        Task {
+            await VeyraHubRecorderScheduler.scheduleUpcomingEpisodes(
+                programmeIndex: [row.channel.tvgID?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "": guide.programmes(for: row)],
+                channels: [row]
+            )
+        }
     }
 }
 

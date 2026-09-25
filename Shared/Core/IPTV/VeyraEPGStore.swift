@@ -962,6 +962,15 @@ final class VeyraEPGStore: ObservableObject {
             programmeIndex =
                 result.programmes
 
+            // Nieuw geladen EPG-venster: kijk of er nieuwe afleveringen bij
+            // zijn voor een actieve "neem hele serie op"-regel. Bewust niet
+            // bij het herstellen van de cache hierboven — alleen bij vers
+            // opgehaalde data kunnen er echt nieuwe afleveringen bij zitten.
+            let scanChannels = channels
+            Task { await VeyraHubRecorderScheduler.scheduleUpcomingEpisodes(
+                programmeIndex: result.programmes, channels: scanChannels
+            ) }
+
             IPTVDiskCache.write(
                 result.programmes,
                 key: "live-guide-v1-\(configuration.providerIdentifier)"
