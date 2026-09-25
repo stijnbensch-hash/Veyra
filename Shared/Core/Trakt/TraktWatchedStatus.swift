@@ -39,7 +39,14 @@ enum TraktWatchedStatus: Equatable {
             }
             let count = Set(seasons.filter { $0.number > 0 }.map(\.number))
                 .reduce(0) { $0 + watchedEpisodes($1).filter { $0 > 0 }.count }
-            return count > 0 ? .partial(count: count, total: nil) : .none
+            // Niet aanwezig in `progress` (Trakt's eigen "volgende aflevering"-berekening,
+            // a.k.a. "Verder kijken") betekent dat er voor deze serie geen onbekeken
+            // uitgezonden afleveringen meer over zijn -- dus bijgewerkt, ook al kennen we
+            // hier lokaal het totale afleveringenaantal niet. Voorheen gaf dit altijd
+            // `.partial(count:, total: nil)`, en zonder gekend totaal liet de "X
+            // afleveringen te gaan"-weergave dan stilzwijgend niets zien -- vandaar dat
+            // een volledig bekeken serie als Yellowstone geen enkele badge kreeg.
+            return count > 0 ? .watched : .none
         case .movie: return .none
         }
     }

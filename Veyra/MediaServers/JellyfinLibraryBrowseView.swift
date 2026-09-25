@@ -11,7 +11,7 @@ struct JellyfinLibrariesView: View {
     @State private var errorMessage: String?
 
     private let columns = [
-        GridItem(.adaptive(minimum: 260), spacing: 24)
+        GridItem(.adaptive(minimum: 300, maximum: 420), spacing: 24)
     ]
 
     var body: some View {
@@ -91,17 +91,24 @@ struct JellyfinLibrariesView: View {
             .frame(width: 60, height: 60)
 
             Text(library.name)
-                .font(.system(size: 26, weight: .semibold))
+                .font(.system(size: 24, weight: .semibold))
                 .foregroundStyle(.white)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
 
-            Spacer()
+            Spacer(minLength: 12)
 
             Image(systemName: "chevron.right")
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(.cyan.opacity(0.6))
         }
         .padding(20)
-        .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
+        // Geen `.frame(maxWidth: .infinity, ...)` hier -- in combinatie met
+        // een `.adaptive` LazyVGrid-kolom gaf dat op tvOS een layout-bug
+        // waarbij elke tegel terugviel op zijn minimale intrinsieke breedte,
+        // met tekst die daardoor letter voor letter onder elkaar werd
+        // gewrapt. De kolombreedte komt nu gewoon van de `GridItem` zelf.
+        .frame(minHeight: 96, alignment: .leading)
         .veyraGlass(radius: VeyraRadius.card)
     }
 
@@ -191,14 +198,14 @@ struct JellyfinItemsView: View {
             } label: {
                 poster(for: item)
             }
-            .buttonStyle(VeyraFocusButtonStyle(radius: VeyraRadius.poster))
+            .buttonStyle(VeyraPosterFocusStyle(cornerRadius: VeyraRadius.poster))
         } else {
             NavigationLink {
                 JellyfinPlaybackDestination(account: account, item: item)
             } label: {
                 poster(for: item)
             }
-            .buttonStyle(VeyraFocusButtonStyle(radius: VeyraRadius.poster))
+            .buttonStyle(VeyraPosterFocusStyle(cornerRadius: VeyraRadius.poster))
         }
     }
 

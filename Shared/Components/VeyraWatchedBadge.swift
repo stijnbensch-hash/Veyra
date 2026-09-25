@@ -52,7 +52,73 @@ struct VeyraWatchedBadge: View {
             .accessibilityLabel("\(title) via Trakt")
     }
 }
+/// Compacte "bekeken"-indicator: enkel een vinkje in een cirkel, zonder tekst — voor smalle postercards
+/// (bv. de streamingdienst-catalogus op iOS) waar de tekstbadge van `VeyraWatchedBadge` niet past.
+/// Bij een gedeeltelijk bekeken seizoen/serie valt dit terug op de tekstbadge van `VeyraWatchedBadge`
+/// (via `partialDisplay`), want "X afleveringen te gaan" past niet in een los vinkje.
+struct VeyraWatchedCheckmark: View {
+    let target: TraktWatchedTarget
+    var partialDisplay: VeyraWatchedPartialDisplay = .hidden
+    @ObservedObject private var store = TraktStore.shared
+
+    private var status: TraktWatchedStatus {
+        guard store.isConnected else { return .none }
+        return .resolve(target, movies: store.watchedMovies, shows: store.watchedShows, progress: store.upNext)
+    }
+
+    var body: some View {
+        switch status {
+        case .none:
+            EmptyView()
+        case .watched:
+            checkmark
+        case .partial:
+            if partialDisplay == .hidden {
+                EmptyView()
+            } else {
+                VeyraWatchedBadge(target: target, partialDisplay: partialDisplay)
+            }
+        }
+    }
+
+    // tvOS bekijk je van op de bank (10-foot UI) -- het kleine vinkje was
+    // daar amper te onderscheiden van de poster zelf, dus flink groter dan
+    // op iOS/iPadOS.
+#if os(tvOS)
+    private var checkmarkDiameter: CGFloat { 40 }
+    private var checkmarkIconSize: CGFloat { 17 }
+    private var checkmarkStrokeWidth: CGFloat { 2 }
+#else
+    private var checkmarkDiameter: CGFloat { 26 }
+    private var checkmarkIconSize: CGFloat { 11 }
+    private var checkmarkStrokeWidth: CGFloat { 1.5 }
+#endif
+
+    private var checkmark: some View {
+        ZStack {
+            Circle().fill(.ultraThinMaterial)
+            Circle().stroke(VeyraColors.cyan.opacity(0.95), lineWidth: checkmarkStrokeWidth)
+            Image(systemName: "checkmark")
+                .font(.system(size: checkmarkIconSize, weight: .bold))
+                .foregroundStyle(VeyraColors.cyan)
+        }
+        .frame(width: checkmarkDiameter, height: checkmarkDiameter)
+        .shadow(color: .black.opacity(0.35), radius: 5, y: 2)
+        .accessibilityLabel("Bekeken")
+    }
+}
+
 extension View {
+    /// Compacte vinkje-badge i.p.v. de tekstbadge (zie `VeyraWatchedCheckmark`). `partialDisplay`
+    /// bepaalt wat een gedeeltelijk bekeken seizoen/serie toont (standaard: niets).
+    func traktWatchedCheckmark(_ target: TraktWatchedTarget, partialDisplay: VeyraWatchedPartialDisplay = .hidden) -> some View {
+        overlay(alignment: .topTrailing) {
+            VeyraWatchedCheckmark(target: target, partialDisplay: partialDisplay)
+                .padding(7)
+                .allowsHitTesting(false)
+        }
+    }
+
     func traktWatched(
         _ target: TraktWatchedTarget,
         partialDisplay: VeyraWatchedPartialDisplay = .watchedCount

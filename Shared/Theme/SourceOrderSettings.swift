@@ -95,4 +95,65 @@ enum SourceOrderDefaults {
 
         return sorted.map(\.1)
     }
+
+    // MARK: - Bronvolgorde (addons/mediaservers in "Selecteer bron")
+
+    /// Volgorde van addon-/mediaservernamen zoals ze in "Selecteer bron"
+    /// (SourceSelectionView, iOS én tvOS) verschijnen — zowel bij "Alle" als
+    /// bij de losse filterknoppen. Onder Instellingen → Bronnen →
+    /// Bronverschijning → Bronvolgorde in te stellen. Losstaand van
+    /// `categoryOrder`/`iptvProviderOrder` hierboven: die twee gaan over
+    /// Instellingen zelf, dit gaat over de speler-broncode.
+    static let originOrderKey = "sourceOrder.originOrder"
+
+    static func loadOriginOrder(from defaults: UserDefaults = .standard) -> [String] {
+        guard let data = defaults.data(forKey: originOrderKey),
+              let strings = try? JSONDecoder().decode([String].self, from: data) else {
+            return []
+        }
+        return strings
+    }
+
+    static func saveOriginOrder(_ order: [String], to defaults: UserDefaults = .standard) {
+        guard let data = try? JSONEncoder().encode(order) else { return }
+        defaults.set(data, forKey: originOrderKey)
+    }
+
+    /// Sorteert waarden op hun origin-naam volgens de opgeslagen volgorde
+    /// (hoofdletterongevoelig). Namen die niet in de opgeslagen volgorde
+    /// voorkomen (nieuwe addon, nog niet ingesteld) behouden hun relatieve
+    /// plek, achteraan.
+    ///
+    /// `isFromHub` markeert bronnen die via een VeyraHub-server komen. Voor
+    /// die bronnen is VeyraHub's eigen addonvolgorde (in te stellen op de
+    /// hub zelf) leidend — de API levert streams al in die volgorde aan.
+    /// Deze functie past de lokale Bronvolgorde-lijst daarom NOOIT toe op
+    /// hub-bronnen, ook niet als een addonnaam toevallig ook in de lokale
+    /// lijst voorkomt (bv. een stale/verouderde entry): ze behouden altijd
+    /// hun binnenkomende (hub-gerangschikte) relatieve volgorde. Zo hoeft
+    /// een VeyraHub-addon niet apart in Instellingen → Bronvolgorde gezet
+    /// te worden, en kan de volgorde nooit uit sync raken met de hub.
+    static func sortedByOriginOrder<T>(
+        _ values: [T],
+        order: [String],
+        originName: (T) -> String,
+        isFromHub: (T) -> Bool = { _ in false }
+    ) -> [T] {
+        guard !order.isEmpty else { return values }
+
+        var rank: [String: Int] = [:]
+        for (index, name) in order.enumerated() {
+            rank[name.lowercased()] = index
+        }
+
+        let indexed = values.enumerated().map { ($0.offset, $0.element) }
+        let sorted = indexed.sorted { lhs, rhs in
+            let lhsRank = isFromHub(lhs.1) ? (order.count + lhs.0) : (rank[originName(lhs.1).lowercased()] ?? (order.count + lhs.0))
+            let rhsRank = isFromHub(rhs.1) ? (order.count + rhs.0) : (rank[originName(rhs.1).lowercased()] ?? (order.count + rhs.0))
+            if lhsRank != rhsRank { return lhsRank < rhsRank }
+            return lhs.0 < rhs.0
+        }
+
+        return sorted.map(\.1)
+    }
 }

@@ -457,7 +457,7 @@ struct SeriesDetailView: View {
             value:
                 isFocused
         )
-        .traktWatched(
+        .traktWatchedCheckmark(
             .season(
                 show:
                     TraktIDs(

@@ -190,7 +190,7 @@ struct SeasonView: View {
                                     == episode
                                         .episodeNumber
                             )
-                            .traktWatched(
+                            .traktWatchedCheckmark(
                                 .episode(
                                     show:
                                         TraktIDs(

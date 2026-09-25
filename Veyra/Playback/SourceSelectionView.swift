@@ -72,6 +72,8 @@ struct SourceSelectionView: View {
                 .vertical,
                 32
             )
+            .frame(maxWidth: 1600)
+            .frame(maxWidth: .infinity)
         }
         .task(
             id: reloadID
@@ -105,7 +107,10 @@ struct SourceSelectionView: View {
     {
         case all
         case iptv
-        case origin(String)
+        case origin(
+            name: String,
+            isHub: Bool
+        )
 
         var id: String {
             switch self {
@@ -116,10 +121,11 @@ struct SourceSelectionView: View {
                 return "iptv"
 
             case .origin(
-                let name
+                let name,
+                let isHub
             ):
                 return
-                    "origin:\(name)"
+                    "origin:\(name):\(isHub)"
             }
         }
     }
@@ -142,8 +148,16 @@ struct SourceSelectionView: View {
             )
         }
 
-        var names:
-            [String] = []
+        // Een addonnaam levert twéé aparte knoppen op zodra er zowel een
+        // rechtstreekse (lokaal geïnstalleerde) als een VeyraHub-versie van
+        // bestaat — bv. "Usenet" en een apart gestylede "Usenet"-knop via
+        // VeyraHub — in plaats van ze onder één knop samen te voegen. Zo
+        // blijft meteen zichtbaar welke bronnen via de mediaserver komen.
+        var comboSeen =
+            Set<String>()
+
+        var combos:
+            [(name: String, isHub: Bool)] = []
 
         for resolved
             in sources
@@ -168,49 +182,45 @@ struct SourceSelectionView: View {
                 continue
             }
 
-            let alreadyExists =
-                names.contains {
-                    $0.caseInsensitiveCompare(
-                        name
-                    ) == .orderedSame
-                }
+            let key =
+                "\(name.lowercased())|\(resolved.isFromHub)"
 
-            if !alreadyExists {
-                names.append(
-                    name
-                )
+            guard
+                !comboSeen.contains(key)
+            else {
+                continue
             }
+
+            comboSeen.insert(key)
+
+            combos.append(
+                (name: name, isHub: resolved.isFromHub)
+            )
         }
 
-        names.sort {
-            $0.localizedStandardCompare(
-                $1
-            ) == .orderedAscending
+        combos.sort {
+            let nameOrder =
+                $0.name.localizedStandardCompare($1.name)
+
+            if nameOrder != .orderedSame {
+                return nameOrder == .orderedAscending
+            }
+
+            // Bij gelijke naam komt de gewone addon-knop eerst, de
+            // VeyraHub-variant erna.
+            return !$0.isHub && $1.isHub
         }
 
-        for name in names {
+        for combo in combos {
             result.append(
                 .origin(
-                    name
+                    name: combo.name,
+                    isHub: combo.isHub
                 )
             )
         }
 
         return result
-    }
-
-    /// True als er onder deze originName (filtertab) minstens één bron zit
-    /// die via VeyraHub is opgehaald — bepaalt of de filterknop het kleine
-    /// hub-icoon toont.
-    private func isHubOrigin(
-        _ name: String
-    ) -> Bool {
-        sources.contains {
-            $0.isFromHub
-                && $0.originName
-                    .caseInsensitiveCompare(name)
-                    == .orderedSame
-        }
     }
 
     private var filteredSources:
@@ -227,11 +237,14 @@ struct SourceSelectionView: View {
             }
 
         case .origin(
-            let selectedName
+            let selectedName,
+            let selectedIsHub
         ):
             return sources.filter {
                 $0.source.kind
                     != .iptvVOD
+                &&
+                $0.isFromHub == selectedIsHub
                 &&
                 $0.originName
                     .caseInsensitiveCompare(
@@ -328,6 +341,37 @@ struct SourceSelectionView: View {
         .focusSection()
     }
 
+    /// Paars/indigo tint voor filterknoppen van bronnen die via VeyraHub
+    /// binnenkomen — zelfde opzet als `VeyraFrame`, maar met een duidelijk
+    /// andere kleur, zodat zo'n knop meteen herkenbaar is als "komt van de
+    /// mediaserver", ook naast een gelijknamige, rechtstreekse addon-knop.
+    private static let hubFrameResting = LinearGradient(
+        colors: [
+            Color(red: 0.62, green: 0.42, blue: 1.0).opacity(0.55),
+            .white.opacity(0.10),
+            Color(red: 0.38, green: 0.2, blue: 0.85).opacity(0.4),
+        ],
+        startPoint: .leading, endPoint: .trailing
+    )
+
+    private static let hubFrameFill = LinearGradient(
+        colors: [
+            Color(red: 0.62, green: 0.42, blue: 1.0).opacity(0.30),
+            Color(red: 0.62, green: 0.42, blue: 1.0).opacity(0.08),
+            Color(red: 0.38, green: 0.2, blue: 0.85).opacity(0.22),
+        ],
+        startPoint: .topLeading, endPoint: .bottomTrailing
+    )
+
+    private static let hubFrameActive = LinearGradient(
+        colors: [
+            .white,
+            Color(red: 0.72, green: 0.55, blue: 1.0),
+            Color(red: 0.46, green: 0.26, blue: 0.95).opacity(0.85),
+        ],
+        startPoint: .leading, endPoint: .trailing
+    )
+
     private func filterControl(
         _ filter:
             SourceFilter
@@ -340,85 +384,94 @@ struct SourceSelectionView: View {
             focusedFilterID
                 == filter.id
 
-        // Een addonbron die via VeyraHub loopt krijgt hier een klein
-        // hub-icoon, zodat "NinjaCentral" (bv.) herkenbaar blijft als een
-        // VeyraHub-addon en niet lijkt op een gelijknamige, lokaal
-        // geïnstalleerde addon.
-        let showsHubIcon: Bool = {
-            if case .origin(let name) = filter {
-                return isHubOrigin(name)
+        // Een origin-knop bestaat in twee smaken: rechtstreeks van een
+        // lokaal geïnstalleerde addon, of via VeyraHub. Die laatste krijgt
+        // hier een eigen kleurenschema + hub-icoon + onderschrift, zodat
+        // twee knoppen met dezelfde naam (bv. "Usenet" en "Usenet" via
+        // VeyraHub) toch meteen uit elkaar te houden zijn.
+        let isHubFilter: Bool = {
+            if case .origin(_, let isHub) = filter {
+                return isHub
             }
             return false
         }()
 
-        return HStack(spacing: 8) {
-            if showsHubIcon {
-                Image(systemName: "server.rack")
-                    .font(.system(size: 15, weight: .semibold))
-            }
+        return VStack(spacing: 2) {
+            HStack(spacing: 8) {
+                if isHubFilter {
+                    Image(systemName: "server.rack")
+                        .font(.system(size: 15, weight: .semibold))
+                }
 
-            Text(
-                filterTitle(
-                    filter
+                Text(
+                    filterTitle(
+                        filter
+                    )
+                )
+            }
+            .font(
+                .system(
+                    size: 21,
+                    weight:
+                        isSelected
+                        ? .bold
+                        : .semibold
                 )
             )
+
+            if isHubFilter {
+                Text("VEYRAHUB")
+                    .font(
+                        .system(
+                            size: 11,
+                            weight: .bold
+                        )
+                    )
+                    .tracking(1.5)
+                    .opacity(0.8)
+            }
         }
-        .font(
-            .system(
-                size: 21,
-                weight:
-                    isSelected
-                    ? .bold
-                    : .semibold
-            )
-        )
-        .foregroundStyle(
-            isSelected
-                || isFocused
-                ? .white
-                : .cyan
-        )
+        .foregroundStyle(.white)
         .padding(
             .horizontal,
             25
         )
         .padding(
             .vertical,
-            13
+            isHubFilter ? 10 : 13
         )
         .background(
-            Capsule()
-                .fill(
-                    isSelected
-                    ? Color.cyan
-                        .opacity(
-                            0.25
-                        )
-                    : isFocused
-                        ? Color.cyan
-                            .opacity(
-                                0.14
-                            )
-                        : Color.cyan
-                            .opacity(
-                                0.04
-                            )
+            isHubFilter
+                ? (
+                    isSelected || isFocused
+                        ? AnyShapeStyle(Self.hubFrameFill)
+                        : AnyShapeStyle(Color.clear)
                 )
+                : (
+                    isSelected || isFocused
+                        ? AnyShapeStyle(VeyraFrame.fill)
+                        : AnyShapeStyle(Color.clear)
+                ),
+            in: Capsule()
         )
         .overlay(
             Capsule()
                 .strokeBorder(
-                    isSelected
-                        || isFocused
-                        ? Color.cyan
-                        : Color.cyan
-                            .opacity(
-                                0.16
-                            ),
+                    isHubFilter
+                        ? AnyShapeStyle(
+                            isSelected || isFocused
+                                ? Self.hubFrameActive
+                                : Self.hubFrameResting
+                        )
+                        : AnyShapeStyle(
+                            isSelected || isFocused
+                                ? VeyraFrame.active
+                                : VeyraFrame.resting
+                        ),
                     lineWidth:
-                        isFocused
+                        isSelected || isFocused
                         ? 2
-                        : 1
+                        : 1.5
                 )
         )
         .contentShape(
@@ -461,7 +514,8 @@ struct SourceSelectionView: View {
             return "IPTV"
 
         case .origin(
-            let name
+            let name,
+            _
         ):
             return name
         }
@@ -644,10 +698,12 @@ struct SourceSelectionView: View {
                 "Geen IPTV-bronnen gevonden."
 
         case .origin(
-            let name
+            let name,
+            let isHub
         ):
-            return
-                "Geen bronnen gevonden via \(name)."
+            return isHub
+                ? "Geen bronnen via VeyraHub gevonden voor \(name)."
+                : "Geen bronnen gevonden via \(name)."
         }
     }
 
@@ -707,6 +763,14 @@ struct SourceSelectionView: View {
             .padding(
                 .vertical,
                 10
+            )
+            // Ruimte voor de 1%-`.scaleEffect` bij focus (zie de toelichting
+            // bij `sourceRow`'s `.drawingGroup()`) -- zonder deze marge werd
+            // de opgeschaalde rand aan beide zijden afgesneden door de
+            // `ScrollView`, omdat de kaarten nu vrijwel randvol zijn.
+            .padding(
+                .horizontal,
+                14
             )
         }
         .focusSection()
@@ -786,7 +850,7 @@ struct SourceSelectionView: View {
                         vertical: true
                     )
                     .frame(
-                        maxWidth: 900,
+                        maxWidth: 1300,
                         alignment: .leading
                     )
                 }
@@ -811,6 +875,16 @@ struct SourceSelectionView: View {
                     .top,
                     2
                 )
+
+                let badges = sourceBadges(for: resolved)
+                if !badges.isEmpty {
+                    HStack(spacing: 10) {
+                        ForEach(badges) { badge in
+                            sourceBadgeChip(badge)
+                        }
+                    }
+                    .padding(.top, 4)
+                }
             }
 
             Spacer(
@@ -846,7 +920,7 @@ struct SourceSelectionView: View {
             24
         )
         .frame(
-            maxWidth: 1200,
+            maxWidth: 1600,
             minHeight: 130,
             alignment: .leading
         )
@@ -892,9 +966,11 @@ struct SourceSelectionView: View {
         // hierboven) elk apart geschaald door `.scaleEffect` hieronder —
         // op tvOS gaf dat een render-glitch waarbij de linkerrand van de
         // rand (`strokeBorder`) wegviel zodra een bron gefocust werd.
-        // `.compositingGroup()` platst kaart + rand eerst tot één laag,
-        // die daarna als geheel geschaald wordt.
-        .compositingGroup()
+        // `.compositingGroup()` platte de laag alleen samen voor blending;
+        // dat bleek niet genoeg om de rand ook echt als één bitmap mee te
+        // schalen -- `.drawingGroup()` rasteriseert kaart + rand vooraf tot
+        // één afbeelding, die daarna zonder randartefacten geschaald wordt.
+        .drawingGroup()
         .focusable(true)
         .focused(
             $focusedSourceID,
@@ -922,6 +998,53 @@ struct SourceSelectionView: View {
     }
 
     // MARK: - Icon
+
+    private func sourceBadges(for resolved: ResolvedSource) -> [SourceBadge] {
+        SourceBadgeStore.shared.badges(matching: [
+            resolved.originName,
+            resolved.source.providerName ?? "",
+            resolved.source.name,
+            resolved.source.description ?? ""
+        ])
+    }
+
+    /// De pil-achtergrond/rand (`tagColor`/`borderColor`) hoort bij de badge
+    /// zelf, niet alleen bij de tekst-terugval — een geladen afbeelding komt
+    /// dus ook binnenin dezelfde pil te zitten, net als in het bronpakket
+    /// bedoeld is (`tagStyle`: "filled and bordered" / "bordered").
+    private func sourceBadgeChip(_ badge: SourceBadge) -> some View {
+        sourceBadgeChipContent(badge)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 7)
+            .background(
+                Capsule().fill(Color(sourceBadgeHex: badge.tagColor) ?? VeyraColors.cyan.opacity(0.6))
+            )
+            .overlay(
+                Capsule().strokeBorder(Color(sourceBadgeHex: badge.borderColor) ?? .clear, lineWidth: 1.5)
+            )
+    }
+
+    @ViewBuilder
+    private func sourceBadgeChipContent(_ badge: SourceBadge) -> some View {
+        if let imageURL = badge.imageURL {
+            AsyncImage(url: imageURL) { phase in
+                if let image = phase.image {
+                    image.resizable().scaledToFit()
+                } else {
+                    sourceBadgeFallback(badge)
+                }
+            }
+            .frame(height: 26)
+        } else {
+            sourceBadgeFallback(badge)
+        }
+    }
+
+    private func sourceBadgeFallback(_ badge: SourceBadge) -> some View {
+        Text(badge.name)
+            .font(.system(size: 22, weight: .bold))
+            .foregroundStyle(Color(sourceBadgeHex: badge.textColor) ?? .white)
+    }
 
     private func sourceIcon(
         _ source:
@@ -1045,6 +1168,22 @@ struct SourceSelectionView: View {
 
     // MARK: - Load
 
+    /// Herschikt bronnen volgens de door de gebruiker ingestelde
+    /// bronvolgorde (Instellingen → Bronnen → Bronverschijning →
+    /// Bronvolgorde) — bepaalt zowel de volgorde in "Alle" als de volgorde
+    /// van de losse filterknoppen (die worden immers uit `sources`
+    /// afgeleid, in ditzelfde volgorde).
+    private static func applyOriginOrder(
+        _ values: [ResolvedSource]
+    ) -> [ResolvedSource] {
+        SourceOrderDefaults.sortedByOriginOrder(
+            values,
+            order: SourceOrderDefaults.loadOriginOrder(),
+            originName: { $0.originName },
+            isFromHub: { $0.isFromHub }
+        )
+    }
+
     private func loadSources()
         async
     {
@@ -1088,12 +1227,26 @@ struct SourceSelectionView: View {
             return
         }
 
+        #if DEBUG
+        print(
+            "[SourceSelectionView] addons=\(addonValues.count) mediaServer=\(mediaServerValues.count) (\(mediaServerValues.filter(\.isFromHub).count) via hub)"
+        )
+        #endif
+
         sources =
-            SourceResolver
-                .deduplicated(
-                    addonValues
-                        + mediaServerValues
-                )
+            Self.applyOriginOrder(
+                SourceResolver
+                    .deduplicated(
+                        addonValues
+                            + mediaServerValues
+                    )
+            )
+
+        #if DEBUG
+        print(
+            "[SourceSelectionView] na merge: \(sources.count) bronnen (\(sources.filter(\.isFromHub).count) via hub)"
+        )
+        #endif
 
         isLoadingAddons =
             false
@@ -1115,11 +1268,13 @@ struct SourceSelectionView: View {
         }
 
         sources =
-            SourceResolver
-                .deduplicated(
-                    sources
-                        + iptvValues
-                )
+            Self.applyOriginOrder(
+                SourceResolver
+                    .deduplicated(
+                        sources
+                            + iptvValues
+                    )
+            )
 
         isLoadingIPTV =
             false

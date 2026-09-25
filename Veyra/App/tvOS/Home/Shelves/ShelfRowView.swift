@@ -31,13 +31,13 @@ struct ShelfRowView: View {
                                     title: item.title,
                                     url: item.posterURL,
                                     symbol: item.type == .movie ? "film" : "tv",
-                                    width: 220,
+                                    width: 240,
                                     genre: item.genre,
                                     rating: item.rating,
                                     sourceLabel: item.tmdbID == nil ? shelf.source.subtitle : nil
                                 )
                             }
-                            .buttonStyle(VeyraFocusButtonStyle(radius: VeyraRadius.poster))
+                            .buttonStyle(VeyraPosterFocusStyle(cornerRadius: VeyraRadius.poster))
                             .reportsHero(.mediaItem(item))
                         }
                     }.padding(12)

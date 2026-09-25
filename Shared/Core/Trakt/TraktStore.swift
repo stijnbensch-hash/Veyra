@@ -90,7 +90,11 @@ final class TraktStore: ObservableObject {
     func connected() async {
         revision = UUID()
 
-        scrobblingEnabled = false
+        // NIET scrobblingEnabled terugzetten naar false hier: dit liep voorheen bij elke
+        // (her)verbinding, ook als de gebruiker scrobbling al had aangezet -- de toggle in
+        // Instellingen ging dan onopgemerkt weer uit en scrobbling/"bekeken" stopte stil met
+        // werken tot iemand toevallig weer in Instellingen keek. De voorkeur staat al in
+        // UserDefaults en hoeft hier niet gereset te worden.
 
         clearCachedData(
             removePersistentHomeCache: true
@@ -1138,8 +1142,10 @@ final class TraktStore: ObservableObject {
 
         print("[TraktScrobble] \(action) wordt verstuurd, item=\(item.title) progress=\(progress)")
 
-        // Home-cache van "voortgang per serie" is na elke scrobble verouderd.
-        TraktHomeThrottle.shared.invalidate()
+        // Home-cache van "voortgang per serie" pas ongeldig maken bij een echt afgeronde kijkbeurt
+        // ("stop", hieronder na een gelukte of 409-bevestigde aanroep) — niet hier bij elke start/pause,
+        // anders wist elke periodieke scrobble-ping de hele cache en jaagt "Verder kijken" voortdurend
+        // nieuwe voortgangsaanvragen de deur uit, wat de echte Trakt-limiet raakt.
 
         let boundedProgressForLocalUpdate =
             min(100, max(0, progress))

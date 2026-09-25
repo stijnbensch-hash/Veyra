@@ -32,7 +32,9 @@ final class SourceSelectionViewModel: ObservableObject {
         let (addonValues, mediaServerValues) = await (addonValuesTask, mediaServerValuesTask)
         guard !Task.isCancelled, self.generation == generation else { return }
 
-        sources = SourceResolver.deduplicated(addonValues + mediaServerValues)
+        sources = Self.applyOriginOrder(
+            SourceResolver.deduplicated(addonValues + mediaServerValues)
+        )
         isLoadingAddons = false
 
         // IPTV voor films én series.
@@ -41,8 +43,24 @@ final class SourceSelectionViewModel: ObservableObject {
         let iptvValues = await resolver.iptvSources(for: item)
         guard !Task.isCancelled, self.generation == generation else { return }
 
-        sources = SourceResolver.deduplicated(sources + iptvValues)
+        sources = Self.applyOriginOrder(
+            SourceResolver.deduplicated(sources + iptvValues)
+        )
         isLoadingIPTV = false
         hasLoaded = true
+    }
+
+    /// Herschikt bronnen volgens de door de gebruiker ingestelde
+    /// bronvolgorde (Instellingen → Bronnen → Bronverschijning →
+    /// Bronvolgorde) — bepaalt zowel de volgorde in "Alle" als de volgorde
+    /// van de losse filterknoppen (die worden immers uit `sources`
+    /// afgeleid, in ditzelfde volgorde).
+    private static func applyOriginOrder(_ values: [ResolvedSource]) -> [ResolvedSource] {
+        SourceOrderDefaults.sortedByOriginOrder(
+            values,
+            order: SourceOrderDefaults.loadOriginOrder(),
+            originName: { $0.originName },
+            isFromHub: { $0.isFromHub }
+        )
     }
 }

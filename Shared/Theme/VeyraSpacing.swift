@@ -3,7 +3,7 @@ import SwiftUI
 enum VeyraSpacing {
     static let page: CGFloat = 36
     static let submenuPage: CGFloat = 28
-    static let rail: CGFloat = 30
+    static let rail: CGFloat = 38
 }
 
 enum VeyraRadius {

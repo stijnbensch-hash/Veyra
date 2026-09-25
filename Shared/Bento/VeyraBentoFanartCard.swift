@@ -38,10 +38,12 @@ struct FanartConfigurationCard: View {
                 .autocorrectionDisabled()
 
             Button("Opslaan") { save() }
+                .buttonStyle(.plain)
                 .disabled(apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
             if configured {
                 Button("Sleutel verwijderen", role: .destructive) { remove() }
+                    .buttonStyle(.plain)
             }
 
             if let message {

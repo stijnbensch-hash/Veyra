@@ -7,7 +7,7 @@ struct MetadataRatingsView: View {
     var body: some View {
         if ratings.hasVisibleRatings {
             HStack(
-                spacing: 24
+                spacing: 30
             ) {
                 if MetadataPreferences.showIMDb,
                    let value = ratings.imdb
@@ -101,7 +101,7 @@ struct MetadataRatingsView: View {
             String
     ) -> some View {
         HStack(
-            spacing: 8
+            spacing: 10
         ) {
             providerIcon(
                 provider
@@ -112,7 +112,7 @@ struct MetadataRatingsView: View {
             )
             .font(
                 .system(
-                    size: 21,
+                    size: 26,
                     weight: .bold,
                     design: .rounded
                 )
@@ -133,113 +133,63 @@ struct MetadataRatingsView: View {
     ) -> some View {
         switch provider {
         case .imdb:
-            Text(
-                "IMDb"
-            )
-            .font(
-                .system(
-                    size: 14,
-                    weight: .black
+            Image("rating-imdb")
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 42, height: 22)
+                .foregroundStyle(.black)
+                .padding(.horizontal, 5)
+                .padding(.vertical, 4)
+                .background(
+                    Color.yellow,
+                    in: RoundedRectangle(cornerRadius: 5, style: .continuous)
                 )
-            )
-            .foregroundStyle(
-                .black
-            )
-            .padding(
-                .horizontal,
-                7
-            )
-            .padding(
-                .vertical,
-                4
-            )
-            .background(
-                Color.yellow,
-                in:
-                    RoundedRectangle(
-                        cornerRadius: 5,
-                        style: .continuous
-                    )
-            )
 
+        // TMDB/Tomatometer/Metacritic/Trakt kwamen voorheen uit monochrome
+        // silhouet-PDF's (`.renderingMode(.template)` op een puur zwarte vorm), wat
+        // enkel een effen gekleurde vlek gaf -- amper te herkennen als het echte
+        // logo. Vervangen door tekst/emoji-badges in de eigen merkkleur, net als
+        // IMDb hieronder al deed: veel duidelijker, en werkt altijd (geen
+        // afbeelding nodig die kan ontbreken of onduidelijk renderen).
         case .tmdb:
-            Text(
-                "TMDB"
-            )
-            .font(
-                .system(
-                    size: 14,
-                    weight: .bold
+            Text("TMDB")
+                .font(.system(size: 14, weight: .heavy, design: .rounded))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 4)
+                .background(
+                    Color(red: 0.01, green: 0.71, blue: 0.89),
+                    in: RoundedRectangle(cornerRadius: 5, style: .continuous)
                 )
-            )
-            .foregroundStyle(
-                .cyan
-            )
 
         case .tomatometer:
-            Image(
-                systemName:
-                    "circle.fill"
-            )
-            .font(
-                .system(
-                    size: 18
-                )
-            )
-            .foregroundStyle(
-                .red
-            )
+            Text("🍅")
+                .font(.system(size: 22))
 
         case .metacritic:
-            Text(
-                "M"
-            )
-            .font(
-                .system(
-                    size: 16,
-                    weight: .black
+            Text("M")
+                .font(.system(size: 16, weight: .heavy, design: .rounded))
+                .foregroundStyle(.white)
+                .frame(width: 26, height: 22)
+                .background(
+                    Color(red: 0.10, green: 0.10, blue: 0.11),
+                    in: RoundedRectangle(cornerRadius: 5, style: .continuous)
                 )
-            )
-            .foregroundStyle(
-                .black
-            )
-            .frame(
-                width: 26,
-                height: 26
-            )
-            .background(
-                Color.yellow,
-                in:
-                    Circle()
-            )
 
         case .trakt:
-            Image(
-                systemName:
-                    "checkmark.square.fill"
-            )
-            .font(
-                .system(
-                    size: 20
+            Image(systemName: "checkmark")
+                .font(.system(size: 13, weight: .heavy))
+                .foregroundStyle(.white)
+                .frame(width: 26, height: 22)
+                .background(
+                    Color(red: 0.62, green: 0.18, blue: 0.55),
+                    in: RoundedRectangle(cornerRadius: 5, style: .continuous)
                 )
-            )
-            .foregroundStyle(
-                .pink
-            )
 
         case .popcornmeter:
-            Image(
-                systemName:
-                    "popcorn.fill"
-            )
-            .font(
-                .system(
-                    size: 20
-                )
-            )
-            .foregroundStyle(
-                .orange
-            )
+            Text("🍿")
+                .font(.system(size: 22))
         }
     }
 }

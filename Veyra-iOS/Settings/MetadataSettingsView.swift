@@ -17,8 +17,6 @@ struct MetadataSettingsView: View {
     private var posterShowQuality = false
     @AppStorage(PosterEnrichmentDefaults.showTrendLabelsKey)
     private var posterShowTrending = false
-    @AppStorage(PosterEnrichmentDefaults.showEpisodesRemainingKey)
-    private var posterShowEpisodesRemaining = false
 
     private var posterEnrichmentSource: PosterEnrichmentMode {
         PosterEnrichmentMode(rawValue: posterEnrichmentSourceRaw) ?? .off
@@ -37,14 +35,14 @@ struct MetadataSettingsView: View {
 
             List {
                 Section {
-                    Picker("Bron", selection: $posterEnrichmentSourceRaw) {
+                    Picker("Posterverrijking", selection: $posterEnrichmentSourceRaw) {
                         ForEach(PosterEnrichmentMode.allCases) { option in
                             Text(option.title).tag(option.rawValue)
                         }
                     }
                     .pickerStyle(.segmented)
 
-                    if posterEnrichmentSource != .off {
+                    if posterEnrichmentSource == .betterPosters {
                         HStack {
                             Spacer()
                             VeyraPosterCard(
@@ -57,9 +55,7 @@ struct MetadataSettingsView: View {
                             Spacer()
                         }
                         .listRowBackground(Color.clear)
-                    }
 
-                    if posterEnrichmentSource == .betterPosters {
                         Toggle("Genre", isOn: $posterShowGenre)
                         Toggle("Beoordeling", isOn: $posterShowRating)
                         if posterShowRating {
@@ -71,17 +67,13 @@ struct MetadataSettingsView: View {
                         }
                         Toggle("Leeftijdsclassificatie", isOn: $posterShowAgeRating)
                         Toggle("Kwaliteitslabels", isOn: $posterShowQuality)
+                            .disabled(true)
                         Toggle("Trendlabels", isOn: $posterShowTrending)
-                        Toggle("Resterende afleveringen", isOn: $posterShowEpisodesRemaining)
-                    } else if posterEnrichmentSource == .rpdb {
-                        Text("RPDB (ratingposterdb.com) is een externe dienst waarvoor nog geen integratie bestaat — deze keuze doet nog niets. Kies Better Posters voor werkende genre-/beoordelingslabels.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
                     }
                 } header: {
                     Text("Posterverrijking")
                 } footer: {
-                    Text("Toont een badge met genre en/of beoordeling op de posters in Films, Series en het startscherm. Genre en Beoordeling via Better Posters werken al echt; Leeftijdsclassificatie, Kwaliteitslabels, Trendlabels en Resterende afleveringen staan klaar maar Veyra haalt die gegevens nog niet op.")
+                    Text("Toont een badge op de posters in Films, Series en het startscherm. Genre, Beoordeling, Leeftijdsclassificatie en Trendlabels werken allemaal echt. Kwaliteitslabels staat uitgeschakeld: dat vraagt per titel een opgezochte stream, wat voor een heel posterrooster te veel netwerkverkeer zou zijn.")
                 }
 
                 Section {
@@ -129,9 +121,18 @@ struct MetadataSettingsView: View {
                         .fill(iconBackground(provider))
                         .frame(width: 36, height: 36)
 
-                    Image(systemName: provider.systemImage)
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(iconForeground(provider))
+                    if let assetName = provider.assetImageName {
+                        Image(assetName)
+                            .renderingMode(.template)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 18, height: 18)
+                            .foregroundStyle(iconForeground(provider))
+                    } else {
+                        Image(systemName: provider.systemImage)
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(iconForeground(provider))
+                    }
                 }
 
                 Text(provider.title)

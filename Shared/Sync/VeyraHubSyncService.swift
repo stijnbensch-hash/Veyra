@@ -56,7 +56,6 @@ final class VeyraHubSyncService {
         "posterEnrichment.mode", "posterEnrichment.showGenre", "posterEnrichment.showRating",
         "posterEnrichment.ratingSource", "posterEnrichment.showAgeRating",
         "posterEnrichment.showQualityLabels", "posterEnrichment.showTrendLabels",
-        "posterEnrichment.showEpisodesRemaining",
         // Overig
         "catalog.watchRegion", "openSubtitlesEnabled", "metadata.source.preference",
         "sports.favoriteTeams",
@@ -75,15 +74,22 @@ final class VeyraHubSyncService {
     ]
 
     private static let sourceOrderDataKeys: [String] = [
-        "sourceOrder.categoryOrder", "sourceOrder.iptvProviderOrder",
+        "sourceOrder.categoryOrder", "sourceOrder.iptvProviderOrder", "sourceOrder.originOrder",
     ]
 
     private static let addonDataKeys: [String] = [
         "veyra.addons.installed",
     ]
 
+    private static let sourceBadgeDataKeys: [String] = [
+        // Bronbadges — zie Shared/Theme/SourceBadges.swift. Beide sleutels
+        // zijn JSON-gecodeerde `Data` (geladen pakketten + actieve modus),
+        // dezelfde generieke plist-opslag als de andere Data-sleutels hier.
+        "sourceBadges.packs", "sourceBadges.mode",
+    ]
+
     private static var settingsDataKeys: [String] {
-        shelfHeroDataKeys + sourceOrderDataKeys + addonDataKeys
+        shelfHeroDataKeys + sourceOrderDataKeys + addonDataKeys + sourceBadgeDataKeys
     }
 
     private static let metadataPrefix = "metadata.rating."

@@ -3,25 +3,24 @@ import SwiftUI
 struct SubtitlePreferencesView: View {
     @AppStorage(SubtitlePreferences.languageKey) private var language = "nl"
 
+    private var currentLanguageTitle: String {
+        SubtitleLanguage(rawValue: language)?.title ?? "Nederlands"
+    }
+
     var body: some View {
         ZStack {
             VeyraBackground().ignoresSafeArea()
 
             List {
                 Section {
-                    ForEach(SubtitleLanguage.allCases) { option in
-                        Button {
-                            language = option.rawValue
-                        } label: {
-                            VeyraSettingsCardRowLabel(icon: "globe", title: option.title) {
-                                if language == option.rawValue {
-                                    Image(systemName: "checkmark")
-                                        .foregroundStyle(VeyraColors.cyan)
-                                }
-                            }
+                    NavigationLink {
+                        SubtitleLanguagePickerView(language: $language)
+                    } label: {
+                        VeyraSettingsCardRowLabel(icon: "globe", title: "Standaardtaal") {
+                            VeyraSettingsCardRowValue(value: currentLanguageTitle)
                         }
-                        .veyraCardRow()
                     }
+                    .veyraCardRow()
                 } header: {
                     Text("Standaardtaal")
                 } footer: {
@@ -32,6 +31,19 @@ struct SubtitlePreferencesView: View {
                     OpenSubtitlesConfigurationCard()
                 } header: {
                     Text("OpenSubtitles")
+                }
+
+                Section {
+                    NavigationLink {
+                        SubtitleAppearanceSettingsView()
+                    } label: {
+                        VeyraSettingsCardRowLabel(icon: "textformat.size", title: "Ondertitelweergave", subtitle: "Grootte, plaatsing, achtergrond") {
+                            VeyraSettingsCardRowValue(value: nil)
+                        }
+                    }
+                    .veyraCardRow()
+                } header: {
+                    Text("Weergave")
                 }
             }
             .frame(maxWidth: 1000)
@@ -139,6 +151,38 @@ struct OpenSubtitlesConfigurationCard: View {
             configured = AppConfiguration.openSubtitlesAPIKey != nil
             message = "Opslaan van de API-sleutel is niet gelukt."
         }
+    }
+}
+
+/// Sub-scherm met alle taalopties — apart van `SubtitlePreferencesView` zodat "Standaardtaal"
+/// daar één uitklapbare rij is i.p.v. alle 15 talen meteen te tonen.
+struct SubtitleLanguagePickerView: View {
+    @Binding var language: String
+
+    var body: some View {
+        ZStack {
+            VeyraBackground().ignoresSafeArea()
+
+            List {
+                Section {
+                    ForEach(SubtitleLanguage.allCases) { option in
+                        Button {
+                            language = option.rawValue
+                        } label: {
+                            VeyraSettingsCardRowLabel(icon: "globe", title: option.title) {
+                                if language == option.rawValue {
+                                    Image(systemName: "checkmark")
+                                        .foregroundStyle(VeyraColors.cyan)
+                                }
+                            }
+                        }
+                        .veyraCardRow()
+                    }
+                }
+            }
+            .frame(maxWidth: 1000)
+        }
+        .navigationTitle("Standaardtaal")
     }
 }
 

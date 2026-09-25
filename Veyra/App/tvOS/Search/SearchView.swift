@@ -237,7 +237,7 @@ struct SearchView: View {
                         path: movie.posterPath
                     ),
                     placeholderSystemName: "film"
-                ).traktWatched(.movie(TraktIDs(tmdb: movie.id)))
+                ).traktWatchedCheckmark(.movie(TraktIDs(tmdb: movie.id)))
             }
             .buttonStyle(.card)
             .disabled(isOpeningMovie)
@@ -285,7 +285,7 @@ struct SearchView: View {
                         path: item.posterPath
                     ),
                     placeholderSystemName: "tv"
-                ).traktWatched(.show(TraktIDs(tmdb: item.id)))
+                ).traktWatchedCheckmark(.show(TraktIDs(tmdb: item.id)))
             }
             .buttonStyle(.card)
 

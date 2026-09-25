@@ -24,8 +24,8 @@ struct SeriesView: View {
         string: "https://image.tmdb.org/t/p/w500"
     )!
 
-    private let railSpacing: CGFloat = 24
-    private let gridPosterWidth: CGFloat = 220
+    private let railSpacing: CGFloat = 32
+    private let gridPosterWidth: CGFloat = 240
 
     @ObservedObject private var heroSpotlight = VeyraHeroSpotlight.shared
 
@@ -71,12 +71,6 @@ struct SeriesView: View {
 
                     VStack(alignment: .leading, spacing: 6) {
                         header
-
-                        WatchProviderRow(
-                            kind: .tv,
-                            selection: $selectedProvider,
-                            region: $watchRegion
-                        )
 
                         MediaFiltersRow(
                             kind: .tv,
@@ -251,9 +245,9 @@ struct SeriesView: View {
         } else {
             LazyVGrid(
                 columns: [
-                    GridItem(.adaptive(minimum: gridPosterWidth, maximum: gridPosterWidth), spacing: railSpacing)
+                    GridItem(.adaptive(minimum: gridPosterWidth, maximum: gridPosterWidth + 40), spacing: railSpacing)
                 ],
-                spacing: 32
+                spacing: 40
             ) {
                 ForEach(series) { item in
                     seriesCard(
@@ -286,21 +280,17 @@ struct SeriesView: View {
                 symbol: "tv",
                 width: width,
                 genre: TMDBGenreNames.firstTVName(for: item.genreIDs ?? []),
-                rating: item.voteAverage
-            )
-            .traktWatched(
-                .show(
-                    TraktIDs(
-                        tmdb: item.id
-                    )
-                )
+                rating: item.voteAverage,
+                year: String(item.firstAirDate?.prefix(4) ?? ""),
+                tmdbID: item.id,
+                isMovie: false,
+                releaseDateRaw: item.firstAirDate,
+                watchedTarget: .show(TraktIDs(tmdb: item.id)),
+                watchedPartialDisplay: .remaining
             )
         }
         .buttonStyle(
-            VeyraFocusButtonStyle(
-                radius:
-                    VeyraRadius.poster
-            )
+            VeyraPosterFocusStyle(cornerRadius: VeyraRadius.poster)
         )
         .reportsHero(.series(item))
     }

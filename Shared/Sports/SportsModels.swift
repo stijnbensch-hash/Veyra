@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - League
 
-struct SportsLeague:
+nonisolated struct SportsLeague:
     Identifiable,
     Hashable,
     Sendable
@@ -54,7 +54,7 @@ struct SportsLeague:
 
 // MARK: - Team
 
-struct SportsTeam:
+nonisolated struct SportsTeam:
     Identifiable,
     Hashable,
     Sendable

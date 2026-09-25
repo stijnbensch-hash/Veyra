@@ -365,6 +365,8 @@ nonisolated struct VeyraCatalogSource: Sendable {
             let backdrop_path: String?
             let release_date: String?
             let first_air_date: String?
+            let genre_ids: [Int]?
+            let vote_average: Double?
         }
         let results: [Item]
     }
@@ -663,7 +665,9 @@ nonisolated struct VeyraCatalogSource: Sendable {
                 all.append(BentoTMDBTitle(id: item.id, kind: kind, title: title,
                                           posterURL: Self.imageURL(item.poster_path, size: "w342"),
                                           backdropURL: Self.imageURL(item.backdrop_path, size: "w1280"),
-                                          releaseDate: rawDate.flatMap(formatter.date(from:))))
+                                          releaseDate: rawDate.flatMap(formatter.date(from:)),
+                                          genreIDs: item.genre_ids ?? [],
+                                          voteAverage: item.vote_average))
             }
             if result.results.count < 20 { break }
         }
@@ -749,6 +753,14 @@ struct VeyraBentoCatalogView: View {
     @State private var heroURL: URL?
     @State private var loading = true
 
+    // Automatisch roterende hero voor streamingdiensten, zoals op de
+    // Films/Series-hoofdschermen: elke paar seconden een andere titel uit
+    // het huidige tabblad, zolang de gebruiker zelf geen poster focust.
+    @State private var heroRotationIndex = 0
+    #if os(tvOS)
+    @ObservedObject private var heroSpotlight = VeyraHeroSpotlight.shared
+    #endif
+
     #if os(tvOS)
     private let compact = false
     #else
@@ -756,14 +768,29 @@ struct VeyraBentoCatalogView: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     #endif
 
+    // Zelfde postermaat en rasterindeling als "Films"/"Series" in het hoofdmenu
+    // (`VeyraPosterMetrics` op iOS, `gridPosterWidth`/`railSpacing` op tvOS).
+    #if os(tvOS)
+    private let posterWidth: CGFloat = 240
+    private let railSpacing: CGFloat = 32
+    #else
+    private var posterWidth: CGFloat { sizeClass == .regular ? 192 : 124 }
+    #endif
+
     private var gridColumns: [GridItem] {
         #if os(tvOS)
-        return [GridItem(.adaptive(minimum: 246, maximum: 256), spacing: 28, alignment: .top)]
+        return [GridItem(.adaptive(minimum: posterWidth, maximum: posterWidth + 40), spacing: railSpacing, alignment: .top)]
         #else
-        if sizeClass == .regular {
-            return [GridItem(.adaptive(minimum: 170, maximum: 210), spacing: 16, alignment: .top)]
-        }
-        return [GridItem(.flexible(), spacing: 14, alignment: .top), GridItem(.flexible(), spacing: 14, alignment: .top)]
+        return [GridItem(.adaptive(minimum: posterWidth), spacing: sizeClass == .regular ? 26 : 16, alignment: .top)]
+        #endif
+    }
+
+    /// Verticale ruimte tussen posterrijen — zelfde maten als "Films"/"Series" in het hoofdmenu.
+    private var gridRowSpacing: CGFloat {
+        #if os(tvOS)
+        return 40
+        #else
+        return sizeClass == .regular ? 28 : 18
         #endif
     }
 
@@ -772,40 +799,68 @@ struct VeyraBentoCatalogView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: compact ? 16 : 30) {
-                hero
-
-                if sections.count > 1 {
-                    HStack(spacing: compact ? 10 : 20) {
-                        ForEach(sections) { section in tab(section) }
-                    }
-                }
-
-                if loading {
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 40)
-                } else if current == nil {
-                    Text("Niets gevonden.")
-                        .font(.title3)
-                        .foregroundStyle(VeyraHomeStyle.dim)
-                }
-
-                if let current {
-                    // `id: \.offset` i.p.v. het TMDB-id zelf: als twee titels
-                    // (door een mislukte koppeling) toch hetzelfde id hebben,
-                    // blijft elke kaart een eigen, stabiele identiteit houden
-                    // zodat tikken altijd de juiste kaart opent.
-                    LazyVGrid(columns: gridColumns, alignment: .leading, spacing: compact ? 18 : 34) {
-                        ForEach(Array(current.titles.enumerated()), id: \.offset) { _, title in card(title) }
-                    }
-                }
+        ZStack {
+            #if os(tvOS)
+            if catalog.isService {
+                // Schermvullende, automatisch wisselende hero -- zelfde
+                // opzet als de Films/Series-hoofdschermen: de achtergrond
+                // loopt onderaan over in `VeyraBackground`'s eigen gradient
+                // i.p.v. een effen kleur.
+                VeyraArtworkBackground(url: heroSpotlight.focused?.backdropURL ?? featuredBackdropURL)
+                    .id(heroSpotlight.focused?.id ?? "catalog-hero:\(catalog.id):\(heroRotationIndex)")
+                    .animation(.easeInOut(duration: 0.35), value: heroSpotlight.focused?.id)
+                    .animation(.easeInOut(duration: 0.35), value: featuredBackdropURL)
+            } else {
+                VeyraHomeStyle.ink.ignoresSafeArea()
             }
-            .padding(compact ? 16 : 60)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            #else
+            VeyraHomeStyle.ink.ignoresSafeArea()
+            #endif
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: compact ? 16 : 30) {
+                    hero
+
+                    if sections.count > 1 {
+                        HStack(spacing: compact ? 10 : 20) {
+                            ForEach(sections) { section in tab(section) }
+                        }
+                    }
+
+                    if loading {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 40)
+                    } else if current == nil {
+                        Text("Niets gevonden.")
+                            .font(.title3)
+                            .foregroundStyle(VeyraHomeStyle.dim)
+                    }
+
+                    if let current {
+                        // `id: \.offset` i.p.v. het TMDB-id zelf: als twee titels
+                        // (door een mislukte koppeling) toch hetzelfde id hebben,
+                        // blijft elke kaart een eigen, stabiele identiteit houden
+                        // zodat tikken altijd de juiste kaart opent.
+                        LazyVGrid(columns: gridColumns, alignment: .leading, spacing: gridRowSpacing) {
+                            ForEach(Array(current.titles.enumerated()), id: \.offset) { _, title in card(title) }
+                        }
+                        // Extra 6pt, zoals bij "Films"/"Series" op het hoofdmenu -- daar
+                        // krijgt het raster zelf nog wat marge bovenop de VStack-marge.
+                        .padding(.horizontal, compact ? 0 : 6)
+                        // Zonder dit blijft alle overtollige rijbreedte rechts hangen (asymmetrisch); zo
+                        // verdeelt de resterende ruimte zich gelijk aan beide kanten van het raster.
+                        .frame(maxWidth: .infinity, alignment: .center)
+                    }
+                }
+                // Horizontaal dezelfde inzet als "Films"/"Series" in het hoofdmenu (28pt
+                // VStack-marge + 6pt grid-marge hierboven) -- stond hiervoor op 60pt,
+                // waardoor het raster merkbaar smaller en meer naar binnen begon.
+                .padding(.horizontal, compact ? 16 : 28)
+                .padding(.vertical, compact ? 16 : 60)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
-        .background(VeyraHomeStyle.ink.ignoresSafeArea())
         .foregroundStyle(.white)
         #if !os(tvOS)
         .navigationTitle(catalog.name)
@@ -819,7 +874,35 @@ struct VeyraBentoCatalogView: View {
             heroURL = Self.heroImage(catalog: catalog, sections: loaded)
             loading = false
         }
+        #if os(tvOS)
+        .task(id: heroPool.map(\.id)) {
+            await rotateHeroAutomatically()
+        }
+        #endif
     }
+
+    // MARK: Hero-rotatie (streamingdiensten)
+
+    #if os(tvOS)
+    private var heroPool: [BentoTMDBTitle] {
+        Array((current?.titles ?? []).filter { $0.backdropURL != nil }.prefix(10))
+    }
+
+    private var featuredBackdropURL: URL? {
+        guard !heroPool.isEmpty else { return heroURL }
+        return heroPool[heroRotationIndex % heroPool.count].backdropURL
+    }
+
+    private func rotateHeroAutomatically() async {
+        heroRotationIndex = 0
+        guard heroPool.count > 1 else { return }
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(8))
+            guard !Task.isCancelled else { return }
+            heroRotationIndex = (heroRotationIndex + 1) % heroPool.count
+        }
+    }
+    #endif
 
     // MARK: Grote afbeelding
 
@@ -838,11 +921,20 @@ struct VeyraBentoCatalogView: View {
     @ViewBuilder
     private var hero: some View {
         if catalog.isService {
-            // Alleen het logo, geen grote achtergrond-afbeelding erboven --
-            // die had toch geen relatie met de dienst zelf (een
-            // willekeurige backdrop uit het aanbod).
+            #if os(tvOS)
+            // Transparant blok boven op de schermvullende achtergrond-hero
+            // (zie `body`) -- alleen het logo onderaan, net als bij
+            // Films/Series op het hoofdmenu.
+            Color.clear
+                .overlay(alignment: .bottomLeading) {
+                    heroTitle.padding(compact ? 16 : 40)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: compact ? 220 : 460)
+            #else
             heroTitle
                 .padding(.top, compact ? 4 : 12)
+            #endif
         } else {
             // Kleur bepaalt de maat; het (brede) beeld ligt er als overlay op, anders rekt
             // `scaledToFill` de hele pagina -- en dus de poster-kolommen -- breder dan het scherm.
@@ -930,37 +1022,64 @@ struct VeyraBentoCatalogView: View {
 
     @ViewBuilder
     private func tab(_ section: BentoCatalogSection) -> some View {
-        if section.id == (current?.id ?? "") {
-            Button { selected = section.id } label: {
-                Text(section.heading)
-                    .font(.system(size: compact ? 16 : 28, weight: .semibold))
-                    .padding(.horizontal, compact ? 8 : 24)
-                    .padding(.vertical, compact ? 2 : 8)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(VeyraColors.cyan)
-        } else {
-            Button { selected = section.id } label: {
-                Text(section.heading)
-                    .font(.system(size: compact ? 16 : 28, weight: .semibold))
-                    .padding(.horizontal, compact ? 8 : 24)
-                    .padding(.vertical, compact ? 2 : 8)
-            }
-            .buttonStyle(.bordered)
-            .tint(.white)
+        let active = section.id == (current?.id ?? "")
+        Button { selected = section.id } label: {
+            Text(section.heading)
+                .font(.system(size: compact ? 16 : 28, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, compact ? 14 : 28)
+                .padding(.vertical, compact ? 7 : 12)
+                .background(active ? AnyShapeStyle(VeyraFrame.fill) : AnyShapeStyle(Color.clear), in: Capsule())
+                .overlay(Capsule().strokeBorder(active ? VeyraFrame.active : VeyraFrame.resting, lineWidth: active ? 2 : 1.5))
         }
+        #if os(tvOS)
+        .buttonStyle(VeyraTabFocusStyle())
+        #else
+        .buttonStyle(.plain)
+        #endif
     }
 
-    @ViewBuilder
+    private static let yearFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy"
+        return f
+    }()
+
+    private static let rawDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+
     private func card(_ title: BentoTMDBTitle) -> some View {
+        let genre = title.kind == .movie ? TMDBGenreNames.firstMovieName(for: title.genreIDs) : TMDBGenreNames.firstTVName(for: title.genreIDs)
+        let releaseDateRaw = title.releaseDate.map { Self.rawDateFormatter.string(from: $0) }
+        let watchedTarget: TraktWatchedTarget = title.kind == .movie ? .movie(TraktIDs(tmdb: title.id)) : .show(TraktIDs(tmdb: title.id))
+        let watchedPartialDisplay: VeyraWatchedPartialDisplay = title.kind == .movie ? .hidden : .remaining
         #if os(tvOS)
-        Button { onOpen(title) } label: {
-            VeyraBentoPosterContent(title: title.title, url: title.posterURL, kind: title.kind, posterHeight: 360, titleSize: 24, watchedID: title.id, watchedKind: title.kind)
+        return Button { onOpen(title) } label: {
+            VeyraPosterCard(title: title.title, url: title.posterURL, symbol: title.kind == .movie ? "film" : "tv", width: posterWidth, genre: genre, rating: title.voteAverage, year: title.releaseDate.map { Self.yearFormatter.string(from: $0) }, tmdbID: title.id, isMovie: title.kind == .movie, releaseDateRaw: releaseDateRaw, watchedTarget: watchedTarget, watchedPartialDisplay: watchedPartialDisplay)
         }
-        .buttonStyle(VeyraPosterFocusStyle())
+        // Zelfde focusstijl als de posters op "Films"/"Series" -- tekent zelf geen
+        // kader/gloed meer rond de hele kaart, dat doet `VeyraPosterCard` nu rond
+        // enkel de poster.
+        .buttonStyle(VeyraPosterFocusStyle(cornerRadius: VeyraRadius.poster))
+        .reportsHero(
+            catalog.isService
+                ? VeyraHeroContent(
+                    id: "catalog:\(title.id)",
+                    eyebrow: genre ?? catalog.name,
+                    title: title.title,
+                    overview: nil,
+                    metadata: [],
+                    backdropURL: title.backdropURL
+                )
+                : nil
+        )
         #else
-        Button { onOpen(title) } label: {
-            VeyraBentoPosterContent(title: title.title, url: title.posterURL, compact: true, kind: title.kind, titleSize: 15, fillWidth: true, watchedID: title.id, watchedKind: title.kind)
+        return Button { onOpen(title) } label: {
+            VeyraPosterCard(title: title.title, url: title.posterURL, symbol: title.kind == .movie ? "film" : "tv", width: posterWidth, genre: genre, rating: title.voteAverage, year: title.releaseDate.map { Self.yearFormatter.string(from: $0) }, tmdbID: title.id, isMovie: title.kind == .movie, releaseDateRaw: releaseDateRaw, watchedTarget: watchedTarget, watchedPartialDisplay: watchedPartialDisplay)
         }
         .buttonStyle(.plain)
         #endif

@@ -107,8 +107,6 @@ private struct PosterEnrichmentSettingsView: View {
     private var posterShowQuality = false
     @AppStorage(PosterEnrichmentDefaults.showTrendLabelsKey)
     private var posterShowTrending = false
-    @AppStorage(PosterEnrichmentDefaults.showEpisodesRemainingKey)
-    private var posterShowEpisodesRemaining = false
 
     private var posterEnrichmentSource: PosterEnrichmentMode {
         PosterEnrichmentMode(rawValue: posterEnrichmentSourceRaw) ?? .off
@@ -117,16 +115,6 @@ private struct PosterEnrichmentSettingsView: View {
     var body: some View {
         Form {
             Section {
-                // Blijft een systeem-Picker met .menu (niet de nieuwe
-                // verticale VeyraSettingsChoiceRow): deze rij wordt direct
-                // gevolgd door secties die in-/uitklappen zodra de keuze
-                // verandert (voorbeeldposter, toggles). Met een push-stijl
-                // (NavigationLink) duwt tvOS een apart kiesscherm open en
-                // moet het bij het teruggaan tegelijk de lijst herbouwen
-                // — die combinatie liet de focus-engine soms vastlopen
-                // (de app viel dan terug naar het beginscherm). Een
-                // menu-stijl kiezer verandert de selectie zonder te
-                // navigeren, dus die botsing kan niet meer optreden.
                 Picker("Bron", selection: $posterEnrichmentSourceRaw) {
                     ForEach(PosterEnrichmentMode.allCases) { option in
                         Text(option.title).tag(option.rawValue)
@@ -134,7 +122,7 @@ private struct PosterEnrichmentSettingsView: View {
                 }
                 .pickerStyle(.menu)
 
-                if posterEnrichmentSource != .off {
+                if posterEnrichmentSource == .betterPosters {
                     HStack {
                         Spacer()
                         VeyraPosterCard(
@@ -146,15 +134,10 @@ private struct PosterEnrichmentSettingsView: View {
                         )
                         Spacer()
                     }
-                }
 
-                if posterEnrichmentSource == .betterPosters {
                     VeyraSettingsToggleRow(icon: "tag", title: "Genre", isOn: $posterShowGenre)
                     VeyraSettingsToggleRow(icon: "star", title: "Beoordeling", isOn: $posterShowRating)
                     if posterShowRating {
-                        // Zelfde reden als "Bron" hierboven: .menu i.p.v.
-                        // push-stijl, om de focus-engine niet te laten
-                        // vastlopen in een sectie die zelf ook in-/uitklapt.
                         Picker("Bron beoordeling", selection: $posterRatingSourceRaw) {
                             ForEach(PosterRatingSource.allCases) { option in
                                 Text(option.title).tag(option.rawValue)
@@ -164,14 +147,11 @@ private struct PosterEnrichmentSettingsView: View {
                     }
                     VeyraSettingsToggleRow(icon: "checkmark.seal", title: "Leeftijdsclassificatie", isOn: $posterShowAgeRating)
                     VeyraSettingsToggleRow(icon: "rosette", title: "Kwaliteitslabels", isOn: $posterShowQuality)
+                        .disabled(true)
                     VeyraSettingsToggleRow(icon: "chart.line.uptrend.xyaxis", title: "Trendlabels", isOn: $posterShowTrending)
-                    VeyraSettingsToggleRow(icon: "list.number", title: "Resterende afleveringen", isOn: $posterShowEpisodesRemaining)
-                } else if posterEnrichmentSource == .rpdb {
-                    Text("RPDB (ratingposterdb.com) is een externe dienst waarvoor nog geen integratie bestaat — deze keuze doet nog niets. Kies Better Posters voor werkende genre-/beoordelingslabels.")
-                        .foregroundStyle(.secondary)
                 }
             } footer: {
-                Text("Toont een badge met genre en/of beoordeling op de posters in Films, Series en het startscherm. Genre en Beoordeling via Better Posters werken al echt; Leeftijdsclassificatie, Kwaliteitslabels, Trendlabels en Resterende afleveringen staan klaar maar Veyra haalt die gegevens nog niet op.")
+                Text("Toont een badge op de posters in Films, Series en het startscherm. Genre, Beoordeling, Leeftijdsclassificatie en Trendlabels werken allemaal echt. Kwaliteitslabels staat uitgeschakeld: dat vraagt per titel een opgezochte stream, wat voor een heel posterrooster te veel netwerkverkeer zou zijn.")
             }
         }
         .frame(maxWidth: 1000)
@@ -288,9 +268,18 @@ private struct MetadataRatingsSettingsView: View {
                 .fill(iconBackground(provider))
                 .frame(width: 44, height: 44)
 
-            Image(systemName: provider.systemImage)
-                .font(.system(size: 20, weight: .bold))
-                .foregroundStyle(iconForeground(provider))
+            if let assetName = provider.assetImageName {
+                Image(assetName)
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 22, height: 22)
+                    .foregroundStyle(iconForeground(provider))
+            } else {
+                Image(systemName: provider.systemImage)
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(iconForeground(provider))
+            }
         }
     }
 

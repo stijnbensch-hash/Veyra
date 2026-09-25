@@ -254,7 +254,18 @@ struct VeyraBentoHomeView: View {
                 VeyraBentoShelf(title: "Nieuwe films", subtitle: "Nieuw uitgebracht", contentHeight: 356) {
                     ForEach(model.releaseFilms) { title in
                         Button { onOpenTMDBTitle(title) } label: {
-                            VeyraBentoPosterContent(title: title.title, url: title.posterURL, posterHeight: 300, watchedID: title.id, watchedKind: title.kind)
+                            VeyraPosterCard(
+                                title: title.title,
+                                url: title.posterURL,
+                                width: 220,
+                                genre: TMDBGenreNames.firstMovieName(for: title.genreIDs),
+                                rating: title.voteAverage,
+                                year: title.releaseDate.map { Self.yearFormatter.string(from: $0) },
+                                tmdbID: title.id,
+                                isMovie: true,
+                                releaseDateRaw: title.releaseDate.map { Self.rawDateFormatter.string(from: $0) },
+                                watchedTarget: .movie(TraktIDs(tmdb: title.id))
+                            )
                         }
                         .buttonStyle(VeyraPosterFocusStyle())
                         .focused($focus, equals: .shelf("rf-\(title.id)"))
@@ -267,7 +278,19 @@ struct VeyraBentoHomeView: View {
                 VeyraBentoShelf(title: "Nieuwe series", subtitle: "Nieuw uitgebracht", contentHeight: 356) {
                     ForEach(model.releaseSeries) { title in
                         Button { onOpenTMDBTitle(title) } label: {
-                            VeyraBentoPosterContent(title: title.title, url: title.posterURL, posterHeight: 300, watchedID: title.id, watchedKind: title.kind)
+                            VeyraPosterCard(
+                                title: title.title,
+                                url: title.posterURL,
+                                width: 220,
+                                genre: TMDBGenreNames.firstTVName(for: title.genreIDs),
+                                rating: title.voteAverage,
+                                year: title.releaseDate.map { Self.yearFormatter.string(from: $0) },
+                                tmdbID: title.id,
+                                isMovie: false,
+                                releaseDateRaw: title.releaseDate.map { Self.rawDateFormatter.string(from: $0) },
+                                watchedTarget: .show(TraktIDs(tmdb: title.id)),
+                                watchedPartialDisplay: .remaining
+                            )
                         }
                         .buttonStyle(VeyraPosterFocusStyle())
                         .focused($focus, equals: .shelf("rs-\(title.id)"))
@@ -431,6 +454,19 @@ struct VeyraBentoHomeView: View {
         case .live(let channelID, _): onOpenLiveTV(channelID)
         }
     }
+
+    private static let yearFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy"
+        return f
+    }()
+
+    private static let rawDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
 }
 
 // MARK: - Ingeklapte hero (kopregel boven het raster)

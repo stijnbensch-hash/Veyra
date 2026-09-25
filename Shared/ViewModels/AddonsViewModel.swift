@@ -45,6 +45,18 @@ final class AddonsViewModel: ObservableObject {
         reload()
     }
 
+    /// Aan/uit-knop op het overzicht -- schakelt de addon zonder naar het
+    /// bewerkscherm te hoeven navigeren.
+    func toggleEnabled(_ addon: AddonManifest) {
+        var updated = addon
+        updated.isEnabled.toggle()
+        do {
+            try update(updated)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func subtitle(for addon: AddonManifest) -> String {
         let host = addon.baseURL.host ?? addon.baseURL.absoluteString
 

@@ -64,7 +64,7 @@ struct TraktSeriesOverviewView: View {
                                         EpisodeView(series: details, episode: episode)
                                     } label: {
                                         episodeCard(episode)
-                                            .traktWatched(.episode(show: TraktIDs(tmdb: details.id), season: episode.seasonNumber, number: episode.episodeNumber))
+                                            .traktWatchedCheckmark(.episode(show: TraktIDs(tmdb: details.id), season: episode.seasonNumber, number: episode.episodeNumber))
                                     }.buttonStyle(VeyraFocusButtonStyle())
                                 }
                             }

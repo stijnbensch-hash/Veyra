@@ -3,6 +3,7 @@ import SwiftUI
 enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
     case iptv
     case liveTVSettings
+    case sourceAppearance
     case addons
     case mediaServers
     case general
@@ -21,6 +22,7 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
         switch self {
         case .iptv: return "IPTV"
         case .liveTVSettings: return "Live TV instellingen"
+        case .sourceAppearance: return "Bronverschijning"
         case .addons: return "Addons"
         case .mediaServers: return "Mediaservers"
         case .general: return "Algemeen"
@@ -39,6 +41,7 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
         switch self {
         case .iptv: return "Live TV en VOD via Xtream of M3U"
         case .liveTVSettings: return "Gids, player, buffer en kanaalcache"
+        case .sourceAppearance: return "Badges in het bronkeuzescherm"
         case .addons: return "Streams via gekoppelde addons"
         case .mediaServers: return "Jellyfin en andere eigen servers"
         case .general: return "Startscherm, sport en kaartweergave"
@@ -57,6 +60,7 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
         switch self {
         case .iptv: return "antenna.radiowaves.left.and.right"
         case .liveTVSettings: return "slider.horizontal.3"
+        case .sourceAppearance: return "tag"
         case .addons: return "puzzlepiece.extension.fill"
         case .mediaServers: return "server.rack"
         case .general: return "slider.horizontal.3"
@@ -166,6 +170,8 @@ struct SettingsView: View {
                             .font(.system(size: 15, weight: .semibold))
                             .tracking(2)
                             .foregroundStyle(VeyraColors.secondary)
+
+                        settingsCard(.sourceAppearance, status: "", statusColor: VeyraColors.cyan)
 
                         ForEach(categoryOrder) { category in
                             bronnenRow(for: category)
@@ -390,6 +396,7 @@ struct SettingsView: View {
         switch destination {
         case .iptv: IPTVAccountsView()
         case .liveTVSettings: IPTVPlaybackSettingsView()
+        case .sourceAppearance: SourceAppearanceView()
         case .addons: AddonsSettingsView()
         case .mediaServers: MediaServersSettingsView()
         case .general: GeneralSettingsView()

@@ -193,10 +193,21 @@ struct VeyraBentoHomeView: View {
             }
 
             if present.contains(.releasesFilms) {
-                VeyraBentoShelf(title: "Nieuwe films", subtitle: "Nieuw uitgebracht", compact: true, contentHeight: (regular ? 240 : 190) + 36) {
+                VeyraBentoShelf(title: "Nieuwe films", subtitle: "Nieuw uitgebracht", compact: true, contentHeight: (regular ? 260 : 205) + 36) {
                     ForEach(model.releaseFilms) { title in
                         Button { onOpenTMDBTitle(title) } label: {
-                            VeyraBentoPosterContent(title: title.title, url: title.posterURL, compact: true, posterHeight: regular ? 240 : 190, watchedID: title.id, watchedKind: title.kind)
+                            VeyraPosterCard(
+                                title: title.title,
+                                url: title.posterURL,
+                                width: (regular ? 260 : 205) / 1.5,
+                                genre: TMDBGenreNames.firstMovieName(for: title.genreIDs),
+                                rating: title.voteAverage,
+                                year: title.releaseDate.map { Self.yearFormatter.string(from: $0) },
+                                tmdbID: title.id,
+                                isMovie: true,
+                                releaseDateRaw: title.releaseDate.map { Self.rawDateFormatter.string(from: $0) },
+                                watchedTarget: .movie(TraktIDs(tmdb: title.id))
+                            )
                         }
                         .buttonStyle(.plain)
                     }
@@ -206,10 +217,22 @@ struct VeyraBentoHomeView: View {
             }
 
             if present.contains(.releasesSeries) {
-                VeyraBentoShelf(title: "Nieuwe series", subtitle: "Nieuw uitgebracht", compact: true, contentHeight: (regular ? 240 : 190) + 36) {
+                VeyraBentoShelf(title: "Nieuwe series", subtitle: "Nieuw uitgebracht", compact: true, contentHeight: (regular ? 260 : 205) + 36) {
                     ForEach(model.releaseSeries) { title in
                         Button { onOpenTMDBTitle(title) } label: {
-                            VeyraBentoPosterContent(title: title.title, url: title.posterURL, compact: true, posterHeight: regular ? 240 : 190, watchedID: title.id, watchedKind: title.kind)
+                            VeyraPosterCard(
+                                title: title.title,
+                                url: title.posterURL,
+                                width: (regular ? 260 : 205) / 1.5,
+                                genre: TMDBGenreNames.firstTVName(for: title.genreIDs),
+                                rating: title.voteAverage,
+                                year: title.releaseDate.map { Self.yearFormatter.string(from: $0) },
+                                tmdbID: title.id,
+                                isMovie: false,
+                                releaseDateRaw: title.releaseDate.map { Self.rawDateFormatter.string(from: $0) },
+                                watchedTarget: .show(TraktIDs(tmdb: title.id)),
+                                watchedPartialDisplay: .remaining
+                            )
                         }
                         .buttonStyle(.plain)
                     }
@@ -372,6 +395,19 @@ struct VeyraBentoHomeView: View {
         case .live(let channelID, _): onOpenLiveTV(channelID)
         }
     }
+
+    private static let yearFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy"
+        return f
+    }()
+
+    private static let rawDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
 }
 
 #if DEBUG

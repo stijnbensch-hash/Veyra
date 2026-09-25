@@ -13,8 +13,14 @@ final class IPTVAccountsViewModel: ObservableObject {
     @Published private(set) var refreshMessages: [UUID: String] = [:]
     @Published private(set) var providerErrors: [UUID: String] = [:]
 
+    /// Online/offline-status per provider, zoals `MediaServersViewModel.onlineStatus`
+    /// — een lichte bereikbaarheidscheck, niet de volledige inhoud verversen.
+    /// Ontbreekt een id nog, dan is die provider nog niet gecontroleerd.
+    @Published private(set) var onlineStatus: [UUID: Bool] = [:]
+
     private let configurationStore: IPTVConfigurationStore
     private let service: IPTVService
+    private var statusCheckTask: Task<Void, Never>?
 
     nonisolated init(
         configurationStore: IPTVConfigurationStore = IPTVConfigurationStore(),
@@ -48,8 +54,58 @@ final class IPTVAccountsViewModel: ObservableObject {
             let loaded = try configurationStore.loadProviders()
             let order = SourceOrderDefaults.loadIPTVProviderOrder()
             providers = SourceOrderDefaults.sortedProviders(loaded, order: order) { $0.id }
+            let knownIDs = Set(providers.map(\.id))
+            onlineStatus = onlineStatus.filter { knownIDs.contains($0.key) }
+            refreshStatus()
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Ververst de online/offline-status van alle providers, parallel en
+    /// zonder de UI te blokkeren. Een vorige, nog lopende controle wordt
+    /// geannuleerd — zie `MediaServersViewModel.refreshStatus()`.
+    func refreshStatus() {
+        statusCheckTask?.cancel()
+        let checkedProviders = providers
+
+        statusCheckTask = Task { @MainActor [weak self] in
+            await withTaskGroup(of: (UUID, Bool).self) { group in
+                for provider in checkedProviders {
+                    group.addTask {
+                        (provider.id, await Self.ping(provider.configuration))
+                    }
+                }
+
+                for await (id, isOnline) in group {
+                    guard let self, !Task.isCancelled else { continue }
+                    self.onlineStatus[id] = isOnline
+                }
+            }
+        }
+    }
+
+    /// Lichte bereikbaarheidscheck: bij Xtream een korte `player_api.php`-
+    /// aanroep (bevestigt zowel bereikbaarheid als geldige inloggegevens),
+    /// bij M3U een `HEAD`-verzoek op de playlist-URL.
+    private static func ping(_ configuration: IPTVStoredConfiguration, timeout: TimeInterval = 6) async -> Bool {
+        switch configuration {
+        case .xtream(let xtream):
+            return (try? await XtreamClient(configuration: xtream).liveCategories()) != nil
+
+        case .m3u(let m3u):
+            var request = URLRequest(url: m3u.playlistURL)
+            request.httpMethod = "HEAD"
+            request.timeoutInterval = timeout
+
+            guard
+                let (_, response) = try? await URLSession.shared.data(for: request),
+                let httpResponse = response as? HTTPURLResponse
+            else {
+                return false
+            }
+
+            return (200...299).contains(httpResponse.statusCode)
         }
     }
 

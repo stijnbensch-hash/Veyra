@@ -8,7 +8,7 @@ struct IPTVRecentlyAddedSeriesRow: View {
     @State private var showAllSeries = false
     @State private var isRefreshing = false
 
-    private let posterWidth: CGFloat = 220
+    private let posterWidth: CGFloat = 240
 
     var body: some View {
         VStack(
@@ -176,10 +176,7 @@ struct IPTVRecentlyAddedSeriesRow: View {
             )
         }
         .buttonStyle(
-            VeyraFocusButtonStyle(
-                radius:
-                    VeyraRadius.poster
-            )
+            VeyraPosterFocusStyle(cornerRadius: VeyraRadius.poster)
         )
         .reportsHero(
             VeyraHeroContent(
@@ -215,10 +212,7 @@ struct IPTVRecentlyAddedSeriesRow: View {
             )
         }
         .buttonStyle(
-            VeyraFocusButtonStyle(
-                radius:
-                    VeyraRadius.poster
-            )
+            VeyraPosterFocusStyle(cornerRadius: VeyraRadius.poster)
         )
     }
 
@@ -866,10 +860,7 @@ struct IPTVSeriesDetailView: View {
             )
         }
         .buttonStyle(
-            VeyraFocusButtonStyle(
-                radius:
-                    VeyraRadius.poster
-            )
+            VeyraPosterFocusStyle(cornerRadius: VeyraRadius.poster)
         )
     }
 

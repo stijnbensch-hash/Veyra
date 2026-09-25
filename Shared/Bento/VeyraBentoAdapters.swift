@@ -455,6 +455,9 @@ nonisolated struct BentoTMDBTitle: Identifiable, Hashable, Sendable {
     // Alleen gebruikt om "nieuwste eerst" te kunnen sorteren op de
     // streamingdienst-overzichtspagina; niet gevuld door elke bron.
     var releaseDate: Date? = nil
+    // Voor de Better-Posters badge (genre/beoordeling) op de Home-shelves.
+    var genreIDs: [Int] = []
+    var voteAverage: Double? = nil
 }
 
 /// Recent uitgebrachte titels (films ≤ 45 dagen, series ≤ 60 dagen), op populariteit, via TMDB `discover`.
@@ -465,6 +468,10 @@ nonisolated struct VeyraTMDBReleases: Sendable {
             let title: String?
             let name: String?
             let poster_path: String?
+            let genre_ids: [Int]?
+            let vote_average: Double?
+            let release_date: String?
+            let first_air_date: String?
         }
         let results: [Item]
     }
@@ -505,8 +512,13 @@ nonisolated struct VeyraTMDBReleases: Sendable {
 
         return page.results.compactMap { item in
             guard let poster = item.poster_path, let title = item.title ?? item.name else { return nil }
+            let dateString = item.release_date ?? item.first_air_date
+            let releaseDate = dateString.flatMap { formatter.date(from: $0) }
             return BentoTMDBTitle(id: item.id, kind: kind, title: title,
-                                  posterURL: URL(string: "https://image.tmdb.org/t/p/w342\(poster)"))
+                                  posterURL: URL(string: "https://image.tmdb.org/t/p/w342\(poster)"),
+                                  releaseDate: releaseDate,
+                                  genreIDs: item.genre_ids ?? [],
+                                  voteAverage: item.vote_average)
         }
         .prefix(20).map { $0 }
     }

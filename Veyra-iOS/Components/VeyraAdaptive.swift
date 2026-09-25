@@ -13,9 +13,9 @@ extension View {
 struct VeyraPosterMetrics {
     let regular: Bool
 
-    var posterWidth: CGFloat { regular ? 176 : 112 }
+    var posterWidth: CGFloat { regular ? 192 : 124 }
     var columns: [GridItem] {
-        [GridItem(.adaptive(minimum: posterWidth), spacing: regular ? 20 : 12)]
+        [GridItem(.adaptive(minimum: posterWidth), spacing: regular ? 26 : 16)]
     }
     var rowSpacing: CGFloat { regular ? 22 : 14 }
     var backdropHeight: CGFloat { regular ? 380 : 220 }

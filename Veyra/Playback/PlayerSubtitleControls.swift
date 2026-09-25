@@ -471,7 +471,7 @@ struct PlayerSubtitleControls: View {
                 case .audio: audioTabContent
                 }
             }.frame(maxWidth: .infinity, alignment: .leading)
-        }.padding(28).frame(width: 1520).frame(maxHeight: 620, alignment: .top).veyraGlass()
+        }.padding(28).frame(width: 1520).frame(maxHeight: 620, alignment: .top).veyraGlass(backgroundOpacity: 0.55)
             .onAppear {
                 Task { @MainActor in
                     await Task.yield()

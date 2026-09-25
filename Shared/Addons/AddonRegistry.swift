@@ -64,4 +64,28 @@ struct AddonRegistry {
                 \.provider
             )
     }
+
+    // MARK: - Bronvolgorde
+
+    /// Namen van addons die daadwerkelijk streams kunnen leveren, dus met
+    /// uitzondering van metadata-only addons (zoals AIOMetadata) die geen
+    /// stream-resource aanbieden en dus nooit als knop in "Selecteer bron"
+    /// verschijnen. Gebruikt voor de Bronvolgorde-instelling, zodat daar
+    /// geen namen staan die toch nooit een bron opleveren.
+    func streamProviderNames() -> [String] {
+        store
+            .enabledAddons()
+            .filter { $0.kind != .aioMetadata }
+            .map { addon in
+                let cleanName =
+                    addon.name
+                        .trimmingCharacters(
+                            in: .whitespacesAndNewlines
+                        )
+
+                return cleanName.isEmpty
+                    ? "Stremio Addon"
+                    : cleanName
+            }
+    }
 }

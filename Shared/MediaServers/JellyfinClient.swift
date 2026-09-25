@@ -113,7 +113,7 @@ struct JellyfinClient {
         }
 
         let isVeyraHub =
-            await Self.isVeyraHubServer(
+            await Self.checkVeyraHub(
                 serverURL: serverURL
             )
 
@@ -135,7 +135,16 @@ struct JellyfinClient {
     /// (network, unexpected response) is treated as "not Veyra Hub" rather
     /// than surfaced as an error, since this only affects which streaming
     /// path gets used, not whether sign-in succeeds.
-    private static func isVeyraHubServer(
+    ///
+    /// Not private: `MediaServersViewModel` also calls this directly to
+    /// periodically re-verify `MediaServerAccount.isVeyraHub` for servers
+    /// that are already signed in, without requiring the user to re-enter
+    /// their password (this endpoint needs no authentication). Otherwise a
+    /// flag that came back `false` from a flaky probe at sign-in time — or
+    /// an account created before this flag existed — would silently and
+    /// permanently disable VeyraHub-native source resolution for that
+    /// server.
+    static func checkVeyraHub(
         serverURL: URL
     ) async -> Bool {
         let endpoint =

@@ -14,6 +14,25 @@ struct VeyraPosterCard: View {
     /// als dit item niet aan TMDB gekoppeld kon worden — zodat duidelijk is
     /// waar de titel vandaan komt als de rijke TMDB-info ontbreekt.
     var sourceLabel: String? = nil
+    /// Releasejaar, bv. "2024" — enkel getoond als "Releasejaar tonen" (Instellingen → Algemeen) aan staat.
+    var year: String? = nil
+    /// TMDB-id van deze titel — nodig voor Leeftijdsclassificatie, Trendlabels en Resterende
+    /// afleveringen (die slaan een titel op via id, niet via genre/rating die al meekomen).
+    /// Zonder id blijven die drie badges gewoon leeg; Genre/Beoordeling werken ook zonder id.
+    var tmdbID: Int? = nil
+    var isMovie: Bool = true
+    /// Ruwe releasedatum ("yyyy-MM-dd", zoals TMDB die teruggeeft) — enkel gebruikt om het
+    /// "Nieuw"-trendlabel te bepalen (recent uitgebracht), niet voor weergave.
+    var releaseDateRaw: String? = nil
+    /// "Bekeken"-vinkje (Trakt) -- hier als parameter i.p.v. de aanroeper `.traktWatchedCheckmark(...)`
+    /// erna te laten plakken: dat plakte het vinkje aan de rechterbovenhoek van de HELE kaart (incl. het
+    /// trendlabel/genre-rijtje errond), waardoor het bij een trendlabel los van de poster kwam te hangen.
+    /// Nu zit het vinkje in de overlay van de posterafbeelding zelf, dus altijd exact op de poster.
+    var watchedTarget: TraktWatchedTarget? = nil
+    var watchedPartialDisplay: VeyraWatchedPartialDisplay = .hidden
+
+    @AppStorage(GeneralSettingsDefaults.showReleaseYearKey)
+    private var showReleaseYear = true
 
     @AppStorage(PosterEnrichmentDefaults.modeKey)
     private var enrichmentSourceRaw = PosterEnrichmentMode.off.rawValue
@@ -21,19 +40,63 @@ struct VeyraPosterCard: View {
     private var showGenre = true
     @AppStorage(PosterEnrichmentDefaults.showRatingKey)
     private var showRating = true
+    @AppStorage(PosterEnrichmentDefaults.showAgeRatingKey)
+    private var showAgeRating = false
+    @AppStorage(PosterEnrichmentDefaults.showTrendLabelsKey)
+    private var showTrending = false
+
+    @ObservedObject private var enrichmentStore = PosterEnrichmentDataStore.shared
+    @State private var certification: String?
+
+    // Kader + gloed bij focus horen uitsluitend rond de posterafbeelding, niet rond de
+    // hele kaart (incl. trendlabel/genre-tekst errond) -- vandaar hier gelezen i.p.v. in
+    // de `buttonStyle` van de aanroeper (zie `VeyraPosterFocusStyle`, die enkel nog een
+    // lichte vergroting van de hele kaart doet).
+#if os(tvOS)
+    @Environment(\.isFocused) private var isFocused
+#endif
 
     private var enrichmentSource: PosterEnrichmentMode {
         PosterEnrichmentMode(rawValue: enrichmentSourceRaw) ?? .off
     }
 
-    /// Better Posters is de enige bron die hier al echt iets tekent — RPDB
-    /// is een externe dienst zonder integratie (zie Shared/Theme/PosterEnrichmentSettings.swift).
     private var enrichmentText: String? {
         guard enrichmentSource == .betterPosters else { return nil }
         var parts: [String] = []
         if showGenre, let genre { parts.append(genre) }
         if showRating, let rating, rating > 0 { parts.append(String(format: "★ %.1f", rating)) }
+        if showAgeRating, let certification { parts.append(certification) }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    /// Trendlabel, gecentreerd bovenaan de poster, los van genre/beoordeling onderaan —
+    /// zelfde drie varianten als de referentie-app (BetterPoster): "#N" (rangschikking in de
+    /// trendinglijst van vandaag), "Trending" (trending maar niet in de top), of "Nieuw"
+    /// (minder dan 21 dagen geleden uitgebracht). Hoogstens één label per poster.
+    private var trendBadgeText: String? {
+        guard enrichmentSource == .betterPosters, showTrending, let tmdbID else { return nil }
+        if let rank = enrichmentStore.trendingRank(id: tmdbID, isMovie: isMovie) {
+            return rank <= 3 ? "#\(rank)" : "Trending"
+        }
+        if isRecentlyReleased { return "Nieuw" }
+        return nil
+    }
+
+    private var isRecentlyReleased: Bool {
+        guard let releaseDateRaw else { return false }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        guard let date = formatter.date(from: releaseDateRaw) else { return false }
+        let interval = Date().timeIntervalSince(date)
+        return interval >= 0 && interval < 21 * 86_400
+    }
+
+    /// Haalt de leeftijdsclassificatie eenmalig op zodra de badge aan staat en er een id is —
+    /// niet in `enrichmentText` zelf, want dat is een synchrone computed property.
+    private func loadCertificationIfNeeded() async {
+        guard enrichmentSource == .betterPosters, showAgeRating, let tmdbID, certification == nil else { return }
+        certification = await (isMovie ? enrichmentStore.certification(movieID: tmdbID) : enrichmentStore.certification(tvID: tmdbID))
     }
 
     // Op de smalle iOS-postercards (112pt) liep de badge-tekst ("Actie ·
@@ -41,14 +104,25 @@ struct VeyraPosterCard: View {
     // is daar meer dan genoeg ruimte voor. Kleinere badge-tekst, minder
     // opvulling en een schaalfactor lossen dat op zonder de inhoud te
     // moeten inkorten.
+    /// Subtiele pil voor het trendlabel bovenaan en de genre/beoordeling-lijn
+    /// onderaan (dezelfde vorm voor beide): een gedempte, donkere vulling die
+    /// met de poster meegaat i.p.v. een felle cyaan/rode vlek, met daaromheen
+    /// een dun kader in Veyra's eigen cyaan->rood-verloop als enige accent.
+    private var posterBadgeFill: Color { .black.opacity(0.45) }
+    private var posterBadgeBorder: LinearGradient { VeyraFrame.resting }
+
 #if os(tvOS)
     private var enrichmentFontSize: CGFloat { 16 }
     private var enrichmentHPadding: CGFloat { 10 }
     private var enrichmentVPadding: CGFloat { 6 }
+    private var enrichmentTextFontSize: CGFloat { 19 }
+    private var trendBadgeFontSize: CGFloat { 19 }
 #else
     private var enrichmentFontSize: CGFloat { 9 }
     private var enrichmentHPadding: CGFloat { 6 }
     private var enrichmentVPadding: CGFloat { 3 }
+    private var enrichmentTextFontSize: CGFloat { 14 }
+    private var trendBadgeFontSize: CGFloat { 12 }
 #endif
 
     // Op tvOS bekijk je dit van op de bank (10-foot UI), op iOS hou je het
@@ -72,6 +146,24 @@ struct VeyraPosterCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: stackSpacing) {
+            // Altijd dezelfde Text renderen (nooit conditioneel weglaten) en enkel de
+            // zichtbaarheid via opacity regelen: een frame-hoogte op een conditionele
+            // rij bleek in de praktijk niet altijd exact gelijk uit te komen tussen
+            // "met tekst" en "zonder tekst" (afrondingsverschillen in de layout-engine),
+            // waardoor de poster errond toch een paar punten verschoof. Met altijd
+            // dezelfde tekstweergave (zelfde lettertype/opvulling) erin is de eigen
+            // grootte van deze rij gegarandeerd identiek, met of zonder echt trendlabel.
+            Text(trendBadgeText ?? "Nieuw")
+                .font(.system(size: trendBadgeFontSize, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white.opacity(0.88))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .padding(.horizontal, enrichmentHPadding)
+                .padding(.vertical, enrichmentVPadding)
+                .background(posterBadgeFill, in: Capsule())
+                .overlay(Capsule().strokeBorder(posterBadgeBorder, lineWidth: 1))
+                .opacity(trendBadgeText == nil ? 0 : 1)
+                .frame(maxWidth: .infinity, alignment: .bottom)
             AsyncImage(url: url) { phase in
                 if let image = phase.image { image.resizable().scaledToFill() }
                 else {
@@ -105,24 +197,52 @@ struct VeyraPosterCard: View {
                         .frame(maxWidth: width - 12, alignment: .leading)
                 }
             }
-            .overlay(alignment: .bottom) {
-                if let enrichmentText {
-                    Text(enrichmentText)
-                        .font(.system(size: enrichmentFontSize, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, enrichmentHPadding)
-                        .padding(.vertical, enrichmentVPadding)
-                        .background(.black.opacity(0.72), in: Capsule())
-                        .padding(.bottom, 6)
-                        .frame(maxWidth: width - 12)
+            .overlay(alignment: .topTrailing) {
+                if let watchedTarget {
+                    VeyraWatchedCheckmark(target: watchedTarget, partialDisplay: watchedPartialDisplay)
+                        .padding(7)
+                        .allowsHitTesting(false)
                 }
             }
-            Text(title).font(.system(size: titleFontSize, weight: .medium)).foregroundStyle(.white)
-                .lineLimit(2).frame(height: titleHeight, alignment: .topLeading)
+#if os(tvOS)
+            // Kader + gloed bij focus, enkel rond de poster -- niet rond de tekstregels
+            // errond (zie `VeyraPosterFocusStyle`, die het kader niet meer zelf tekent).
+            .overlay(
+                RoundedRectangle(cornerRadius: VeyraRadius.poster, style: .continuous)
+                    .strokeBorder(VeyraFrame.active, lineWidth: 3)
+                    .opacity(isFocused ? 1 : 0)
+            )
+            .shadow(color: isFocused ? VeyraColors.cyan.opacity(0.35) : .clear, radius: 16, x: -4)
+            .shadow(color: isFocused ? VeyraColors.red.opacity(0.22) : .clear, radius: 16, x: 6)
+            .animation(.easeOut(duration: 0.16), value: isFocused)
+#endif
+            // Zelfde altijd-dezelfde-tekst-truc: zonder genre/beoordeling mag de titel
+            // niet omhoog kruipen -- dan staan titels in dezelfde rij niet meer op één
+            // lijn t.o.v. elkaar.
+            Text(enrichmentText ?? "Genre · ★ 0.0")
+                .font(.system(size: enrichmentTextFontSize, weight: .medium))
+                .foregroundStyle(.white.opacity(0.88))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .padding(.horizontal, enrichmentHPadding)
+                .padding(.vertical, enrichmentVPadding)
+                .background(posterBadgeFill, in: Capsule())
+                .overlay(Capsule().strokeBorder(posterBadgeBorder, lineWidth: 1))
+                .opacity(enrichmentText == nil ? 0 : 1)
+                .frame(maxWidth: .infinity, alignment: .top)
+            HStack(alignment: .top, spacing: 6) {
+                Text(title).font(.system(size: titleFontSize, weight: .medium)).foregroundStyle(.white)
+                    .lineLimit(2).frame(maxWidth: .infinity, alignment: .topLeading)
+
+                if showReleaseYear, let year, !year.isEmpty {
+                    Text(year).font(.system(size: titleFontSize, weight: .medium)).foregroundStyle(VeyraColors.cyan)
+                        .lineLimit(1)
+                        .layoutPriority(1)
+                }
+            }
+            .frame(height: titleHeight, alignment: .topLeading)
         }.frame(width: width).padding(cardPadding)
+        .task(id: tmdbID) { await loadCertificationIfNeeded() }
     }
 }
 

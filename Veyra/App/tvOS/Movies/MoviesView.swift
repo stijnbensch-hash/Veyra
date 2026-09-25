@@ -25,8 +25,8 @@ struct MoviesView: View {
         string: "https://image.tmdb.org/t/p/w500"
     )!
 
-    private let railSpacing: CGFloat = 24
-    private let gridPosterWidth: CGFloat = 220
+    private let railSpacing: CGFloat = 32
+    private let gridPosterWidth: CGFloat = 240
 
     @ObservedObject private var heroSpotlight = VeyraHeroSpotlight.shared
 
@@ -72,12 +72,6 @@ struct MoviesView: View {
 
                     VStack(alignment: .leading, spacing: 6) {
                         header
-
-                        WatchProviderRow(
-                            kind: .movie,
-                            selection: $selectedProvider,
-                            region: $watchRegion
-                        )
 
                         MediaFiltersRow(
                             kind: .movie,
@@ -265,9 +259,9 @@ struct MoviesView: View {
         } else {
             LazyVGrid(
                 columns: [
-                    GridItem(.adaptive(minimum: gridPosterWidth, maximum: gridPosterWidth), spacing: railSpacing)
+                    GridItem(.adaptive(minimum: gridPosterWidth, maximum: gridPosterWidth + 40), spacing: railSpacing)
                 ],
-                spacing: 32
+                spacing: 40
             ) {
                 ForEach(movies) { movie in
                     movieCard(
@@ -302,21 +296,16 @@ struct MoviesView: View {
                 ),
                 width: width,
                 genre: TMDBGenreNames.firstMovieName(for: movie.genreIDs ?? []),
-                rating: movie.voteAverage
-            )
-            .traktWatched(
-                .movie(
-                    TraktIDs(
-                        tmdb: movie.id
-                    )
-                )
+                rating: movie.voteAverage,
+                year: String(movie.releaseDate?.prefix(4) ?? ""),
+                tmdbID: movie.id,
+                isMovie: true,
+                releaseDateRaw: movie.releaseDate,
+                watchedTarget: .movie(TraktIDs(tmdb: movie.id))
             )
         }
         .buttonStyle(
-            VeyraFocusButtonStyle(
-                radius:
-                    VeyraRadius.poster
-            )
+            VeyraPosterFocusStyle(cornerRadius: VeyraRadius.poster)
         )
         .reportsHero(.movie(movie))
         .disabled(

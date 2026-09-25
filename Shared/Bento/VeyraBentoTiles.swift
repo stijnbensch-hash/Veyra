@@ -536,7 +536,7 @@ struct VeyraBentoShelf<Cards: View>: View {
             VStack(alignment: .leading, spacing: compact ? 6 : 10) {
                 VeyraBentoLabel(title: title, trailing: subtitle, compact: compact, smallTrailing: true)
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(alignment: .top, spacing: compact ? 10 : 18) { cards }
+                    HStack(alignment: .top, spacing: compact ? 14 : 26) { cards }
                         .frame(height: contentHeight ?? (compact ? 200 : 312))
                         .padding(.vertical, compact ? 2 : 8)
                         .padding(.horizontal, compact ? 2 : 8)

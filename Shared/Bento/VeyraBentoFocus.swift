@@ -45,27 +45,53 @@ struct VeyraTileStyle: ButtonStyle {
     }
 }
 
-/// Focusstijl voor posters in de IPTV-planken: Veyra-kader (cyaan -> rood) en lichte vergroting.
-struct VeyraPosterFocusStyle: ButtonStyle {
-    var cornerRadius: CGFloat = 14
-
+#if os(tvOS)
+/// Focusstijl voor de capsule-knoppen boven een streamingdienst-catalogus ("Films"/"Series"): geen systeem-witte
+/// focuskaart, enkel een lichte vergroting + gloed — de knop tekent zijn eigen achtergrond/rand al (zie `tab(_:)`
+/// in `VeyraBentoCatalog.swift`).
+struct VeyraTabFocusStyle: ButtonStyle {
     func makeBody(configuration: ButtonStyleConfiguration) -> some View {
-        Inner(configuration: configuration, cornerRadius: cornerRadius)
+        Inner(configuration: configuration)
             .focusEffectDisabled()
     }
 
     private struct Inner: View {
         let configuration: ButtonStyleConfiguration
-        let cornerRadius: CGFloat
         @Environment(\.isFocused) private var isFocused
 
         var body: some View {
-            let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
             configuration.label
-                .overlay(shape.strokeBorder(VeyraFrame.active, lineWidth: 3).opacity(isFocused ? 1 : 0))
-                .shadow(color: isFocused ? VeyraColors.cyan.opacity(0.35) : .clear, radius: 16, x: -4)
-                .shadow(color: isFocused ? VeyraColors.red.opacity(0.22) : .clear, radius: 16, x: 6)
-                .scaleEffect(isFocused ? 1.07 : (configuration.isPressed ? 0.97 : 1))
+                .shadow(color: isFocused ? VeyraColors.cyan.opacity(0.30) : .clear, radius: 12, x: -3)
+                .shadow(color: isFocused ? VeyraColors.red.opacity(0.20) : .clear, radius: 12, x: 4)
+                .scaleEffect(isFocused ? 1.05 : (configuration.isPressed ? 0.97 : 1))
+                .animation(.easeOut(duration: 0.16), value: isFocused)
+        }
+    }
+}
+#endif
+
+/// Focusstijl voor postercards: GEEN eigen rand/gloed op het hele kaartje (dat zou ook de
+/// tekstregels errond omsluiten) -- enkel een lichte vergroting van de hele kaart. Het
+/// kader + gloed bij focus tekent `VeyraPosterCard` zelf, uitsluitend rond de poster-
+/// afbeelding, via diezelfde `@Environment(\.isFocused)`. `cornerRadius` blijft als
+/// parameter bestaan voor bron-compatibiliteit met bestaande aanroepen, maar wordt hier
+/// niet meer gebruikt.
+struct VeyraPosterFocusStyle: ButtonStyle {
+    var cornerRadius: CGFloat = 14
+
+    func makeBody(configuration: ButtonStyleConfiguration) -> some View {
+        Inner(configuration: configuration)
+            .focusEffectDisabled()
+    }
+
+    private struct Inner: View {
+        let configuration: ButtonStyleConfiguration
+        @Environment(\.isFocused) private var isFocused
+
+        var body: some View {
+            configuration.label
+                .scaleEffect(isFocused ? 1.05 : (configuration.isPressed ? 0.97 : 1))
+                .zIndex(isFocused ? 1 : 0)
                 .animation(.easeOut(duration: 0.16), value: isFocused)
         }
     }

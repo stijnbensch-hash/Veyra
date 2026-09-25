@@ -40,6 +40,9 @@ struct SettingsView: View {
                     }
 
                     settingsSection(title: "Bronnen") {
+                        settingsCard(destination: .sourceAppearance, icon: "tag", title: "Bronverschijning",
+                                     subtitle: "Badges in het bronkeuzescherm", status: "", statusColor: VeyraColors.secondary)
+
                         ForEach(categoryOrder) { category in
                             bronnenRow(for: category)
                         }
@@ -47,9 +50,7 @@ struct SettingsView: View {
 
                     settingsSection(title: "Weergave") {
                         settingsCard(destination: .subtitles, icon: "captions.bubble", title: "Ondertitels",
-                                     subtitle: "Standaardtaal en OpenSubtitles", status: "", statusColor: VeyraColors.cyan)
-                        settingsCard(destination: .subtitleAppearance, icon: "textformat.size", title: "Ondertitelweergave",
-                                     subtitle: "Grootte, plaatsing, achtergrond", status: "", statusColor: VeyraColors.secondary)
+                                     subtitle: "Taal, OpenSubtitles en weergave", status: "", statusColor: VeyraColors.cyan)
                         settingsCard(destination: .general, icon: "gearshape", title: "Algemeen",
                                      subtitle: "Sport en favoriete teams", status: "", statusColor: VeyraColors.secondary)
                         settingsCard(destination: .playback, icon: "play.circle", title: "Afspelen",
@@ -118,6 +119,9 @@ struct SettingsView: View {
 
             case .liveTVSettings:
                 IPTVPlaybackSettingsView()
+
+            case .sourceAppearance:
+                SourceAppearanceView()
 
             case .addons:
                 VeyraAddonsSettingsView()
@@ -446,6 +450,7 @@ private enum SettingsDestination:
 {
     case iptv
     case liveTVSettings
+    case sourceAppearance
     case addons
     case mediaServers
     case account
@@ -484,6 +489,10 @@ struct VeyraAddonsSettingsView:
 
     @FocusState
     private var focusedDeleteAddonID:
+        UUID?
+
+    @FocusState
+    private var focusedToggleAddonID:
         UUID?
 
     @FocusState
@@ -763,7 +772,101 @@ struct VeyraAddonsSettingsView:
             spacing: 14
         ) {
             addonMainControl(addon)
+            addonToggleControl(addon)
             addonDeleteControl(addon)
+        }
+    }
+
+    // MARK: - Aan/uit
+
+    private func addonToggleControl(
+        _ addon: AddonManifest
+    ) -> some View {
+        let isFocused =
+            focusedToggleAddonID
+                == addon.id
+
+        return VStack(spacing: 8) {
+            Image(
+                systemName:
+                    addon.isEnabled
+                    ? "checkmark.circle.fill"
+                    : "circle"
+            )
+            .font(
+                .system(
+                    size: 32,
+                    weight: .medium
+                )
+            )
+
+            Text(
+                addon.isEnabled
+                ? "AAN"
+                : "UIT"
+            )
+            .font(
+                .system(
+                    size: 18,
+                    weight: .semibold
+                )
+            )
+            .tracking(1)
+        }
+        .foregroundStyle(
+            isFocused
+            ? .white
+            : (
+                addon.isEnabled
+                ? .cyan.opacity(0.85)
+                : .white.opacity(0.35)
+            )
+        )
+        .frame(
+            width: 130,
+            height: 116
+        )
+        .background(
+            RoundedRectangle(
+                cornerRadius: 20,
+                style: .continuous
+            )
+            .fill(
+                isFocused
+                ? Color.cyan
+                    .opacity(0.20)
+                : Color(
+                    red: 0.03,
+                    green: 0.09,
+                    blue: 0.14
+                )
+            )
+        )
+        .overlay(
+            RoundedRectangle(
+                cornerRadius: 20,
+                style: .continuous
+            )
+            .strokeBorder(
+                isFocused
+                ? Color.cyan
+                : Color.cyan
+                    .opacity(0.25),
+                lineWidth:
+                    isFocused
+                    ? 2
+                    : 1
+            )
+        )
+        .contentShape(Rectangle())
+        .focusable(true)
+        .focused(
+            $focusedToggleAddonID,
+            equals: addon.id
+        )
+        .focusEffectDisabled()
+        .onTapGesture {
+            viewModel.toggleEnabled(addon)
         }
     }
 

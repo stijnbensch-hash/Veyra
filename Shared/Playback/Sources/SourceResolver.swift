@@ -279,6 +279,12 @@ struct SourceResolver {
             return all
         }
 
+        #if DEBUG
+        print(
+            "[SourceResolver] jellyfinSources: \(accounts.count) account(en) -> \(result.count) native/fallback resultaten vóór dedup (\(result.filter(\.isFromHub).count) via hub)"
+        )
+        #endif
+
         return Self
             .deduplicated(
                 result
@@ -287,26 +293,34 @@ struct SourceResolver {
 
     // MARK: - Deduplication
 
+    // De dedup-sleutel bevat bewust ook `isFromHub`: VeyraHub aggregeert
+    // vaak dezelfde addon die ook los geïnstalleerd staat, en levert dan
+    // exact dezelfde stream-URL op als de rechtstreekse addon-aanroep. Een
+    // eerdere versie liet zo'n botsing de VeyraHub-versie "winnen" en de
+    // rechtstreekse addon-kopie vervangen — maar daarmee verdween de
+    // gewone addon-knop (en zijn resultaten) helemaal zodra al zijn
+    // resultaten toevallig ook via VeyraHub binnenkwamen. Door het
+    // hub-onderscheid in de sleutel op te nemen blijven beide versies
+    // gewoon naast elkaar bestaan — als twee aparte, apart gestylede
+    // knoppen (zie SourceSelectionView) — en dedupt deze functie alleen
+    // nog écht identieke dubbels binnen dezelfde bron (zelfde URL, zelfde
+    // herkomst).
     static func deduplicated(
         _ values:
             [ResolvedSource]
     ) -> [ResolvedSource] {
-        var seen =
-            Set<String>()
+        var seenKeys:
+            Set<String> = []
 
         var result:
             [ResolvedSource] = []
 
         for value in values {
             let key =
-                value.source
-                    .url
-                    .absoluteString
+                "\(value.source.url.absoluteString)|\(value.isFromHub)"
 
             guard
-                seen.insert(
-                    key
-                ).inserted
+                seenKeys.insert(key).inserted
             else {
                 continue
             }
@@ -315,6 +329,14 @@ struct SourceResolver {
                 value
             )
         }
+
+        #if DEBUG
+        if values.count != result.count || values.contains(where: \.isFromHub) {
+            print(
+                "[SourceResolver] deduplicated: \(values.count) in -> \(result.count) out (\(result.filter(\.isFromHub).count) via hub, \(values.filter(\.isFromHub).count) hub in input)"
+            )
+        }
+        #endif
 
         return result
     }

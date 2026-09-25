@@ -96,14 +96,6 @@ struct MoviesView: View {
                         ) {
                             header
 
-                            WatchProviderRowIOS(
-                                kind: .movie,
-                                selection:
-                                    $selectedProvider,
-                                region:
-                                    $watchRegion
-                            )
-
                             MediaFiltersRowIOS(
                                 kind: .movie,
                                 selectedGenreID:
@@ -331,7 +323,11 @@ struct MoviesView: View {
                                             ?? []
                                     ),
                                 rating:
-                                    movie.voteAverage
+                                    movie.voteAverage,
+                                year: String(movie.releaseDate?.prefix(4) ?? ""),
+                                tmdbID: movie.id,
+                                isMovie: true,
+                                releaseDateRaw: movie.releaseDate
                             )
 
                             if isWatched(

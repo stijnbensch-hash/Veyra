@@ -68,14 +68,22 @@ struct JellyfinSourceProvider:
         // does (see VeyraHubNativeClient). Try that first, and only fall
         // back to title search if it comes back empty — e.g. no IMDb id
         // was available, or the addon genuinely has nothing for this id.
-        if account.isVeyraHub {
-            let native = await nativeResolvedSources(
-                for: item
-            )
+        //
+        // Tried regardless of the cached `account.isVeyraHub` flag: that
+        // flag is only refreshed on a full re-login or by a periodic,
+        // best-effort recheck (see `MediaServersViewModel`), so it can
+        // stay stuck on a stale `false` — which used to mean this whole
+        // provider silently returned nothing for a Veyra Hub server whose
+        // addon has no searchable Jellyfin catalog. A plain Jellyfin/Emby
+        // server just answers this endpoint with 404, which
+        // `nativeResolvedSources` already treats as "no results" and
+        // falls through from, so this is safe to always attempt.
+        let native = await nativeResolvedSources(
+            for: item
+        )
 
-            if !native.isEmpty {
-                return native
-            }
+        if !native.isEmpty {
+            return native
         }
 
         switch item.type {

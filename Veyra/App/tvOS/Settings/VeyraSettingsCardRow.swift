@@ -173,3 +173,26 @@ extension View {
         // scheidingslijnen tussen rijen, dus er is niets te verbergen.
     }
 }
+
+extension View {
+    /// Zelfde kaart-look als `.veyraCardRow()` (donkere achtergrond +
+    /// zwakke rand), maar dan voor een rij die zelf GEEN `Button` is (bv.
+    /// een rij met eigen focusbare sub-knoppen erin, zoals de
+    /// omhoog/omlaag-knoppen bij `SourceOrderView`) — `.buttonStyle(...)`
+    /// heeft daar niets om op aan te grijpen, dus deze tekent de kaart
+    /// altijd in de "niet-gefocust" toestand rechtstreeks.
+    func veyraStaticCardRow() -> some View {
+        self
+            .padding(.horizontal, 0)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Color.white.opacity(0.05))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(Color.white.opacity(0.10), lineWidth: 1)
+            )
+            .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+            .listRowBackground(Color.clear)
+    }
+}

@@ -92,20 +92,22 @@ struct SourceSelectionView: View {
     private enum SourceFilter: Hashable {
         case all
         case iptv
-        case origin(String)
+        case origin(name: String, isHub: Bool)
 
         var id: String {
             switch self {
             case .all: return "all"
             case .iptv: return "iptv"
-            case .origin(let name): return "origin:\(name)"
+            case .origin(let name, let isHub): return "origin:\(name):\(isHub)"
             }
         }
     }
 
     /// IPTV en "Alle" staan altijd vooraan; daarna een knop per addon-
-    /// of mediaserverbron (bv. "AIOStreams", "VeyraHub") — automatisch
-    /// afgeleid uit wat er daadwerkelijk geladen is, net als op tvOS.
+    /// of mediaserverbron. Eenzelfde addonnaam levert twéé aparte knoppen
+    /// op zodra er zowel een rechtstreekse als een VeyraHub-versie van
+    /// bestaat, apart gestyled (zie filterChip), in plaats van ze onder
+    /// één knop samen te voegen — net als op tvOS.
     private var filters: [SourceFilter] {
         var result: [SourceFilter] = [.all]
 
@@ -117,21 +119,33 @@ struct SourceSelectionView: View {
             }
         }
 
-        var names: [String] = []
+        var comboSeen = Set<String>()
+        var combos: [(name: String, isHub: Bool)] = []
+
         for resolved in viewModel.sources {
             guard resolved.source.kind != .iptvVOD else { continue }
 
             let name = resolved.originName.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !name.isEmpty else { continue }
 
-            let alreadyExists = names.contains { $0.caseInsensitiveCompare(name) == .orderedSame }
-            if !alreadyExists {
-                names.append(name)
-            }
+            let key = "\(name.lowercased())|\(resolved.isFromHub)"
+            guard !comboSeen.contains(key) else { continue }
+            comboSeen.insert(key)
+
+            combos.append((name: name, isHub: resolved.isFromHub))
         }
 
-        names.sort { $0.localizedStandardCompare($1) == .orderedAscending }
-        result.append(contentsOf: names.map { .origin($0) })
+        combos.sort {
+            let nameOrder = $0.name.localizedStandardCompare($1.name)
+            if nameOrder != .orderedSame {
+                return nameOrder == .orderedAscending
+            }
+            // Bij gelijke naam komt de gewone addon-knop eerst, de
+            // VeyraHub-variant erna.
+            return !$0.isHub && $1.isHub
+        }
+
+        result.append(contentsOf: combos.map { .origin(name: $0.name, isHub: $0.isHub) })
 
         return result
     }
@@ -144,9 +158,10 @@ struct SourceSelectionView: View {
         case .iptv:
             return viewModel.sources.filter { $0.source.kind == .iptvVOD }
 
-        case .origin(let selectedName):
+        case .origin(let selectedName, let selectedIsHub):
             return viewModel.sources.filter {
                 $0.source.kind != .iptvVOD
+                    && $0.isFromHub == selectedIsHub
                     && $0.originName.caseInsensitiveCompare(selectedName) == .orderedSame
             }
         }
@@ -156,7 +171,10 @@ struct SourceSelectionView: View {
         switch selectedFilter {
         case .all: return "Geen afspeelbronnen gevonden"
         case .iptv: return "Geen IPTV-bronnen gevonden"
-        case .origin(let name): return "Geen bronnen gevonden via \(name)"
+        case .origin(let name, let isHub):
+            return isHub
+                ? "Geen bronnen via VeyraHub gevonden voor \(name)"
+                : "Geen bronnen gevonden via \(name)"
         }
     }
 
@@ -173,21 +191,55 @@ struct SourceSelectionView: View {
         .background(VeyraColors.background)
     }
 
+    /// Paars/indigo tint voor filterknoppen van bronnen die via VeyraHub
+    /// binnenkomen — duidelijk anders dan het gewone cyaan, zodat zo'n knop
+    /// meteen herkenbaar is als "komt van de mediaserver", ook naast een
+    /// gelijknamige, rechtstreekse addon-knop.
+    private static let hubTint = Color(red: 0.62, green: 0.42, blue: 1.0)
+
     private func filterChip(_ filter: SourceFilter) -> some View {
         let isSelected = selectedFilter == filter
+
+        let isHubFilter: Bool = {
+            if case .origin(_, let isHub) = filter { return isHub }
+            return false
+        }()
+
+        let tint = isHubFilter ? Self.hubTint : VeyraColors.cyan
 
         return Button {
             selectedFilter = filter
         } label: {
-            Text(filterTitle(filter))
-                .font(.subheadline.weight(isSelected ? .semibold : .medium))
-                .foregroundStyle(isSelected ? Color.black : VeyraColors.cyan)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(
-                    Capsule()
-                        .fill(isSelected ? VeyraColors.cyan : VeyraColors.cyan.opacity(0.12))
-                )
+            HStack(spacing: 6) {
+                if isHubFilter {
+                    Image(systemName: "server.rack")
+                        .font(.caption.weight(.semibold))
+                }
+
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(filterTitle(filter))
+                        .font(.subheadline.weight(isSelected ? .semibold : .medium))
+
+                    if isHubFilter {
+                        Text("VEYRAHUB")
+                            .font(.system(size: 9, weight: .bold))
+                            .tracking(1)
+                            .opacity(0.75)
+                    }
+                }
+            }
+            .foregroundStyle(isSelected ? Color.black : tint)
+            .padding(.horizontal, 16)
+            .padding(.vertical, isHubFilter ? 6 : 8)
+            .background(
+                Capsule()
+                    .fill(isSelected ? tint : tint.opacity(0.12))
+            )
+            .overlay {
+                if isHubFilter {
+                    Capsule().strokeBorder(tint.opacity(isSelected ? 0 : 0.5), lineWidth: 1)
+                }
+            }
         }
         .buttonStyle(.plain)
     }
@@ -196,7 +248,7 @@ struct SourceSelectionView: View {
         switch filter {
         case .all: return "Alle"
         case .iptv: return "IPTV"
-        case .origin(let name): return name
+        case .origin(let name, _): return name
         }
     }
 
@@ -214,10 +266,16 @@ struct SourceSelectionView: View {
             .frame(width: 44, height: 44)
 
             VStack(alignment: .leading, spacing: 5) {
-                Text(resolved.source.name)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 8) {
+                    Text(resolved.source.name)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    ForEach(sourceBadges(for: resolved)) { badge in
+                        sourceBadgeChip(badge)
+                    }
+                }
 
                 // Geen regelbeperking — anders knipt SwiftUI een tweede/derde
                 // regel (kwaliteit, codec, HDR, grootte…) halverwege af met
@@ -252,6 +310,53 @@ struct SourceSelectionView: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(VeyraColors.cyan.opacity(0.10), lineWidth: 1)
         )
+    }
+
+    private func sourceBadges(for resolved: ResolvedSource) -> [SourceBadge] {
+        SourceBadgeStore.shared.badges(matching: [
+            resolved.originName,
+            resolved.source.providerName ?? "",
+            resolved.source.name,
+            resolved.source.description ?? ""
+        ])
+    }
+
+    /// De pil-achtergrond/rand (`tagColor`/`borderColor`) hoort bij de badge
+    /// zelf, niet alleen bij de tekst-terugval — een geladen afbeelding komt
+    /// dus ook binnenin dezelfde pil te zitten, net als in het bronpakket
+    /// bedoeld is (`tagStyle`: "filled and bordered" / "bordered").
+    private func sourceBadgeChip(_ badge: SourceBadge) -> some View {
+        sourceBadgeChipContent(badge)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(
+                Capsule().fill(Color(sourceBadgeHex: badge.tagColor) ?? VeyraColors.cyan.opacity(0.6))
+            )
+            .overlay(
+                Capsule().strokeBorder(Color(sourceBadgeHex: badge.borderColor) ?? .clear, lineWidth: 1)
+            )
+    }
+
+    @ViewBuilder
+    private func sourceBadgeChipContent(_ badge: SourceBadge) -> some View {
+        if let imageURL = badge.imageURL {
+            AsyncImage(url: imageURL) { phase in
+                if let image = phase.image {
+                    image.resizable().scaledToFit()
+                } else {
+                    sourceBadgeFallback(badge)
+                }
+            }
+            .frame(height: 10)
+        } else {
+            sourceBadgeFallback(badge)
+        }
+    }
+
+    private func sourceBadgeFallback(_ badge: SourceBadge) -> some View {
+        Text(badge.name)
+            .font(.system(size: 10, weight: .bold))
+            .foregroundStyle(Color(sourceBadgeHex: badge.textColor) ?? .white)
     }
 
     private func sourceIconName(_ source: PlayableSource) -> String {

@@ -1,24 +1,25 @@
 import Foundation
 
 /// "Posterverrijking" — badges (genre, beoordeling, leeftijdsclassificatie,
-/// kwaliteitslabels, trendlabels, resterende afleveringen) bovenop de
-/// posterafbeelding zelf, zoals Strand dat aanbiedt onder Metadata.
+/// kwaliteitslabels, trendlabels) bovenop de posterafbeelding zelf, zoals
+/// Strand dat aanbiedt onder Metadata.
 ///
 /// Elk platform (iOS en tvOS zijn aparte apps met een eigen `UserDefaults`)
 /// bewaart zijn eigen keuze via deze zelfde sleutels, zodat de instelling
 /// per toestel werkt zoals de rest van Veyra dat al doet (bv. Trakt-koppeling).
 ///
-/// Status: de UI en de "Better Posters"-weergave (genre + beoordeling,
-/// lokaal samengesteld uit data die Veyra al ophaalt) zijn functioneel.
-/// "RPDB" is hier alleen als keuze aanwezig — een echte RatingPosterDB-
-/// integratie (API-sleutel, aanroepen, beeld ophalen) is nog niet gebouwd.
-/// Leeftijdsclassificatie, kwaliteitslabels, trendlabels en "resterende
-/// afleveringen" tonen momenteel niets: Veyra haalt die gegevens nog niet
-/// op. De toggles bestaan alvast zodat de instelling meteen klaarstaat
-/// zodra die databronnen worden toegevoegd.
+/// Vier van de vijf badges zijn functioneel (via `PosterEnrichmentDataStore`):
+/// Genre en Beoordeling komen uit data die Veyra al ophaalt voor de poster
+/// zelf; Leeftijdsclassificatie en Trendlabels komen rechtstreeks van TMDB
+/// (release_dates/content_ratings, trending/day — met een korte cache).
+/// ("Resterende afleveringen" bestaat hier niet meer als apart badge-type --
+/// dat toont het "bekeken"-vinkje nu zelf via Trakt, zie `VeyraWatchedCheckmark`.)
+/// Kwaliteitslabels (bv. "4K"/"HDR") is de uitzondering: die info bestaat
+/// pas nadat een stream voor een titel is opgezocht (bron-resolutie), wat
+/// voor een heel postersrooster onbetaalbaar veel netwerkverkeer zou zijn
+/// — die toggle blijft daarom uitgeschakeld met uitleg in de UI.
 enum PosterEnrichmentMode: String, CaseIterable, Identifiable {
     case off
-    case rpdb
     case betterPosters
 
     var id: String { rawValue }
@@ -26,7 +27,6 @@ enum PosterEnrichmentMode: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .off: return "Uit"
-        case .rpdb: return "RPDB"
         case .betterPosters: return "Better Posters"
         }
     }
@@ -59,7 +59,6 @@ enum PosterEnrichmentDefaults {
     static let showAgeRatingKey = "posterEnrichment.showAgeRating"
     static let showQualityLabelsKey = "posterEnrichment.showQualityLabels"
     static let showTrendLabelsKey = "posterEnrichment.showTrendLabels"
-    static let showEpisodesRemainingKey = "posterEnrichment.showEpisodesRemaining"
 }
 
 /// TMDB's eigen, publieke genre-ID's — vertaald voor de Nederlandse
