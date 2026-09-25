@@ -40,9 +40,24 @@ extension Notification.Name {
 }
 
 enum VeyraAPIKeyStore {
-    private static let service =
+    /// Vast, niet van de bundle-ID afhankelijk service-label, zodat zowel
+    /// de app (`com.veyra.Veyra`) als de VeyraTopShelf-extensie
+    /// (`com.veyra.Veyra.VeyraTopShelf`) dezelfde keychain-items zien —
+    /// nodig zodat de extensie de Trakt/TMDB-sleutels kan lezen om
+    /// "Verder kijken" te tonen zonder dat de app open staat.
+    private static let service = "com.veyra.shared.apikeys"
+
+    /// Het vroegere, per-target service-label (`Bundle.main.bundleIdentifier`).
+    /// Uitsluitend nog gebruikt om bestaande sleutels van vóór deze wijziging
+    /// één keer over te zetten naar `service`, zodat niemand hun al
+    /// ingevulde Trakt/TMDB-sleutels kwijtraakt.
+    private static var legacyService: String? {
         Bundle.main.bundleIdentifier
-        ?? "Veyra"
+    }
+
+    private static var accessGroup: String? {
+        VeyraKeychainAccessGroup.shared
+    }
 
     // MARK: - Hub sync
     //
@@ -75,55 +90,54 @@ enum VeyraAPIKeyStore {
         }
     }
 
-    static func value(
-        for key: VeyraAPIKey
-    ) -> String? {
+    private static func readRaw(service: String, account: String) -> String? {
         var query: [String: Any] = [
-            kSecClass as String:
-                kSecClassGenericPassword,
-
-            kSecAttrService as String:
-                service,
-
-            kSecAttrAccount as String:
-                key.account,
-
-            kSecReturnData as String:
-                true,
-
-            kSecMatchLimit as String:
-                kSecMatchLimitOne
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
         ]
+        if let accessGroup, service == self.service {
+            query[kSecAttrAccessGroup as String] = accessGroup
+        }
 
         var result: CFTypeRef?
-
-        let status =
-            SecItemCopyMatching(
-                query as CFDictionary,
-                &result
-            )
-
-        query.removeAll()
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
 
         guard
             status == errSecSuccess,
             let data = result as? Data,
-            let value = String(
-                data: data,
-                encoding: .utf8
-            )
+            let value = String(data: data, encoding: .utf8)
         else {
             return nil
         }
 
-        let trimmed =
-            value.trimmingCharacters(
-                in: .whitespacesAndNewlines
-            )
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
 
-        return trimmed.isEmpty
-            ? nil
-            : trimmed
+    static func value(
+        for key: VeyraAPIKey
+    ) -> String? {
+        if let value = readRaw(service: service, account: key.account) {
+            return value
+        }
+
+        // Val terug op het oude, bundle-ID-afhankelijke item en zet het
+        // meteen om naar het nieuwe gedeelde item, zodat een al
+        // ingevulde sleutel niet verdwijnt door deze wijziging en de
+        // migratie maar één keer per sleutel hoeft te gebeuren.
+        guard
+            let legacyService,
+            legacyService != service,
+            let legacyValue = readRaw(service: legacyService, account: key.account)
+        else {
+            return nil
+        }
+
+        try? set(legacyValue, for: key)
+        return legacyValue
     }
 
     static func set(
@@ -150,7 +164,7 @@ enum VeyraAPIKeyStore {
             throw VeyraAPIKeyStoreError.encoding
         }
 
-        let baseQuery: [String: Any] = [
+        var baseQuery: [String: Any] = [
             kSecClass as String:
                 kSecClassGenericPassword,
 
@@ -160,6 +174,9 @@ enum VeyraAPIKeyStore {
             kSecAttrAccount as String:
                 key.account
         ]
+        if let accessGroup {
+            baseQuery[kSecAttrAccessGroup as String] = accessGroup
+        }
 
         let update: [String: Any] = [
             kSecValueData as String:
@@ -217,7 +234,7 @@ enum VeyraAPIKeyStore {
     static func remove(
         _ key: VeyraAPIKey
     ) throws {
-        let query: [String: Any] = [
+        var query: [String: Any] = [
             kSecClass as String:
                 kSecClassGenericPassword,
 
@@ -227,6 +244,9 @@ enum VeyraAPIKeyStore {
             kSecAttrAccount as String:
                 key.account
         ]
+        if let accessGroup {
+            query[kSecAttrAccessGroup as String] = accessGroup
+        }
 
         let status =
             SecItemDelete(

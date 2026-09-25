@@ -9,9 +9,19 @@ protocol TraktTokenStorage {
 
 struct TraktKeychain: TraktTokenStorage {
     private var query: [String: Any] {
-        [kSecClass as String: kSecClassGenericPassword,
-         kSecAttrService as String: "com.veyra.trakt",
-         kSecAttrAccount as String: "oauth"]
+        var q: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "com.veyra.trakt",
+            kSecAttrAccount as String: "oauth"
+        ]
+        // Gedeeld met de VeyraTopShelf-extensie (zie
+        // VeyraKeychainAccessGroup) zodat "Verder kijken" op het
+        // tvOS-beginscherm dezelfde Trakt-sessie kan lezen als de app
+        // zelf, zonder dat de app open hoeft te staan.
+        if let group = VeyraKeychainAccessGroup.shared {
+            q[kSecAttrAccessGroup as String] = group
+        }
+        return q
     }
     func read() throws -> Data? {
         var attributes = query

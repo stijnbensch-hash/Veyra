@@ -7,17 +7,50 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B31BA2E63066D7BF00B8FC0E /* TVServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B31BA2E53066D7BF00B8FC0E /* TVServices.framework */; };
+		B31BA2ED3066D7BF00B8FC0E /* VeyraTopShelf.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B31BA2E33066D7BF00B8FC0E /* VeyraTopShelf.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		B3B65AF2305A984B003B5F07 /* AetherEngine in Frameworks */ = {isa = PBXBuildFile; productRef = B3B65AF1305A984B003B5F07 /* AetherEngine */; };
 		EE598D814D3F6400CD01A50F /* AetherEngine in Frameworks */ = {isa = PBXBuildFile; productRef = B3B65AF1305A984B003B5F07 /* AetherEngine */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		B31BA2EB3066D7BF00B8FC0E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B3B65ABD305A5A6C003B5F07 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B31BA2E23066D7BF00B8FC0E;
+			remoteInfo = VeyraTopShelf;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		B31BA2F23066D7BF00B8FC0E /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			dstPath = "";
+			dstSubfolder = PlugIns;
+			files = (
+				B31BA2ED3066D7BF00B8FC0E /* VeyraTopShelf.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		B31BA2E33066D7BF00B8FC0E /* VeyraTopShelf.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = VeyraTopShelf.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		B31BA2E53066D7BF00B8FC0E /* TVServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = TVServices.framework; path = System/Library/Frameworks/TVServices.framework; sourceTree = SDKROOT; };
 		B3B65AC5305A5A6C003B5F07 /* Veyra.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Veyra.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B3B65B05305AAB69003B5F07 /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
 		B3EE10D6305E9262002FAC51 /* Veyra-iOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Veyra-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		B31BA2F13066D7BF00B8FC0E /* Exceptions for "VeyraTopShelf" folder in "VeyraTopShelf" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = B31BA2E23066D7BF00B8FC0E /* VeyraTopShelf */;
+		};
 		B3B65B0A305AB56E003B5F07 /* Exceptions for "Veyra" folder in "Veyra" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -37,6 +70,14 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		B31BA2E73066D7BF00B8FC0E /* VeyraTopShelf */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				B31BA2F13066D7BF00B8FC0E /* Exceptions for "VeyraTopShelf" folder in "VeyraTopShelf" target */,
+			);
+			path = VeyraTopShelf;
+			sourceTree = "<group>";
+		};
 		B3B65AC7305A5A6C003B5F07 /* Veyra */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -61,6 +102,12 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		B31BA2E03066D7BF00B8FC0E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+				B31BA2E63066D7BF00B8FC0E /* TVServices.framework in Frameworks */,
+			);
+		};
 		B3B65AC2305A5A6C003B5F07 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
@@ -76,6 +123,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		B31BA2E43066D7BF00B8FC0E /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				B31BA2E53066D7BF00B8FC0E /* TVServices.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		B3B65ABC305A5A6C003B5F07 = {
 			isa = PBXGroup;
 			children = (
@@ -83,6 +138,8 @@
 				B3B65AC7305A5A6C003B5F07 /* Veyra */,
 				B3EE10D7305E9263002FAC51 /* Veyra-iOS */,
 				E01E6D1422F6265A8D4C8DE9 /* Shared */,
+				B31BA2E73066D7BF00B8FC0E /* VeyraTopShelf */,
+				B31BA2E43066D7BF00B8FC0E /* Frameworks */,
 				B3B65AC6305A5A6C003B5F07 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -92,6 +149,7 @@
 			children = (
 				B3B65AC5305A5A6C003B5F07 /* Veyra.app */,
 				B3EE10D6305E9262002FAC51 /* Veyra-iOS.app */,
+				B31BA2E33066D7BF00B8FC0E /* VeyraTopShelf.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -99,6 +157,24 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		B31BA2E23066D7BF00B8FC0E /* VeyraTopShelf */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B31BA2EE3066D7BF00B8FC0E /* Build configuration list for PBXNativeTarget "VeyraTopShelf" */;
+			buildPhases = (
+				B31BA2DF3066D7BF00B8FC0E /* Sources */,
+				B31BA2E03066D7BF00B8FC0E /* Frameworks */,
+				B31BA2E13066D7BF00B8FC0E /* Resources */,
+			);
+			buildRules = (
+			);
+			fileSystemSynchronizedGroups = (
+				B31BA2E73066D7BF00B8FC0E /* VeyraTopShelf */,
+			);
+			name = VeyraTopShelf;
+			productName = VeyraTopShelf;
+			productReference = B31BA2E33066D7BF00B8FC0E /* VeyraTopShelf.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		B3B65AC4305A5A6C003B5F07 /* Veyra */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = B3B65AD0305A5A70003B5F07 /* Build configuration list for PBXNativeTarget "Veyra" */;
@@ -106,8 +182,12 @@
 				B3B65AC1305A5A6C003B5F07 /* Sources */,
 				B3B65AC2305A5A6C003B5F07 /* Frameworks */,
 				B3B65AC3305A5A6C003B5F07 /* Resources */,
+				B31BA2F23066D7BF00B8FC0E /* Embed Foundation Extensions */,
 			);
 			buildRules = (
+			);
+			dependencies = (
+				B31BA2EC3066D7BF00B8FC0E /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				B3B65AC7305A5A6C003B5F07 /* Veyra */,
@@ -153,6 +233,9 @@
 				LastSwiftUpdateCheck = 2700;
 				LastUpgradeCheck = 2700;
 				TargetAttributes = {
+					B31BA2E23066D7BF00B8FC0E = {
+						CreatedOnToolsVersion = 27.0;
+					};
 					B3B65AC4305A5A6C003B5F07 = {
 						CreatedOnToolsVersion = 27.0;
 					};
@@ -180,11 +263,17 @@
 			targets = (
 				B3B65AC4305A5A6C003B5F07 /* Veyra */,
 				B3EE10D5305E9262002FAC51 /* Veyra-iOS */,
+				B31BA2E23066D7BF00B8FC0E /* VeyraTopShelf */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		B31BA2E13066D7BF00B8FC0E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
 		B3B65AC3305A5A6C003B5F07 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
@@ -198,6 +287,11 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		B31BA2DF3066D7BF00B8FC0E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
 		B3B65AC1305A5A6C003B5F07 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			files = (
@@ -210,7 +304,73 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		B31BA2EC3066D7BF00B8FC0E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B31BA2E23066D7BF00B8FC0E /* VeyraTopShelf */;
+			targetProxy = B31BA2EB3066D7BF00B8FC0E /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		B31BA2EF3066D7BF00B8FC0E /* Debug configuration for PBXNativeTarget "VeyraTopShelf" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = VeyraTopShelf/VeyraTopShelf.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = SGMLZ564HT;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = VeyraTopShelf/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = VeyraTopShelf;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.veyra.Veyra.VeyraTopShelf;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 3;
+			};
+			name = Debug;
+		};
+		B31BA2F03066D7BF00B8FC0E /* Release configuration for PBXNativeTarget "VeyraTopShelf" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = VeyraTopShelf/VeyraTopShelf.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = SGMLZ564HT;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = VeyraTopShelf/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = VeyraTopShelf;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.veyra.Veyra.VeyraTopShelf;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 3;
+			};
+			name = Release;
+		};
 		B3B65ACE305A5A70003B5F07 /* Debug configuration for PBXProject "Veyra" */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = B3B65B05305AAB69003B5F07 /* Secrets.xcconfig */;
@@ -461,6 +621,14 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		B31BA2EE3066D7BF00B8FC0E /* Build configuration list for PBXNativeTarget "VeyraTopShelf" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B31BA2EF3066D7BF00B8FC0E /* Debug configuration for PBXNativeTarget "VeyraTopShelf" */,
+				B31BA2F03066D7BF00B8FC0E /* Release configuration for PBXNativeTarget "VeyraTopShelf" */,
+			);
+			defaultConfigurationName = Release;
+		};
 		B3B65AC0305A5A6C003B5F07 /* Build configuration list for PBXProject "Veyra" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
