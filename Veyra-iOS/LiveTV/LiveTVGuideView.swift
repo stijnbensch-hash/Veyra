@@ -9,6 +9,9 @@ struct LiveTVGuideView: View {
     let onPlay: (VeyraGuideChannel) -> Void
 
     @State private var selection: ProgrammeSelection?
+    @State private var recorderMessage = ""
+    @State private var showRecorderAlert = false
+    @State private var schedulingRecording = false
 
     @Environment(\.horizontalSizeClass) private var sizeClass
 
@@ -251,6 +254,18 @@ struct LiveTVGuideView: View {
                     .buttonStyle(.borderedProminent)
                     .tint(VeyraColors.cyan)
 
+                    if let programme = selected.programme,
+                       programme.end > Date() {
+                        Button {
+                            Task { await scheduleRecording(selected.row, programme: programme) }
+                        } label: {
+                            Label("Neem op met VeyraHub", systemImage: "record.circle")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(schedulingRecording)
+                    }
+
                     Button {
                         guide.toggleFavorite(selected.row)
                     } label: {
@@ -267,7 +282,42 @@ struct LiveTVGuideView: View {
             .background(VeyraColors.background)
             .navigationTitle("Programma")
             .navigationBarTitleDisplayMode(.inline)
+            .alert("VeyraHub Recorder", isPresented: $showRecorderAlert) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(recorderMessage)
+            }
         }
+    }
+
+    private func scheduleRecording(
+        _ row: VeyraGuideChannel,
+        programme: VeyraEPGProgramme
+    ) async {
+        guard let hub = MediaServerStore().load().first(where: { $0.isVeyraHub }) else {
+            recorderMessage = "Voeg VeyraHub eerst toe bij Mediaservers."
+            showRecorderAlert = true
+            return
+        }
+
+        schedulingRecording = true
+        defer { schedulingRecording = false }
+        do {
+            try await VeyraHubRecorderClient(account: hub).schedule(
+                title: programme.title,
+                channel: ChannelNameOverrideStore.effectiveName(
+                    channelID: row.channel.id,
+                    defaultName: row.channel.name
+                ),
+                streamURL: row.channel.streamURL,
+                start: programme.start,
+                end: programme.end
+            )
+            recorderMessage = "Opname gepland in VeyraHub."
+        } catch {
+            recorderMessage = error.localizedDescription
+        }
+        showRecorderAlert = true
     }
 
     private struct ProgrammeSelection: Identifiable {

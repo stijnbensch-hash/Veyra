@@ -1700,6 +1700,10 @@ private struct VeyraEPGDetails: View {
     let onPlay:
         () -> Void
 
+    @State private var recorderMessage = ""
+    @State private var showRecorderAlert = false
+    @State private var schedulingRecording = false
+
     @Environment(\.dismiss)
     private var dismiss
 
@@ -1907,6 +1911,18 @@ private struct VeyraEPGDetails: View {
                             VeyraEPGButtonStyle()
                         )
                     }
+
+                    if let programme = selection.programme,
+                       programme.end > Date() {
+                        Button {
+                            Task { await scheduleRecording(programme) }
+                        } label: {
+                            Label("Neem op met VeyraHub", systemImage: "record.circle")
+                                .padding(16)
+                        }
+                        .buttonStyle(VeyraEPGButtonStyle())
+                        .disabled(schedulingRecording)
+                    }
                 }
                 .frame(
                     maxWidth: 1200,
@@ -1920,6 +1936,38 @@ private struct VeyraEPGDetails: View {
         .foregroundStyle(
             .white
         )
+        .alert("VeyraHub Recorder", isPresented: $showRecorderAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(recorderMessage)
+        }
+    }
+
+    private func scheduleRecording(_ programme: VeyraEPGProgramme) async {
+        guard let hub = MediaServerStore().load().first(where: { $0.isVeyraHub }) else {
+            recorderMessage = "Voeg VeyraHub eerst toe bij Mediaservers."
+            showRecorderAlert = true
+            return
+        }
+
+        schedulingRecording = true
+        defer { schedulingRecording = false }
+        do {
+            try await VeyraHubRecorderClient(account: hub).schedule(
+                title: programme.title,
+                channel: ChannelNameOverrideStore.effectiveName(
+                    channelID: selection.row.channel.id,
+                    defaultName: selection.row.channel.name
+                ),
+                streamURL: selection.row.channel.streamURL,
+                start: programme.start,
+                end: programme.end
+            )
+            recorderMessage = "Opname gepland in VeyraHub."
+        } catch {
+            recorderMessage = error.localizedDescription
+        }
+        showRecorderAlert = true
     }
 }
 
