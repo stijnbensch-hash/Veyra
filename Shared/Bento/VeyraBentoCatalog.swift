@@ -367,6 +367,7 @@ nonisolated struct VeyraCatalogSource: Sendable {
             let first_air_date: String?
             let genre_ids: [Int]?
             let vote_average: Double?
+            let original_language: String?
         }
         let results: [Item]
     }
@@ -627,17 +628,9 @@ nonisolated struct VeyraCatalogSource: Sendable {
         }
     }
 
-    /// Altijd nieuwste eerst (releasedatum / eerste uitzending, niet in de toekomst).
-    ///
-    /// `sort_by=primary_release_date.desc`/`first_air_date.desc` gecombineerd met
-    /// `with_watch_providers` levert bij TMDB voor veel (vooral kleinere/regionale)
-    /// diensten geregeld 0 resultaten op -- een bekende eigenaardigheid van hun
-    /// discover-API. We sorteren daarom zelf, na het ophalen, en gebruiken
-    /// `sort_by=popularity.desc` om de resultaten betrouwbaar te krijgen. Ook
-    /// `with_watch_monetization_types` stond vast op "flatrate" (alleen betaalde
-    /// abonnementen); gratis/reclame-gefinancierde diensten (bv. publieke omroep-
-    /// apps) worden door TMDB vaak als "free"/"ads" getagd, niet "flatrate" --
-    /// zonder die twee erbij kwamen zulke diensten leeg terug.
+    /// Maximaal 100 titels per soort, op releasedatum/eerste uitzending.
+    /// Sommige regionale aanbieders geven bij datumsortering geen resultaten;
+    /// in dat geval verzamelen we populaire kandidaten en sorteren die zelf.
     private func discover(kind: MediaKind, provider: Int, region: String? = nil) async -> [BentoTMDBTitle] {
         let isMovie = kind == .movie
         let path = isMovie ? "/discover/movie" : "/discover/tv"
@@ -646,41 +639,53 @@ nonisolated struct VeyraCatalogSource: Sendable {
         formatter.dateFormat = "yyyy-MM-dd"
         let today = formatter.string(from: Date())
 
-        var all: [BentoTMDBTitle] = []
-        for page in 1...3 {
-            let query: [URLQueryItem] = [
-                .init(name: "with_watch_providers", value: String(provider)),
-                .init(name: "watch_region", value: region ?? Self.region),
-                .init(name: "with_watch_monetization_types", value: "flatrate|free|ads"),
-                .init(name: "sort_by", value: "popularity.desc"),
-                .init(name: isMovie ? "primary_release_date.lte" : "first_air_date.lte", value: today),
-                .init(name: "language", value: "nl-BE"),
-                .init(name: "include_adult", value: "false"),
-                .init(name: "page", value: String(page))
-            ]
-            guard let result = await VeyraTMDBHTTP.get(path, query, as: TitlePage.self) else { break }
-            for item in result.results {
-                guard let title = item.title ?? item.name, item.poster_path != nil else { continue }
-                let rawDate = isMovie ? item.release_date : item.first_air_date
-                all.append(BentoTMDBTitle(id: item.id, kind: kind, title: title,
-                                          posterURL: Self.imageURL(item.poster_path, size: "w342"),
-                                          backdropURL: Self.imageURL(item.backdrop_path, size: "w1280"),
-                                          releaseDate: rawDate.flatMap(formatter.date(from:)),
-                                          genreIDs: item.genre_ids ?? [],
-                                          voteAverage: item.vote_average))
+        func fetch(sortBy: String) async -> [BentoTMDBTitle] {
+            var titles: [BentoTMDBTitle] = []
+            var seenIDs = Set<Int>()
+            // Extra pagina's vullen de lijst ook als taalfilter/posterloze
+            // resultaten afvallen. De zichtbare lijst blijft maximaal 100.
+            for page in 1...10 {
+                let query: [URLQueryItem] = [
+                    .init(name: "with_watch_providers", value: String(provider)),
+                    .init(name: "watch_region", value: region ?? Self.region),
+                    .init(name: "with_watch_monetization_types", value: "flatrate|free|ads"),
+                    .init(name: "sort_by", value: sortBy),
+                    .init(name: isMovie ? "primary_release_date.lte" : "first_air_date.lte", value: today),
+                    .init(name: "language", value: "nl-BE"),
+                    .init(name: "include_adult", value: "false"),
+                    .init(name: "page", value: String(page))
+                ]
+                guard let result = await VeyraTMDBHTTP.get(path, query, as: TitlePage.self) else { break }
+                for item in result.results {
+                    guard TMDBCatalogLanguageFilter.allows(item.original_language),
+                          let title = item.title ?? item.name,
+                          item.poster_path != nil,
+                          seenIDs.insert(item.id).inserted else { continue }
+                    let rawDate = isMovie ? item.release_date : item.first_air_date
+                    titles.append(BentoTMDBTitle(id: item.id, kind: kind, title: title,
+                                                 posterURL: Self.imageURL(item.poster_path, size: "w342"),
+                                                 backdropURL: Self.imageURL(item.backdrop_path, size: "w1280"),
+                                                 releaseDate: rawDate.flatMap(formatter.date(from:)),
+                                                 genreIDs: item.genre_ids ?? [],
+                                                 voteAverage: item.vote_average))
+                }
+                if titles.count >= 100 || result.results.count < 20 { break }
             }
-            if result.results.count < 20 { break }
+            return titles
         }
+
+        let newest = await fetch(sortBy: isMovie ? "primary_release_date.desc" : "first_air_date.desc")
+        let all = newest.isEmpty ? await fetch(sortBy: "popularity.desc") : newest
         // Nieuwste eerst, ongeacht wat TMDB zelf als volgorde teruggaf; titels
         // zonder (herkenbare) datum komen achteraan i.p.v. de sortering te breken.
-        return all.sorted { lhs, rhs in
+        return Array(all.sorted { lhs, rhs in
             switch (lhs.releaseDate, rhs.releaseDate) {
             case let (l?, r?): return l > r
             case (.some, nil): return true
             case (nil, .some): return false
             case (nil, nil): return false
             }
-        }
+        }.prefix(100))
     }
 
     private nonisolated struct CollectionImages: Decodable {
@@ -747,6 +752,7 @@ nonisolated struct VeyraCatalogSource: Sendable {
 struct VeyraBentoCatalogView: View {
     let catalog: BentoCatalog
     var onOpen: (BentoTMDBTitle) -> Void = { _ in }
+    @AppStorage(TMDBCatalogLanguageFilter.key) private var catalogLanguages = "nl-en"
 
     @State private var sections: [BentoCatalogSection] = []
     @State private var selected = ""
@@ -866,7 +872,7 @@ struct VeyraBentoCatalogView: View {
         .navigationTitle(catalog.name)
         .navigationBarTitleDisplayMode(.inline)
         #endif
-        .task(id: catalog.id) {
+        .task(id: catalog.id + "|" + catalogLanguages) {
             loading = true
             let loaded = await VeyraCatalogSource().sections(for: catalog)
             sections = loaded
@@ -874,6 +880,11 @@ struct VeyraBentoCatalogView: View {
             heroURL = Self.heroImage(catalog: catalog, sections: loaded)
             loading = false
         }
+        #if os(iOS)
+        .task {
+            if catalog.isService { await TraktStore.shared.refreshIfNeeded() }
+        }
+        #endif
         #if os(tvOS)
         .task(id: heroPool.map(\.id)) {
             await rotateHeroAutomatically()

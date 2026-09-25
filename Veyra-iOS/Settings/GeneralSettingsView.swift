@@ -29,6 +29,8 @@ struct GeneralSettingsView: View {
     private var hideTitlesUnderPosters = false
     @AppStorage(GeneralSettingsDefaults.hideEpisodesRemainingKey)
     private var hideEpisodesRemaining = false
+    @AppStorage(TMDBCatalogLanguageFilter.key)
+    private var catalogLanguages = "nl-en"
 
     // Toegankelijkheid
     @AppStorage(GeneralSettingsDefaults.textSizeKey)
@@ -43,6 +45,17 @@ struct GeneralSettingsView: View {
             VeyraColors.background.ignoresSafeArea()
 
             List {
+                Section {
+                    Picker("Oorspronkelijke taal", selection: $catalogLanguages) {
+                        Text("Nederlands en Engels").tag("nl-en")
+                        Text("Alle talen").tag("all")
+                    }
+                } header: {
+                    sectionHeader("TMDB-lijsten", symbol: "line.3.horizontal.decrease.circle", tint: VeyraColors.cyan)
+                } footer: {
+                    Text("Filtert automatisch samengestelde lijsten, ook op Home. Zoeken en eigen lijsten blijven volledig beschikbaar.")
+                }
+
                 Section {
                     Toggle("Verder kijken tonen", isOn: $showContinueWatching)
 

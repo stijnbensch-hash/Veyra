@@ -227,10 +227,11 @@ final class TraktStore: ObservableObject {
             }
         }
 
-        // Watched-state staat los van de overige bibliotheek.
-        await loadWatchedSnapshot(
-            snapshot: snapshot
-        )
+        // De posterbadges mogen niet wachten op kijklijst, beoordelingen en
+        // geschiedenis. Haal hun voortgang en bekeken afleveringen tegelijk op.
+        async let watched: Void = loadWatchedSnapshot(snapshot: snapshot)
+        async let next: Void = loadUpNextSnapshot(snapshot: snapshot)
+        _ = await (watched, next)
 
         guard
             snapshot == revision,
@@ -301,12 +302,6 @@ final class TraktStore: ObservableObject {
                     "users/me/lists"
                 )
 
-            let nextEpisodes:
-                [TraktUpNext] =
-                try await client.allPages(
-                    "sync/progress/up_next"
-                )
-
             let recentHistory:
                 [TraktEntry] =
                 try await client.request(
@@ -349,13 +344,6 @@ final class TraktStore: ObservableObject {
             history =
                 recentHistory
 
-            upNext =
-                nextEpisodes
-
-            cachedUpNextEntries =
-                nextEpisodes
-                    .compactMap(\.entry)
-
             lastSync =
                 Date()
 
@@ -379,6 +367,20 @@ final class TraktStore: ObservableObject {
     }
 
     // MARK: - Watched snapshot
+
+    private func loadUpNextSnapshot(snapshot: UUID) async {
+        do {
+            let next: [TraktUpNext] = try await client.allPages("sync/progress/up_next")
+            guard snapshot == revision, isConnected, !Task.isCancelled else { return }
+            upNext = next
+            cachedUpNextEntries = next.compactMap(\.entry)
+            saveHomeCache()
+        } catch is CancellationError {
+            return
+        } catch {
+            // De eerder bewaarde voortgang blijft bruikbaar als Trakt tijdelijk faalt.
+        }
+    }
 
     private func loadWatchedSnapshot(
         snapshot: UUID
@@ -460,6 +462,7 @@ final class TraktStore: ObservableObject {
         {
             lastWatchedSync =
                 Date()
+            saveHomeCache()
         }
     }
 
@@ -506,6 +509,8 @@ final class TraktStore: ObservableObject {
         cachedUpNextEntries =
             cache.upNextEntries
 
+        upNext = cache.upNext
+
         watchedMovies =
             cache.watchedMovies
 
@@ -534,6 +539,7 @@ final class TraktStore: ObservableObject {
                         cachedUpNextEntries
                             .prefix(100)
                     ),
+                upNext: Array(upNext.prefix(2000)),
                 watchedMovies:
                     Array(
                         watchedMovies.prefix(2000)
@@ -1277,6 +1283,7 @@ nonisolated private struct TraktHomeCache:
 
     let upNextEntries:
         [TraktEntry]
+    var upNext: [TraktUpNext] = []
 
     // Bekeken-status (films/series) — apart van de "verder kijken"-cache
     // hierboven, zodat bekeken-badges (bv. bij seizoenen/afleveringen)
@@ -1284,9 +1291,10 @@ nonisolated private struct TraktHomeCache:
     var watchedMovies: [TraktEntry] = []
     var watchedShows: [TraktEntry] = []
 
-    init(playback: [TraktEntry], upNextEntries: [TraktEntry], watchedMovies: [TraktEntry], watchedShows: [TraktEntry]) {
+    init(playback: [TraktEntry], upNextEntries: [TraktEntry], upNext: [TraktUpNext], watchedMovies: [TraktEntry], watchedShows: [TraktEntry]) {
         self.playback = playback
         self.upNextEntries = upNextEntries
+        self.upNext = upNext
         self.watchedMovies = watchedMovies
         self.watchedShows = watchedShows
     }
@@ -1299,6 +1307,7 @@ nonisolated private struct TraktHomeCache:
         let container = try decoder.container(keyedBy: CodingKeys.self)
         playback = try container.decode([TraktEntry].self, forKey: .playback)
         upNextEntries = try container.decode([TraktEntry].self, forKey: .upNextEntries)
+        upNext = try container.decodeIfPresent([TraktUpNext].self, forKey: .upNext) ?? []
         watchedMovies = try container.decodeIfPresent([TraktEntry].self, forKey: .watchedMovies) ?? []
         watchedShows = try container.decodeIfPresent([TraktEntry].self, forKey: .watchedShows) ?? []
     }

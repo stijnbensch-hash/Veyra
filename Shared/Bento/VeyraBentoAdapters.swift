@@ -470,6 +470,7 @@ nonisolated struct VeyraTMDBReleases: Sendable {
             let poster_path: String?
             let genre_ids: [Int]?
             let vote_average: Double?
+            let original_language: String?
             let release_date: String?
             let first_air_date: String?
         }
@@ -511,7 +512,8 @@ nonisolated struct VeyraTMDBReleases: Sendable {
               let page = try? JSONDecoder().decode(Page.self, from: data) else { return [] }
 
         return page.results.compactMap { item in
-            guard let poster = item.poster_path, let title = item.title ?? item.name else { return nil }
+            guard TMDBCatalogLanguageFilter.allows(item.original_language),
+                  let poster = item.poster_path, let title = item.title ?? item.name else { return nil }
             let dateString = item.release_date ?? item.first_air_date
             let releaseDate = dateString.flatMap { formatter.date(from: $0) }
             return BentoTMDBTitle(id: item.id, kind: kind, title: title,

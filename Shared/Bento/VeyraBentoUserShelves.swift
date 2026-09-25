@@ -33,6 +33,7 @@ private struct VeyraBentoUserShelf: View {
     // `BentoTMDBTitle`, zodat zulke items niet stilletjes wegvallen.
     @State private var items: [MediaItem] = []
     @State private var loaded = false
+    @AppStorage(TMDBCatalogLanguageFilter.key) private var catalogLanguages = "nl-en"
 
     var body: some View {
         Group {
@@ -43,7 +44,7 @@ private struct VeyraBentoUserShelf: View {
                 .frame(height: compact ? 270 : 440)
             }
         }
-        .task(id: shelf.id) { await load() }
+        .task(id: shelf.id.uuidString + "|" + catalogLanguages) { await load() }
         .onReceive(NotificationCenter.default.publisher(for: .veyraShelfConfigurationDidChange)) { _ in
             Task { await load() }
         }

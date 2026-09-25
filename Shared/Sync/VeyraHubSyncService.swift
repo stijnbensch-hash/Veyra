@@ -57,7 +57,7 @@ final class VeyraHubSyncService {
         "posterEnrichment.ratingSource", "posterEnrichment.showAgeRating",
         "posterEnrichment.showQualityLabels", "posterEnrichment.showTrendLabels",
         // Overig
-        "catalog.watchRegion", "openSubtitlesEnabled", "metadata.source.preference",
+        "catalog.watchRegion", "catalog.originalLanguages", "openSubtitlesEnabled", "metadata.source.preference",
         "sports.favoriteTeams",
         // Home: namen onder de filmcollectie-banners tonen of verbergen
         "veyra.bento.collectionNames",

@@ -20,6 +20,8 @@ struct TraktMedia: Codable, Hashable {
     var season: Int?
     var number: Int?
     var overview: String?
+    /// Trakt levert dit bij `sync/watched/shows?extended=progress` op het show-object.
+    var airedEpisodes: Int? = nil
 }
 
 struct TraktEntry: Codable, Identifiable, Hashable {
@@ -131,7 +133,7 @@ extension MediaItem {
     }
 }
 
-struct TraktUpNext: Decodable {
+struct TraktUpNext: Codable {
     var show: TraktMedia
     var progress: TraktShowProgress
     var entry: TraktEntry? {
@@ -139,7 +141,7 @@ struct TraktUpNext: Decodable {
         return TraktEntry(show: show, episode: episode)
     }
 }
-struct TraktShowProgress: Decodable {
+struct TraktShowProgress: Codable {
     var aired: Int
     var completed: Int
     var nextEpisode: TraktMedia?

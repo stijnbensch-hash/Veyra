@@ -133,59 +133,43 @@ struct MetadataRatingsView: View {
     ) -> some View {
         switch provider {
         case .imdb:
-            Image("rating-imdb")
-                .renderingMode(.template)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 42, height: 22)
+            Text("IMDb")
+                .font(.system(size: 21, weight: .black, design: .rounded))
                 .foregroundStyle(.black)
-                .padding(.horizontal, 5)
+                .padding(.horizontal, 7)
                 .padding(.vertical, 4)
                 .background(
-                    Color.yellow,
+                    Color(red: 0.96, green: 0.77, blue: 0.09),
                     in: RoundedRectangle(cornerRadius: 5, style: .continuous)
                 )
 
-        // TMDB/Tomatometer/Metacritic/Trakt kwamen voorheen uit monochrome
-        // silhouet-PDF's (`.renderingMode(.template)` op een puur zwarte vorm), wat
-        // enkel een effen gekleurde vlek gaf -- amper te herkennen als het echte
-        // logo. Vervangen door tekst/emoji-badges in de eigen merkkleur, net als
-        // IMDb hieronder al deed: veel duidelijker, en werkt altijd (geen
-        // afbeelding nodig die kan ontbreken of onduidelijk renderen).
         case .tmdb:
-            Text("TMDB")
-                .font(.system(size: 14, weight: .heavy, design: .rounded))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 4)
-                .background(
-                    Color(red: 0.01, green: 0.71, blue: 0.89),
-                    in: RoundedRectangle(cornerRadius: 5, style: .continuous)
-                )
+            Image("rating-tmdb")
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 30, height: 24)
+                .foregroundStyle(Color(red: 0.37, green: 0.82, blue: 0.78))
 
         case .tomatometer:
             Text("🍅")
                 .font(.system(size: 22))
 
         case .metacritic:
-            Text("M")
-                .font(.system(size: 16, weight: .heavy, design: .rounded))
-                .foregroundStyle(.white)
-                .frame(width: 26, height: 22)
-                .background(
-                    Color(red: 0.10, green: 0.10, blue: 0.11),
-                    in: RoundedRectangle(cornerRadius: 5, style: .continuous)
-                )
+            Image("rating-metacritic")
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 24, height: 24)
+                .foregroundStyle(Color(red: 0.96, green: 0.78, blue: 0.16))
 
         case .trakt:
-            Image(systemName: "checkmark")
-                .font(.system(size: 13, weight: .heavy))
-                .foregroundStyle(.white)
-                .frame(width: 26, height: 22)
-                .background(
-                    Color(red: 0.62, green: 0.18, blue: 0.55),
-                    in: RoundedRectangle(cornerRadius: 5, style: .continuous)
-                )
+            Image("rating-trakt")
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 24, height: 24)
+                .foregroundStyle(Color(red: 0.79, green: 0.40, blue: 0.76))
 
         case .popcornmeter:
             Text("🍿")

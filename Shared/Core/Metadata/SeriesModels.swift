@@ -8,6 +8,7 @@ struct TMDBSeries: Decodable, Identifiable, Hashable {
     let backdropPath: String?
     let firstAirDate: String?
     let voteAverage: Double?
+    var originalLanguage: String? = nil
     /// Alleen aanwezig op lijst-/ontdek-eindpunten; zie TMDBMovie.genreIDs.
     let genreIDs: [Int]?
 
@@ -19,6 +20,7 @@ struct TMDBSeries: Decodable, Identifiable, Hashable {
         case backdropPath = "backdrop_path"
         case firstAirDate = "first_air_date"
         case voteAverage = "vote_average"
+        case originalLanguage = "original_language"
         case genreIDs = "genre_ids"
     }
 }

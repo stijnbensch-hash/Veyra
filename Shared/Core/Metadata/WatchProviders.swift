@@ -71,7 +71,7 @@ extension TMDBClient {
             results.append(contentsOf: response.results)
             if response.results.count < 20 { break }
         }
-        return Array(results.prefix(100))
+        return Array(results.filter { TMDBCatalogLanguageFilter.allows($0.originalLanguage) }.prefix(100))
     }
 
     /// Series ontdekken via TMDB's discover-endpoint — zie `movies(...)` hierboven.
@@ -103,7 +103,7 @@ extension TMDBClient {
             results.append(contentsOf: response.results)
             if response.results.count < 20 { break }
         }
-        return Array(results.prefix(100))
+        return Array(results.filter { TMDBCatalogLanguageFilter.allows($0.originalLanguage) }.prefix(100))
     }
 
     private func discoverQuery(

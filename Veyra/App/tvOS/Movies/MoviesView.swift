@@ -13,6 +13,8 @@ struct MoviesView: View {
 
     @AppStorage("catalog.watchRegion")
     private var watchRegion = "BE"
+    @AppStorage(TMDBCatalogLanguageFilter.key)
+    private var catalogLanguages = "nl-en"
 
     @State private var catalogRequestID = UUID()
 
@@ -198,6 +200,7 @@ struct MoviesView: View {
     private var catalogTaskID: String {
         [
             watchRegion,
+            catalogLanguages,
             selectedProvider?.id.description ?? "-",
             selectedGenreID?.description ?? "-",
             selectedDecade?.id ?? "-",

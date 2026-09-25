@@ -3,6 +3,19 @@ import Foundation
 // The catalog language is independent from the selected availability country.
 enum CatalogLocalization { nonisolated static let language = "nl-NL" }
 
+/// Filter only automatic TMDB catalog lists. Search, details and personal lists
+/// remain available regardless of the original language of a title.
+nonisolated enum TMDBCatalogLanguageFilter {
+    static let key = "catalog.originalLanguages"
+    static var selected: String { UserDefaults.standard.string(forKey: key) ?? "nl-en" }
+
+    static func allows(_ language: String?) -> Bool {
+        guard selected != "all" else { return true }
+        guard let language, !language.isEmpty else { return true }
+        return language == "nl" || language == "en"
+    }
+}
+
 struct TMDBClient {
     private let session: URLSession
     private let readAccessToken: String
@@ -23,31 +36,35 @@ struct TMDBClient {
     }
 
     func popularMovies() async throws -> [TMDBMovie] {
-        let response: TMDBMoviePage = try await request(
-            path: "/3/movie/popular"
-        )
-
-        return response.results
+        try await catalogMovies(path: "/3/movie/popular")
     }
 
     func topRatedMovies() async throws -> [TMDBMovie] {
-        let response: TMDBMoviePage = try await request(path: "/3/movie/top_rated")
-        return response.results
+        try await catalogMovies(path: "/3/movie/top_rated")
     }
 
     func nowPlayingMovies() async throws -> [TMDBMovie] {
-        let response: TMDBMoviePage = try await request(path: "/3/movie/now_playing")
-        return response.results
+        try await catalogMovies(path: "/3/movie/now_playing")
     }
 
     func upcomingMovies() async throws -> [TMDBMovie] {
-        let response: TMDBMoviePage = try await request(path: "/3/movie/upcoming")
-        return response.results
+        try await catalogMovies(path: "/3/movie/upcoming")
     }
 
     func trendingMovies(window: String = "week") async throws -> [TMDBMovie] {
-        let response: TMDBMoviePage = try await request(path: "/3/trending/movie/\(window)")
-        return response.results
+        try await catalogMovies(path: "/3/trending/movie/\(window)")
+    }
+
+    private func catalogMovies(path: String) async throws -> [TMDBMovie] {
+        var titles: [TMDBMovie] = []
+        for page in 1...5 {
+            let response: TMDBMoviePage = try await request(
+                path: path, queryItems: [.init(name: "page", value: String(page))]
+            )
+            titles.append(contentsOf: response.results.filter { TMDBCatalogLanguageFilter.allows($0.originalLanguage) })
+            if titles.count >= 20 || response.results.count < 20 { break }
+        }
+        return Array(titles.prefix(20))
     }
 
     func searchMovies(query: String) async throws -> [TMDBMovie] {
@@ -202,6 +219,7 @@ struct TMDBMovie: Decodable, Identifiable, Hashable {
     let backdropPath: String?
     let releaseDate: String?
     let voteAverage: Double?
+    var originalLanguage: String? = nil
     /// Alleen aanwezig op lijst-/ontdek-eindpunten (bv. "populair"); TMDB's
     /// detail-eindpunt geeft in plaats daarvan volledige `genres`-objecten.
     /// Gebruikt voor de genre-badge op de poster (zie Shared/Theme/PosterEnrichmentSettings.swift).
@@ -215,6 +233,7 @@ struct TMDBMovie: Decodable, Identifiable, Hashable {
         case backdropPath = "backdrop_path"
         case releaseDate = "release_date"
         case voteAverage = "vote_average"
+        case originalLanguage = "original_language"
         case genreIDs = "genre_ids"
     }
 }

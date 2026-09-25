@@ -28,12 +28,7 @@ struct VeyraWatchedBadge: View {
                     if let total {
                         let remaining = max(total - count, 0)
                         if remaining > 0 {
-                            badge(
-                                remaining == 1
-                                    ? "1 aflevering te gaan"
-                                    : "\(remaining) afleveringen te gaan",
-                                symbol: "clock.fill"
-                            )
+                            remainingBadge(remaining)
                         }
                     }
                 case .hidden:
@@ -51,11 +46,35 @@ struct VeyraWatchedBadge: View {
         )
             .accessibilityLabel("\(title) via Trakt")
     }
+
+    @ViewBuilder
+    private func remainingBadge(_ remaining: Int) -> some View {
+        let fullTitle = remaining == 1
+            ? "1 aflevering te gaan"
+            : "\(remaining) afleveringen te gaan"
+#if os(iOS)
+        HStack(spacing: 4) {
+            Image(systemName: "clock.fill")
+                .foregroundStyle(VeyraColors.cyan)
+            Text("\(remaining) te gaan")
+        }
+        .font(.system(size: 11, weight: .semibold, design: .rounded))
+        .lineLimit(1)
+        .foregroundStyle(.white)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 5)
+        .background(.black.opacity(0.88), in: Capsule())
+        .overlay(Capsule().strokeBorder(VeyraColors.cyan.opacity(0.8), lineWidth: 1))
+        .accessibilityLabel("\(fullTitle) via Trakt")
+#else
+        badge(fullTitle, symbol: "clock.fill")
+#endif
+    }
 }
 /// Compacte "bekeken"-indicator: enkel een vinkje in een cirkel, zonder tekst — voor smalle postercards
 /// (bv. de streamingdienst-catalogus op iOS) waar de tekstbadge van `VeyraWatchedBadge` niet past.
-/// Bij een gedeeltelijk bekeken seizoen/serie valt dit terug op de tekstbadge van `VeyraWatchedBadge`
-/// (via `partialDisplay`), want "X afleveringen te gaan" past niet in een los vinkje.
+/// Bij een gedeeltelijk bekeken seizoen/serie toont `partialDisplay` een
+/// compacte resterende-afleveringenbadge in plaats van een los vinkje.
 struct VeyraWatchedCheckmark: View {
     let target: TraktWatchedTarget
     var partialDisplay: VeyraWatchedPartialDisplay = .hidden

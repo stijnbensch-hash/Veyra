@@ -31,6 +31,7 @@ struct VeyraBentoHomeView: View {
     var onOpenCompetition: (SportCompetition) -> Void
 
     @AppStorage(GeneralSettingsDefaults.showContinueWatchingKey) private var showContinueWatching = true
+    @AppStorage(TMDBCatalogLanguageFilter.key) private var catalogLanguages = "nl-en"
     @AppStorage(VeyraCollectionNames.key) private var showCollectionNames = true
     @AppStorage(GeneralSettingsDefaults.showUpcomingKey) private var showUpcoming = true
     @State private var layout = VeyraHomeLayoutStore.load()
@@ -121,6 +122,7 @@ struct VeyraBentoHomeView: View {
             await sportModel?.load()
         }
         .task { await model.load() }
+        .onChange(of: catalogLanguages) { _, _ in Task { await model.load(force: true) } }
         .onReceive(NotificationCenter.default.publisher(for: .veyraHomeLayoutDidChange)) { _ in reloadLayout() }
         .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in reloadLayout() }
         // Anders blijven "IPTV films"/"IPTV series" de oude, al-in-memory

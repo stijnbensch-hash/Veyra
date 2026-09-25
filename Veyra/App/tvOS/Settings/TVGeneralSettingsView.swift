@@ -4,12 +4,25 @@ import SwiftUI
 struct TVGeneralSettingsView: View {
     @AppStorage(GeneralSettingsDefaults.hideScoreSpoilersKey)
     private var hideScoreSpoilers = false
+    @AppStorage(TMDBCatalogLanguageFilter.key)
+    private var catalogLanguages = "nl-en"
 
     var body: some View {
         ZStack {
             VeyraBackground().ignoresSafeArea()
 
             List {
+                Section {
+                    Picker("Oorspronkelijke taal", selection: $catalogLanguages) {
+                        Text("Nederlands en Engels").tag("nl-en")
+                        Text("Alle talen").tag("all")
+                    }
+                } header: {
+                    Text("TMDB-lijsten")
+                } footer: {
+                    Text("Filtert automatisch samengestelde lijsten, ook op Home. Zoeken en eigen lijsten blijven volledig beschikbaar.")
+                }
+
                 Section {
                     VeyraSettingsToggleRow(icon: "eye.slash", title: "Uitslag verbergen tot tik",
                                            subtitle: "Vervaagt de stand op live en afgelopen wedstrijden",

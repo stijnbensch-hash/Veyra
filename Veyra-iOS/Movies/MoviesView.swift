@@ -15,6 +15,8 @@ struct MoviesView: View {
 
     @AppStorage("catalog.watchRegion")
     private var watchRegion = "BE"
+    @AppStorage(TMDBCatalogLanguageFilter.key)
+    private var catalogLanguages = "nl-en"
 
     @State private var catalogRequestID = UUID()
 
@@ -239,6 +241,7 @@ struct MoviesView: View {
     private var catalogTaskID: String {
         [
             watchRegion,
+            catalogLanguages,
             selectedProvider?
                 .id
                 .description
@@ -302,41 +305,30 @@ struct MoviesView: View {
                             )
                         }
                     } label: {
-                        ZStack(
-                            alignment:
-                                .topTrailing
-                        ) {
-                            VeyraPosterCard(
-                                title:
-                                    movie.title,
-                                url:
-                                    posterURL(
-                                        for:
-                                            movie
-                                    ),
-                                width: metrics.posterWidth,
-                                genre:
-                                    TMDBGenreNames
-                                    .firstMovieName(
-                                        for:
-                                            movie.genreIDs
-                                            ?? []
-                                    ),
-                                rating:
-                                    movie.voteAverage,
-                                year: String(movie.releaseDate?.prefix(4) ?? ""),
-                                tmdbID: movie.id,
-                                isMovie: true,
-                                releaseDateRaw: movie.releaseDate
-                            )
-
-                            if isWatched(
-                                movie
-                            ) {
-                                watchedBadge
-                                    .padding(7)
-                            }
-                        }
+                        VeyraPosterCard(
+                            title:
+                                movie.title,
+                            url:
+                                posterURL(
+                                    for:
+                                        movie
+                                ),
+                            width: metrics.posterWidth,
+                            genre:
+                                TMDBGenreNames
+                                .firstMovieName(
+                                    for:
+                                        movie.genreIDs
+                                        ?? []
+                                ),
+                            rating:
+                                movie.voteAverage,
+                            year: String(movie.releaseDate?.prefix(4) ?? ""),
+                            tmdbID: movie.id,
+                            isMovie: true,
+                            releaseDateRaw: movie.releaseDate,
+                            watchedTarget: .movie(TraktIDs(tmdb: movie.id))
+                        )
                     }
                     .buttonStyle(.plain)
                     .disabled(
@@ -345,65 +337,6 @@ struct MoviesView: View {
                 }
             }
         }
-    }
-
-    // MARK: - Watched badge
-
-    private var watchedBadge:
-        some View
-    {
-        ZStack {
-            Circle()
-                .fill(
-                    .ultraThinMaterial
-                )
-
-            Circle()
-                .stroke(
-                    Color.cyan
-                        .opacity(0.95),
-                    lineWidth: 1.5
-                )
-
-            Image(
-                systemName:
-                    "checkmark"
-            )
-            .font(
-                .system(
-                    size: 11,
-                    weight: .bold
-                )
-            )
-            .foregroundStyle(
-                Color.cyan
-            )
-        }
-        .frame(
-            width: 26,
-            height: 26
-        )
-        .shadow(
-            color:
-                .black.opacity(0.35),
-            radius: 5,
-            y: 2
-        )
-        .accessibilityLabel(
-            "Bekeken"
-        )
-    }
-
-    private func isWatched(
-        _ movie: TMDBMovie
-    ) -> Bool {
-        trakt.watchedMovies
-            .contains { entry in
-                entry.movie?
-                    .ids
-                    .tmdb
-                    == movie.id
-            }
     }
 
     // MARK: - Error

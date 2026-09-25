@@ -12,26 +12,31 @@ struct SeriesService {
     }
 
     func popularSeries() async throws -> [TMDBSeries] {
-        let response: TMDBSeriesPage = try await request(
-            path: "/3/tv/popular"
-        )
-
-        return response.results
+        try await catalogSeries(path: "/3/tv/popular")
     }
 
     func topRatedSeries() async throws -> [TMDBSeries] {
-        let response: TMDBSeriesPage = try await request(path: "/3/tv/top_rated")
-        return response.results
+        try await catalogSeries(path: "/3/tv/top_rated")
     }
 
     func onTheAirSeries() async throws -> [TMDBSeries] {
-        let response: TMDBSeriesPage = try await request(path: "/3/tv/on_the_air")
-        return response.results
+        try await catalogSeries(path: "/3/tv/on_the_air")
     }
 
     func trendingSeries(window: String = "week") async throws -> [TMDBSeries] {
-        let response: TMDBSeriesPage = try await request(path: "/3/trending/tv/\(window)")
-        return response.results
+        try await catalogSeries(path: "/3/trending/tv/\(window)")
+    }
+
+    private func catalogSeries(path: String) async throws -> [TMDBSeries] {
+        var titles: [TMDBSeries] = []
+        for page in 1...5 {
+            let response: TMDBSeriesPage = try await request(
+                path: path, queryItems: [.init(name: "page", value: String(page))]
+            )
+            titles.append(contentsOf: response.results.filter { TMDBCatalogLanguageFilter.allows($0.originalLanguage) })
+            if titles.count >= 20 || page >= response.totalPages { break }
+        }
+        return Array(titles.prefix(20))
     }
 
     func searchSeries(
