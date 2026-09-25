@@ -73,28 +73,42 @@ struct ContentView: View {
             .navigationDestination(
                 item: $destination
             ) { destination in
-                switch destination {
-                case .home:
-                    EmptyView()
-                case .account:
-                    AccountView()
-                case .film:
-                    MoviesView()
+                Group {
+                    switch destination {
+                    case .home:
+                        EmptyView()
+                    case .account:
+                        AccountView()
+                    case .film:
+                        MoviesView()
 
-                case .series:
-                    SeriesView()
+                    case .series:
+                        SeriesView()
 
-                case .liveTV:
-                    LiveTVView()
+                    case .liveTV:
+                        LiveTVView()
 
-                case .sport:
-                    SportsView()
+                    case .sport:
+                        SportsView()
 
-                case .search:
-                    SearchView()
+                    case .search:
+                        SearchView()
 
-                case .settings:
-                    SettingsView()
+                    case .settings:
+                        SettingsView()
+                    }
+                }
+                // Zonder dit vangt tvOS de Menu-knop hier soms op als
+                // "geen verder terug te gaan" en sluit de hele app af
+                // i.p.v. terug te navigeren naar Home. Zolang dit
+                // hoofdscherm (nog) niets verder gepusht heeft, blijft
+                // de focus hier en onderscheppen we de Menu-knop zelf
+                // om gewoon 1 scherm terug (naar Home) te gaan; zodra
+                // een dieper scherm gepusht wordt, is dát scherm actief
+                // en werkt de normale NavigationStack-terugknop verder
+                // gewoon zoals verwacht.
+                .onExitCommand {
+                    self.destination = nil
                 }
             }
         }
