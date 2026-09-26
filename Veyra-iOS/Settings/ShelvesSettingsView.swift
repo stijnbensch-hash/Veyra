@@ -65,7 +65,9 @@ struct ShelvesSettingsView: View {
                 Button { showAddSheet = true } label: { Image(systemName: "plus") }
             }
             ToolbarItem(placement: .navigationBarLeading) {
+                #if os(iOS)
                 if !viewModel.shelves.isEmpty { EditButton() }
+                #endif
             }
         }
         .sheet(isPresented: $showAddSheet, onDismiss: viewModel.reload) {

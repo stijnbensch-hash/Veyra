@@ -50,11 +50,7 @@ struct TrailerButton: View {
             .tint(VeyraColors.cyan)
             .disabled(isLoading)
             .accessibilityLabel("Speel trailer af")
-            .fullScreenCover(isPresented: $isPresentingPlayer) {
-                if let youtubeKey {
-                    TrailerSheet(youtubeKey: youtubeKey)
-                }
-            }
+            .veyraTrailerPresentation(isPresented: $isPresentingPlayer, youtubeKey: youtubeKey)
             .alert("Geen trailer beschikbaar", isPresented: $showUnavailableAlert) {
                 Button("OK", role: .cancel) {}
             }

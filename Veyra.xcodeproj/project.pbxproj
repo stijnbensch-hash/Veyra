@@ -11,6 +11,7 @@
 		B31BA2ED3066D7BF00B8FC0E /* VeyraTopShelf.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B31BA2E33066D7BF00B8FC0E /* VeyraTopShelf.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		B3B65AF2305A984B003B5F07 /* AetherEngine in Frameworks */ = {isa = PBXBuildFile; productRef = B3B65AF1305A984B003B5F07 /* AetherEngine */; };
 		EE598D814D3F6400CD01A50F /* AetherEngine in Frameworks */ = {isa = PBXBuildFile; productRef = B3B65AF1305A984B003B5F07 /* AetherEngine */; };
+		F0A0000A305E9267002FAC51 /* AetherEngine in Frameworks */ = {isa = PBXBuildFile; productRef = B3B65AF1305A984B003B5F07 /* AetherEngine */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -41,6 +42,7 @@
 		B3B65AC5305A5A6C003B5F07 /* Veyra.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Veyra.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B3B65B05305AAB69003B5F07 /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
 		B3EE10D6305E9262002FAC51 /* Veyra-iOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Veyra-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		F0A00002305E9267002FAC51 /* Veyra-macOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Veyra-macOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -67,6 +69,30 @@
 			);
 			target = B3EE10D5305E9262002FAC51 /* Veyra-iOS */;
 		};
+		F0A0000B305E9267002FAC51 /* Exceptions for "Veyra-macOS" folder in "Veyra-macOS" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = F0A00001305E9267002FAC51 /* Veyra-macOS */;
+		};
+		F0A0000C305E9267002FAC51 /* Exceptions for "Veyra-iOS" folder in "Veyra-macOS" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Components/VeyraAdaptive.swift,
+				ContentView.swift,
+				Info.plist,
+				LiveTV/LiveTVFavoritesOrderView.swift,
+				Playback/AetherPictureInPicture.swift,
+				Playback/AirPlayButton.swift,
+				Playback/OrientationLock.swift,
+				Playback/PlayerView.swift,
+				Playback/SystemVolumeSlider.swift,
+				Playback/TrailerPlayerView.swift,
+				Veyra_iOSApp.swift,
+			);
+			target = F0A00001305E9267002FAC51 /* Veyra-macOS */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -90,6 +116,7 @@
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				C0FFEE01305E9267002FAC51 /* Exceptions for "Veyra-iOS" folder in "Veyra-iOS" target */,
+				F0A0000C305E9267002FAC51 /* Exceptions for "Veyra-iOS" folder in "Veyra-macOS" target */,
 			);
 			path = "Veyra-iOS";
 			sourceTree = "<group>";
@@ -97,6 +124,14 @@
 		E01E6D1422F6265A8D4C8DE9 /* Shared */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Shared;
+			sourceTree = "<group>";
+		};
+		F0A00003305E9267002FAC51 /* Veyra-macOS */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				F0A0000B305E9267002FAC51 /* Exceptions for "Veyra-macOS" folder in "Veyra-macOS" target */,
+			);
+			path = "Veyra-macOS";
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -120,6 +155,12 @@
 				EE598D814D3F6400CD01A50F /* AetherEngine in Frameworks */,
 			);
 		};
+		F0A00005305E9267002FAC51 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+				F0A0000A305E9267002FAC51 /* AetherEngine in Frameworks */,
+			);
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -137,6 +178,7 @@
 				B3B65B05305AAB69003B5F07 /* Secrets.xcconfig */,
 				B3B65AC7305A5A6C003B5F07 /* Veyra */,
 				B3EE10D7305E9263002FAC51 /* Veyra-iOS */,
+				F0A00003305E9267002FAC51 /* Veyra-macOS */,
 				E01E6D1422F6265A8D4C8DE9 /* Shared */,
 				B31BA2E73066D7BF00B8FC0E /* VeyraTopShelf */,
 				B31BA2E43066D7BF00B8FC0E /* Frameworks */,
@@ -149,6 +191,7 @@
 			children = (
 				B3B65AC5305A5A6C003B5F07 /* Veyra.app */,
 				B3EE10D6305E9262002FAC51 /* Veyra-iOS.app */,
+				F0A00002305E9267002FAC51 /* Veyra-macOS.app */,
 				B31BA2E33066D7BF00B8FC0E /* VeyraTopShelf.appex */,
 			);
 			name = Products;
@@ -223,6 +266,29 @@
 			productReference = B3EE10D6305E9262002FAC51 /* Veyra-iOS.app */;
 			productType = "com.apple.product-type.application";
 		};
+		F0A00001305E9267002FAC51 /* Veyra-macOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F0A00007305E9267002FAC51 /* Build configuration list for PBXNativeTarget "Veyra-macOS" */;
+			buildPhases = (
+				F0A00004305E9267002FAC51 /* Sources */,
+				F0A00005305E9267002FAC51 /* Frameworks */,
+				F0A00006305E9267002FAC51 /* Resources */,
+			);
+			buildRules = (
+			);
+			fileSystemSynchronizedGroups = (
+				B3EE10D7305E9263002FAC51 /* Veyra-iOS */,
+				E01E6D1422F6265A8D4C8DE9 /* Shared */,
+				F0A00003305E9267002FAC51 /* Veyra-macOS */,
+			);
+			name = "Veyra-macOS";
+			packageProductDependencies = (
+				B3B65AF1305A984B003B5F07 /* AetherEngine */,
+			);
+			productName = "Veyra-macOS";
+			productReference = F0A00002305E9267002FAC51 /* Veyra-macOS.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -240,6 +306,9 @@
 						CreatedOnToolsVersion = 27.0;
 					};
 					B3EE10D5305E9262002FAC51 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					F0A00001305E9267002FAC51 = {
 						CreatedOnToolsVersion = 27.0;
 					};
 				};
@@ -263,6 +332,7 @@
 			targets = (
 				B3B65AC4305A5A6C003B5F07 /* Veyra */,
 				B3EE10D5305E9262002FAC51 /* Veyra-iOS */,
+				F0A00001305E9267002FAC51 /* Veyra-macOS */,
 				B31BA2E23066D7BF00B8FC0E /* VeyraTopShelf */,
 			);
 		};
@@ -284,6 +354,11 @@
 			files = (
 			);
 		};
+		F0A00006305E9267002FAC51 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -298,6 +373,11 @@
 			);
 		};
 		B3EE10D2305E9262002FAC51 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
+		F0A00004305E9267002FAC51 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			files = (
 			);
@@ -618,6 +698,64 @@
 			};
 			name = Release;
 		};
+		F0A00008305E9267002FAC51 /* Debug configuration for PBXNativeTarget "Veyra-macOS" */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = B3B65B05305AAB69003B5F07 /* Secrets.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = SGMLZ564HT;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Veyra-macOS/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.veyra.Veyra-macOS";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = NO;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		F0A00009305E9267002FAC51 /* Release configuration for PBXNativeTarget "Veyra-macOS" */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = B3B65B05305AAB69003B5F07 /* Secrets.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = SGMLZ564HT;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Veyra-macOS/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.veyra.Veyra-macOS";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = NO;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -650,6 +788,14 @@
 			buildConfigurations = (
 				B3EE10DF305E9267002FAC51 /* Debug configuration for PBXNativeTarget "Veyra-iOS" */,
 				B3EE10E0305E9267002FAC51 /* Release configuration for PBXNativeTarget "Veyra-iOS" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		F0A00007305E9267002FAC51 /* Build configuration list for PBXNativeTarget "Veyra-macOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F0A00008305E9267002FAC51 /* Debug configuration for PBXNativeTarget "Veyra-macOS" */,
+				F0A00009305E9267002FAC51 /* Release configuration for PBXNativeTarget "Veyra-macOS" */,
 			);
 			defaultConfigurationName = Release;
 		};

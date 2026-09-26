@@ -133,10 +133,7 @@ struct MoviesView: View {
                     )
                 }
             }
-            .toolbar(
-                .hidden,
-                for: .navigationBar
-            )
+            .veyraHideNavigationBar()
             .onChange(
                 of: watchRegion
             ) { _, _ in

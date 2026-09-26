@@ -60,7 +60,7 @@ struct MovieDetailView: View {
             .veyraReadableWidth()
         }
         .background(VeyraColors.background.ignoresSafeArea())
-        .toolbar(.hidden, for: .navigationBar)
+        .veyraHideNavigationBar()
         .overlay(alignment: .topLeading) { floatingBackButton }
         .ignoresSafeArea(edges: .top)
         .task(id: movie.id) {

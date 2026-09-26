@@ -47,9 +47,7 @@ struct VeyraRecordingsView: View {
                 Button("Sluiten") { dismiss() }
             }
         }
-        .fullScreenCover(item: $playingSource) { source in
-            PlayerView(source: source)
-        }
+        .veyraPlayerPresentation(item: $playingSource)
         .task { await load() }
     }
 

@@ -231,7 +231,7 @@ struct SeriesDetailView: View {
                 .background
                 .ignoresSafeArea()
         )
-        .toolbar(.hidden, for: .navigationBar)
+        .veyraHideNavigationBar()
         .overlay(alignment: .topLeading) {
             BackButtonCircle()
                 .padding(.leading, 16)

@@ -24,7 +24,7 @@ struct SportsFavoritesSettingsView: View {
         }
         .navigationTitle("Favoriete teams")
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Zoek een team")
+        .veyraTeamSearch(text: $query)
         .task { await directory.load() }
         .onChange(of: directory.teams.count) { _, _ in backfill() }
     }

@@ -114,10 +114,7 @@ struct SeriesView: View {
                     .padding(.bottom, 40)
                 }
             }
-            .toolbar(
-                .hidden,
-                for: .navigationBar
-            )
+            .veyraHideNavigationBar()
             .onChange(
                 of: watchRegion
             ) { _, _ in

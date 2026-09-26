@@ -19,7 +19,7 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             homeContent
-                .toolbar(.hidden, for: .navigationBar)
+                .veyraHideNavigationBar()
                 .sportChannelSheet($sportQuery) { bentoChannel = $0 }
                 .modifier(HomeDestinations(
                     title: $bentoTitle, channel: $bentoChannel, film: $bentoFilm,

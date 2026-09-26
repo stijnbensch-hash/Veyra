@@ -131,12 +131,7 @@ struct LiveTVFavoritesOrderView:
             .navigationBarTitleDisplayMode(
                 .inline
             )
-            .environment(
-                \.editMode,
-                .constant(
-                    .active
-                )
-            )
+            .veyraAlwaysEditing()
             .toolbar {
                 ToolbarItem(
                     placement:

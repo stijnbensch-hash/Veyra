@@ -38,7 +38,7 @@ struct SportsView: View {
                 content
             }
             .onAppear { store.reloadFavorites() }
-            .toolbar(.hidden, for: .navigationBar)
+            .veyraHideNavigationBar()
             .navigationDestination(item: $selectedMatch) { match in
                 SportsMatchDetailIOS(match: match)
             }

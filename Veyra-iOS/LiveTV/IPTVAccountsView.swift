@@ -93,7 +93,9 @@ struct IPTVAccountsView: View {
                 }
             }
             ToolbarItem(placement: .primaryAction) {
+                #if os(iOS)
                 EditButton()
+                #endif
             }
         }
         .sheet(isPresented: $showAddSheet, onDismiss: reload) {

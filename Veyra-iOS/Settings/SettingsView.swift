@@ -176,7 +176,7 @@ struct SettingsView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.hidden, for: .navigationBar)
+        .veyraHideNavigationBar()
     }
 
     // MARK: - Header
