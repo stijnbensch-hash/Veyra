@@ -16,6 +16,11 @@ struct PlayerView: View {
     @StateObject
     private var viewModel: PlaybackViewModel
 
+    @StateObject
+    private var pip = AetherPictureInPictureController()
+
+    @State private var backgroundStopTask: Task<Void, Never>?
+
     @State
     private var nextEpisodeRequest: NextPlaybackRequest?
 
@@ -74,6 +79,7 @@ struct PlayerView: View {
             } else if let playbackEngine = viewModel.playbackEngine {
                 iOSPlayerSurface(
                     engine: playbackEngine.engine, title: item?.title, item: item,
+                    pip: pip,
                     onClose: { dismiss() },
                     onPlayNextEpisode: { next in
                         // Zie de zelfde fix + toelichting in de tvOS
@@ -126,11 +132,18 @@ struct PlayerView: View {
             }
         }
         .onDisappear {
-            viewModel.stopForDisappear()
+            if !pip.keepsPlaybackAlive {
+                if scenePhase == .active {
+                    viewModel.stopForDisappear()
+                } else {
+                    scheduleBackgroundStop()
+                }
+            }
             OrientationLock.shared.allowAll()
         }
         .onChange(of: scenePhase) { _, phase in
-            viewModel.handleScenePhaseChange(phase)
+            backgroundStopTask?.cancel()
+            if phase == .background { scheduleBackgroundStop() }
         }
         .navigationDestination(item: $nextEpisodeRequest) { request in
             if let matchedSource = request.source {
@@ -138,6 +151,17 @@ struct PlayerView: View {
             } else {
                 SourceSelectionView(item: request.item)
             }
+        }
+    }
+
+    private func scheduleBackgroundStop() {
+        backgroundStopTask?.cancel()
+        // AVKit kan PiP nog starten tijdens de overgang naar de achtergrond.
+        // Geef die overgang kort tijd voordat we een sessie zonder PiP stoppen.
+        backgroundStopTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(800))
+            guard !Task.isCancelled, !pip.keepsPlaybackAlive else { return }
+            viewModel.handleScenePhaseChange(.background)
         }
     }
 }
@@ -160,6 +184,7 @@ private struct iOSPlayerSurface: View {
     @ObservedObject var engine: AetherEngine
     let title: String?
     var item: MediaItem? = nil
+    @ObservedObject var pip: AetherPictureInPictureController
     let onClose: () -> Void
     var onPlayNextEpisode: (MediaItem) -> Void = { _ in }
 
@@ -193,8 +218,6 @@ private struct iOSPlayerSurface: View {
 
     // Picture-in-Picture en AirPlay. Zie
     // `Veyra-iOS/Playback/AetherPictureInPicture.swift` en `AirPlayButton.swift`.
-    @StateObject private var pip = AetherPictureInPictureController()
-
     // Helderheid/volume via verticale sleepgebaren, zie
     // `Veyra-iOS/Playback/SystemVolumeSlider.swift`.
     @State private var volumeSlider: UISlider?
@@ -335,6 +358,11 @@ private struct iOSPlayerSurface: View {
             scheduleAutoHide()
             pip.attach(engine: engine)
         }
+        .onReceive(engine.$state) { _ in pip.attach(engine: engine) }
+        .onReceive(engine.$softwarePiPSource) { _ in pip.attach(engine: engine) }
+        .onChange(of: engine.hasFirstFrameReadyForDisplay) { _, _ in
+            pip.attach(engine: engine)
+        }
         .onDisappear { hideTask?.cancel(); countdownTask?.cancel() }
         .task(id: item?.id) {
             countdownTask?.cancel()
@@ -414,6 +442,7 @@ private struct iOSPlayerSurface: View {
                             .padding(11)
                             .background(.black.opacity(0.4), in: Circle())
                     }
+                    .accessibilityLabel(pip.isActive ? "Beeld in beeld stoppen" : "Beeld in beeld starten")
                 }
 
                 AirPlayButton()

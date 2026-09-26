@@ -296,6 +296,7 @@ struct SportsMatch:
     let phase: Phase
     let detail: String
     let venue: String?
+    let tvBroadcast: String?
 
     var showsScore: Bool {
         phase == .live
@@ -341,7 +342,35 @@ struct ESPNScoreboard: Decodable {
     struct Competition: Decodable {
         let competitors: [Competitor]
         let venue: Venue?
+        let broadcasts: [Broadcast]?
+        let geoBroadcasts: [GeoBroadcast]?
+
+        var tvBroadcast: String? {
+            let television = (geoBroadcasts ?? [])
+                .filter { $0.type?.shortName?.caseInsensitiveCompare("TV") == .orderedSame }
+                .compactMap { $0.media?.shortName }
+            let names = television.isEmpty ? (broadcasts ?? []).flatMap { $0.names ?? [] } : television
+            var seen = Set<String>()
+            let unique = names.compactMap { name -> String? in
+                let clean = name.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !clean.isEmpty, seen.insert(clean.lowercased()).inserted else { return nil }
+                return clean
+            }
+            return unique.isEmpty ? nil : unique.prefix(2).joined(separator: " · ")
+        }
     }
+
+    struct Broadcast: Decodable {
+        let names: [String]?
+    }
+
+    struct GeoBroadcast: Decodable {
+        let type: BroadcastType?
+        let media: BroadcastMedia?
+    }
+
+    struct BroadcastType: Decodable { let shortName: String? }
+    struct BroadcastMedia: Decodable { let shortName: String? }
 
     // MARK: Venue
 
@@ -562,7 +591,10 @@ struct ESPNScoreboard: Decodable {
                 venue:
                     competition
                         .venue?
-                        .fullName
+                        .fullName,
+                tvBroadcast:
+                    competition
+                        .tvBroadcast
             )
         }
     }

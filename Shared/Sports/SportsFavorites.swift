@@ -25,7 +25,16 @@ enum SportsFavorites {
     // zijn, staan nog in het oude formaat: zonder migratie matchen ze nooit meer met een wedstrijd en
     // blijft de "Favorieten"-rij op Home leeg. Zet ze eenmalig om.
     private static let legacyPrefixMigrationKey = "sports.favoriteTeams.legacyPrefixMigrated"
+    private static let legacySoccerPrefixMigrationKey = "sports.favoriteTeams.legacySoccerPrefixMigrated"
     private static let legacyPrefixMap: [String: String] = [
+        "bel.1": "soccer",
+        "uefa.champions": "soccer",
+        "uefa.europa": "soccer",
+        "eng.1": "soccer",
+        "esp.1": "soccer",
+        "ita.1": "soccer",
+        "ger.1": "soccer",
+        "fra.1": "soccer",
         "nfl": "football/nfl",
         "nba": "basketball/nba",
         "euroleague": "basketball/euroleague",
@@ -40,8 +49,10 @@ enum SportsFavorites {
     }
 
     private static func migrateLegacyPrefixesIfNeeded(_ defaults: UserDefaults) {
-        guard !defaults.bool(forKey: legacyPrefixMigrationKey) else { return }
+        guard !defaults.bool(forKey: legacyPrefixMigrationKey)
+                || !defaults.bool(forKey: legacySoccerPrefixMigrationKey) else { return }
         defaults.set(true, forKey: legacyPrefixMigrationKey)
+        defaults.set(true, forKey: legacySoccerPrefixMigrationKey)
 
         let oldIDs = defaults.stringArray(forKey: idsKey) ?? []
         let newIDs = oldIDs.map(migratedID)

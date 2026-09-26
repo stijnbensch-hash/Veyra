@@ -89,28 +89,37 @@ struct VeyraSportMatchCard: View {
 
     @ViewBuilder
     private var header: some View {
-        if live {
-            HStack(spacing: 6) {
+        HStack(spacing: 6) {
+            if live {
                 Circle().fill(VeyraHomeStyle.live).frame(width: badgeIndicatorSize, height: badgeIndicatorSize)
                 Text(event.score?.text ?? event.score?.minute ?? "LIVE")
                     .font(.system(size: headerFont, weight: .heavy))
                     .monospacedDigit()
-            }
-            .foregroundStyle(VeyraHomeStyle.live)
-        } else {
-            HStack(spacing: 5) {
+                    .foregroundStyle(VeyraHomeStyle.live)
+            } else {
                 Image(systemName: "clock")
                     .font(.system(size: headerIconFont, weight: .semibold))
+                    .foregroundStyle(VeyraHomeStyle.cyan)
                 Text(event.start.formatted(.dateTime.hour().minute().locale(VeyraHomeFormat.locale)))
                     .font(.system(size: headerFont, weight: .bold))
                     .monospacedDigit()
+                    .foregroundStyle(VeyraHomeStyle.cyan)
                 if !Calendar.current.isDate(event.start, inSameDayAs: now) {
                     Text(event.start.formatted(.dateTime.weekday(.abbreviated).locale(VeyraHomeFormat.locale)))
                         .font(.system(size: headerIconFont, weight: .semibold))
                         .textCase(.uppercase)
+                        .foregroundStyle(VeyraHomeStyle.cyan)
                 }
             }
-            .foregroundStyle(VeyraHomeStyle.cyan)
+            Spacer(minLength: 4)
+            if let tvBroadcast = event.tvBroadcast, !tvBroadcast.isEmpty {
+                Text(tvBroadcast)
+                    .font(.system(size: headerIconFont, weight: .bold))
+                    .foregroundStyle(VeyraHomeStyle.live)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .multilineTextAlignment(.trailing)
+            }
         }
     }
 
@@ -191,10 +200,11 @@ struct VeyraSportMatchCard: View {
     }
 
     private var accessibilityText: String {
+        let broadcast = event.tvBroadcast.map { ", op \($0)" } ?? ""
         if live {
             let score = event.score.map { ", stand \($0.home) \($0.away)" } ?? ""
-            return "Live: \(event.title)\(score)"
+            return "Live: \(event.title)\(score)\(broadcast)"
         }
-        return "\(event.title), \(VeyraSportFormat.kickoff(event.start, now: now))"
+        return "\(event.title), \(VeyraSportFormat.kickoff(event.start, now: now))\(broadcast)"
     }
 }

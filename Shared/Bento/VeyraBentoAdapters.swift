@@ -186,7 +186,8 @@ extension SportEvent {
             awayLogoURL: match.away.logoURL ?? SportsTeam.fallbackLogoURL(abbreviation: match.away.abbreviation),
             leagueSymbol: match.league.symbol,
             homeTeamID: match.home.id,
-            awayTeamID: match.away.id)
+            awayTeamID: match.away.id,
+            tvBroadcast: match.tvBroadcast)
     }
 }
 
@@ -197,26 +198,60 @@ nonisolated struct SportsStoreProvider: SportHomeProviding {
     func events(from: Date, to: Date) async throws -> [SportEvent] {
         let today = await load(day: Date())
         let now = Date()
-        // Iets live of nog te komen vandaag: klaar.
-        if today.contains(where: { $0.isLive(at: now) || $0.start > now }) { return today }
+        // Elke aangezette competitie krijgt haar komende wedstrijden, ook als een
+        // andere competitie vandaag al speelt (bijv. NFL morgen, Pro League na een pauze).
+        let leagues = await MainActor.run {
+            SportsLeague.all.filter { SportsDisplayPreferences.isLeagueEnabled($0.id) }
+        }
+        let enabledIDs = Set(leagues.map(\.id))
+        if let cached = await SportFutureCache.shared.events(now: now, enabledIDs: enabledIDs) {
+            return today + cached
+        }
 
-        // Niets meer vandaag: toon de eerstvolgende wedstrijden van de komende dagen.
-        if let cached = await SportFutureCache.shared.events(now: now) { return today + cached }
-        for offset in 1...7 {
-            guard let day = Calendar.current.date(byAdding: .day, value: offset, to: now) else { break }
-            let upcoming = await load(day: day).filter { $0.start > now }
-            if !upcoming.isEmpty {
-                await SportFutureCache.shared.store(upcoming, now: now)
-                return today + upcoming
+        let start = Calendar.current.date(byAdding: .day, value: 1,
+                                          to: Calendar.current.startOfDay(for: now))!
+        let end = Calendar.current.date(byAdding: .day, value: 1,
+                                        to: Calendar.current.startOfDay(for: to))!
+        let provider = await MainActor.run { ESPNScoreProvider() }
+        var matches: [SportsMatch] = []
+        var succeeded = 0
+        // Beperk gelijktijdige aanvragen; een grote piek leidde tot ontbrekende
+        // competities. Een dagaanvraag vangt gateways op die maandwaarden weigeren.
+        for batchStart in stride(from: 0, to: leagues.count, by: 4) {
+            let batch = leagues[batchStart..<min(batchStart + 4, leagues.count)]
+            await withTaskGroup(of: [SportsMatch]?.self) { group in
+                for league in batch {
+                    group.addTask { @MainActor in
+                        do {
+                            return try await provider.matches(league: league, from: start, to: end)
+                        } catch {
+                            return try? await provider.matches(league: league, date: start)
+                        }
+                    }
+                }
+                for await part in group {
+                    if let part {
+                        matches += part
+                        succeeded += 1
+                    }
+                }
             }
         }
-        return today
+        let upcoming = await makeEvents(matches: matches.filter { $0.date > now })
+        if succeeded > 0 {
+            await SportFutureCache.shared.store(upcoming, now: now, enabledIDs: enabledIDs)
+        }
+        return today + upcoming
     }
 
     private func load(day: Date) async -> [SportEvent] {
         // Eigen, per dag gecachete aanvraag: het gedeelde SportsStore wist zijn lijst bij een dagwissel en
         // liet gelijktijdige aanvragen leeg terugkeren ("Vandaag & straks" bleef dan leeg).
         let matches = await SportDayCache.shared.matches(day: day)
+        return await makeEvents(matches: matches)
+    }
+
+    private func makeEvents(matches: [SportsMatch]) async -> [SportEvent] {
         let (events, paths) = await MainActor.run { () -> ([SportEvent], [String: String]) in
             let hideScore = UserDefaults.standard.bool(forKey: GeneralSettingsDefaults.hideScoreSpoilersKey)
             var paths: [String: String] = [:]
@@ -310,21 +345,24 @@ private final class SportDayCache {
     }
 }
 
-/// Onthoudt de komende wedstrijden 15 minuten, zodat de minuut-verversing niet elke keer zeven dagen ophaalt.
+/// Onthoudt komende wedstrijden 15 minuten, zodat de minuut-verversing geen maandaanvragen herhaalt.
 private actor SportFutureCache {
     static let shared = SportFutureCache()
     private var stored: [SportEvent] = []
     private var fetchedAt: Date?
+    private var enabledIDs: Set<String> = []
 
-    func events(now: Date) -> [SportEvent]? {
-        guard let fetchedAt, now.timeIntervalSince(fetchedAt) < 900 else { return nil }
+    func events(now: Date, enabledIDs: Set<String>) -> [SportEvent]? {
+        guard let fetchedAt, now.timeIntervalSince(fetchedAt) < 900,
+              self.enabledIDs == enabledIDs else { return nil }
         let still = stored.filter { $0.start > now }
-        return still.isEmpty ? nil : still
+        return still
     }
 
-    func store(_ events: [SportEvent], now: Date) {
+    func store(_ events: [SportEvent], now: Date, enabledIDs: Set<String>) {
         stored = events
         fetchedAt = now
+        self.enabledIDs = enabledIDs
     }
 }
 

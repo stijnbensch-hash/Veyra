@@ -9,6 +9,32 @@ protocol SportsScoreProvider {
 /// Replaceable personal-use adapter. Public ESPN endpoints have no availability guarantee.
 @MainActor
 struct ESPNScoreProvider: SportsScoreProvider {
+    /// De Home-sectie vraagt een ruimer venster op. ESPN accepteert jaar- en
+    /// maandwaarden voor `dates`, maar geen bereik met twee volledige datums.
+    func matches(league: SportsLeague, from: Date, to: Date) async throws -> [SportsMatch] {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "America/New_York")
+        formatter.dateFormat = "yyyyMM"
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = formatter.timeZone
+        var month = calendar.date(from: calendar.dateComponents([.year, .month], from: from))!
+        let lastMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: to))!
+        var matches: [SportsMatch] = []
+        var succeeded = false
+        while month <= lastMonth {
+            try Task.checkCancellation()
+            if let part = try? await fetch(league: league, dates: formatter.string(from: month)) {
+                matches += part
+                succeeded = true
+            }
+            month = calendar.date(byAdding: .month, value: 1, to: month)!
+        }
+        guard succeeded else { throw URLError(.badServerResponse) }
+        return Dictionary(matches.filter { $0.date >= from && $0.date < to }.map { ($0.id, $0) },
+                          uniquingKeysWith: { a, _ in a }).values.sorted { $0.date < $1.date }
+    }
+
     func matches(league: SportsLeague, date: Date) async throws -> [SportsMatch] {
         // ESPN groups scoreboards by US Eastern days. Query the days that overlap
         // the user's local day, then filter in the user's time zone.
@@ -23,17 +49,21 @@ struct ESPNScoreProvider: SportsScoreProvider {
         var matches: [SportsMatch] = []
         for key in keys.sorted() {
             try Task.checkCancellation()
-            var components = URLComponents(string: "\(VeyraEndpoints.sports)/\(league.path)/scoreboard")!
-            components.queryItems = [URLQueryItem(name: "dates", value: key), URLQueryItem(name: "limit", value: "1000")]
-            if let groups = league.groups { components.queryItems?.append(URLQueryItem(name: "groups", value: groups)) }
-            var request = URLRequest(url: components.url!)
-            request.timeoutInterval = 15
-            request.cachePolicy = .reloadIgnoringLocalCacheData
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else { throw URLError(.badServerResponse) }
-            matches += try JSONDecoder().decode(ESPNScoreboard.self, from: data).matches(league: league)
+            matches += try await fetch(league: league, dates: key)
         }
         return Dictionary(matches.filter { $0.date >= start && $0.date < end }.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a }).values.sorted { $0.date < $1.date }
+    }
+
+    private func fetch(league: SportsLeague, dates: String) async throws -> [SportsMatch] {
+        var components = URLComponents(string: "\(VeyraEndpoints.sports)/\(league.path)/scoreboard")!
+        components.queryItems = [URLQueryItem(name: "dates", value: dates), URLQueryItem(name: "limit", value: "1000")]
+        if let groups = league.groups { components.queryItems?.append(URLQueryItem(name: "groups", value: groups)) }
+        var request = URLRequest(url: components.url!)
+        request.timeoutInterval = 15
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else { throw URLError(.badServerResponse) }
+        return try JSONDecoder().decode(ESPNScoreboard.self, from: data).matches(league: league)
     }
 }
 
@@ -52,7 +82,7 @@ final class SportsStore: ObservableObject {
     init(provider: (any SportsScoreProvider)? = nil, defaults: UserDefaults = .standard) {
         self.provider = provider ?? ESPNScoreProvider()
         self.defaults = defaults
-        favorites = Set(defaults.stringArray(forKey: "sports.favoriteTeams") ?? [])
+        favorites = SportsFavorites.ids(defaults)
     }
 
     func toggle(_ team: SportsTeam) {
@@ -63,7 +93,7 @@ final class SportsStore: ObservableObject {
 
     /// Herlaadt de favorieten uit UserDefaults (bv. nadat ze in een detailscherm gewijzigd zijn).
     func reloadFavorites() {
-        favorites = Set(defaults.stringArray(forKey: "sports.favoriteTeams") ?? [])
+        favorites = SportsFavorites.ids(defaults)
     }
 
     func isFavorite(_ match: SportsMatch) -> Bool { favorites.contains(match.home.id) || favorites.contains(match.away.id) }
@@ -78,7 +108,7 @@ final class SportsStore: ObservableObject {
     }
 
     func refresh(date: Date, force: Bool = false) async {
-        favorites = Set(defaults.stringArray(forKey: "sports.favoriteTeams") ?? [])
+        favorites = SportsFavorites.ids(defaults)
         let day = Calendar.current.startOfDay(for: date)
         let dateChanged = day != selectedDate
         if !dateChanged && isLoading { return }

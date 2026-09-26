@@ -60,6 +60,8 @@ nonisolated struct SportEvent: Identifiable, Equatable, Sendable {
     /// Extra live-situatie naast de resterende tijd, indien de bron dit levert
     /// (bv. "Eerste kwart", "3rd & 7", "Rust"). `nil` als onbekend.
     var situation: String? = nil
+    /// ESPN-zender of streamingbron voor wedstrijden uit het Sport-menu.
+    var tvBroadcast: String? = nil
 
     enum PhaseHint: Sendable { case auto, live, scheduled, finished }
 
@@ -268,7 +270,7 @@ final class VeyraSportViewModel {
         phase = .loading
         do {
             events = try await provider.events(from: now.addingTimeInterval(-4 * 3600),
-                                               to: now.addingTimeInterval(48 * 3600))
+                                               to: now.addingTimeInterval(21 * 24 * 3600))
             phase = .loaded
             await refreshScores(now: now)
         } catch {
@@ -285,7 +287,7 @@ final class VeyraSportViewModel {
     /// Vernieuwt de wedstrijden zonder de sectie te laten knipperen; bij een fout blijven de vorige data staan.
     func reload(now: Date = .now) async {
         guard let fresh = try? await provider.events(from: now.addingTimeInterval(-4 * 3600),
-                                                     to: now.addingTimeInterval(48 * 3600)) else { return }
+                                                     to: now.addingTimeInterval(21 * 24 * 3600)) else { return }
         events = fresh
         phase = .loaded
         await refreshScores(now: now)
