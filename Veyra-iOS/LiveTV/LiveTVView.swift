@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
 
 struct LiveTVView: View {
     @StateObject
@@ -20,10 +23,29 @@ struct LiveTVView: View {
     private var showFavoriteOrder = false
 
     @State
+    private var showRecordings = false
+
+    @State
+    private var showFolders = false
+
+    @State
     private var displayMode: LiveTVDisplayMode = .channels
 
     @Environment(\.horizontalSizeClass)
     private var sizeClass
+
+    // Opnames is op iPad/Mac een eigen tab/zijbalk-item (past daar naast de
+    // rest); op iPhone past dat niet meer zonder dat de tabbalk onder "Meer"
+    // wegvalt, dus daar blijft deze knop de enige weg naar het opname-
+    // overzicht. Dit bestand compileert ook mee in het macOS-target (geen
+    // UIDevice daar), vandaar de platformcheck.
+    private var isPad: Bool {
+        #if os(macOS)
+        true
+        #else
+        UIDevice.current.userInterfaceIdiom == .pad
+        #endif
+    }
 
     var body: some View {
         NavigationStack {
@@ -123,6 +145,41 @@ struct LiveTVView: View {
                             )
                         }
                     }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    if !isPad {
+                        Button {
+                            showRecordings = true
+                        } label: {
+                            Label("Opnames", systemImage: "record.circle")
+                        }
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showFolders = true
+                    } label: {
+                        Label("Mijn mappen", systemImage: "folder")
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        // Rechtstreeks force-reloaden i.p.v. alleen
+                        // `reloadID` te wijzigen -- anders zou dit niets
+                        // doen zolang het ingestelde verversinterval nog
+                        // niet verstreken was (zie `VeyraEPGStore.reload`).
+                        Task { await guide.reload(force: true) }
+                    } label: {
+                        Label("Vernieuwen", systemImage: "arrow.clockwise")
+                    }
+                }
+            }
+            .sheet(isPresented: $showRecordings) {
+                VeyraRecordingsView()
+            }
+            .sheet(isPresented: $showFolders) {
+                NavigationStack {
+                    LiveTVFoldersListView()
                 }
             }
             .sheet(

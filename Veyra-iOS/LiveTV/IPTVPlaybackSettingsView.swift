@@ -1,10 +1,8 @@
 import SwiftUI
 
 /// Live TV-voorkeuren: gidsvormgeving, afspeelmotor, buffering/catch-up en
-/// hoe vaak zenderlijst/gids ververst worden. Zie `IPTVPlaybackSettings.swift`
-/// (Shared) voor wat er nu al werkt en wat nog een stub is — momenteel is
-/// dat alles: er bestaat nog geen zenderlijst-/gidscache, afspeelmotor-keuze
-/// of FPS-teller in Veyra.
+/// hoe vaak zenderlijst/gids ververst worden. De cache-intervallen en
+/// wisknoppen zijn aangesloten op VeyraEPGStore.
 struct IPTVPlaybackSettingsView: View {
     @AppStorage(IPTVPlaybackSettingsDefaults.guideThemeKey)
     private var guideThemeRaw = IPTVGuideTheme.colourful.rawValue
@@ -99,15 +97,15 @@ struct IPTVPlaybackSettingsView: View {
                     }
 
                     Button("Zenderlijst-cache wissen", role: .destructive) {
-                        cacheAlertMessage = "Er is nog geen zenderlijst-cache in Veyra om te wissen."
+                        clearCache(guide: false)
                     }
                     Button("Gidscache wissen", role: .destructive) {
-                        cacheAlertMessage = "Er is nog geen gidscache in Veyra om te wissen."
+                        clearCache(guide: true)
                     }
                 } header: {
                     sectionHeader("Cache & verversen", symbol: "arrow.triangle.2.circlepath", tint: VeyraColors.secondary)
                 } footer: {
-                    Text("Zenderlijsten veranderen zelden; de gids ververst op zijn eigen ritme. Veyra heeft nog geen zenderlijst- of gidscache, dus deze instellingen en knoppen doen voorlopig niets.")
+                    Text("Zenders en gids worden lokaal bewaard en bij het opstarten geladen. Na het gekozen interval wordt de bron ververst.")
                 }
 
                 Section {
@@ -142,6 +140,20 @@ struct IPTVPlaybackSettingsView: View {
             Image(systemName: symbol)
                 .foregroundStyle(tint)
         }
+    }
+
+    private func clearCache(guide: Bool) {
+        guard let configuration = try? IPTVConfigurationStore().load() else {
+            cacheAlertMessage = "Geen IPTV-provider ingesteld."
+            return
+        }
+        let identifier = configuration.providerIdentifier
+        let key = (guide ? "live-guide-v1-" : "live-catalog-v1-") + identifier
+        IPTVDiskCache.remove(key: key)
+        let snapshot = (guide ? VeyraIPTVSnapshot.guidePrefix : VeyraIPTVSnapshot.catalogPrefix) + identifier
+        UserDefaults.standard.removeObject(forKey: snapshot)
+        NotificationCenter.default.post(name: .iptvConfigurationDidChange, object: nil)
+        cacheAlertMessage = guide ? "Gidscache gewist. De gids wordt opnieuw geladen." : "Zenderlijst-cache gewist. De zenders worden opnieuw geladen."
     }
 }
 

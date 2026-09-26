@@ -125,17 +125,22 @@ struct TraktListView: View {
         .listStyle(.plain)
         .tint(VeyraColors.cyan)
         .task { editedName = list.name; await load() }
-        .confirmationDialog("Deze lijst definitief uit Trakt verwijderen?", isPresented: $confirmDelete, titleVisibility: .visible) {
+        .veyraConfirmationDialog("Deze lijst definitief uit Trakt verwijderen?", isPresented: $confirmDelete) {
             Button("Lijst verwijderen", role: .destructive) {
+                confirmDelete = false
                 perform { try await store.deleteList(list); dismiss() }
             }
+            Button("Annuleren", role: .cancel) { confirmDelete = false }
         }
-        .confirmationDialog("Titel uit deze lijst verwijderen?", isPresented: Binding(get: { entryToRemove != nil }, set: { if !$0 { entryToRemove = nil } }), titleVisibility: .visible) {
+        .veyraConfirmationDialog("Titel uit deze lijst verwijderen?", isPresented: Binding(get: { entryToRemove != nil }, set: { if !$0 { entryToRemove = nil } })) {
             if let entry = entryToRemove {
                 Button("Verwijderen", role: .destructive) {
-                    perform { try await store.remove(entry, from: list); await load() }
+                    let removed = entry
+                    entryToRemove = nil
+                    perform { try await store.remove(removed, from: list); await load() }
                 }
             }
+            Button("Annuleren", role: .cancel) { entryToRemove = nil }
         }
     }
     private func load() async {

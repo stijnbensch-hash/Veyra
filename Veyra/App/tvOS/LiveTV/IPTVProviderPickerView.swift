@@ -35,18 +35,18 @@ struct IPTVProviderPickerView: View {
             .buttonStyle(.bordered)
             .tint(.cyan)
             .disabled(providers.isEmpty)
-            .confirmationDialog(
+            .veyraConfirmationDialog(
                 "Kies een IPTV-provider",
-                isPresented: $isShowingProviders,
-                titleVisibility: .visible
+                isPresented: $isShowingProviders
             ) {
                 ForEach(providers) { provider in
                     Button(selectionTitle(for: provider)) {
+                        isShowingProviders = false
                         select(provider)
                     }
                 }
 
-                Button("Annuleren", role: .cancel) {}
+                Button("Annuleren", role: .cancel) { isShowingProviders = false }
             }
 
             if let errorMessage {

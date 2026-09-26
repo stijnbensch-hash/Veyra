@@ -27,6 +27,12 @@ struct PlayerView: View {
 
             if let message = viewModel.playbackError {
                 ContentUnavailableView("Afspelen niet mogelijk", systemImage: "play.slash", description: Text(message))
+                    .overlay(alignment: .top) {
+                        if source.kind == .liveTV {
+                            IPTVLiveProviderStatusBadge(source: source, item: item)
+                                .padding()
+                        }
+                    }
                     .overlay(alignment: .bottom) {
                         Button("Opnieuw proberen") { Task { await viewModel.retry() } }
                             .padding()
@@ -36,6 +42,7 @@ struct PlayerView: View {
                     engine: playbackEngine.engine,
                     title: item?.title ?? source.name,
                     item: item,
+                    source: source,
                     nextEpisode: nextEpisode,
                     resolvingNextEpisode: resolvingNextEpisode,
                     onPlayNextEpisode: playNextEpisode
@@ -86,9 +93,30 @@ private struct MacPlayerSurface: View {
     @ObservedObject var engine: AetherEngine
     let title: String
     let item: MediaItem?
+    let source: PlayableSource
     let nextEpisode: MediaItem?
     let resolvingNextEpisode: Bool
     let onPlayNextEpisode: (MediaItem) -> Void
+
+    // Actieve/maximale gelijktijdige verbindingen van de Xtream-provider
+    // waarmee deze IPTV-stream loopt (bv. "1/2") -- enkel voor IPTV, zie de
+    // iOS/tvOS-spelers voor dezelfde aanpak.
+    @State private var connectionStatus: XtreamConnectionStatus?
+
+    private var isIPTV: Bool {
+        source.kind == .liveTV || source.kind == .iptvVOD
+    }
+
+    private func loadConnectionStatus() async {
+        guard isIPTV else { return }
+        let store = IPTVConfigurationStore()
+        guard let activeID = try? store.activeProviderID(),
+              let providers = try? store.loadProviders(),
+              let provider = providers.first(where: { $0.id == activeID }),
+              case .xtream(let configuration) = provider.configuration
+        else { return }
+        connectionStatus = try? await XtreamClient(configuration: configuration).connectionStatus()
+    }
 
     @State private var seekPosition: Double = 0
     @State private var isSeeking = false
@@ -151,6 +179,15 @@ private struct MacPlayerSurface: View {
 
                 HStack(spacing: 18) {
                     Text(title).font(.headline).lineLimit(1)
+                    if source.kind == .liveTV {
+                        IPTVLiveProviderStatusBadge(source: source, item: item)
+                    }
+                    if let connectionStatus {
+                        Text(connectionStatus.display)
+                            .font(.caption.weight(.bold))
+                            .padding(.horizontal, 7).padding(.vertical, 3)
+                            .background(VeyraColors.cyan.opacity(0.22), in: Capsule())
+                    }
                     Spacer()
                     Button { Task { await engine.seek(to: max(0, engine.currentTime - 10)) } } label: {
                         Image(systemName: "gobackward.10")
@@ -267,6 +304,7 @@ private struct MacPlayerSurface: View {
         }
         .onDisappear { countdownTask?.cancel() }
         .onAppear { pip.attach(engine: engine) }
+        .task { await loadConnectionStatus() }
         .onChange(of: engine.state) { _, _ in pip.attach(engine: engine) }
     }
 

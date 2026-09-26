@@ -1,12 +1,12 @@
 import SwiftUI
 
-/// Rolverdeling (regisseur/bedenker + cast) van een film of serie, als
-/// horizontale rij ronde portretten -- hoort op elk film-/seriedetailscherm,
-/// tvOS zowel als iOS. Tikken op iemand opent `PersonDetailView`.
+/// Acteurs van een film of serie, boven "Vergelijkbaar" op de detailschermen.
+/// Tikken op iemand opent de biografie en bekende titels.
 struct CastRow: View {
     let item: MediaItem
 
     @State private var credits: TMDBCredits?
+    @State private var isLoading = true
 
     private struct Person: Identifiable, Hashable {
         let id: Int
@@ -17,53 +17,67 @@ struct CastRow: View {
 
     private var people: [Person] {
         guard let credits else { return [] }
-        let crew = credits.directorsOrCreators.map {
-            Person(id: $0.id, name: $0.name, role: $0.job == "Creator" ? "Bedenker" : "Regisseur", profilePath: $0.profilePath)
-        }
         let cast = credits.cast
             .sorted { ($0.order ?? .max) < ($1.order ?? .max) }
             .prefix(20)
             .map { Person(id: $0.id, name: $0.name, role: $0.character, profilePath: $0.profilePath) }
-        return crew + Array(cast)
+        let castIDs = Set(cast.map(\.id))
+        let makers = credits.directorsOrCreators
+            .filter { !castIDs.contains($0.id) }
+            .map {
+                Person(id: $0.id, name: $0.name,
+                       role: $0.job == "Creator" ? "Bedenker" : "Regisseur",
+                       profilePath: $0.profilePath)
+            }
+        return Array(cast) + makers
     }
 
     var body: some View {
-        Group {
-            if !people.isEmpty {
-                VStack(alignment: .leading, spacing: sectionSpacing) {
-                    VeyraSectionHeader(title: "Rolverdeling")
+        VStack(alignment: .leading, spacing: sectionSpacing) {
+            VeyraSectionHeader(title: "Cast")
 #if !os(tvOS)
-                        .padding(.horizontal)
+                .padding(.horizontal)
 #endif
 
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(alignment: .top, spacing: rowSpacing) {
-                            ForEach(people) { person in
-                                NavigationLink {
-                                    PersonDetailView(personID: person.id, name: person.name)
-                                } label: {
-                                    personCard(person)
-                                }
-#if os(tvOS)
-                                .buttonStyle(VeyraPosterFocusStyle())
-#else
-                                .buttonStyle(.plain)
-#endif
+            if isLoading {
+                ProgressView("Cast laden…")
+                    .padding(.horizontal)
+            } else if people.isEmpty {
+                Text("Geen castgegevens beschikbaar.")
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .top, spacing: rowSpacing) {
+                        ForEach(people) { person in
+                            NavigationLink {
+                                PersonDetailView(personID: person.id, name: person.name)
+                            } label: {
+                                personCard(person)
                             }
-                        }
 #if os(tvOS)
-                        .padding(12)
+                            .buttonStyle(VeyraPosterFocusStyle())
 #else
-                        .padding(.horizontal)
+                            .buttonStyle(.plain)
 #endif
+                        }
                     }
 #if os(tvOS)
-                    .scrollClipDisabled()
+                    .padding(12)
+#else
+                    .padding(.horizontal)
 #endif
                 }
+#if os(tvOS)
+                .scrollClipDisabled()
+#endif
             }
         }
-        .task(id: item.tmdbID) { await load() }
+        // SeriesDetailView maakt zijn MediaItem in `body`; diens UUID wisselt
+        // per render. Een stabiele metadata-sleutel voorkomt herhaalde requests.
+        .task(id: "\(item.type.rawValue)|\(item.tmdbID.map(String.init) ?? "")|\(item.imdbID ?? "")|\(item.title)") {
+            await load()
+        }
     }
 
     private func personCard(_ person: Person) -> some View {
@@ -142,7 +156,8 @@ struct CastRow: View {
     }
 
     private func load() async {
+        isLoading = true
         credits = await CreditsService.credits(for: item)
-        print("[CastRow] tmdbID=\(item.tmdbID.map(String.init) ?? "nil") type=\(item.type) cast=\(credits?.cast.count ?? -1) crew=\(credits?.crew.count ?? -1)")
+        isLoading = false
     }
 }

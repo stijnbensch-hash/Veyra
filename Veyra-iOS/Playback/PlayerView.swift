@@ -1,5 +1,6 @@
 import SwiftUI
 import AetherEngine
+import AVFoundation
 import UIKit
 
 struct PlayerView: View {
@@ -64,6 +65,10 @@ struct PlayerView: View {
                         .foregroundStyle(.white.opacity(0.7))
                         .multilineTextAlignment(.center)
 
+                    if source.kind == .liveTV {
+                        IPTVLiveProviderStatusBadge(source: source, item: item)
+                    }
+
                     HStack(spacing: 14) {
                         Button("Sluiten") { dismiss() }
                             .buttonStyle(.bordered)
@@ -79,6 +84,7 @@ struct PlayerView: View {
             } else if let playbackEngine = viewModel.playbackEngine {
                 iOSPlayerSurface(
                     engine: playbackEngine.engine, title: item?.title, item: item,
+                    source: source,
                     pip: pip,
                     onClose: { dismiss() },
                     onPlayNextEpisode: { next in
@@ -184,9 +190,30 @@ private struct iOSPlayerSurface: View {
     @ObservedObject var engine: AetherEngine
     let title: String?
     var item: MediaItem? = nil
+    let source: PlayableSource
     @ObservedObject var pip: AetherPictureInPictureController
     let onClose: () -> Void
     var onPlayNextEpisode: (MediaItem) -> Void = { _ in }
+
+    // Actieve/maximale gelijktijdige verbindingen van de Xtream-provider
+    // waarmee deze IPTV-stream loopt (bv. "1/2") -- enkel voor IPTV, en
+    // enkel de actieve provider (dezelfde die de stream levert).
+    @State private var connectionStatus: XtreamConnectionStatus?
+
+    private var isIPTV: Bool {
+        source.kind == .liveTV || source.kind == .iptvVOD
+    }
+
+    private func loadConnectionStatus() async {
+        guard isIPTV else { return }
+        let store = IPTVConfigurationStore()
+        guard let activeID = try? store.activeProviderID(),
+              let providers = try? store.loadProviders(),
+              let provider = providers.first(where: { $0.id == activeID }),
+              case .xtream(let configuration) = provider.configuration
+        else { return }
+        connectionStatus = try? await XtreamClient(configuration: configuration).connectionStatus()
+    }
 
     @State private var controlsVisible = true
     @State private var isDragging = false
@@ -194,6 +221,22 @@ private struct iOSPlayerSurface: View {
     @State private var hideTask: Task<Void, Never>?
     @State private var activePanel: IOSPlayerPanel?
     @State private var nextEpisode: MediaItem?
+    @State private var isLandscape = false
+
+    // Standaard toont de video het volledige beeld (met zwarte randen indien
+    // nodig) i.p.v. bij te snijden -- "scherm vullen" snijdt namelijk altijd een
+    // deel van het beeld weg om de randen op te vullen, en dat mag de kijker
+    // zelf aanzetten via de knop, niet standaard aanstaan.
+    @AppStorage("veyra.playback.fillPhoneScreen")
+    private var fillPhoneScreen = false
+
+    private var isPhone: Bool { UIDevice.current.userInterfaceIdiom == .phone }
+
+    private func updateVideoGravity() {
+        engine.videoGravity = isPhone && isLandscape && fillPhoneScreen
+            ? .resizeAspectFill
+            : .resizeAspect
+    }
 
     // "Hierna"-instellingen (automatisch doorspelen + aftellen). Zelfde
     // sleutels als de tvOS-speler, zie `Shared/Theme/PlaybackSettings.swift`.
@@ -354,10 +397,25 @@ private struct iOSPlayerSurface: View {
                 .transition(.opacity)
             }
         }
+        .background {
+            GeometryReader { geometry in
+                Color.clear
+                    .onAppear {
+                        isLandscape = geometry.size.width > geometry.size.height
+                        updateVideoGravity()
+                    }
+                    .onChange(of: geometry.size) { _, size in
+                        isLandscape = size.width > size.height
+                        updateVideoGravity()
+                    }
+            }
+        }
         .onAppear {
             scheduleAutoHide()
             pip.attach(engine: engine)
         }
+        .task { await loadConnectionStatus() }
+        .onChange(of: fillPhoneScreen) { _, _ in updateVideoGravity() }
         .onReceive(engine.$state) { _ in pip.attach(engine: engine) }
         .onReceive(engine.$softwarePiPSource) { _ in pip.attach(engine: engine) }
         .onChange(of: engine.hasFirstFrameReadyForDisplay) { _, _ in
@@ -415,10 +473,21 @@ private struct iOSPlayerSurface: View {
 
             if let title, !title.isEmpty {
                 VStack(spacing: 2) {
-                    Text(title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
+                    HStack(spacing: 6) {
+                        Text(title)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+
+                        if let connectionStatus {
+                            Text(connectionStatus.display)
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(VeyraColors.cyan.opacity(0.35), in: Capsule())
+                        }
+                    }
 
                     if let episodeLabel {
                         Text(episodeLabel)
@@ -429,9 +498,29 @@ private struct iOSPlayerSurface: View {
                 }
             }
 
+            if source.kind == .liveTV {
+                IPTVLiveProviderStatusBadge(source: source, item: item)
+            }
+
             Spacer()
 
             HStack(spacing: 10) {
+                if isPhone && isLandscape {
+                    Button {
+                        fillPhoneScreen.toggle()
+                        scheduleAutoHide()
+                    } label: {
+                        Image(systemName: fillPhoneScreen
+                            ? "arrow.down.right.and.arrow.up.left"
+                            : "arrow.up.left.and.arrow.down.right")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .padding(11)
+                            .background(.black.opacity(0.4), in: Circle())
+                    }
+                    .accessibilityLabel(fillPhoneScreen ? "Volledig beeld tonen" : "Scherm vullen")
+                }
+
                 if pip.isAvailable {
                     Button {
                         pip.toggle()

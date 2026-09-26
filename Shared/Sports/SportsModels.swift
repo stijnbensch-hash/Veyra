@@ -297,6 +297,8 @@ struct SportsMatch:
     let detail: String
     let venue: String?
     let tvBroadcast: String?
+    /// Live down/distance/balbezit (American football, via ESPN `situation`). `nil` voor andere sporten of als niet live.
+    let situation: String?
 
     var showsScore: Bool {
         phase == .live
@@ -344,6 +346,18 @@ struct ESPNScoreboard: Decodable {
         let venue: Venue?
         let broadcasts: [Broadcast]?
         let geoBroadcasts: [GeoBroadcast]?
+        let situation: Situation?
+
+        /// Beknopte live-situatie zoals de ESPN-app toont (bv. "1st & 10", "ILL 6") --
+        /// enkel relevant voor American football, andere sporten leveren dit veld niet.
+        var situationText: String? {
+            guard let situation else { return nil }
+            let downDistance = situation.shortDownDistanceText ?? situation.downDistanceText
+            let possession = situation.possessionText
+            let parts = [downDistance, possession].compactMap { $0?.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+            return parts.isEmpty ? nil : parts.joined(separator: " · ")
+        }
 
         var tvBroadcast: String? {
             let television = (geoBroadcasts ?? [])
@@ -371,6 +385,12 @@ struct ESPNScoreboard: Decodable {
 
     struct BroadcastType: Decodable { let shortName: String? }
     struct BroadcastMedia: Decodable { let shortName: String? }
+
+    struct Situation: Decodable {
+        let downDistanceText: String?
+        let shortDownDistanceText: String?
+        let possessionText: String?
+    }
 
     // MARK: Venue
 
@@ -594,7 +614,11 @@ struct ESPNScoreboard: Decodable {
                         .fullName,
                 tvBroadcast:
                     competition
-                        .tvBroadcast
+                        .tvBroadcast,
+                situation:
+                    phase == .live
+                    ? competition.situationText
+                    : nil
             )
         }
     }

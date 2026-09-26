@@ -70,6 +70,10 @@ struct PlayerView: View {
                         )
                     )
 
+                    if source.kind == .liveTV {
+                        IPTVLiveProviderStatusBadge(source: source, item: item)
+                    }
+
                     HStack(spacing: 24) {
                         Button("Sluiten") {
                             dismiss()
@@ -99,6 +103,7 @@ struct PlayerView: View {
                         item?.title,
                     item: item,
                     sourceMetadata: source.metadata,
+                    source: source,
                     onRequestExit: {
                         dismiss()
                     },

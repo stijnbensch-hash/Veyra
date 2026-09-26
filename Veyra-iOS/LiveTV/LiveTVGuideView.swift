@@ -13,7 +13,6 @@ struct LiveTVGuideView: View {
     @State private var showRecorderAlert = false
     @State private var schedulingRecording = false
     @State private var seriesRuleVersion = 0
-    @State private var showRecordings = false
 
     @Environment(\.horizontalSizeClass) private var sizeClass
 
@@ -60,9 +59,6 @@ struct LiveTVGuideView: View {
             details(for: selected)
                 .presentationDetents([.medium, .large])
         }
-        .sheet(isPresented: $showRecordings) {
-            NavigationStack { VeyraRecordingsView() }
-        }
     }
 
     private var controls: some View {
@@ -105,12 +101,6 @@ struct LiveTVGuideView: View {
             }
             .accessibilityLabel("Programmagids vernieuwen")
 
-            Button {
-                showRecordings = true
-            } label: {
-                Image(systemName: "list.bullet.rectangle")
-            }
-            .accessibilityLabel("Mijn opnames")
         }
         .foregroundStyle(VeyraColors.cyan)
         .padding(.horizontal, 16)

@@ -24,11 +24,13 @@ struct TraktView: View {
         .navigationTitle("Trakt")
         .task { await store.refreshIfNeeded() }
         .onDisappear { loginTask?.cancel(); loginTask = nil; isLinking = false; deviceCode = nil }
-        .confirmationDialog("Trakt ontkoppelen?", isPresented: $confirmDisconnect, titleVisibility: .visible) {
+        .veyraConfirmationDialog("Trakt ontkoppelen?", isPresented: $confirmDisconnect) {
             Button("Ontkoppelen", role: .destructive) {
+                confirmDisconnect = false
                 disconnecting = true
                 Task { await store.disconnect(); disconnecting = false }
             }
+            Button("Annuleren", role: .cancel) { confirmDisconnect = false }
         } message: {
             Text("De koppeling en geladen Trakt-gegevens worden van deze Apple TV verwijderd. Je geschiedenis en lijsten bij Trakt blijven behouden.")
         }

@@ -131,9 +131,9 @@ struct GeneralSettingsView: View {
                         }
                     }
                 } header: {
-                    sectionHeader("iPad-navigatie", symbol: "sidebar.left", tint: VeyraColors.cyan)
+                    sectionHeader("Navigatie (iPad & Mac)", symbol: "sidebar.left", tint: VeyraColors.cyan)
                 } footer: {
-                    Text("Kies of Veyra op de iPad een zijbalk of een menubalk bovenaan gebruikt — nooit allebei tegelijk. Op iPhone heeft dit geen effect (altijd een tabbalk onderaan).")
+                    Text("Kies of Veyra op de iPad en op de Mac een zijbalk of een menubalk bovenaan gebruikt — nooit allebei tegelijk. Op iPhone heeft dit geen effect (altijd een tabbalk onderaan).")
                 }
 
                 Section {

@@ -216,6 +216,9 @@ struct SeasonView: View {
                                     .episodeNumber
                         )
                         .focusEffectDisabled()
+                        // Nog niet uitgebracht: opvallend gedimd, en niet aan te klikken.
+                        .opacity(episode.isUnreleased ? 0.45 : 1)
+                        .disabled(episode.isUnreleased)
                         .traktMarkWatchedMenu(
                             MediaItem(
                                 title:
@@ -476,23 +479,10 @@ struct SeasonView: View {
                     .lineSpacing(3)
                 }
 
-                if let airDate =
-                    episode.airDate,
-                   airDate.count >= 4
-                {
-                    Text(
-                        String(
-                            airDate.prefix(4)
-                        )
-                    )
-                    .font(
-                        .system(
-                            size: 18
-                        )
-                    )
-                    .foregroundStyle(
-                        .white.opacity(0.45)
-                    )
+                if let airDate = episode.formattedAirDate {
+                    Text(airDate)
+                        .font(.system(size: 18))
+                        .foregroundStyle(.white.opacity(0.45))
                 }
             }
 

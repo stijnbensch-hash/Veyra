@@ -13,16 +13,29 @@ enum SimilarTitlesService {
             guard let token = AppConfiguration.tmdbReadAccessToken else { return [] }
             let client = TMDBClient(readAccessToken: token)
             guard let movies = try? await client.similarMovies(id: tmdbID) else { return [] }
-            return movies.map(mediaItem(from:))
+            return newestFirst(movies.map(mediaItem(from:)))
 
         case .series:
             guard let service = SeriesService() else { return [] }
             guard let series = try? await service.similarSeries(id: tmdbID) else { return [] }
-            return series.map(mediaItem(from:))
+            return newestFirst(series.map(mediaItem(from:)))
 
         default:
             return []
         }
+    }
+
+    /// TMDB geeft datums als yyyy-MM-dd terug. De alfabetische volgorde is
+    /// daardoor ook de datumvolgorde. Titels zonder datum komen achteraan;
+    /// bij dezelfde datum blijft TMDB's oorspronkelijke volgorde behouden.
+    private static func newestFirst(_ items: [MediaItem]) -> [MediaItem] {
+        items.enumerated()
+            .sorted { lhs, rhs in
+                let leftDate = lhs.element.releaseDate ?? ""
+                let rightDate = rhs.element.releaseDate ?? ""
+                return leftDate == rightDate ? lhs.offset < rhs.offset : leftDate > rightDate
+            }
+            .map(\.element)
     }
 
     private static func mediaItem(from movie: TMDBMovie) -> MediaItem {

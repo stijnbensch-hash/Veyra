@@ -22,6 +22,8 @@ struct SourceSelectionView: View {
             VeyraColors.background.ignoresSafeArea()
 
             VStack(spacing: 0) {
+                sourceHeader
+
                 if !viewModel.sources.isEmpty {
                     filterBar
                 }
@@ -62,7 +64,7 @@ struct SourceSelectionView: View {
                 .scrollContentBackground(.hidden)
             }
         }
-        .navigationTitle(item.title)
+        .navigationTitle("Selecteer bron")
         .navigationBarTitleDisplayMode(.inline)
         .task { await viewModel.loadSources() }
         .onChange(of: viewModel.hasLoaded) { _, hasLoaded in
@@ -85,6 +87,21 @@ struct SourceSelectionView: View {
                 resumeProgress: traktStore.progress(for: item)
             )
         }
+    }
+
+    private var sourceHeader: some View {
+        VeyraClearLogo(
+            item: item,
+            fallbackTitle: item.title,
+            maxWidth: 300,
+            maxHeight: 80,
+            font: .system(size: 24, weight: .semibold, design: .rounded),
+            alignment: .trailing
+        )
+        .frame(maxWidth: .infinity, minHeight: 80, alignment: .trailing)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .accessibilityLabel(item.title)
     }
 
     // MARK: - Filter

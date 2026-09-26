@@ -1,10 +1,6 @@
 // VeyraBentoHome.swift — tvOS 17+
-// De bento-home: hero + één raster van zes tegels (Verder kijken · Live nu · Vandaag · Tijd voor jou ·
-// Nieuw toegevoegd · Bronnen), met daaronder optioneel de sectie Sport.
-//
-//   rust (geen focus / Verder kijken)  grote hero (660 pt) met "nu" en "straks"
-//   focus op een andere tegel          hero klapt in tot een kopregel (300 pt) die volgt wat je focust:
-//                                      Live nu -> de live zender (sport eerst), Vandaag -> de eerste release
+// De bento-home: rijen voor Verder kijken, Binnenkort, Live TV, films en series,
+// met daaronder optioneel de sectie Sport.
 //
 // Bediening:
 //   select Verder kijken   -> afspelen (lang indrukken: verwijderen uit Verder kijken)
@@ -14,7 +10,7 @@
 //   select Nieuw / Bronnen -> onOpenNew() / onOpenSources()
 //
 // Vereist: VeyraBentoLayout/Model/Tiles.swift, VeyraBentoFocus.swift (VeyraHomeFocus, VeyraTileStyle),
-//          VeyraBentoStyle.swift, VeyraBentoTrakt.swift, VeyraBentoHero.swift, VeyraBentoHeroModel.swift, VeyraBentoEPGModel.swift,
+//          VeyraBentoStyle.swift, VeyraBentoTrakt.swift, VeyraBentoEPGModel.swift,
 //          en voor Sport: VeyraSportHome/Shared/Section.swift.
 
 #if os(tvOS)
@@ -77,67 +73,6 @@ struct VeyraBentoHomeView: View {
         self.onPlaySport = onPlaySport
         self.onToggleSportReminder = onToggleSportReminder
         self.onOpenCompetition = onOpenCompetition
-    }
-
-    // MARK: Hero
-
-    private var heroCollapsed: Bool {
-        switch focus {
-        case nil, .cont?: return false
-        default: return true
-        }
-    }
-
-    private var heroContent: HeroContent? {
-        let now = Date.now
-        switch focus {
-        case .cont(let id)?:
-            if showContinueWatching, let item = model.home.continueItems.first(where: { $0.id == id }) {
-                return model.home.heroContent(forContinue: item)
-            }
-        case .sport(_, let id)?:
-            if let event = sportModel?.events.first(where: { $0.id == id }) { return sportModel?.heroContent(for: event) }
-        case .bento(.live)?:
-            if let row = model.featuredLiveRow(at: now), let content = model.heroContent(forLive: row, now: now) { return content }
-        case .bento(.vandaag)?:
-            if showUpcoming, let item = model.today(at: now)?.items.first { return model.home.heroContent(forUpcoming: item) }
-        default:
-            break
-        }
-        if showContinueWatching, let first = model.continueMain { return model.home.heroContent(forContinue: first) }
-        // Zonder Trakt-items (niet gekoppeld of niets bezig): de live zender als hero.
-        if let row = model.featuredLiveRow(at: now) { return model.heroContent(forLive: row, now: now) }
-        return nil
-    }
-
-    @ViewBuilder
-    private var hero: some View {
-        if let content = heroContent {
-            if heroCollapsed {
-                BentoCollapsedHero(content: content)
-            } else {
-                VeyraHeroView(content: content, onPlay: playFromHero, onInfo: { _ in })
-            }
-        } else {
-            Color.clear
-        }
-    }
-
-    private func playFromHero(_ moment: HeroMoment) {
-        let now = Date.now
-        if let item = model.home.continueItems.first(where: { $0.id == moment.id }) {
-            onPlay(item)
-        } else if let row = model.liveRows(at: now).first(where: { $0.id == moment.id }) {
-            onOpenLiveTV(row.channelID)
-        } else if let upcoming = model.home.upcoming.first(where: { $0.id == moment.id }) {
-            toggle(upcoming)
-        } else if let event = sportModel?.events.first(where: { $0.id == moment.id }) {
-            if event.isLive(at: now) {
-                onPlaySport(event, .live)
-            } else {
-                onToggleSportReminder(event, sportModel?.toggleReminder(event) ?? false)
-            }
-        }
     }
 
     // MARK: Body
@@ -263,10 +198,14 @@ struct VeyraBentoHomeView: View {
                             .padding(.horizontal, 12)
 
                         ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 24) {
+                            LazyHStack(spacing: 24) {
                                 ForEach(items) { item in
                                     continueButton(item, radius: 22) { VeyraBentoContinueMiniContent(item: item) }
-                                        .frame(width: 420, height: 236)
+                                        // Beide rijen gebruiken dezelfde vaste tvOS-maat; binnenin
+                                        // hebben beeld en onderschrift elk hun eigen hoogte, ongeacht
+                                        // of de titel tekst of een clearlogo is.
+                                        .frame(width: VeyraCaptionedCardLayout.tv.width,
+                                               height: VeyraCaptionedCardLayout.tv.height)
                                 }
                             }
                             .padding(.vertical, 12)
@@ -289,7 +228,7 @@ struct VeyraBentoHomeView: View {
 
                         // Losse kaarten op een horizontale rij, zonder groot kader eromheen.
                         ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 24) {
+                            LazyHStack(spacing: 24) {
                                 ForEach(today.items) { item in
                                     let on = model.home.reminderIDs.contains(item.id)
                                     Button { toggle(item) } label: {
@@ -297,7 +236,9 @@ struct VeyraBentoHomeView: View {
                                     }
                                     .buttonStyle(VeyraCaptionedTileStyle())
                                     .focused($focus, equals: .cont("upcoming-\(item.id)"))
-                                    .frame(width: 420, height: 236)
+                                    // Zelfde formaat en onderverdeling als "Verder kijken".
+                                    .frame(width: VeyraCaptionedCardLayout.tv.width,
+                                           height: VeyraCaptionedCardLayout.tv.height)
                                     .contextMenu {
                                         Button { toggle(item) } label: {
                                             Label(on ? "Herinnering uit · \(item.title)" : "Herinner mij · \(item.title)",
@@ -351,7 +292,7 @@ struct VeyraBentoHomeView: View {
 
             if present.contains(.streaming) {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 24) {
+                    LazyHStack(spacing: 24) {
                         ForEach(model.providers) { provider in
                             Button { onOpenCatalog(provider) } label: {
                                 VeyraBentoStreamingContent(name: provider.name, iconURL: provider.imageURL,
@@ -438,7 +379,7 @@ struct VeyraBentoHomeView: View {
                         .padding(.horizontal, 12)
 
                     ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 24) {
+                        LazyHStack(spacing: 24) {
                             ForEach(model.collections) { collection in
                                 Button { onOpenCatalog(collection) } label: {
                                     VeyraBentoCollectionMiniContent(title: collection.name, url: collection.imageURL, showName: showCollectionNames)
@@ -512,96 +453,6 @@ struct VeyraBentoHomeView: View {
         f.dateFormat = "yyyy-MM-dd"
         return f
     }()
-}
-
-// MARK: - Ingeklapte hero (kopregel boven het raster)
-
-private struct BentoCollapsedHero: View {
-    let content: HeroContent
-
-    // Clearlogo i.p.v. platte titeltekst -- zelfde patroon als de grote
-    // hero (VeyraHeroView.logo): logo wanneer beschikbaar, anders de titel
-    // als tekst zodat een titel zonder logo er ongewijzigd uitziet.
-    @ViewBuilder
-    private var collapsedLogo: some View {
-        if let url = content.logoURL {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .success(let image):
-                    image.resizable().scaledToFit()
-                        .frame(maxWidth: 520, maxHeight: 110)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                default:
-                    collapsedTitleText
-                }
-            }
-        } else {
-            collapsedTitleText
-        }
-    }
-
-    private var collapsedTitleText: some View {
-        Text(content.fallbackTitle)
-            .font(.system(size: 56, weight: .bold))
-            .lineLimit(1)
-            .minimumScaleFactor(0.6)
-    }
-
-    var body: some View {
-        let now = content.moments.first
-        let next = content.moments.dropFirst().first
-
-        ZStack(alignment: .bottomLeading) {
-            VeyraArt(url: now?.backdropURL, seed: content.fallbackTitle)
-            LinearGradient(colors: [.black.opacity(0.55), .black.opacity(0.1), VeyraHomeStyle.ink],
-                           startPoint: .top, endPoint: .bottom)
-
-            HStack(alignment: .bottom, spacing: 40) {
-                VStack(alignment: .leading, spacing: 8) {
-                    if let now {
-                        HStack(spacing: 12) {
-                            if now.isLive {
-                                Circle().fill(VeyraHomeStyle.live).frame(width: 12, height: 12)
-                                    .shadow(color: VeyraHomeStyle.live, radius: 5)
-                            }
-                            Text(now.label)
-                                .font(.system(size: 22, weight: .bold))
-                                .tracking(3)
-                                .foregroundStyle(now.isLive ? VeyraHomeStyle.live : VeyraHomeStyle.cyan)
-                            Text(now.title)
-                                .font(.title3.weight(.semibold))
-                                .foregroundStyle(VeyraHomeStyle.dim)
-                                .lineLimit(1)
-                        }
-                    }
-                    collapsedLogo
-                    if let now {
-                        Text(now.metaLine)
-                            .font(.title2.weight(.semibold))
-                            .foregroundStyle(.white.opacity(0.88))
-                    }
-                }
-                Spacer(minLength: 0)
-                if let next {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(next.label)
-                            .font(.system(size: 20, weight: .bold))
-                            .tracking(2.6)
-                            .foregroundStyle(VeyraHomeStyle.cyan)
-                        Text(next.title).font(.title3.weight(.semibold)).lineLimit(1)
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 14)
-                    .frame(maxWidth: 420, alignment: .leading)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Color.white.opacity(0.14), lineWidth: 1))
-                }
-            }
-            .padding(.horizontal, 80)
-            .padding(.bottom, 24)
-        }
-        .foregroundStyle(.white)
-    }
 }
 
 // MARK: - Preview

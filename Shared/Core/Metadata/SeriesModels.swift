@@ -82,12 +82,33 @@ struct TMDBEpisode: Decodable, Identifiable, Hashable {
         Self.formattedAirDate(from: airDate)
     }
 
-    static func formattedAirDate(from raw: String?) -> String? {
+    /// Geparste `airDate`, of `nil` als er geen datum is of die niet te
+    /// parsen valt.
+    var airDateValue: Date? {
+        Self.parseAirDate(airDate)
+    }
+
+    /// `true` zodra de uitgavedatum nog in de toekomst ligt — gebruikt om
+    /// nog niet uitgebrachte afleveringen in seizoenslijsten gedimd te tonen.
+    /// Zonder gekende datum wordt een aflevering nooit als "nog niet
+    /// uitgebracht" beschouwd (conservatief: liever normaal tonen dan
+    /// onterecht dimmen).
+    var isUnreleased: Bool {
+        guard let date = airDateValue else { return false }
+        return date > Date()
+    }
+
+    static func parseAirDate(_ raw: String?) -> Date? {
         guard let raw, !raw.isEmpty else { return nil }
         let parser = DateFormatter()
         parser.locale = Locale(identifier: "en_US_POSIX")
         parser.dateFormat = "yyyy-MM-dd"
-        guard let date = parser.date(from: raw) else { return raw }
+        return parser.date(from: raw)
+    }
+
+    static func formattedAirDate(from raw: String?) -> String? {
+        guard let raw, !raw.isEmpty else { return nil }
+        guard let date = parseAirDate(raw) else { return raw }
         let display = DateFormatter()
         display.locale = Locale(identifier: "nl_BE")
         display.setLocalizedDateFormatFromTemplate("d MMMM yyyy")

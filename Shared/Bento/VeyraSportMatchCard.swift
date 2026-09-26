@@ -36,6 +36,8 @@ struct VeyraSportMatchCard: View {
     private let cardWidth: CGFloat = 470
     private let headerFont: CGFloat = 30
     private let headerIconFont: CGFloat = 24
+    // Bovenste (thuis-)team blijft duidelijk groter dan het onderste -- zie `teamRow`.
+    private let topTeamFont: CGFloat = 28
     private let teamFont: CGFloat = 24
     private let initialsFont: CGFloat = 22
     private let footerFont: CGFloat = 16
@@ -50,6 +52,8 @@ struct VeyraSportMatchCard: View {
     private let cardWidth: CGFloat? = nil
     private let headerFont: CGFloat = 13
     private let headerIconFont: CGFloat = 11
+    // Bovenste (thuis-)team blijft duidelijk groter dan het onderste -- zie `teamRow`.
+    private let topTeamFont: CGFloat = 15
     private let teamFont: CGFloat = 13
     private let initialsFont: CGFloat = 9
     private let footerFont: CGFloat = 10
@@ -59,9 +63,12 @@ struct VeyraSportMatchCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: outerSpacing) {
             header
+            if live, let situation = event.situation, !situation.isEmpty {
+                situationRow(situation)
+            }
             VStack(alignment: .leading, spacing: rowSpacing) {
-                teamRow(event.home, logo: event.homeLogoURL)
-                teamRow(event.away, logo: event.awayLogoURL)
+                teamRow(event.home, logo: event.homeLogoURL, score: event.score?.home, font: topTeamFont)
+                teamRow(event.away, logo: event.awayLogoURL, score: event.score?.away, font: teamFont)
             }
             Spacer(minLength: 0)
             footer
@@ -85,6 +92,16 @@ struct VeyraSportMatchCard: View {
         .accessibilityLabel(accessibilityText)
     }
 
+    // MARK: Live-situatie (American football: "1st & 10 · ILL 6", naar het voorbeeld van de ESPN-app)
+
+    private func situationRow(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: headerIconFont, weight: .bold))
+            .foregroundStyle(.white.opacity(0.75))
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+    }
+
     // MARK: Kop: klok + tijdstip (of live-status)
 
     @ViewBuilder
@@ -92,7 +109,8 @@ struct VeyraSportMatchCard: View {
         HStack(spacing: 6) {
             if live {
                 Circle().fill(VeyraHomeStyle.live).frame(width: badgeIndicatorSize, height: badgeIndicatorSize)
-                Text(event.score?.text ?? event.score?.minute ?? "LIVE")
+                // Enkel status/speeltijd hier -- de stand staat nu per team in de rijen eronder.
+                Text(event.score?.minute ?? "LIVE")
                     .font(.system(size: headerFont, weight: .heavy))
                     .monospacedDigit()
                     .foregroundStyle(VeyraHomeStyle.live)
@@ -105,7 +123,9 @@ struct VeyraSportMatchCard: View {
                     .monospacedDigit()
                     .foregroundStyle(VeyraHomeStyle.cyan)
                 if !Calendar.current.isDate(event.start, inSameDayAs: now) {
-                    Text(event.start.formatted(.dateTime.weekday(.abbreviated).locale(VeyraHomeFormat.locale)))
+                    // Exacte datum i.p.v. enkel de dagnaam ("vr", "zo", ...) -- zodat
+                    // meteen duidelijk is wanneer een wedstrijd verder in de toekomst is.
+                    Text(event.start.formatted(.dateTime.day().month(.abbreviated).locale(VeyraHomeFormat.locale)))
                         .font(.system(size: headerIconFont, weight: .semibold))
                         .textCase(.uppercase)
                         .foregroundStyle(VeyraHomeStyle.cyan)
@@ -133,14 +153,23 @@ struct VeyraSportMatchCard: View {
 
     // MARK: Team-rij: rond logo + naam
 
-    private func teamRow(_ name: String?, logo: URL?) -> some View {
+    private func teamRow(_ name: String?, logo: URL?, score: Int?, font: CGFloat) -> some View {
         let displayName = name ?? event.title
         return HStack(spacing: rowSpacing) {
             teamBadge(logo, name: displayName)
             Text(displayName)
-                .font(.system(size: teamFont, weight: .semibold))
+                .font(.system(size: font, weight: .semibold))
                 .lineLimit(1)
                 .minimumScaleFactor(0.9)
+            // Live stand per team, rechts uitgelijnd naast de naam -- naast de
+            // gecombineerde stand ("28-13") bovenaan in de kop.
+            if live, let score {
+                Spacer(minLength: 4)
+                Text("\(score)")
+                    .font(.system(size: font, weight: .heavy))
+                    .monospacedDigit()
+                    .foregroundStyle(VeyraHomeStyle.live)
+            }
         }
     }
 

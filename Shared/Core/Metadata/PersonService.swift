@@ -5,7 +5,23 @@ import Foundation
 enum PersonService {
     static func details(id: Int) async -> TMDBPersonDetails? {
         guard let token = AppConfiguration.tmdbReadAccessToken else { return nil }
-        return await request(path: "/3/person/\(id)", token: token)
+        let path = "/3/person/\(id)"
+        let localized: TMDBPersonDetails? = await request(path: path, token: token)
+        if let biography = localized?.biography,
+           !biography.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return localized
+        }
+        // Niet iedere persoon heeft een Nederlandse biografie op TMDB.
+        guard let english: TMDBPersonDetails = await request(path: path, token: token, language: "en-US") else {
+            return localized
+        }
+        guard let localized else { return english }
+        return TMDBPersonDetails(id: localized.id, name: localized.name,
+                                 biography: english.biography, profilePath: localized.profilePath ?? english.profilePath,
+                                 birthday: localized.birthday ?? english.birthday,
+                                 deathday: localized.deathday ?? english.deathday,
+                                 placeOfBirth: localized.placeOfBirth ?? english.placeOfBirth,
+                                 knownForDepartment: localized.knownForDepartment ?? english.knownForDepartment)
     }
 
     static func combinedCredits(id: Int) async -> [TMDBPersonCredit] {
@@ -29,12 +45,13 @@ enum PersonService {
         return merged.sorted { ($0.sortDate ?? "") > ($1.sortDate ?? "") }
     }
 
-    private static func request<Response: Decodable>(path: String, token: String) async -> Response? {
+    private static func request<Response: Decodable>(path: String, token: String,
+                                                     language: String = CatalogLocalization.language) async -> Response? {
         var components = URLComponents()
         components.scheme = "https"
         components.host = "api.themoviedb.org"
         components.path = path
-        components.queryItems = [URLQueryItem(name: "language", value: CatalogLocalization.language)]
+        components.queryItems = [URLQueryItem(name: "language", value: language)]
 
         guard let url = components.url else { return nil }
 
@@ -104,6 +121,8 @@ struct TMDBPersonCredit: Decodable, Hashable {
     let releaseDate: String?
     let firstAirDate: String?
     let voteAverage: Double?
+    let voteCount: Int?
+    let popularity: Double?
     let genreIDs: [Int]?
 
     enum CodingKeys: String, CodingKey {
@@ -117,6 +136,8 @@ struct TMDBPersonCredit: Decodable, Hashable {
         case releaseDate = "release_date"
         case firstAirDate = "first_air_date"
         case voteAverage = "vote_average"
+        case voteCount = "vote_count"
+        case popularity
         case genreIDs = "genre_ids"
     }
 

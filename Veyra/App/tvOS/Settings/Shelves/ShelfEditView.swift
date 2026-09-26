@@ -40,10 +40,13 @@ struct ShelfEditView: View {
     @State private var availableLibraries: [JellyfinLibrary] = []
     @State private var isLoadingLibraries = false
     @State private var iptvChannels: [ShelfIPTVChannel] = []
+    @State private var itemOrder: ShelfItemOrder = .dateAdded
+    @State private var sortDirection: ShelfSortDirection = .descending
     @State private var title = ""
     @State private var titleEdited = false
     @State private var isEnabled = true
     @State private var errorMessage: String?
+    @State private var hasLoadedExisting = false
 
     private var metadataAddons: [AddonManifest] {
         AddonStore().load().filter { $0.kind == .aioMetadata }
@@ -328,6 +331,23 @@ struct ShelfEditView: View {
                 }
             }
         }
+
+        Section {
+            Picker("Item-volgorde", selection: $itemOrder) {
+                ForEach(ShelfItemOrder.allCases) { order in
+                    Text(order.label).tag(order)
+                }
+            }
+            Picker("Richting", selection: $sortDirection) {
+                ForEach(ShelfSortDirection.allCases) { direction in
+                    Text(direction.label).tag(direction)
+                }
+            }
+        } header: {
+            Text("Item-volgorde")
+        } footer: {
+            Text("Bepaalt in welke volgorde deze plank zijn items ophaalt bij de mediaserver.")
+        }
     }
 
     @ViewBuilder
@@ -364,6 +384,15 @@ struct ShelfEditView: View {
     }
 
     private func setupFromExisting() {
+        // Zonder deze wacht was elke terugkeer naar dit scherm (bv. na het
+        // pushen naar "Kanalen kiezen" en weer terugkomen) een nieuwe
+        // `.onAppear` -- die zette `iptvChannels`/de rest dan telkens terug
+        // naar de oorspronkelijke, opgeslagen plank, en veegde zo net
+        // toegevoegde kanalen meteen weer weg. Vandaar dat een tweede kanaal
+        // nooit "beklijfde".
+        guard !hasLoadedExisting else { return }
+        hasLoadedExisting = true
+
         guard let shelf else {
             title = defaultTitle()
             return
@@ -372,6 +401,8 @@ struct ShelfEditView: View {
         title = shelf.title
         isEnabled = shelf.isEnabled
         titleEdited = true
+        itemOrder = shelf.effectiveItemOrder
+        sortDirection = shelf.effectiveSortDirection
 
         switch shelf.source {
         case .trakt(let list, let mediaKind):
@@ -592,10 +623,13 @@ struct ShelfEditView: View {
             source = .iptv(channels: iptvChannels)
         }
 
+        let savedItemOrder: ShelfItemOrder? = sourceKind == .mediaServer ? itemOrder : nil
+        let savedSortDirection: ShelfSortDirection? = sourceKind == .mediaServer ? sortDirection : nil
+
         if let shelf {
-            viewModel.update(Shelf(id: shelf.id, title: trimmedTitle, isEnabled: isEnabled, source: source))
+            viewModel.update(Shelf(id: shelf.id, title: trimmedTitle, isEnabled: isEnabled, source: source, itemOrder: savedItemOrder, sortDirection: savedSortDirection))
         } else {
-            viewModel.add(Shelf(title: trimmedTitle, isEnabled: isEnabled, source: source))
+            viewModel.add(Shelf(title: trimmedTitle, isEnabled: isEnabled, source: source, itemOrder: savedItemOrder, sortDirection: savedSortDirection))
         }
         dismiss()
     }

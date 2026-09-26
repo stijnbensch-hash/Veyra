@@ -76,10 +76,12 @@ private struct TraktItemActionsView: View {
             .padding(.bottom, 50)
         }
         .task { await store.refreshIfNeeded(); selectedRating = store.rating(for: item) ?? 7 }
-        .confirmationDialog("Alle kijkregistraties voor deze titel verwijderen?", isPresented: $confirmUnwatched, titleVisibility: .visible) {
+        .veyraConfirmationDialog("Alle kijkregistraties voor deze titel verwijderen?", isPresented: $confirmUnwatched) {
             Button("Markeer als niet bekeken", role: .destructive) {
+                confirmUnwatched = false
                 perform { try await store.setWatched(item, watched: false) }
             }
+            Button("Annuleren", role: .cancel) { confirmUnwatched = false }
         }
     }
     private func perform(_ action: @escaping @MainActor () async throws -> Void) {

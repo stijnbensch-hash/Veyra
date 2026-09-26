@@ -88,6 +88,9 @@ struct ContentView: View {
                     case .liveTV:
                         LiveTVView()
 
+                    case .recordings:
+                        TVRecordingsView()
+
                     case .sport:
                         SportsView()
 

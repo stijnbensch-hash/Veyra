@@ -1,62 +1,100 @@
 import SwiftUI
 
-private enum MacSection: String, Hashable, CaseIterable {
-    case home = "Home"
-    case movies = "Films"
-    case series = "Series"
-    case search = "Zoeken"
-    case live = "Live"
-    case sports = "Sport"
-    case settings = "Instellingen"
-
-    var symbol: String {
-        switch self {
-        case .home: "house.fill"
-        case .movies: "film.fill"
-        case .series: "tv.fill"
-        case .search: "magnifyingglass"
-        case .live: "antenna.radiowaves.left.and.right"
-        case .sports: "trophy"
-        case .settings: "gearshape.fill"
-        }
-    }
-}
-
 struct MacContentView: View {
-    @State private var selection: MacSection? = .home
+    // Optioneel omdat `List(_:selection:)` in de zijbalk-laag hieronder een
+    // optionele binding verwacht (kan leeg zijn zodra de gebruiker in de
+    // lijst zelf de selectie opheft) -- `content` valt terug op `.home`.
+    @State private var selection: MenuDestination? = .home
     @ObservedObject private var homeNavigation = HomeNavigationState.shared
 
+    // Zijbalk of menubalk boven, net als op iPad (Instellingen → Algemeen →
+    // Navigatie) -- dezelfde instelling, want tot nu toe las macOS deze
+    // sleutel helemaal niet uit en gebruikte altijd een vaste zijbalk,
+    // ongeacht wat hier stond.
+    @AppStorage(GeneralSettingsDefaults.ipadNavigationStyleKey)
+    private var navigationStyleRaw = IPadNavigationStyle.sidebar.rawValue
+
+    private var navigationStyle: IPadNavigationStyle {
+        IPadNavigationStyle(rawValue: navigationStyleRaw) ?? .sidebar
+    }
+
     var body: some View {
-        NavigationSplitView {
-            List(MacSection.allCases, selection: $selection) { section in
-                Label(section.rawValue, systemImage: section.symbol)
-                    .tag(section)
+        Group {
+            switch navigationStyle {
+            case .sidebar:
+                sidebarLayout
+            case .topBar:
+                topBarLayout
             }
-            .navigationTitle("Veyra")
-            .listStyle(.sidebar)
-        } detail: {
-            Group {
-                switch selection ?? .home {
-                case .home: HomeView(onSearch: { selection = .search }, onSettings: { selection = .settings })
-                case .movies: MoviesView()
-                case .series: SeriesView()
-                case .search: SearchView()
-                case .live: LiveTVView()
-                case .sports: SportsView()
-                case .settings: SettingsView()
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .tint(VeyraColors.cyan)
         .onChange(of: homeNavigation.requestedTab) { _, tab in
             guard let tab else { return }
-            selection = tab == .live ? .live : .sports
+            selection = tab == .live ? .liveTV : .sport
             homeNavigation.requestedTab = nil
         }
     }
-}
 
-extension MacSection: Identifiable {
-    var id: String { rawValue }
+    // MARK: - Zijbalk
+
+    private var sidebarLayout: some View {
+        NavigationSplitView {
+            List(sidebarSections, selection: $selection) { destination in
+                Label(destination.title, systemImage: destination.symbol)
+                    .tag(destination as MenuDestination?)
+                    .foregroundStyle(selection == destination ? VeyraColors.cyan : .primary)
+            }
+            .navigationTitle("Veyra")
+            .listStyle(.sidebar)
+            .scrollContentBackground(.hidden)
+            .background(VeyraColors.background)
+        } detail: {
+            content
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    /// Zelfde items en volgorde als de menubalk hieronder en als tvOS'
+    /// `VeyraTopNavigation` -- alleen als verticale lijst i.p.v. horizontale
+    /// pillen.
+    private var sidebarSections: [MenuDestination] {
+        [.home, .film, .series, .sport, .liveTV, .recordings, .search, .account, .settings]
+    }
+
+    // MARK: - Menubalk boven
+
+    private var topBarLayout: some View {
+        VStack(spacing: 0) {
+            MacTopNavigation(selected: selection ?? .home) { selection = $0 }
+            content
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .background(VeyraColors.background)
+    }
+
+    // MARK: - Inhoud
+
+    @ViewBuilder
+    private var content: some View {
+        switch selection ?? .home {
+        case .home:
+            HomeView(onSearch: { selection = .search }, onSettings: { selection = .settings })
+        case .film:
+            MoviesView()
+        case .series:
+            SeriesView()
+        case .search:
+            SearchView()
+        case .liveTV:
+            LiveTVView()
+        case .sport:
+            SportsView()
+        case .recordings:
+            VeyraRecordingsView()
+        case .account:
+            AccountView()
+        case .settings:
+            SettingsView()
+        }
+    }
 }

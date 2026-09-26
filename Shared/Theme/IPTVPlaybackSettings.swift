@@ -4,11 +4,8 @@ import Foundation
 /// afspeelt, buffering/catch-up-correctie, en hoe vaak zenderlijst en gids
 /// ververst worden.
 ///
-/// Status: dit bestand legt alleen de instellingen zelf vast (opslag +
-/// keuzelijsten). Er bestaat vandaag geen zenderlijst- of gidscache in
-/// Veyra, geen aparte afspeelmotor-keuze voor Live TV, en geen FPS-teller —
-/// dus niets hiervan heeft nu al effect. De instellingen staan klaar zodat
-/// ze aangesloten kunnen worden zodra die onderdelen gebouwd zijn.
+/// De cache-intervallen worden door VeyraEPGStore gebruikt. De aparte
+/// afspeelmotor-keuze en FPS-teller zijn nog niet aangesloten.
 enum IPTVPlaybackSettingsDefaults {
     // Zenderguide
     static let guideThemeKey = "iptv.guideTheme"
@@ -89,6 +86,17 @@ enum IPTVCacheRefreshInterval: String, CaseIterable, Identifiable {
         case .twelveHours: return "12 uur"
         case .twentyFourHours: return "24 uur"
         case .never: return "Nooit"
+        }
+    }
+
+    var seconds: TimeInterval {
+        switch self {
+        case .oneHour: 3_600
+        case .threeHours: 10_800
+        case .sixHours: 21_600
+        case .twelveHours: 43_200
+        case .twentyFourHours: 86_400
+        case .never: .infinity
         }
     }
 }

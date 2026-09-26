@@ -1,5 +1,8 @@
 import Foundation
 import AetherEngine
+#if os(iOS)
+import UIKit
+#endif
 
 @MainActor
 final class AetherPlaybackEngine:
@@ -215,7 +218,23 @@ final class AetherPlaybackEngine:
         options.isLive =
             source.kind == .liveTV
 
-        if source.requiresSoftwareVideo {
+        #if os(macOS) || os(tvOS)
+        // Ruwe, doorlopende IPTV-live-transportstreams geven op iPad/Mac/
+        // Apple TV geregeld een spelende AVPlayer met zwart beeld. Aethers
+        // softwarepad verwerkt deze forward-only bron rechtstreeks. Op
+        // tvOS gold dit bewust net zo hard als op macOS (geen iPad-achtige
+        // uitzondering) -- vandaar dat beide platforms dezelfde tak delen.
+        let rawLiveIPTV = source.kind == .liveTV
+            && !source.url.path.lowercased().hasSuffix(".m3u8")
+        #elseif os(iOS)
+        let rawLiveIPTV = UIDevice.current.userInterfaceIdiom == .pad
+            && source.kind == .liveTV
+            && !source.url.path.lowercased().hasSuffix(".m3u8")
+        #else
+        let rawLiveIPTV = false
+        #endif
+
+        if source.requiresSoftwareVideo || rawLiveIPTV {
             options.preferredDecodePath =
                 .software
 

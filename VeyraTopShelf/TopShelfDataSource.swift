@@ -7,7 +7,8 @@ import Security
 /// `project.pbxproj`), dus die code kan hier niet rechtstreeks hergebruikt
 /// worden — dit dupliceert alleen wat nodig is om "Verder kijken" te tonen:
 /// het gedeelde Keychain-item met de Trakt-sessie lezen (en zo nodig
-/// verversen), en de "continue watching"-lijst + TMDB-achtergrond ophalen.
+/// verversen), de onderbroken items en volgende afleveringen ophalen, en
+/// TMDB-achtergrond plus clearlogo vinden.
 enum TopShelfKeychainAccessGroup {
     private static var cached: String?
     private static var didFail = false
@@ -135,11 +136,19 @@ enum TopShelfKeychain {
 
 // MARK: - Trakt "continue watching"
 
-private struct TopShelfIDs: Decodable { let tmdb: Int? }
+private struct TopShelfIDs: Decodable {
+    let trakt: Int?
+    let tmdb: Int?
+}
 private struct TopShelfMovieDTO: Decodable { let title: String; let ids: TopShelfIDs }
 private struct TopShelfShowDTO: Decodable { let title: String; let ids: TopShelfIDs }
-private struct TopShelfEpisodeDTO: Decodable { let season: Int; let number: Int }
+private struct TopShelfEpisodeDTO: Decodable {
+    let season: Int
+    let number: Int
+    let title: String?
+}
 private struct TopShelfPlaybackDTO: Decodable {
+    let id: Int
     let progress: Double
     let pausedAt: Date
     let type: String
@@ -147,12 +156,30 @@ private struct TopShelfPlaybackDTO: Decodable {
     let episode: TopShelfEpisodeDTO?
     let show: TopShelfShowDTO?
 }
+private struct TopShelfWatchedShowDTO: Decodable {
+    let lastWatchedAt: Date
+    let show: TopShelfShowDTO
+}
+private struct TopShelfShowProgressDTO: Decodable {
+    let aired: Int?
+    let completed: Int?
+    let nextEpisode: TopShelfEpisodeDTO?
+}
 
-struct TopShelfContinueItem {
+struct TopShelfContinueItem: Sendable {
+    let id: String
     let title: String
-    let subtitle: String?
+    let season: Int?
+    let episode: Int?
+    let episodeTitle: String?
     let tmdbID: Int?
     let isShow: Bool
+    let playbackProgress: Double
+
+    var subtitle: String? {
+        guard let season, let episode else { return nil }
+        return "S\(season)E\(episode)"
+    }
 }
 
 enum TopShelfTraktAPI {
@@ -207,7 +234,39 @@ enum TopShelfTraktAPI {
         return fresh
     }
 
-    /// Haalt maximaal `limit` "verder kijken"-items op, nieuwste eerst.
+    private static func get<T: Decodable>(
+        _ path: String,
+        clientID: String,
+        accessToken: String
+    ) async -> T? {
+        guard let url = URL(string: "https://api.trakt.tv/\(path)") else { return nil }
+        var request = URLRequest(url: url)
+        request.setValue("2", forHTTPHeaderField: "trakt-api-version")
+        request.setValue(clientID, forHTTPHeaderField: "trakt-api-key")
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse,
+              (200..<300).contains(http.statusCode)
+        else { return nil }
+        return try? decoder().decode(T.self, from: data)
+    }
+
+    private static func showProgress(
+        _ showID: Int,
+        clientID: String,
+        accessToken: String
+    ) async -> TopShelfShowProgressDTO? {
+        await get(
+            "shows/\(showID)/progress/watched?hidden=false&specials=false",
+            clientID: clientID,
+            accessToken: accessToken
+        )
+    }
+
+    /// Dezelfde twee groepen als de Trakt-rij in de app: onderbroken films en
+    /// afleveringen, gevolgd door de volgende aflevering van recent bekeken
+    /// series. Maximaal één item per serie en 40 voortgangsopvragingen.
     static func continueWatching(limit: Int) async -> [TopShelfContinueItem] {
         guard
             let clientID = TopShelfKeychain.apiKey(account: "trakt.client-id", legacyService: Bundle.main.bundleIdentifier),
@@ -219,56 +278,114 @@ enum TopShelfTraktAPI {
            let fresh = await refreshed(token, clientID: clientID, clientSecret: clientSecret) {
             token = fresh
         }
+        let accessToken = token.accessToken
 
-        guard let url = URL(string: "https://api.trakt.tv/sync/playback?extended=full") else { return [] }
-        var request = URLRequest(url: url)
-        request.setValue("2", forHTTPHeaderField: "trakt-api-version")
-        request.setValue(clientID, forHTTPHeaderField: "trakt-api-key")
-        request.setValue("Bearer \(token.accessToken)", forHTTPHeaderField: "Authorization")
+        guard let playback: [TopShelfPlaybackDTO] = await get(
+            "sync/playback?extended=full",
+            clientID: clientID,
+            accessToken: accessToken
+        ) else { return [] }
 
-        guard
-            let (data, response) = try? await URLSession.shared.data(for: request),
-            let http = response as? HTTPURLResponse,
-            (200..<300).contains(http.statusCode),
-            let items = try? decoder().decode([TopShelfPlaybackDTO].self, from: data)
-        else { return [] }
-
-        return items
-            .sorted { $0.pausedAt > $1.pausedAt }
-            .prefix(limit)
-            .compactMap { dto -> TopShelfContinueItem? in
-                if let movie = dto.movie {
-                    return TopShelfContinueItem(title: movie.title, subtitle: nil, tmdbID: movie.ids.tmdb, isShow: false)
-                }
-                if let show = dto.show, let episode = dto.episode {
-                    return TopShelfContinueItem(
-                        title: show.title,
-                        subtitle: "S\(episode.season)E\(episode.number)",
-                        tmdbID: show.ids.tmdb,
-                        isShow: true
-                    )
-                }
-                return nil
+        var seenShows = Set<Int>()
+        var results: [TopShelfContinueItem] = []
+        for entry in playback.sorted(by: { $0.pausedAt > $1.pausedAt }) {
+            let fraction = min(max(entry.progress / 100, 0), 1)
+            if entry.type == "movie", let movie = entry.movie {
+                results.append(TopShelfContinueItem(
+                    id: "pb-\(entry.id)", title: movie.title,
+                    season: nil, episode: nil, episodeTitle: nil,
+                    tmdbID: movie.ids.tmdb, isShow: false,
+                    playbackProgress: fraction
+                ))
+            } else if entry.type == "episode",
+                      let show = entry.show,
+                      let episode = entry.episode {
+                if let showID = show.ids.trakt,
+                   !seenShows.insert(showID).inserted { continue }
+                results.append(TopShelfContinueItem(
+                    id: "pb-\(entry.id)", title: show.title,
+                    season: episode.season, episode: episode.number,
+                    episodeTitle: episode.title, tmdbID: show.ids.tmdb,
+                    isShow: true, playbackProgress: fraction
+                ))
             }
+            if results.count >= limit { return results }
+        }
+
+        guard let watched: [TopShelfWatchedShowDTO] = await get(
+            "sync/watched/shows?extended=noseasons",
+            clientID: clientID,
+            accessToken: accessToken
+        ) else { return results }
+
+        let cutoff = Date().addingTimeInterval(-365 * 86_400)
+        let candidates = Array(watched
+            .filter { $0.lastWatchedAt > cutoff }
+            .filter { $0.show.ids.trakt.map { !seenShows.contains($0) } ?? false }
+            .sorted { $0.lastWatchedAt > $1.lastWatchedAt }
+            .prefix(min(40, limit - results.count)))
+
+        var nextItems: [(Date, TopShelfContinueItem)] = []
+        // Kleine batches houden netwerk- en geheugengebruik van de extensie
+        // begrensd, maar wachten niet serie voor serie op Trakt.
+        for start in stride(from: 0, to: candidates.count, by: 6) {
+            let batch = candidates[start..<min(start + 6, candidates.count)]
+            let found = await withTaskGroup(of: (Date, TopShelfContinueItem)?.self) { group in
+                for candidate in batch {
+                    guard let showID = candidate.show.ids.trakt else { continue }
+                    group.addTask {
+                        guard let progress = await showProgress(
+                            showID, clientID: clientID, accessToken: accessToken
+                        ), let episode = progress.nextEpisode else { return nil }
+                        let item = TopShelfContinueItem(
+                            id: "next-\(showID)-S\(episode.season)E\(episode.number)",
+                            title: candidate.show.title,
+                            season: episode.season, episode: episode.number,
+                            episodeTitle: episode.title, tmdbID: candidate.show.ids.tmdb,
+                            isShow: true, playbackProgress: 0
+                        )
+                        return (candidate.lastWatchedAt, item)
+                    }
+                }
+                var values: [(Date, TopShelfContinueItem)] = []
+                for await value in group { if let value { values.append(value) } }
+                return values
+            }
+            nextItems.append(contentsOf: found)
+        }
+
+        results.append(contentsOf: nextItems
+            .sorted { $0.0 > $1.0 }
+            .map(\.1))
+        return Array(results.prefix(limit))
     }
 }
 
-// MARK: - TMDB-achtergrond
+// MARK: - TMDB-achtergrond en clearlogo
 
 private struct TopShelfTMDBImagesResponse: Decodable {
-    struct Backdrop: Decodable { let filePath: String }
-    let backdrops: [Backdrop]
+    struct Image: Decodable {
+        let filePath: String
+        let iso6391: String?
+
+        enum CodingKeys: String, CodingKey {
+            case filePath = "file_path"
+            case iso6391 = "iso_639_1"
+        }
+    }
+    let backdrops: [Image]
+    let logos: [Image]
 }
 
 enum TopShelfTMDBArtwork {
-    static func backdropURL(isShow: Bool, tmdbID: Int) async -> URL? {
+    static func imageURLs(isShow: Bool, tmdbID: Int) async -> (backdrop: URL?, logo: URL?) {
         guard let token = TopShelfKeychain.apiKey(
             account: "tmdb.read-access-token",
             legacyService: Bundle.main.bundleIdentifier
-        ) else { return nil }
+        ) else { return (nil, nil) }
 
         let kind = isShow ? "tv" : "movie"
-        guard let url = URL(string: "https://api.themoviedb.org/3/\(kind)/\(tmdbID)/images") else { return nil }
+        guard let url = URL(string: "https://api.themoviedb.org/3/\(kind)/\(tmdbID)/images?include_image_language=nl,en,null") else { return (nil, nil) }
         var request = URLRequest(url: url)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
@@ -279,10 +396,17 @@ enum TopShelfTMDBArtwork {
             let (data, response) = try? await URLSession.shared.data(for: request),
             let http = response as? HTTPURLResponse,
             (200..<300).contains(http.statusCode),
-            let decoded = try? decoder.decode(TopShelfTMDBImagesResponse.self, from: data),
-            let path = decoded.backdrops.first?.filePath
-        else { return nil }
+            let decoded = try? decoder.decode(TopShelfTMDBImagesResponse.self, from: data)
+        else { return (nil, nil) }
 
-        return URL(string: "https://image.tmdb.org/t/p/w1280\(path)")
+        let logo = decoded.logos.first { $0.iso6391 == "en" }
+            ?? decoded.logos.first { $0.iso6391 == "nl" }
+            ?? decoded.logos.first { $0.iso6391 == nil }
+            ?? decoded.logos.first
+        let backdrop = decoded.backdrops.first
+        return (
+            backdrop.flatMap { URL(string: "https://image.tmdb.org/t/p/w1280\($0.filePath)") },
+            logo.flatMap { URL(string: "https://image.tmdb.org/t/p/w500\($0.filePath)") }
+        )
     }
 }

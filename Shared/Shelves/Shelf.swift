@@ -8,18 +8,82 @@ struct Shelf: Codable, Identifiable, Equatable, Hashable {
     var title: String
     var isEnabled: Bool
     var source: ShelfSource
+    // Alleen van toepassing op `.mediaServer`-planken (Jellyfin/VeyraHub) --
+    // bepaalt de `SortBy`/`SortOrder` waarmee `ShelfCatalogService` die
+    // bibliotheek bevraagt (zie `JellyfinService.items`). Bewust Optioneel
+    // i.p.v. met een standaardwaarde: Swifts automatische Codable-synthese
+    // decodeert een ontbrekende sleutel voor een Optioneel veld stilzwijgend
+    // als `nil` i.p.v. te falen, zodat al opgeslagen planken van vóór deze
+    // functie gewoon blijven inladen. `nil` betekent "standaard" -- zie
+    // `effectiveItemOrder`/`effectiveSortDirection`.
+    var itemOrder: ShelfItemOrder?
+    var sortDirection: ShelfSortDirection?
 
     init(
         id: UUID = UUID(),
         title: String,
         isEnabled: Bool = true,
-        source: ShelfSource
+        source: ShelfSource,
+        itemOrder: ShelfItemOrder? = nil,
+        sortDirection: ShelfSortDirection? = nil
     ) {
         self.id = id
         self.title = title
         self.isEnabled = isEnabled
         self.source = source
+        self.itemOrder = itemOrder
+        self.sortDirection = sortDirection
     }
+
+    /// Standaard "Datum toegevoegd, aflopend" (nieuwste eerst) -- past bij
+    /// planken als "NFL Recent" die expliciet de nieuwste items vooraan
+    /// willen tonen, en is de meest gekozen sortering bij mediaserver-planken.
+    var effectiveItemOrder: ShelfItemOrder { itemOrder ?? .dateAdded }
+    var effectiveSortDirection: ShelfSortDirection { sortDirection ?? .descending }
+}
+
+/// Item-volgorde voor een `.mediaServer`-plank (Jellyfin/VeyraHub) -- wordt
+/// rechtstreeks vertaald naar de `SortBy`-queryparameter van de Jellyfin-API.
+enum ShelfItemOrder: String, Codable, CaseIterable, Identifiable, Hashable {
+    case dateAdded
+    case name
+    case releaseDate
+    case rating
+    case random
+
+    var id: String { rawValue }
+
+    var jellyfinSortBy: String {
+        switch self {
+        case .dateAdded: return "DateCreated"
+        case .name: return "SortName"
+        case .releaseDate: return "PremiereDate"
+        case .rating: return "CommunityRating"
+        case .random: return "Random"
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .dateAdded: return "Datum toegevoegd"
+        case .name: return "Naam"
+        case .releaseDate: return "Releasedatum"
+        case .rating: return "Beoordeling"
+        case .random: return "Willekeurig"
+        }
+    }
+}
+
+/// Sorteerrichting bij `ShelfItemOrder`, vertaald naar Jellyfin's `SortOrder`.
+enum ShelfSortDirection: String, Codable, CaseIterable, Identifiable, Hashable {
+    case ascending
+    case descending
+
+    var id: String { rawValue }
+
+    var jellyfinSortOrder: String { self == .ascending ? "Ascending" : "Descending" }
+
+    var label: String { self == .ascending ? "Oplopend" : "Aflopend" }
 }
 
 enum ShelfMediaKind: String, Codable, CaseIterable, Hashable {
@@ -127,6 +191,12 @@ struct ShelfIPTVChannel: Codable, Equatable, Hashable, Identifiable {
     // beschikbaar). Standaard `nil` zodat bestaande aanroepen van het
     // memberwise `init` (zonder dit veld) blijven compileren.
     var addedAt: Date? = nil
+    // EPG-kanaal-ID (Xtream `epg_channel_id` / M3U `tvg-id`) -- alleen relevant
+    // voor `.live`-kanalen. Hiermee kan de gids van dit kanaal alsnog worden
+    // opgevraagd los van de provider die op dat moment "actief" staat (zie
+    // `LiveTVFolderEPGLoader`), want `VeyraEPGStore` volgt zelf maar één
+    // provider tegelijk. `nil` bij oudere planken/mappen (van vóór dit veld).
+    var tvgID: String? = nil
 
     var id: String { "\((kind ?? .live).rawValue):\(providerName):\(channelID)" }
 }

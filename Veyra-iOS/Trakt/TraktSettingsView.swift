@@ -43,11 +43,13 @@ struct TraktSettingsView: View {
             isLinking = false
             deviceCode = nil
         }
-        .confirmationDialog("Trakt ontkoppelen?", isPresented: $confirmDisconnect, titleVisibility: .visible) {
+        .veyraConfirmationDialog("Trakt ontkoppelen?", isPresented: $confirmDisconnect) {
             Button("Ontkoppelen", role: .destructive) {
+                confirmDisconnect = false
                 disconnecting = true
                 Task { await store.disconnect(); disconnecting = false }
             }
+            Button("Annuleren", role: .cancel) { confirmDisconnect = false }
         } message: {
             Text("De koppeling en geladen Trakt-gegevens worden van dit toestel verwijderd. Je geschiedenis en lijsten bij Trakt blijven behouden.")
         }

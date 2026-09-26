@@ -4,6 +4,10 @@ struct ShelvesSettingsView: View {
     @StateObject private var viewModel = ShelvesViewModel()
     @State private var showAddSheet = false
     @State private var editingShelf: Shelf?
+    // Los "submenu" met snelinstellingen per plank (momenteel enkel
+    // item-volgorde/richting voor mediaserver-planken) -- zonder eerst het
+    // hele "Wijzig plank"-scherm te moeten openen.
+    @State private var quickSettingsShelf: Shelf?
 
     var body: some View {
         Form {
@@ -43,6 +47,13 @@ struct ShelvesSettingsView: View {
                                 }.disabled(index >= viewModel.shelves.count - 1)
                             }
                             .buttonStyle(.plain)
+
+                            if case .mediaServer = shelf.source {
+                                Button { quickSettingsShelf = shelf } label: {
+                                    Image(systemName: "ellipsis.circle")
+                                }
+                                .buttonStyle(.plain)
+                            }
                         }
                         .veyraCardRow()
                     }
@@ -76,6 +87,39 @@ struct ShelvesSettingsView: View {
         }
         .onAppear(perform: viewModel.reload)
         .onReceive(NotificationCenter.default.publisher(for: .veyraShelfConfigurationDidChange)) { _ in viewModel.reload() }
+        .confirmationDialog(
+            quickSettingsShelf?.title ?? "Plankinstellingen",
+            isPresented: Binding(
+                get: { quickSettingsShelf != nil },
+                set: { if !$0 { quickSettingsShelf = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            quickSettingsDialogButtons
+        }
+    }
+
+    @ViewBuilder
+    private var quickSettingsDialogButtons: some View {
+        if let shelf = quickSettingsShelf {
+            ForEach(ShelfItemOrder.allCases) { order in
+                Button(order.label + (shelf.effectiveItemOrder == order ? " ✓" : "")) {
+                    var updated = shelf
+                    updated.itemOrder = order
+                    viewModel.update(updated)
+                    quickSettingsShelf = viewModel.shelves.first { $0.id == shelf.id }
+                }
+            }
+            ForEach(ShelfSortDirection.allCases) { direction in
+                Button(direction.label + (shelf.effectiveSortDirection == direction ? " ✓" : "")) {
+                    var updated = shelf
+                    updated.sortDirection = direction
+                    viewModel.update(updated)
+                    quickSettingsShelf = viewModel.shelves.first { $0.id == shelf.id }
+                }
+            }
+        }
+        Button("Sluiten", role: .cancel) {}
     }
 
     private func moveShelf(_ index: Int, by offset: Int) {

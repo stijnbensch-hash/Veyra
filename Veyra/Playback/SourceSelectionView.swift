@@ -56,8 +56,6 @@ struct SourceSelectionView: View {
 
                 filterBar
 
-                loadingStatus
-
                 content
 
                 Spacer(
@@ -267,43 +265,37 @@ struct SourceSelectionView: View {
     private var header:
         some View
     {
-        VStack(
-            alignment: .leading,
-            spacing: 10
+        HStack(
+            alignment: .center,
+            spacing: 36
         ) {
-            Text("Selecteer bron")
-            .font(.system(size: 48, weight: .bold, design: .rounded))
-            .foregroundStyle(
-                .white
-            )
+            VStack(
+                alignment: .leading,
+                spacing: 10
+            ) {
+                Text("Selecteer bron")
+                .font(.system(size: 48, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
 
-            Text(
-                item.title
-            )
-            .font(
-                .system(
-                    size: 27,
-                    weight: .semibold
+                Text(mediaDescription)
+                .font(.system(size: 19))
+                .foregroundStyle(
+                    .white.opacity(0.55)
                 )
-            )
-            .foregroundStyle(
-                .cyan
-            )
-            .lineLimit(1)
+            }
 
-            Text(
-                mediaDescription
+            Spacer(minLength: 24)
+
+            VeyraClearLogo(
+                item: item,
+                fallbackTitle: item.title,
+                maxWidth: 500,
+                maxHeight: 110,
+                font: .system(size: 36, weight: .semibold, design: .rounded),
+                alignment: .trailing
             )
-            .font(
-                .system(
-                    size: 19
-                )
-            )
-            .foregroundStyle(
-                .white.opacity(
-                    0.55
-                )
-            )
+            .frame(width: 500, height: 110, alignment: .trailing)
+            .accessibilityLabel(item.title)
         }
     }
 
@@ -521,62 +513,6 @@ struct SourceSelectionView: View {
         }
     }
 
-    // MARK: - Loading
-
-    @ViewBuilder
-    private var loadingStatus:
-        some View
-    {
-        if isLoadingAddons {
-            HStack(
-                spacing: 12
-            ) {
-                ProgressView()
-                    .scaleEffect(
-                        0.75
-                    )
-
-                Text(
-                    "Addonbronnen zoeken…"
-                )
-                .font(
-                    .system(
-                        size: 18
-                    )
-                )
-                .foregroundStyle(
-                    .white.opacity(
-                        0.60
-                    )
-                )
-            }
-
-        } else if isLoadingIPTV {
-            HStack(
-                spacing: 12
-            ) {
-                ProgressView()
-                    .scaleEffect(
-                        0.65
-                    )
-
-                Text(
-                    "IPTV VOD wordt toegevoegd…"
-                )
-                .font(
-                    .system(
-                        size: 17
-                    )
-                )
-                .foregroundStyle(
-                    .cyan.opacity(
-                        0.72
-                    )
-                )
-            }
-        }
-    }
-
     // MARK: - Content
 
     @ViewBuilder
@@ -584,7 +520,7 @@ struct SourceSelectionView: View {
         some View
     {
         if sources.isEmpty
-            && isLoadingAddons
+            && (isLoadingAddons || isLoadingIPTV)
         {
             loadingView
 
@@ -607,7 +543,9 @@ struct SourceSelectionView: View {
             ProgressView()
 
             Text(
-                "Beschikbare bronnen zoeken…"
+                isLoadingAddons
+                    ? "Beschikbare bronnen zoeken…"
+                    : "IPTV-bronnen zoeken…"
             )
             .font(
                 .system(

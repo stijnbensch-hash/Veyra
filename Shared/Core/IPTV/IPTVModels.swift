@@ -94,7 +94,7 @@ nonisolated struct IPTVVODItem: Identifiable, Hashable, Codable, Sendable {
             name: name,
             description: "IPTV VOD",
             url: streamURL,
-            kind: .direct
+            kind: .iptvVOD
         )
     }
 }

@@ -34,7 +34,8 @@ struct SimilarTitlesRow: View {
                                     symbol: related.type == .movie ? "film" : "tv",
                                     width: posterWidth,
                                     genre: related.genre,
-                                    rating: related.rating
+                                    rating: related.rating,
+                                    year: String(related.releaseDate?.prefix(4) ?? "")
                                 )
                             }
 #if os(tvOS)

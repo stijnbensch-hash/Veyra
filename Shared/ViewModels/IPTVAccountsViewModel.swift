@@ -88,7 +88,7 @@ final class IPTVAccountsViewModel: ObservableObject {
     /// Lichte bereikbaarheidscheck: bij Xtream een korte `player_api.php`-
     /// aanroep (bevestigt zowel bereikbaarheid als geldige inloggegevens),
     /// bij M3U een `HEAD`-verzoek op de playlist-URL.
-    private static func ping(_ configuration: IPTVStoredConfiguration, timeout: TimeInterval = 6) async -> Bool {
+    static func ping(_ configuration: IPTVStoredConfiguration, timeout: TimeInterval = 6) async -> Bool {
         switch configuration {
         case .xtream(let xtream):
             return (try? await XtreamClient(configuration: xtream).liveCategories()) != nil

@@ -193,12 +193,25 @@ extension BentoTile {
         case .tv:
             switch self {
             case .releasesFilms, .releasesSeries: return 504
-            case .volgende: return 340
-            case .vandaag: return 236
+            // Was 340/236 -- de kaarten in deze twee rijen (`VeyraBentoHome.swift`)
+            // zijn intussen 292pt hoog (was 236, te krap voor beeld + titel/logo-
+            // rij eronder), dus de rijhoogte zelf moet mee omhoog. Deze twee
+            // rijen gebruiken `.scrollClipDisabled()`, dus een tekort hier klipt
+            // niet zichtbaar weg maar laat de kaarten gewoon over de volgende
+            // sectie heen lopen -- vandaar dat dit hier ook echt moet kloppen.
+            case .volgende: return 352
+            case .vandaag: return 352
             case .live: return 520
             case .iptvFilms, .iptvSeries: return 450
             case .streaming: return 220
-            case .collecties: return names ? 306 : 272
+            // Was 306/272 -- te krap voor de kop + z'n `spacing` + de eigen
+            // verticale padding van de banner-ScrollView (24pt) erboven op de
+            // bannerhoogte zelf. `VeyraBentoGrid` geeft de rij precies deze
+            // hoogte door (niet de werkelijk benodigde inhoudshoogte), dus
+            // met te weinig ruimte klipte de horizontale ScrollView de
+            // banners verticaal middenin hun ronde hoeken -- rechte randen
+            // boven/onder, alleen de zijkanten van de rand nog zichtbaar.
+            case .collecties: return names ? 334 : 300
             default: return 300
             }
         case .tablet:
@@ -209,7 +222,8 @@ extension BentoTile {
             case .vandaag: return 205
             case .iptvFilms, .iptvSeries: return 280
             case .streaming: return 76
-            case .collecties: return names ? 216 : 194
+            // Zie toelichting bij `.tv` hierboven -- zelfde tekort, andere maten.
+            case .collecties: return names ? 244 : 222
             default: return 200
             }
         case .phone:
@@ -219,7 +233,8 @@ extension BentoTile {
             case .releasesFilms, .releasesSeries: return 300
             case .iptvFilms, .iptvSeries: return 270
             case .streaming: return 60
-            case .collecties: return names ? 177 : 155
+            // Zie toelichting bij `.tv` hierboven -- zelfde tekort, andere maten.
+            case .collecties: return names ? 205 : 183
             case .vandaag: return 165
             default: return 200
             }

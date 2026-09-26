@@ -109,6 +109,13 @@ nonisolated enum IPTVDiskCache {
                 to: fileURL,
                 options: .atomic
             )
+            #if os(iOS) || os(tvOS)
+            // De catalogus kan streamadressen met providergegevens bevatten.
+            try? FileManager.default.setAttributes(
+                [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+                ofItemAtPath: fileURL.path
+            )
+            #endif
         }
     }
 
@@ -116,7 +123,16 @@ nonisolated enum IPTVDiskCache {
         guard let fileURL = fileURL(for: key) else {
             return
         }
+        writeQueue.sync {
+            try? FileManager.default.removeItem(at: fileURL)
+        }
+    }
 
-        try? FileManager.default.removeItem(at: fileURL)
+    /// Wacht tot eerdere achtergrondsaves klaar zijn voordat andere schermen
+    /// de zojuist voorgevulde cache lezen.
+    static func flush() async {
+        await withCheckedContinuation { continuation in
+            writeQueue.async { continuation.resume() }
+        }
     }
 }

@@ -55,6 +55,28 @@ private struct VeyraBentoPanel<Content: View>: View {
 
 // MARK: - Verder kijken
 
+/// Dezelfde verdeling voor beeld en onderschrift op elk apparaat. Alleen de
+/// buitenmaat volgt de beschikbare ruimte; een clearlogo verandert het kader niet.
+struct VeyraCaptionedCardLayout {
+    let width: CGFloat
+    let height: CGFloat
+    let captionHeight: CGFloat
+    let spacing: CGFloat
+
+    var artworkHeight: CGFloat { height - captionHeight - spacing }
+
+    /// Liggende kaart met een 16:9-beeld en een vaste regel voor logo en tekst eronder.
+    static func landscape(width: CGFloat) -> Self {
+        let captionHeight: CGFloat = 26
+        let spacing: CGFloat = 6
+        return Self(width: width, height: width * 9 / 16 + captionHeight + spacing,
+                    captionHeight: captionHeight, spacing: spacing)
+    }
+
+    static let tv = Self(width: 420, height: 292, captionHeight: 42, spacing: 8)
+    static let regular = landscape(width: 380)
+}
+
 /// Grote kaart: beeld + (kleine) clearlogo/titel, aflevering en resterende tijd, cyaan voortgangslijn.
 struct VeyraBentoContinueHeroContent: View {
     let item: ContinueItem
@@ -131,20 +153,23 @@ struct VeyraBentoContinueMiniContent: View {
     var compact = false
     var thumbnailWidth: CGFloat? = nil
     var cornerRadius: CGFloat = 22
+    var cardLayout: VeyraCaptionedCardLayout = .tv
 
     @Environment(\.isFocused) private var isFocused
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
 
-        VStack(alignment: .leading, spacing: compact ? 4 : 8) {
+        VStack(alignment: .leading, spacing: cardLayout.spacing) {
             ZStack {
-                // Enkel de afbeelding in het kader -- geen titeltekst/clearlogo meer overheen
-                // (die staat, samen met de meta-tekst, al los onder het kader).
-                VeyraArt(url: item.bannerURL ?? item.backdropURL, seed: item.title)
+                VeyraArt(url: item.backdropURL ?? item.bannerURL, seed: item.title,
+                         contentMode: .fit)
                 LinearGradient(colors: [.black.opacity(0.45), .clear, .black.opacity(0.10)],
                                startPoint: .top, endPoint: .bottom)
             }
+            // De beeldhoogte is op alle apparaten vast, zodat een clearlogo
+            // in het onderschrift het kader niet kleiner kan maken.
+            .frame(height: cardLayout.artworkHeight)
             .overlay(alignment: .bottom) {
                 if item.progress > 0 { VeyraHairline(progress: item.progress, height: compact ? 3 : 4) }
             }
@@ -156,17 +181,22 @@ struct VeyraBentoContinueMiniContent: View {
                     radius: isFocused ? 22 : 14, x: isFocused ? -5 : 0, y: isFocused ? 3 : 10)
             .shadow(color: isFocused ? VeyraColors.red.opacity(0.20) : .clear, radius: 22, x: 8, y: 3)
 
-            // Zelfde onderschriftstijl als Binnenkort: clearlogo links, cyaan info rechts.
+            // Clearlogo/titel links, cyaan meta-tekst rechts -- buiten het kader, eronder.
+            // Op tvOS (niet-compact) bewust groter dan op iOS: op de bank, van
+            // veraf bekeken, was zowel het clearlogo als de cyaan meta-tekst
+            // hier te klein om vlot te lezen.
             HStack(alignment: .center, spacing: compact ? 8 : 14) {
                 VeyraTitleLogo(title: item.title, logoURL: item.logoURL,
-                               size: compact ? 15 : 20, maxLogoHeight: compact ? 26 : 38)
+                               size: compact ? 15 : 30,
+                               maxLogoHeight: cardLayout.captionHeight)
 
                 Text(compact ? item.shortMetaText : item.metaText)
-                    .font(.system(size: compact ? 14 : 18, weight: .bold))
+                    .font(.system(size: compact ? 14 : 27, weight: .bold))
                     .foregroundStyle(VeyraHomeStyle.cyan)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
             }
+            .frame(height: cardLayout.captionHeight)
             .padding(.horizontal, compact ? 10 : 14)
         }
         .foregroundStyle(.white)
@@ -355,15 +385,16 @@ struct VeyraBentoUpcomingCardContent: View {
     let isReminded: Bool
     var compact = false
     var cornerRadius: CGFloat = 22
+    var cardLayout: VeyraCaptionedCardLayout = .tv
 
     @Environment(\.isFocused) private var isFocused
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
 
-        VStack(alignment: .leading, spacing: compact ? 4 : 8) {
+        VStack(alignment: .leading, spacing: cardLayout.spacing) {
             ZStack {
-                VeyraArt(url: item.backdropURL, seed: item.title)
+                VeyraArt(url: item.backdropURL, seed: item.title, contentMode: .fit)
                 LinearGradient(colors: [.black.opacity(0.55), .clear],
                                startPoint: .bottom, endPoint: .top)
                 VStack(alignment: .leading, spacing: 0) {
@@ -383,6 +414,7 @@ struct VeyraBentoUpcomingCardContent: View {
                 }
                 .padding(compact ? 10 : 14)
             }
+            .frame(height: cardLayout.artworkHeight)
             // Het cyaan/rode kader zit alleen rond de banner, niet rond de tekst eronder.
             .clipShape(shape)
             .overlay(shape.strokeBorder(isFocused ? VeyraFrame.active : VeyraFrame.resting,
@@ -391,17 +423,20 @@ struct VeyraBentoUpcomingCardContent: View {
                     radius: isFocused ? 22 : 14, x: isFocused ? -5 : 0, y: isFocused ? 3 : 10)
             .shadow(color: isFocused ? VeyraColors.red.opacity(0.20) : .clear, radius: 22, x: 8, y: 3)
 
-            // Titel-clearlogo en datum staan samen onder het beeldkader.
+            // Titel-clearlogo en datum staan samen onder het beeldkader. Zelfde
+            // grotere tvOS-maten als bij "Verder kijken" hierboven.
             HStack(alignment: .center, spacing: compact ? 8 : 14) {
                 VeyraTitleLogo(title: item.title, logoURL: item.logoURL,
-                               size: compact ? 15 : 20, maxLogoHeight: compact ? 26 : 38)
+                               size: compact ? 15 : 30,
+                               maxLogoHeight: cardLayout.captionHeight)
 
                 Text(VeyraHomeFormat.when(item.airDate, now: now, dateOnly: true))
-                    .font(.system(size: compact ? 14 : 18, weight: .bold))
+                    .font(.system(size: compact ? 14 : 27, weight: .bold))
                     .foregroundStyle(VeyraHomeStyle.cyan)
                     .lineLimit(1)
                     .fixedSize(horizontal: true, vertical: false)
             }
+            .frame(height: cardLayout.captionHeight)
             .padding(.horizontal, compact ? 10 : 14)
         }
         .foregroundStyle(.white)
@@ -634,7 +669,7 @@ struct VeyraBentoShelf<Cards: View>: View {
             VStack(alignment: .leading, spacing: compact ? 6 : 10) {
                 VeyraBentoLabel(title: title, trailing: subtitle, compact: compact, smallTrailing: true)
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(alignment: .top, spacing: compact ? 14 : 26) { cards }
+                    LazyHStack(alignment: .top, spacing: compact ? 14 : 26) { cards }
                         .frame(height: contentHeight ?? (compact ? 200 : 312))
                         .padding(.vertical, compact ? 2 : 8)
                         .padding(.horizontal, compact ? 2 : 8)
@@ -859,12 +894,13 @@ struct VeyraBentoCollectionMiniContent: View {
             }
             .clipShape(RoundedRectangle(cornerRadius: compact ? 16 : 22, style: .continuous))
             // Cyaan-rode rand enkel om de banner (net als bij "Verder kijken"); de naam eronder blijft erbuiten.
+            // Altijd een zichtbare rand -- niet enkel bij focus/hover, want op iOS/iPadOS/macOS is er geen
+            // afstandsbediening-focus, dus dan viel de rand hier (en de gloed eronder) helemaal weg.
             .overlay {
-                // Rand (en focus-gloed op tvOS) enkel om de banner; de naam eronder blijft erbuiten.
                 RoundedRectangle(cornerRadius: compact ? 16 : 22, style: .continuous)
-                    .strokeBorder(isFocused ? VeyraFrame.active : VeyraFrame.resting, lineWidth: isFocused ? 3 : 1.5)
+                    .strokeBorder(isFocused ? VeyraFrame.active : VeyraFrame.resting, lineWidth: isFocused ? 3 : (compact ? 2 : 1.5))
             }
-            .shadow(color: isFocused ? VeyraColors.cyan.opacity(0.35) : .clear, radius: 16, x: -4)
-            .shadow(color: isFocused ? VeyraColors.red.opacity(0.22) : .clear, radius: 16, x: 6)
+            .shadow(color: VeyraColors.cyan.opacity(isFocused ? 0.35 : 0.16), radius: isFocused ? 16 : 8, x: -4)
+            .shadow(color: VeyraColors.red.opacity(isFocused ? 0.22 : 0.12), radius: isFocused ? 16 : 8, x: 6)
     }
 }

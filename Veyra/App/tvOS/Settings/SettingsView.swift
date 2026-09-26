@@ -574,12 +574,9 @@ struct VeyraAddonsSettingsView:
         ) {
             AddonAddView()
         }
-        .confirmationDialog(
+        .veyraConfirmationDialog(
             "Koppeling verwijderen?",
-            isPresented:
-                deleteDialogBinding,
-            titleVisibility:
-                .visible
+            isPresented: deleteDialogBinding
         ) {
             Button(
                 "Verwijderen",

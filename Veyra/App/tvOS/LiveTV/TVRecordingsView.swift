@@ -1,16 +1,13 @@
 import SwiftUI
 
-/// tvOS: "Mijn opnames" — VeyraHub Recorder's geplande, lopende en
-/// voltooide opnames. Bereikbaar vanuit de programmagids (zie
-/// `LiveTVView.recordingsButton`).
+/// tvOS: "Opnames"-menu-item — VeyraHub Recorder's geplande, lopende en
+/// voltooide opnames.
 struct TVRecordingsView: View {
     @State private var recordings: [VeyraHubRecording] = []
     @State private var message: String?
     @State private var playingSource: PlayableSource?
 
     @FocusState private var focusedActionID: String?
-
-    @Environment(\.dismiss) private var dismiss
 
     private var hub: MediaServerAccount? {
         MediaServerStore().load().first(where: { $0.isVeyraHub })

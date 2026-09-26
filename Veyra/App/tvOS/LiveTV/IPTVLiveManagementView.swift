@@ -103,20 +103,32 @@ struct IPTVLiveManagementView: View {
     // MARK: - Header
 
     private var header: some View {
-        VStack(
-            alignment: .leading,
-            spacing: 8
-        ) {
-            Text("Live TV beheren")
-                .font(.system(size: 48, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
+        HStack(alignment: .top) {
+            VStack(
+                alignment: .leading,
+                spacing: 8
+            ) {
+                Text("Live TV beheren")
+                    .font(.system(size: 48, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
 
-            Text("CATEGORIEËN & KANALEN")
-                .font(.caption)
-                .tracking(3)
-                .foregroundStyle(
-                    .cyan.opacity(0.75)
-                )
+                Text("CATEGORIEËN & KANALEN")
+                    .font(.caption)
+                    .tracking(3)
+                    .foregroundStyle(
+                        .cyan.opacity(0.75)
+                    )
+            }
+
+            Spacer()
+
+            Button {
+                Task { await load() }
+            } label: {
+                Image(systemName: "arrow.clockwise")
+                    .frame(width: 48, height: 48)
+            }
+            .accessibilityLabel("Categorieën en kanalen nu vernieuwen")
         }
     }
 

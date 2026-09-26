@@ -72,6 +72,31 @@ final class VeyraEPGStore: ObservableObject {
         data.count < Self.maxUserDefaultsSnapshotBytes
     }
 
+    private static func cacheInterval(
+        key: String,
+        fallback: IPTVCacheRefreshInterval
+    ) -> TimeInterval {
+        let raw = UserDefaults.standard.string(forKey: key) ?? fallback.rawValue
+        return (IPTVCacheRefreshInterval(rawValue: raw) ?? fallback).seconds
+    }
+
+    private static func catalogUsesCurrentCredentials(
+        _ catalog: VeyraLiveCatalog,
+        configuration: IPTVStoredConfiguration
+    ) -> Bool {
+        guard case .xtream(let account) = configuration else { return true }
+        guard let channel = catalog.channels.first(where: { $0.sourceType == .xtream }) else { return false }
+        let expectedBase = account.serverURL
+            .appendingPathComponent("live")
+            .appendingPathComponent(account.username)
+            .appendingPathComponent(account.password)
+        let actualBase = channel.streamURL.deletingLastPathComponent()
+        return actualBase.scheme == expectedBase.scheme
+            && actualBase.host == expectedBase.host
+            && actualBase.port == expectedBase.port
+            && actualBase.pathComponents == expectedBase.pathComponents
+    }
+
     private var providerKey: String?
     private var generation = UUID()
     private var completedReloadID: UUID?
@@ -206,7 +231,15 @@ final class VeyraEPGStore: ObservableObject {
 
     // MARK: - Reload
 
-    func reload() async {
+    /// - Parameter force: negeert de "verversen"-instellingen
+    /// (`refreshChannelsIntervalKey`/`refreshEPGIntervalKey`) en de korte
+    /// 15-minuten-throttle hieronder, en haalt zenderlijst + gids altijd
+    /// opnieuw bij de provider op. Gebruikt door de expliciete
+    /// "Vernieuwen"-knoppen in Live TV en de kanaal-/VOD-beheerschermen --
+    /// zonder deze parameter deed zo'n knop feitelijk niets zolang het
+    /// ingestelde interval nog niet verstreken was, want `reload()` las de
+    /// schijfcache dan gewoon opnieuw in.
+    func reload(force: Bool = false) async {
         let token = UUID()
         generation = token
 
@@ -237,7 +270,8 @@ final class VeyraEPGStore: ObservableObject {
 
             // Bij dezelfde reload hoeven zenders niet opnieuw
             // gedownload te worden.
-            if completedReloadID == requestedReloadID,
+            if !force,
+               completedReloadID == requestedReloadID,
                configuration == loadedConfiguration,
                preferences == loadedPreferences,
                let loadedAt,
@@ -278,33 +312,68 @@ final class VeyraEPGStore: ObservableObject {
             }
 
             let cacheKey = "live-catalog-v1-\(configuration.providerIdentifier)"
-            if let cached = IPTVDiskCache.read(
-                VeyraLiveCatalog.self, key: cacheKey
-            )?.value {
-                applyCatalog(cached, configuration: configuration, preferences: preferences)
-                loadingChannels = false
-            }
-            if let data = UserDefaults.standard.data(
+            let diskCatalog = IPTVDiskCache.read(VeyraLiveCatalog.self, key: cacheKey)
+            let syncedCatalog = UserDefaults.standard.data(
                 forKey: VeyraIPTVSnapshot.catalogPrefix + configuration.providerIdentifier
-            ), let snapshot = VeyraIPTVSnapshot.decode(
-                VeyraCatalogSnapshot.self, from: data
-            ) {
+            ).flatMap { VeyraIPTVSnapshot.decode(VeyraCatalogSnapshot.self, from: $0) }
+            var catalogSavedAt: Date?
+            if let snapshot = syncedCatalog,
+               Self.catalogUsesCurrentCredentials(snapshot.catalog, configuration: configuration),
+               snapshot.savedAt.timeIntervalSince(diskCatalog?.savedAt ?? .distantPast) > 60 {
+                // Een ander apparaat kan inmiddels nieuwe kanalen hebben.
+                // Toon ze meteen, maar haal daarna de volledige catalogus op.
+                applyCatalog(snapshot.catalog, configuration: configuration, preferences: preferences)
+                loadingChannels = false
+            } else if let cached = diskCatalog,
+                      Self.catalogUsesCurrentCredentials(cached.value, configuration: configuration) {
+                applyCatalog(cached.value, configuration: configuration, preferences: preferences)
+                catalogSavedAt = cached.savedAt
+                loadingChannels = false
+            } else if let snapshot = syncedCatalog,
+                      Self.catalogUsesCurrentCredentials(snapshot.catalog, configuration: configuration) {
                 applyCatalog(snapshot.catalog, configuration: configuration, preferences: preferences)
                 loadingChannels = false
             }
             let guideCacheKey = "live-guide-v1-\(configuration.providerIdentifier)"
-            if let cachedGuide = IPTVDiskCache.read(
-                [String: [VeyraEPGProgramme]].self,
-                key: guideCacheKey
-            )?.value {
-                programmeIndex = cachedGuide
-            }
-            if let data = UserDefaults.standard.data(
+            let diskGuide = IPTVDiskCache.read([String: [VeyraEPGProgramme]].self,
+                                               key: guideCacheKey)
+            let syncedGuide = UserDefaults.standard.data(
                 forKey: VeyraIPTVSnapshot.guidePrefix + configuration.providerIdentifier
-            ), let snapshot = VeyraIPTVSnapshot.decode(
-                VeyraGuideSnapshot.self, from: data
-            ) {
+            ).flatMap { VeyraIPTVSnapshot.decode(VeyraGuideSnapshot.self, from: $0) }
+            var guideSavedAt: Date?
+            if let snapshot = syncedGuide,
+               snapshot.savedAt.timeIntervalSince(diskGuide?.savedAt ?? .distantPast) > 60 {
                 programmeIndex = snapshot.programmes
+                guideSavedAt = snapshot.savedAt
+            } else if let cachedGuide = diskGuide {
+                programmeIndex = cachedGuide.value
+                guideSavedAt = cachedGuide.savedAt
+            } else if let snapshot = syncedGuide {
+                programmeIndex = snapshot.programmes
+                guideSavedAt = snapshot.savedAt
+            }
+
+            let channelInterval = Self.cacheInterval(
+                key: IPTVPlaybackSettingsDefaults.refreshChannelsIntervalKey,
+                fallback: .sixHours)
+            let guideInterval = Self.cacheInterval(
+                key: IPTVPlaybackSettingsDefaults.refreshEPGIntervalKey,
+                fallback: .twelveHours)
+            let guideIsFresh = guideSavedAt.map { savedAt in
+                Date().timeIntervalSince(savedAt) < guideInterval
+                    && (catalogSavedAt.map { savedAt >= $0 } ?? true)
+            } ?? false
+            if !force, let catalogSavedAt, !allChannels.isEmpty,
+               Date().timeIntervalSince(catalogSavedAt) < channelInterval {
+                loadedConfiguration = configuration
+                loadedPreferences = preferences
+                loadingChannels = false
+                await loadGuide(configuration: configuration, token: token,
+                                useCachedGuide: guideIsFresh)
+                guard generation == token, !Task.isCancelled else { return }
+                completedReloadID = requestedReloadID
+                loadedAt = Date()
+                return
             }
 
             let receivedChannels: [IPTVChannel]
@@ -389,6 +458,8 @@ final class VeyraEPGStore: ObservableObject {
             loadedConfiguration = configuration
             loadedPreferences = preferences
 
+            // Een nieuwe zenderlijst kan nieuwe EPG-ID's bevatten: haal de
+            // gids dan mee op, ook als de vorige gids nog binnen zijn TTL valt.
             await loadGuide(configuration: configuration, token: token)
 
             guard generation == token, !Task.isCancelled else { return }
@@ -864,8 +935,10 @@ final class VeyraEPGStore: ObservableObject {
 
     private func loadGuide(
         configuration: IPTVStoredConfiguration,
-        token: UUID
+        token: UUID,
+        useCachedGuide: Bool = false
     ) async {
+        if useCachedGuide { return }
         // Gebruik `allChannels` (ongefilterd door Live TV-zichtbaarheid) i.p.v.
         // `channels`, zodat de EPG-programmadata ook beschikbaar is voor niet-
         // zichtbaar-gezette zenders (nodig voor sportwedstrijd-kanaalmatching).

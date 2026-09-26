@@ -20,7 +20,13 @@ enum ShelfCatalogService {
             return await addonItems(addonID: addonID, catalogType: catalogType, catalogID: catalogID)
 
         case .mediaServer(let serverID, _, let libraryID, _, let kind):
-            return await mediaServerItems(serverID: serverID, libraryID: libraryID, kind: kind)
+            return await mediaServerItems(
+                serverID: serverID,
+                libraryID: libraryID,
+                kind: kind,
+                itemOrder: shelf.effectiveItemOrder,
+                sortDirection: shelf.effectiveSortDirection
+            )
 
         case .iptv(let channels):
             return channels.map(mediaItem(from:))
@@ -381,7 +387,9 @@ enum ShelfCatalogService {
     private static func mediaServerItems(
         serverID: UUID,
         libraryID: String,
-        kind: ShelfMediaKind
+        kind: ShelfMediaKind,
+        itemOrder: ShelfItemOrder,
+        sortDirection: ShelfSortDirection
     ) async -> [MediaItem] {
         guard let account = MediaServerStore().load().first(where: { $0.id == serverID }) else { return [] }
 
@@ -390,7 +398,9 @@ enum ShelfCatalogService {
         do {
             let items = try await service.items(
                 parentID: libraryID,
-                includeItemTypes: [kind == .movie ? "Movie" : "Series"]
+                includeItemTypes: [kind == .movie ? "Movie" : "Series"],
+                sortBy: itemOrder.jellyfinSortBy,
+                sortOrder: sortDirection.jellyfinSortOrder
             )
             let mediaItems = items.map { mediaItem(from: $0, service: service, kind: kind) }
             // Als de server geen TMDB-ID meegaf via `ProviderIds` (bv. een

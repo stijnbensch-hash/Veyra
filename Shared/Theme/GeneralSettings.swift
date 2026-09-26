@@ -27,14 +27,17 @@ enum GeneralSettingsDefaults {
     // Weergave
     static let textSizeKey = "general.textSize"
 
-    // iPad-navigatie
+    // Navigatie (iPad & Mac)
     static let ipadNavigationStyleKey = "general.ipadNavigationStyle"
 }
 
-/// Hoe de hoofdnavigatie op iPad (brede/regular schermbreedte) wordt
-/// getoond — als vaste keuze in plaats van het door het systeem geboden
-/// wissel-knopje tussen beide weergaven (`.sidebarAdaptable` laat anders
-/// altijd omschakelen), zodat er maar één van de twee tegelijk te zien is.
+/// Hoe de hoofdnavigatie op iPad (brede/regular schermbreedte) en op macOS
+/// wordt getoond — als vaste keuze in plaats van het door het systeem
+/// geboden wissel-knopje tussen beide weergaven (`.sidebarAdaptable` laat
+/// anders altijd omschakelen), zodat er maar één van de twee tegelijk te
+/// zien is. `MacContentView` (Veyra-macOS) leest dezelfde sleutel als
+/// `ContentView` (iPad); voorheen gebruikte macOS altijd een vaste zijbalk
+/// en negeerde deze instelling volledig.
 enum IPadNavigationStyle: String, CaseIterable, Identifiable {
     case sidebar
     case topBar

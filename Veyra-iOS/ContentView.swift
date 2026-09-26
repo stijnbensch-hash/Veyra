@@ -7,7 +7,7 @@ import SwiftUI
 import UIKit
 
 private enum AppTab: Hashable {
-    case home, movies, series, search, live, sports, settings
+    case home, movies, series, search, live, sports, recordings, settings
 }
 
 struct ContentView: View {
@@ -50,6 +50,13 @@ struct ContentView: View {
             Tab("Live", systemImage: "antenna.radiowaves.left.and.right", value: AppTab.live) { LiveTVView() }
             Tab("Sport", systemImage: "trophy", value: AppTab.sports) { SportsView() }
             if isPad {
+                // Op iPhone past dit niet meer naast de 5 vaste tabs zonder dat het systeem
+                // ze onder een "Meer"-tab wegstopt -- daar zit Opnames i.p.v. daarvan als
+                // knop in Live TV (zie `LiveTVView.recordingsButton`), net als Zoeken/
+                // Instellingen daar via zwevende knoppen lopen i.p.v. een eigen tab.
+                Tab("Opnames", systemImage: "record.circle", value: AppTab.recordings) {
+                    VeyraRecordingsView()
+                }
                 Tab("Instellingen", systemImage: "gearshape.fill", value: AppTab.settings) { SettingsView() }
             }
         }
@@ -84,6 +91,7 @@ struct ContentView: View {
                 Label("Zoeken", systemImage: "magnifyingglass").tag(AppTab.search)
                 Label("Live", systemImage: "antenna.radiowaves.left.and.right").tag(AppTab.live)
                 Label("Sport", systemImage: "trophy").tag(AppTab.sports)
+                Label("Opnames", systemImage: "record.circle").tag(AppTab.recordings)
                 Label("Instellingen", systemImage: "gearshape.fill").tag(AppTab.settings)
             }
             .navigationTitle("Veyra")
@@ -150,6 +158,7 @@ struct ContentView: View {
         case .search: SearchView()
         case .live: LiveTVView()
         case .sports: SportsView()
+        case .recordings: VeyraRecordingsView()
         case .settings: SettingsView()
         }
     }

@@ -75,6 +75,12 @@ final class VeyraHubSyncService {
         "veyra.bento.collections", "veyra.bento.streaming", "veyra.home.layout", "veyra.home.presetChosen",
     ]
 
+    private static let liveTVFolderDataKeys: [String] = [
+        // Eigen Live TV-mappen (cross-provider kanalencollecties) --
+        // zie Shared/LiveTV/LiveTVFolderStore.swift.
+        "veyra.livetv.folders.configured",
+    ]
+
     private static let sourceOrderDataKeys: [String] = [
         "sourceOrder.categoryOrder", "sourceOrder.iptvProviderOrder", "sourceOrder.originOrder",
     ]
@@ -104,7 +110,7 @@ final class VeyraHubSyncService {
     ]
 
     private static var settingsDataKeys: [String] {
-        shelfHeroDataKeys + sourceOrderDataKeys + addonDataKeys + sourceBadgeDataKeys + recorderDataKeys + sportsDataKeys
+        shelfHeroDataKeys + liveTVFolderDataKeys + sourceOrderDataKeys + addonDataKeys + sourceBadgeDataKeys + recorderDataKeys + sportsDataKeys
     }
 
     private static let metadataPrefix = "metadata.rating."
@@ -349,6 +355,7 @@ final class VeyraHubSyncService {
         var changed = false
         var iptvChanged = false
         var mediaServersChanged = false
+        var liveTVFoldersChanged = false
         for (key, encoded) in values {
             if name == "settings", key == "veyra.iptv.providers" {
                 guard let data = Data(base64Encoded: encoded) else { continue }
@@ -413,6 +420,7 @@ final class VeyraHubSyncService {
             defaults.set(value, forKey: key)
             changed = true
             if key.hasPrefix("veyra.iptv.provider.preferences.") { iptvChanged = true }
+            if key == "veyra.livetv.folders.configured" { liveTVFoldersChanged = true }
         }
         if changed {
             if name == "livetv" {
@@ -426,6 +434,9 @@ final class VeyraHubSyncService {
                 }
                 if mediaServersChanged {
                     NotificationCenter.default.post(name: .veyraMediaServerConfigurationDidChange, object: nil)
+                }
+                if liveTVFoldersChanged {
+                    notifyLiveTVFoldersChange()
                 }
             }
         }

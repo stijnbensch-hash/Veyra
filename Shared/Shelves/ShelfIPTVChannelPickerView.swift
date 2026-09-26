@@ -108,6 +108,14 @@ struct ShelfIPTVChannelPickerView: View {
         )
         .navigationTitle("Kanalen kiezen")
         .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button {
+                    Task { await refresh() }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .accessibilityLabel(contentKind == .live ? "Kanalen nu vernieuwen" : "Aanbieders nu vernieuwen")
+            }
             ToolbarItem(placement: .confirmationAction) {
                 Button("Gereed") {
                     commit()
@@ -164,6 +172,11 @@ struct ShelfIPTVChannelPickerView: View {
         // Wanneer de provider deze titel heeft toegevoegd (Xtream "added") —
         // `nil` voor zenders en M3U (geen datum beschikbaar).
         var addedAt: Date? = nil
+        // EPG-kanaal-ID (Xtream `epg_channel_id` / M3U `tvg-id`) — alleen
+        // gezet voor live zenders, zodat een plank/map die dit kanaal bewaart
+        // later zelf de gids kan opvragen zonder opnieuw de kanalenlijst te
+        // moeten doorzoeken. `nil` voor VOD/series (niet van toepassing).
+        var tvgID: String? = nil
     }
 
     private func itemRow(_ item: PickerItem) -> some View {
@@ -267,6 +280,17 @@ struct ShelfIPTVChannelPickerView: View {
 
     // MARK: - Laden
 
+    /// Haalt de huidige lijst (kanalen of VOD-categorieën) opnieuw op bij de
+    /// provider -- bedoeld voor de verversknop, dus in tegenstelling tot
+    /// `onChange(of: contentKind)` hierboven negeert dit bewust `vodLoaded`.
+    private func refresh() async {
+        if contentKind == .live {
+            await loadLiveChannels()
+        } else {
+            await loadVODCategories()
+        }
+    }
+
     private func loadProviders() async {
         do {
             providers = try configurationStore.loadProviders()
@@ -334,7 +358,8 @@ struct ShelfIPTVChannelPickerView: View {
                         name: ChannelNameOverrideStore.effectiveName(channelID: channel.id, defaultName: channel.name),
                         streamURL: channel.streamURL,
                         logoURL: channel.logoURL,
-                        group: channel.group
+                        group: channel.group,
+                        tvgID: channel.tvgID
                     )
                 }) }
                 .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -518,7 +543,8 @@ struct ShelfIPTVChannelPickerView: View {
                     streamURL: item.streamURL,
                     logoURL: item.logoURL,
                     group: item.group,
-                    kind: .live
+                    kind: .live,
+                    tvgID: item.tvgID
                 )
             } else {
                 byID.removeValue(forKey: key)

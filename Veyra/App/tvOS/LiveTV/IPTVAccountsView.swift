@@ -17,6 +17,9 @@ struct IPTVAccountsView: View {
     @FocusState private var focusedReorderUpID: UUID?
     @FocusState private var focusedReorderDownID: UUID?
 
+    // Actieve/maximale gelijktijdige verbindingen per Xtream-provider.
+    @State private var connectionStatus: [UUID: XtreamConnectionStatus] = [:]
+
     var body: some View {
         ZStack {
             VeyraBackground().ignoresSafeArea()
@@ -150,6 +153,9 @@ struct IPTVAccountsView: View {
                 providerEditControl(provider)
                 reorderColumn(provider)
             }
+            .task(id: provider.id) {
+                await loadConnectionStatus(for: provider)
+            }
 
             if let message = viewModel.refreshMessages[provider.id] {
                 Label(message, systemImage: "checkmark.circle")
@@ -193,6 +199,15 @@ struct IPTVAccountsView: View {
                         .font(.system(size: 16, weight: .bold))
                         .tracking(1)
                         .foregroundStyle(.cyan)
+
+                    if let status = connectionStatus[provider.id] {
+                        Text(status.display)
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(Color.cyan.opacity(0.22), in: Capsule())
+                    }
                 }
 
                 Text(providerSubtitle(provider.configuration))
@@ -453,6 +468,15 @@ struct IPTVAccountsView: View {
     }
 
     // MARK: - Helpers
+
+    /// Enkel voor Xtream-providers -- faalt geruisloos (bv. server offline)
+    /// zodat de rij gewoon normaal blijft tonen zonder badge.
+    private func loadConnectionStatus(for provider: IPTVStoredProvider) async {
+        guard case .xtream(let configuration) = provider.configuration else { return }
+        let status = try? await XtreamClient(configuration: configuration).connectionStatus()
+        guard let status else { return }
+        connectionStatus[provider.id] = status
+    }
 
     private func providerSymbol(_ configuration: IPTVStoredConfiguration) -> String {
         switch configuration {

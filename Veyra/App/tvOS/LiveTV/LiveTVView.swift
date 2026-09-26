@@ -10,13 +10,16 @@ struct LiveTVView: View {
     private var showProviders = false
 
     @State
+    private var showCategories = false
+
+    @State
     private var showSearch = false
 
     @State
     private var showFavoriteOrder = false
 
     @State
-    private var showRecordings = false
+    private var showFolders = false
 
     @State
     private var selection: VeyraEPGSelection?
@@ -35,6 +38,9 @@ struct LiveTVView: View {
 
     @Environment(\.scenePhase)
     private var scenePhase
+
+    private let guideRowHeight: CGFloat = 120
+    private let guideFocusInset: CGFloat = 12
 
     var body: some View {
         navigationLayer
@@ -107,20 +113,27 @@ struct LiveTVView: View {
                 )
             }
             .sheet(
-                isPresented: $showRecordings
+                isPresented: $showFolders
             ) {
-                NavigationStack { TVRecordingsView() }
+                NavigationStack {
+                    LiveTVFoldersListView()
+                }
             }
     }
 
     private var providerDialogLayer: some View {
         lifecycleLayer
-            .confirmationDialog(
+            .veyraConfirmationDialog(
                 "Kies je IPTV-provider",
-                isPresented: $showProviders,
-                titleVisibility: .visible
+                isPresented: $showProviders
             ) {
                 providerDialogButtons
+            }
+            .veyraConfirmationDialog(
+                "Kanalen",
+                isPresented: $showCategories
+            ) {
+                categoryDialogButtons
             }
     }
 
@@ -181,7 +194,7 @@ struct LiveTVView: View {
             }
             .padding(
                 .horizontal,
-                50
+                24
             )
             .padding(
                 .vertical,
@@ -265,6 +278,7 @@ struct LiveTVView: View {
                     provider
                 )
             ) {
+                showProviders = false
                 guide.selectProvider(
                     provider
                 )
@@ -274,7 +288,7 @@ struct LiveTVView: View {
         Button(
             "Annuleren",
             role: .cancel
-        ) {}
+        ) { showProviders = false }
     }
 
     private func providerTitle(
@@ -291,6 +305,33 @@ struct LiveTVView: View {
         return provider.displayName
     }
 
+    @ViewBuilder
+    private var categoryDialogButtons: some View {
+        Button("Alle zenders (\(guide.channels.count))") {
+            showCategories = false
+            guide.selectedCategory = "all"
+        }
+
+        Button("Favorieten (\(guide.favoriteRows.count))") {
+            showCategories = false
+            guide.selectedCategory = "favorites"
+        }
+
+        Button("Recent geopend (\(recentCount))") {
+            showCategories = false
+            guide.selectedCategory = "recent"
+        }
+
+        ForEach(guide.categories) { category in
+            Button(category.name) {
+                showCategories = false
+                guide.selectedCategory = "group:" + category.id
+            }
+        }
+
+        Button("Annuleren", role: .cancel) { showCategories = false }
+    }
+
     // MARK: - Toolbar
 
     private var toolbar: some View {
@@ -305,19 +346,21 @@ struct LiveTVView: View {
 
             providerButton
 
+            categoryButton
+
             nowButton
 
             searchButton
 
-            recordingsButton
-
             refreshButton
+
+            foldersButton
 
             settingsButton
         }
         .font(
             .system(
-                size: 18,
+                size: 20,
                 weight: .semibold
             )
         )
@@ -410,6 +453,29 @@ struct LiveTVView: View {
         )
     }
 
+    /// Vervangt de vroegere vaste linkerbalk: uitklapbare knop die dezelfde
+    /// keuzes toont (Alle zenders/Favorieten/Recent geopend/categorieën) via
+    /// `categoryDialogButtons`, zodat de EPG-lijst zelf de volle breedte kan
+    /// gebruiken.
+    private var categoryButton: some View {
+        Button {
+            showCategories = true
+
+        } label: {
+            Label(
+                currentCategoryTitle,
+                systemImage: "line.3.horizontal"
+            )
+            .lineLimit(1)
+            .frame(maxWidth: 260)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+        }
+        .buttonStyle(
+            VeyraEPGButtonStyle()
+        )
+    }
+
     private var nowButton: some View {
         Button {
             guide.showNow()
@@ -462,32 +528,13 @@ struct LiveTVView: View {
         )
     }
 
-    private var recordingsButton: some View {
-        Button {
-            showRecordings = true
-
-        } label: {
-            Image(
-                systemName:
-                    "list.bullet.rectangle"
-            )
-            .frame(
-                width: 48,
-                height: 48
-            )
-        }
-        .buttonStyle(
-            VeyraEPGButtonStyle()
-        )
-        .accessibilityLabel(
-            "Mijn opnames"
-        )
-    }
-
     private var refreshButton: some View {
         Button {
-            guide.reloadID =
-                UUID()
+            // Rechtstreeks force-reloaden i.p.v. alleen `reloadID` te
+            // wijzigen -- anders deed deze knop niets zolang het in
+            // Instellingen ingestelde verversinterval nog niet verstreken
+            // was, want `reload()` las dan gewoon de schijfcache opnieuw in.
+            Task { await guide.reload(force: true) }
 
         } label: {
             Image(
@@ -503,7 +550,31 @@ struct LiveTVView: View {
             VeyraEPGButtonStyle()
         )
         .accessibilityLabel(
-            "Zenders en programmagids vernieuwen"
+            "Zenders en programmagids nu vernieuwen"
+        )
+    }
+
+    /// Eigen, over providers heen samengestelde kanalenmappen (bv. "Sport"
+    /// met kanalen van meerdere providers) -- zie `LiveTVFoldersListView`.
+    private var foldersButton: some View {
+        Button {
+            showFolders = true
+
+        } label: {
+            Image(
+                systemName:
+                    "folder"
+            )
+            .frame(
+                width: 48,
+                height: 48
+            )
+        }
+        .buttonStyle(
+            VeyraEPGButtonStyle()
+        )
+        .accessibilityLabel(
+            "Mijn mappen"
         )
     }
 
@@ -532,110 +603,28 @@ struct LiveTVView: View {
     // MARK: - Layout
 
     private var guideLayout: some View {
-        HStack(
-            alignment: .top,
-            spacing: 22
-        ) {
-            sidebar
-                .frame(
-                    width: 250
-                )
-
-            TimelineView(
-                .periodic(
-                    from: .now,
-                    by: 60
-                )
-            ) { context in
-                programmeGrid(
-                    now: context.date
-                )
-            }
-            .focusSection()
-        }
-    }
-
-    // MARK: - Categories
-
-    private var sidebar: some View {
-        ScrollView(
-            .vertical,
-            showsIndicators: false
-        ) {
-            VStack(
-                alignment: .leading,
-                spacing: 10
-            ) {
-                categoryButton(
-                    "Alle zenders",
-                    icon: "tv",
-                    key: "all",
-                    count:
-                        guide.channels.count
-                )
-
-                categoryButton(
-                    "Favorieten",
-                    icon: "star",
-                    key: "favorites",
-                    count:
-                        guide.favoriteRows.count
-                )
-
-                categoryButton(
-                    "Recent geopend",
-                    icon:
-                        "clock.arrow.circlepath",
-                    key: "recent",
-                    count:
-                        recentCount
-                )
-
-                Text(
-                    "CATEGORIEËN"
-                )
-                .font(
-                    .system(
-                        size: 14,
-                        weight: .semibold
-                    )
-                )
-                .tracking(
-                    2
-                )
-                .foregroundStyle(
-                    .cyan.opacity(
-                        0.6
-                    )
-                )
-                .padding(
-                    .top,
-                    18
-                )
-                .padding(
-                    .bottom,
-                    6
-                )
-
-                ForEach(
-                    guide.categories
-                ) { category in
-                    categoryButton(
-                        category.name,
-                        icon: nil,
-                        key:
-                            "group:"
-                            + category.id,
-                        count: nil
-                    )
-                }
-            }
-            .padding(
-                4
+        TimelineView(
+            .periodic(
+                from: .now,
+                by: 60
+            )
+        ) { context in
+            programmeGrid(
+                now: context.date
             )
         }
         .focusSection()
+        .padding(.horizontal, -40)
     }
+
+    // MARK: - Categories
+    //
+    // Vroeger een vaste linkerbalk (`sidebar`) naast de gids; die nam blijvend
+    // een kolom breedte in terwijl de EPG-lijst zelf smaller werd. Nu een
+    // uitklapbare knop naast de providerknop ("TiviOne") in de werkbalk
+    // (`categoryButton`/`categoryDialogButtons` hieronder), zodat de gids de
+    // volle breedte krijgt en de zender-/categoriekeuze alsnog altijd
+    // bereikbaar blijft.
 
     private var recentCount: Int {
         guide.channels.filter {
@@ -646,85 +635,23 @@ struct LiveTVView: View {
         .count
     }
 
-    private func categoryButton(
-        _ title: String,
-        icon: String?,
-        key: String,
-        count: Int?
-    ) -> some View {
-        Button {
-            guide.selectedCategory =
-                key
-
-        } label: {
-            HStack(
-                spacing: 10
-            ) {
-                if let icon {
-                    Image(
-                        systemName:
-                            icon
-                    )
-                    .frame(
-                        width: 22
-                    )
-                }
-
-                Text(
-                    title
-                )
-                .lineLimit(
-                    2
-                )
-                .multilineTextAlignment(
-                    .leading
-                )
-
-                Spacer(
-                    minLength: 4
-                )
-
-                if let count {
-                    Text(
-                        "\(count)"
-                    )
-                    .font(
-                        .system(
-                            size: 13
-                        )
-                    )
-                    .foregroundStyle(
-                        .secondary
-                    )
-                }
+    /// Leesbare titel van de actieve categorie, getoond op de werkbalkknop
+    /// die de categoriekeuze opent.
+    private var currentCategoryTitle: String {
+        switch guide.selectedCategory {
+        case "all":
+            return "Alle zenders"
+        case "favorites":
+            return "Favorieten"
+        case "recent":
+            return "Recent geopend"
+        default:
+            if guide.selectedCategory.hasPrefix("group:") {
+                let id = String(guide.selectedCategory.dropFirst("group:".count))
+                return guide.categories.first { $0.id == id }?.name ?? "Categorie"
             }
-            .font(
-                .system(
-                    size: 17,
-                    weight: .medium
-                )
-            )
-            .padding(
-                .horizontal,
-                14
-            )
-            .padding(
-                .vertical,
-                13
-            )
-            .frame(
-                maxWidth: .infinity,
-                minHeight: 50,
-                alignment: .leading
-            )
+            return "Kanalen"
         }
-        .buttonStyle(
-            VeyraEPGButtonStyle(
-                selected:
-                    guide.selectedCategory
-                    == key
-            )
-        )
     }
 
     // MARK: - Programme grid
@@ -739,7 +666,7 @@ struct LiveTVView: View {
             geometry in
 
             let channelWidth:
-                CGFloat = 250
+                CGFloat = 265
 
             let timelineWidth =
                 max(
@@ -747,6 +674,7 @@ struct LiveTVView: View {
                     geometry.size.width
                     - channelWidth
                     - 12
+                    - guideFocusInset * 2
                 )
 
             VStack(
@@ -762,7 +690,7 @@ struct LiveTVView: View {
                     )
                     .font(
                         .system(
-                            size: 15,
+                            size: 16,
                             weight: .medium
                         )
                     )
@@ -784,6 +712,7 @@ struct LiveTVView: View {
                             now
                     )
                 }
+                .padding(.horizontal, guideFocusInset)
                 .frame(
                     height: 35
                 )
@@ -879,7 +808,7 @@ struct LiveTVView: View {
         }
         .font(
             .system(
-                size: 16,
+                size: 18,
                 weight: .semibold
             )
         )
@@ -984,7 +913,7 @@ struct LiveTVView: View {
                             )
                         }
                         .frame(
-                            height: 108
+                            height: guideRowHeight
                         )
                         .id(
                             row.id
@@ -993,8 +922,9 @@ struct LiveTVView: View {
                 }
                 .padding(
                     .vertical,
-                    4
+                    6
                 )
+                .padding(.horizontal, guideFocusInset)
             }
             .onChange(
                 of: guide.selectedCategory
@@ -1037,7 +967,7 @@ struct LiveTVView: View {
                 )
                 .font(
                     .system(
-                        size: 17,
+                        size: 20,
                         weight: .medium
                     )
                 )
@@ -1112,7 +1042,7 @@ struct LiveTVView: View {
                 )
 
                 VStack(
-                    alignment: .leading,
+                    alignment: .trailing,
                     spacing: 5
                 ) {
                     Text(
@@ -1126,13 +1056,16 @@ struct LiveTVView: View {
                     )
                     .font(
                         .system(
-                            size: 19,
+                            size: 18,
                             weight: .semibold
                         )
                     )
                     .lineLimit(
                         2
                     )
+                    .minimumScaleFactor(0.85)
+                    .multilineTextAlignment(.trailing)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
 
                     if guide.favorites
                         .contains(
@@ -1149,22 +1082,19 @@ struct LiveTVView: View {
                             )
                         )
                         .foregroundStyle(
-                            .cyan
+                            VeyraColors.cyan
                         )
                     }
                 }
-
-                Spacer(
-                    minLength: 0
-                )
+                .frame(maxWidth: .infinity, alignment: .trailing)
             }
             .padding(
                 12
             )
             .frame(
                 maxWidth: .infinity,
-                minHeight: 108,
-                maxHeight: 108
+                minHeight: guideRowHeight,
+                maxHeight: guideRowHeight
             )
         }
         .buttonStyle(
@@ -1324,8 +1254,8 @@ struct LiveTVView: View {
             logoOverrideVersion
         )
         .frame(
-            width: 76,
-            height: 68
+            width: 84,
+            height: 76
         )
     }
 
@@ -1389,7 +1319,7 @@ struct LiveTVView: View {
                             )
                             .font(
                                 .system(
-                                    size: 20,
+                                    size: 23,
                                     weight: .semibold
                                 )
                             )
@@ -1422,14 +1352,14 @@ struct LiveTVView: View {
                                             "NU"
                                         )
                                         .foregroundStyle(
-                                            .cyan
+                                            VeyraColors.cyan
                                         )
                                         .bold()
                                     }
                                 }
                                 .font(
                                     .system(
-                                        size: 14
+                                        size: 17
                                     )
                                 )
                             }
@@ -1455,7 +1385,7 @@ struct LiveTVView: View {
                                 0,
                                 span - 3
                             ),
-                        height: 108,
+                        height: guideRowHeight,
                         alignment:
                             .topLeading
                     )
@@ -1500,7 +1430,7 @@ struct LiveTVView: View {
         }
         .frame(
             width: width,
-            height: 88,
+            height: guideRowHeight,
             alignment: .leading
         )
         .overlay(
@@ -1511,7 +1441,7 @@ struct LiveTVView: View {
             {
                 Rectangle()
                     .fill(
-                        Color.cyan.opacity(
+                        VeyraColors.cyan.opacity(
                             0.7
                         )
                     )
@@ -2106,19 +2036,12 @@ private struct VeyraEPGButtonSurface<
                     style: .continuous
                 )
                 .strokeBorder(
-                    isFocused
-                    ?
-                    Color.cyan
-                    :
-                    Color.cyan.opacity(
-                        selected
-                        ? 0.45
-                        : 0.08
-                    ),
+                    isFocused ? VeyraFrame.active
+                        : (onAir || selected ? VeyraFrame.resting : VeyraEPGTheme.quietFrame),
                     lineWidth:
                         isFocused
-                        ? 2
-                        : 1
+                        ? 2.5
+                        : (onAir || selected ? 1.5 : 1)
                 )
             )
             .scaleEffect(
@@ -2126,6 +2049,7 @@ private struct VeyraEPGButtonSurface<
                 ? 1.025
                 : 1
             )
+            .focusEffectDisabled()
             .opacity(
                 !isEnabled
                 ? 0.4
@@ -2148,14 +2072,14 @@ private struct VeyraEPGButtonSurface<
     {
         if isFocused {
             return
-                Color.cyan.opacity(
+                VeyraColors.cyan.opacity(
                     0.24
                 )
         }
 
         if selected {
             return
-                Color.cyan.opacity(
+                VeyraColors.cyan.opacity(
                     0.16
                 )
         }
@@ -2181,26 +2105,25 @@ private struct VeyraEPGButtonSurface<
 // MARK: - Theme
 
 private enum VeyraEPGTheme {
+    static let quietFrame = LinearGradient(
+        colors: [VeyraColors.cyan.opacity(0.10), VeyraColors.red.opacity(0.06)],
+        startPoint: .leading,
+        endPoint: .trailing
+    )
+
     static var background:
         LinearGradient
     {
         LinearGradient(
             colors: [
-                Color(
-                    red: 0.01,
-                    green: 0.04,
-                    blue: 0.07
-                ),
-                Color(
-                    red: 0.02,
-                    green: 0.10,
-                    blue: 0.16
-                )
+                VeyraColors.background,
+                Color(red: 0.015, green: 0.09, blue: 0.13),
+                Color(red: 0.075, green: 0.015, blue: 0.045)
             ],
             startPoint:
-                .topLeading,
+                .bottomLeading,
             endPoint:
-                .bottomTrailing
+                .topTrailing
         )
     }
 }

@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum MenuDestination: String, Identifiable, CaseIterable {
-    case home, film, series, sport, liveTV, account, search, settings
+    case home, film, series, sport, liveTV, recordings, account, search, settings
     var id: String { rawValue }
     var title: String {
         switch self {
@@ -10,6 +10,7 @@ enum MenuDestination: String, Identifiable, CaseIterable {
         case .series: "Series"
         case .sport: "Sport"
         case .liveTV: "Live TV"
+        case .recordings: "Opnames"
         case .account: "Account"
         case .search: "Zoeken"
         case .settings: "Instellingen"
@@ -22,6 +23,7 @@ enum MenuDestination: String, Identifiable, CaseIterable {
         case .series: "tv"
         case .sport: "trophy"
         case .liveTV: "antenna.radiowaves.left.and.right"
+        case .recordings: "record.circle"
         case .account: "person.crop.circle"
         case .search: "magnifyingglass"
         case .settings: "gearshape"

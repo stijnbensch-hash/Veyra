@@ -5,39 +5,48 @@
 //  Created by Stijn Bensch on 25/09/2026.
 //
 
-import TVServices
+@preconcurrency import TVServices
 
 class ContentProvider: TVTopShelfContentProvider {
 
     override func loadTopShelfContent() async -> (any TVTopShelfContent)? {
-        let items = await TopShelfTraktAPI.continueWatching(limit: 10)
+        let items = await TopShelfTraktAPI.continueWatching(limit: 80)
         guard !items.isEmpty else { return nil }
 
-        var sectionedItems: [TVTopShelfSectionedItem] = []
-
-        for (index, item) in items.enumerated() {
-            let sectionedItem = TVTopShelfSectionedItem(identifier: "continue-watching-\(index)")
-            sectionedItem.title = item.subtitle.map { "\(item.title) · \($0)" } ?? item.title
+        let sectionedItems: [TVTopShelfSectionedItem] = items.map { item in
+            let sectionedItem = TVTopShelfSectionedItem(identifier: item.id)
+            sectionedItem.title = [item.title, item.subtitle, item.episodeTitle]
+                .compactMap { $0 }
+                .joined(separator: " · ")
             sectionedItem.imageShape = .hdtv
-
-            if let tmdbID = item.tmdbID,
-               let backdropURL = await TopShelfTMDBArtwork.backdropURL(isShow: item.isShow, tmdbID: tmdbID) {
-                // `ImageTraits` is enkel een schaal-aanduiding (geen
-                // stijl/grootte, ondanks wat de naam doet vermoeden) —
-                // het systeem kiest zelf de passende variant voor het
-                // apparaat.
-                sectionedItem.setImageURL(backdropURL, for: .screenScale1x)
-                sectionedItem.setImageURL(backdropURL, for: .screenScale2x)
-            }
-
-            // Geen displayURL/playURL: zonder een geregistreerd
-            // URL-schema voor Veyra opent een tik op dit item gewoon de
-            // app zelf (het systeemstandaardgedrag), zonder door te
-            // linken naar deze specifieke titel.
-            sectionedItems.append(sectionedItem)
+            sectionedItem.playbackProgress = item.playbackProgress
+            return sectionedItem
         }
 
-        guard !sectionedItems.isEmpty else { return nil }
+        // Netwerkwerk loopt in kleine batches. De renderer maakt en bewaart
+        // steeds één kaart tegelijk; de Top Shelf-extensie heeft een lagere
+        // geheugenlimiet dan de app.
+        for start in stride(from: 0, to: items.count, by: 4) {
+            let batch = start..<min(start + 4, items.count)
+            let artwork = await withTaskGroup(of: (Int, URL?).self) { group in
+                for index in batch {
+                    let item = items[index]
+                    group.addTask {
+                        (index, await TopShelfArtworkRenderer.imageURL(for: item))
+                    }
+                }
+                var results: [(Int, URL?)] = []
+                for await result in group { results.append(result) }
+                return results
+            }
+            for (index, url) in artwork {
+                guard let url else { continue }
+                sectionedItems[index].setImageURL(url, for: .screenScale1x)
+                sectionedItems[index].setImageURL(url, for: .screenScale2x)
+            }
+        }
+
+        // Zonder eigen URL-schema opent een tik op een kaart de app.
 
         let collection = TVTopShelfItemCollection(items: sectionedItems)
         collection.title = "Verder kijken"

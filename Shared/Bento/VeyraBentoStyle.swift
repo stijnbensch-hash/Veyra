@@ -114,6 +114,7 @@ struct VeyraHairline: View {
 struct VeyraArt: View {
     let url: URL?
     let seed: String
+    var contentMode: ContentMode = .fill
 
     var body: some View {
         GeometryReader { geo in
@@ -121,7 +122,11 @@ struct VeyraArt: View {
                 placeholder
                 if let url {
                     AsyncImage(url: url) { phase in
-                        if case .success(let image) = phase { image.resizable().scaledToFill() }
+                        if case .success(let image) = phase {
+                            image.resizable()
+                                .aspectRatio(contentMode: contentMode)
+                                .frame(width: geo.size.width, height: geo.size.height)
+                        }
                     }
                 }
             }
@@ -159,7 +164,15 @@ struct VeyraTitleLogo: View {
                         text
                     }
                 }
-                .frame(maxHeight: maxLogoHeight, alignment: alignment)
+                // `scaledToFit()` houdt de aspect ratio van het brongebied van de
+                // afbeelding aan, niet van de zichtbare logo-tekens erin -- veel
+                // clearlogo-PNG's (fanart.tv/TMDB) hebben fors transparant opvulsel
+                // rond het eigenlijke logo, met een sterk wisselende canvasverhouding
+                // per titel. Zonder ook een `maxWidth` hier kon zo'n logo bij
+                // `maxLogoHeight` een absurd brede ideale breedte opgeven -- breder dan
+                // de hele kaart -- waardoor het de meta-tekst ernaast in de HStack
+                // wegduwde/overlapte (zie "POWER" in "Verder kijken" op tvOS).
+                .frame(maxWidth: maxLogoHeight * 4, maxHeight: maxLogoHeight, alignment: alignment)
             } else {
                 text
             }

@@ -6,7 +6,7 @@ struct VeyraTopNavigation: View {
     var body: some View {
         HStack(spacing: 12) {
             HStack(spacing: 6) {
-                ForEach([MenuDestination.home, .film, .series, .sport, .liveTV]) { destination in
+                ForEach([MenuDestination.home, .film, .series, .sport, .liveTV, .recordings]) { destination in
                     item(destination, iconOnly: false)
                 }
             }
@@ -31,7 +31,7 @@ struct VeyraTopNavigation: View {
                     .padding(.horizontal, 20)
                     .frame(height: 52)
                     .background(
-                        Color.black.opacity(0.48),
+                        Color.black.opacity(0.28),
                         in: Capsule()
                     )
                     .overlay(
@@ -58,12 +58,12 @@ struct VeyraTopNavigation: View {
                     Capsule()
                         .fill(
                             LinearGradient(
-                                colors: [VeyraColors.cyan.opacity(0.30), VeyraColors.cyan.opacity(0.10), VeyraColors.red.opacity(0.12)],
+                                colors: [VeyraColors.cyan.opacity(0.18), VeyraColors.cyan.opacity(0.06), VeyraColors.red.opacity(0.07)],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )
                         )
-                        .overlay(Capsule().stroke(VeyraColors.ice.opacity(0.40)))
+                        .overlay(Capsule().stroke(VeyraColors.ice.opacity(0.30)))
                 }
             }
         }

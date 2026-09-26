@@ -1,10 +1,19 @@
 import Foundation
 
-/// Rolverdeling (cast + crew) van een film of serie, voor de
-/// "Rolverdeling"-rij op het detailscherm (`CastRow`).
+/// TMDB-credits voor de castsectie van film- en seriedetailschermen.
 enum CreditsService {
     static func credits(for item: MediaItem) async -> TMDBCredits? {
-        guard let tmdbID = item.tmdbID, let token = AppConfiguration.tmdbReadAccessToken else { return nil }
+        guard let token = AppConfiguration.tmdbReadAccessToken else { return nil }
+        let tmdbID: Int
+        if let knownID = item.tmdbID {
+            tmdbID = knownID
+        } else if let imdbID = item.imdbID,
+                  let resolvedID = await TMDBExternalLookup.tmdbID(
+                    forIMDbID: imdbID, kind: item.type == .movie ? .movie : .series) {
+            tmdbID = resolvedID
+        } else {
+            return nil
+        }
 
         let path = item.type == .movie ? "/3/movie/\(tmdbID)/credits" : "/3/tv/\(tmdbID)/credits"
         return await request(path: path, token: token)

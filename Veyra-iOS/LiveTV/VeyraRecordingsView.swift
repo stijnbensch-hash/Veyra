@@ -1,21 +1,19 @@
 import SwiftUI
 
-/// "Mijn opnames": VeyraHub Recorder's geplande, lopende en voltooide
-/// opnames — afspelen, stoppen en verwijderen. Bereikbaar vanuit de
-/// programmagids (zie `LiveTVGuideView`).
+/// "Opnames"-tab: VeyraHub Recorder's geplande, lopende en voltooide
+/// opnames — afspelen, stoppen en verwijderen.
 struct VeyraRecordingsView: View {
     @State private var recordings: [VeyraHubRecording] = []
     @State private var isLoading = true
     @State private var message: String?
     @State private var playingSource: PlayableSource?
 
-    @Environment(\.dismiss) private var dismiss
-
     private var hub: MediaServerAccount? {
         MediaServerStore().load().first(where: { $0.isVeyraHub })
     }
 
     var body: some View {
+        NavigationStack {
         ZStack {
             VeyraColors.background.ignoresSafeArea()
 
@@ -40,15 +38,11 @@ struct VeyraRecordingsView: View {
                 .refreshable { await load() }
             }
         }
-        .navigationTitle("Mijn opnames")
+        .navigationTitle("Opnames")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Sluiten") { dismiss() }
-            }
-        }
         .veyraPlayerPresentation(item: $playingSource)
         .task { await load() }
+        }
     }
 
     @ViewBuilder

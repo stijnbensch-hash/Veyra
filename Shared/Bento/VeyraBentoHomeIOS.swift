@@ -15,6 +15,12 @@ import SwiftUI
 struct VeyraBentoHomeView: View {
     @State private var model: VeyraBentoViewModel
     private let sportModel: VeyraSportViewModel?
+    @State private var heroSpotlight = VeyraHeroSpotlightController()
+
+    #if os(macOS)
+    /// macOS behoudt zijn zachte achtergrond buiten de scrollweergave.
+    @State private var heroScrollProgress: CGFloat = 0
+    #endif
 
     var onPlay: (ContinueItem) -> Void
     var onToggleReminder: (UpcomingItem, Bool) -> Void
@@ -103,7 +109,25 @@ struct VeyraBentoHomeView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    if floatingButtons {
+                    if showsHero {
+                        // Zoek-/instellingenknop zweven over de hero (net als in Strand) i.p.v.
+                        // in een eigen balk erboven -- de hero zelf loopt door tot onder de
+                        // statusbalk, de knoppen blijven wel binnen de safe area staan.
+                        ZStack(alignment: .top) {
+                            hero
+                            if floatingButtons {
+                                HStack {
+                                    FloatingIconButton(symbol: "magnifyingglass", accessibilityLabel: "Zoeken", action: onSearch)
+                                    Spacer()
+                                    if showsSettings {
+                                        FloatingIconButton(symbol: "gearshape.fill", accessibilityLabel: "Instellingen", action: onSettings)
+                                    }
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.top, floatingButtonTopPadding)
+                            }
+                        }
+                    } else if floatingButtons {
                         HStack {
                             FloatingIconButton(symbol: "magnifyingglass", accessibilityLabel: "Zoeken", action: onSearch)
                             Spacer()
@@ -111,6 +135,8 @@ struct VeyraBentoHomeView: View {
                                 FloatingIconButton(symbol: "gearshape.fill", accessibilityLabel: "Instellingen", action: onSettings)
                             }
                         }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 8)
                     }
 
                     VStack(alignment: .leading, spacing: 32) {
@@ -155,15 +181,29 @@ struct VeyraBentoHomeView: View {
                         if layout.showShelves { VeyraBentoUserShelves(compact: true, onOpen: onOpenTMDBTitle) }
                     }
                     .padding(.horizontal, 16)
-                    // De zoek-/instellingenknoppen staan nu als vaste (niet-zwevende) balk boven deze
-                    // ScrollView (zie HomeView.swift), die zelf al de safe-area/statusbalk-ruimte
-                    // reserveert -- hier is dus enkel nog een gewone, kleine top-marge nodig.
+                    // Een kleine afstand tussen de hero en de eerste rij.
                     .padding(.top, 8)
                     .padding(.bottom, 32)
                 }
             }
             .scrollIndicators(.hidden)
-            .background(VeyraHomeStyle.ink.ignoresSafeArea())
+            #if os(iOS)
+            // Het volledige hero-beeld, inclusief de statusbalkzone, schuift nu
+            // als onderdeel van de pagina weg in plaats van vast te blijven staan.
+            .ignoresSafeArea(edges: showsHero && heroSpotlight.settings.style == .fullscreen ? .top : [])
+            #else
+            // Betrouwbare, systeemeigen scrollpositie i.p.v. de klassieke GeometryReader +
+            // PreferenceKey-truc (die bleek in de praktijk niet altijd door te komen).
+            .onScrollGeometryChange(for: CGFloat.self) { geo in
+                geo.contentOffset.y + geo.contentInsets.top
+            } action: { _, newValue in
+                // Volledig effect na 180pt scrollen; geclampt tussen 0 en 1.
+                let progress = min(max(newValue / 180, 0), 1)
+                if heroScrollProgress != progress {
+                    heroScrollProgress = progress
+                }
+            }
+            #endif
             .refreshable {
                 await model.load(force: true)
                 await sportModel?.load()
@@ -187,6 +227,10 @@ struct VeyraBentoHomeView: View {
                 VeyraHomePresetPickerView { askPreset = false }
             }
             .task { if let sportModel, sportModel.phase == .idle { await sportModel.load() } }
+            .task { heroSpotlight.reloadIfNeeded() }
+            .onReceive(NotificationCenter.default.publisher(for: .heroSpotlightSettingsChanged)) { _ in
+                heroSpotlight.settingsChanged()
+            }
             .task {
                 while !Task.isCancelled {
                     try? await Task.sleep(for: .seconds(120))
@@ -196,20 +240,78 @@ struct VeyraBentoHomeView: View {
                 }
             }
         }
+        #if os(macOS)
+        // De macOS-achtergrond blijft buiten de ScrollView.
+        // De schermvullende hero-achtergrond wordt hier, BUITEN de ScrollView om, getekend --
+        // een ScrollView kapt zijn eigen inhoud namelijk af bij de safe area, ook als een kind
+        // daarbinnen `.ignoresSafeArea()` gebruikt. Net als bij de Films-hero
+        // (VeyraArtworkBackground) staat de achtergrond hier als broer van de scrollende inhoud,
+        // niet erin, zodat hij écht tot onder de statusbalk doorloopt.
+        // Volgorde is van belang: eerst de effen basiskleur (helemaal achteraan), dan de
+        // hero-achtergrond daarbovenop (alleen bovenin zichtbaar), en de (grotendeels
+        // doorschijnende) ScrollView-inhoud zelf bovenop dat alles.
+        .background(alignment: .top) {
+            if showsHero, heroSpotlight.settings.style == .fullscreen, let current = heroSpotlight.current {
+                VeyraHeroAmbientBackdrop(url: current.backdropURL, id: current.id,
+                                          height: regular ? 760 : 640)
+                    // Vervaagt en verdonkert licht tijdens het scrollen, wordt weer normaal
+                    // zodra je terug bovenaan bent -- bewust subtiel (tvOS heeft dit effect
+                    // helemaal niet, zie VeyraHeroSpotlightView.swift).
+                    .brightness(-heroScrollProgress * 0.18)
+                    .opacity(1 - heroScrollProgress * 0.12)
+                    .animation(.easeOut(duration: 0.15), value: heroScrollProgress)
+            }
+        }
+        #endif
+        .background(VeyraHomeStyle.ink.ignoresSafeArea())
+    }
+
+    private var floatingButtonTopPadding: CGFloat {
+        #if os(iOS)
+        showsHero && heroSpotlight.settings.style == .fullscreen ? VeyraSafeArea.top + 8 : 8
+        #else
+        8
+        #endif
+    }
+
+    /// Of er momenteel iets is om als hero te tonen -- gebruikt door `body` om `hero` enkel als
+    /// VStack-kind op te nemen wanneer dat zo is. Anders telt de vaste `spacing` van die VStack
+    /// nog steeds mee als lege ruimte, waardoor "Verder kijken"/"Binnenkort"/"Filmcollecties"
+    /// ongewenst mee opschuiven ook al toont `hero` zelf niets.
+    private var showsHero: Bool {
+        !heroSpotlight.items.isEmpty || model.home.phase == .loading || model.home.phase == .idle
     }
 
     @ViewBuilder
     private var hero: some View {
-        if showContinueWatching, let first = model.continueMain {
-            VeyraHeroView(content: model.home.heroContent(forContinue: first),
-                          height: regular ? 520 : 420,
-                          onPlay: { _ in onPlay(first) },
-                          onInfo: { _ in })
+        // Nieuwe trending-carrousel (Instellingen → Home → Hero) vervangt de
+        // vroegere "verder kijken"-hero; die rij blijft wel bestaan als
+        // gewone "Verder kijken"-sectie in `bentoTop`.
+        if !heroSpotlight.items.isEmpty {
+            // Negatieve horizontale padding compenseert de vaste `.padding(.horizontal, 16)`
+            // van de omliggende VStack, zodat "Schermvullend" ook echt rand-tot-rand gaat.
+            // `hero` staat nu als eigen VStack-kind vóór de zijmarge-gepadde inhoud
+            // hieronder, dus geen negatieve padding meer nodig om "Schermvullend" rand-tot-rand
+            // te krijgen -- enkel "Kaart" krijgt hier nog eigen zijmarge.
+            VeyraHeroSpotlightView(items: heroSpotlight.items,
+                                   style: heroSpotlight.settings.style,
+                                   height: heroSpotlight.settings.style == .fullscreen
+                                       ? (regular ? 760 : 560)
+                                       : (regular ? 560 : 460),
+                                   externalBackdrop: usesExternalHeroBackdrop,
+                                   onIndexChange: { heroSpotlight.currentIndex = $0 })
+                .padding(.horizontal, heroSpotlight.settings.style == .card ? 16 : 0)
         } else if model.home.phase == .loading || model.home.phase == .idle {
             ProgressView().tint(.white).frame(maxWidth: .infinity).frame(height: 240)
-        } else {
-            Color.clear.frame(height: 24)
         }
+    }
+
+    private var usesExternalHeroBackdrop: Bool {
+        #if os(iOS)
+        false
+        #else
+        heroSpotlight.settings.style == .fullscreen
+        #endif
     }
 
     // MARK: Raster
@@ -221,10 +323,21 @@ struct VeyraBentoHomeView: View {
         let items = showContinueWatching ? model.home.continueItems : []
         let showVolgende = layout.isVisible(.volgende) && !items.isEmpty
         let showVandaag = layout.isVisible(.vandaag) && today != nil
+        #if os(iOS)
+        let cardLayout = VeyraCaptionedCardLayout.landscape(
+            width: min(regular ? 380 : 300, contentWidth))
+        #else
+        let cardLayout: VeyraCaptionedCardLayout = .regular
+        #endif
 
         if showVolgende || showVandaag {
             let order: [BentoTile] = [showVolgende ? .volgende : nil, showVandaag ? .vandaag : nil].compactMap { $0 }
-            let profile = BentoProfile.make(regular ? .tablet : .phone, order: order)
+            let baseProfile = BentoProfile.make(regular ? .tablet : .phone, order: order)
+            // De 16:9-kaarten hebben meer hoogte nodig dan de vroegere brede banners.
+            let rowHeight = max(baseProfile.rowHeights.first ?? 0, cardLayout.height + 32)
+            let profile = BentoProfile(columns: baseProfile.columns,
+                                       rowHeights: Array(repeating: rowHeight, count: baseProfile.rowHeights.count),
+                                       spacing: baseProfile.spacing, cells: baseProfile.cells)
 
             VeyraBentoGrid(profile: profile) {
                 if showVolgende {
@@ -237,10 +350,17 @@ struct VeyraBentoHomeView: View {
                             .foregroundStyle(VeyraHomeStyle.cyan.opacity(0.85))
 
                         ScrollView(.horizontal) {
-                            HStack(spacing: 10) {
+                            // .top i.p.v. de standaard .center: anders komt de rij verticaal
+                            // gecentreerd te staan in de (soms hogere) rasterrij, wat een groter
+                            // gat tussen titel en kaart geeft dan bij "Favorieten"/"College
+                            // football" in de Sport-sectie (die wél .top gebruikt).
+                            LazyHStack(alignment: .top, spacing: 10) {
                                 ForEach(items) { item in
-                                    continueButton(item, radius: 16) { VeyraBentoContinueMiniContent(item: item, compact: true) }
-                                        .frame(width: min(regular ? 380 : 300, contentWidth), height: regular ? 168 : 130)
+                                    continueButton(item, radius: 16) {
+                                        VeyraBentoContinueMiniContent(item: item, compact: true,
+                                                                      cornerRadius: 16, cardLayout: cardLayout)
+                                    }
+                                    .frame(width: cardLayout.width, height: cardLayout.height)
                                 }
                             }
                         }
@@ -259,14 +379,17 @@ struct VeyraBentoHomeView: View {
 
                         // Losse kaarten op een horizontale rij, zonder groot kader eromheen.
                         ScrollView(.horizontal) {
-                            HStack(spacing: 10) {
+                            // .top, zelfde reden als bij "Verder kijken" hierboven.
+                            LazyHStack(alignment: .top, spacing: 10) {
                                 ForEach(today.items) { item in
                                     let on = model.home.reminderIDs.contains(item.id)
                                     Button { toggle(item) } label: {
-                                        VeyraBentoUpcomingCardContent(item: item, now: now, isReminded: on, compact: true)
+                                        VeyraBentoUpcomingCardContent(item: item, now: now, isReminded: on,
+                                                                      compact: true, cornerRadius: 16,
+                                                                      cardLayout: cardLayout)
                                     }
                                     .buttonStyle(.plain)
-                                    .frame(width: min(regular ? 380 : 300, contentWidth), height: regular ? 168 : 130)
+                                    .frame(width: cardLayout.width, height: cardLayout.height)
                                     .contextMenu {
                                         Button { toggle(item) } label: {
                                             Label(on ? "Herinnering uit · \(item.title)" : "Herinner mij · \(item.title)",
@@ -302,7 +425,20 @@ struct VeyraBentoHomeView: View {
         let live = model.liveRows(at: now, limit: 4, recentFirst: true)
         let present = middlePresentTiles(live: live)
         let order = layout.orderedTiles.filter { present.contains($0) }
-        let profile = BentoProfile.make(regular ? .tablet : .phone, order: order)
+        let baseProfile = BentoProfile.make(regular ? .tablet : .phone, order: order)
+        #if os(iOS)
+        // Wanneer Streamingdiensten vóór Live nu staat, krijgt de ruimte
+        // eronder dezelfde maat als de ruimte erboven. De extra rijafstand
+        // vergroot ook het raster, zodat Sport en alle volgende secties
+        // netjes mee omlaag schuiven.
+        let rowSpacing: CGFloat = order == [.streaming, .live] ? 32 : baseProfile.spacing
+        #else
+        let rowSpacing = baseProfile.spacing
+        #endif
+        let profile = BentoProfile(columns: baseProfile.columns,
+                                   rowHeights: baseProfile.rowHeights,
+                                   spacing: rowSpacing,
+                                   cells: baseProfile.cells)
 
         VeyraBentoGrid(profile: profile) {
             if present.contains(.live) {
@@ -320,7 +456,7 @@ struct VeyraBentoHomeView: View {
 
             if present.contains(.streaming) {
                 ScrollView(.horizontal) {
-                    HStack(spacing: 10) {
+                    LazyHStack(spacing: 10) {
                         ForEach(model.providers) { provider in
                             Button { onOpenCatalog(provider) } label: {
                                 VeyraBentoStreamingContent(name: provider.name, iconURL: provider.imageURL,
@@ -404,7 +540,7 @@ struct VeyraBentoHomeView: View {
                         .foregroundStyle(VeyraHomeStyle.cyan.opacity(0.85))
 
                     ScrollView(.horizontal) {
-                        HStack(spacing: 10) {
+                        LazyHStack(spacing: 10) {
                             ForEach(model.collections) { collection in
                                 Button { onOpenCatalog(collection) } label: {
                                     VeyraBentoCollectionMiniContent(title: collection.name, url: collection.imageURL, compact: true, showName: showCollectionNames)

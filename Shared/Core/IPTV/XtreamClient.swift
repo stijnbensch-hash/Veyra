@@ -21,6 +21,21 @@ struct XtreamClient {
         return Date(timeIntervalSince1970: seconds)
     }
 
+    // MARK: - Account / verbindingen
+
+    /// Xtream's basis-endpoint (`player_api.php` zonder `action`) geeft naast
+    /// accountinfo ook het aantal actieve en maximale gelijktijdige
+    /// verbindingen van deze provider terug -- gebruikt om in de speler en
+    /// bij Mediaservers-instellingen te tonen hoe druk een provider bezet is.
+    func connectionStatus() async throws -> XtreamConnectionStatus {
+        let url = try apiURL(action: nil)
+        let response: XtreamUserInfoResponse = try await request(url: url)
+        return XtreamConnectionStatus(
+            active: response.userInfo.activeCons ?? 0,
+            max: response.userInfo.maxConnections ?? 0
+        )
+    }
+
     // MARK: - Live TV
 
     func liveCategories() async throws -> [IPTVCategory] {
@@ -276,7 +291,7 @@ struct XtreamClient {
     // MARK: - API
 
     private func apiURL(
-        action: String,
+        action: String?,
         categoryID: String? = nil,
         seriesID: Int? = nil
     ) throws -> URL {
@@ -307,12 +322,17 @@ struct XtreamClient {
                 name: "password",
                 value:
                     configuration.password
-            ),
-            URLQueryItem(
-                name: "action",
-                value: action
             )
         ]
+
+        if let action {
+            queryItems.append(
+                URLQueryItem(
+                    name: "action",
+                    value: action
+                )
+            )
+        }
 
         if let categoryID {
             queryItems.append(
@@ -488,6 +508,55 @@ struct XtreamClient {
                 .decodingFailed(
                     error
                 )
+        }
+    }
+}
+
+// MARK: - Verbindingsstatus
+
+/// Actieve versus maximale gelijktijdige verbindingen die deze Xtream-
+/// provider toestaat -- getoond in de speler en bij Mediaservers-
+/// instellingen (bv. "1/2").
+nonisolated struct XtreamConnectionStatus: Sendable, Equatable {
+    let active: Int
+    let max: Int
+
+    var display: String { "\(active)/\(max)" }
+}
+
+private struct XtreamUserInfoResponse: Decodable {
+    let userInfo: UserInfo
+
+    enum CodingKeys: String, CodingKey {
+        case userInfo = "user_info"
+    }
+
+    struct UserInfo: Decodable {
+        let activeCons: Int?
+        let maxConnections: Int?
+
+        enum CodingKeys: String, CodingKey {
+            case activeCons = "active_cons"
+            case maxConnections = "max_connections"
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            activeCons = Self.decodeInt(container, key: .activeCons)
+            maxConnections = Self.decodeInt(container, key: .maxConnections)
+        }
+
+        private static func decodeInt(
+            _ container: KeyedDecodingContainer<CodingKeys>,
+            key: CodingKeys
+        ) -> Int? {
+            if let value = try? container.decodeIfPresent(Int.self, forKey: key) {
+                return value
+            }
+            if let string = try? container.decodeIfPresent(String.self, forKey: key) {
+                return Int(string)
+            }
+            return nil
         }
     }
 }

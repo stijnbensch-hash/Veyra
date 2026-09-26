@@ -84,10 +84,9 @@ struct MediaServersSettingsView:
         ) {
             MediaServerAddView()
         }
-        .confirmationDialog(
+        .veyraConfirmationDialog(
             "Mediaserver verwijderen?",
-            isPresented: deleteDialogBinding,
-            titleVisibility: .visible
+            isPresented: deleteDialogBinding
         ) {
             Button(
                 "Verwijderen",

@@ -9,6 +9,10 @@ struct IPTVAccountsView: View {
     @State private var activeID: UUID?
     @State private var showAddSheet = false
     @State private var editingProvider: EditingProviderID?
+    // Actieve/maximale gelijktijdige verbindingen per Xtream-provider (bv.
+    // "1/2") -- per provider-ID gecachet zodat elke rij zijn eigen `.task`
+    // maar één keer per verschijnen opvraagt.
+    @State private var connectionStatus: [UUID: XtreamConnectionStatus] = [:]
 
     var body: some View {
         ZStack {
@@ -32,8 +36,18 @@ struct IPTVAccountsView: View {
                         } label: {
                             HStack {
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text(provider.displayName)
-                                        .foregroundStyle(.primary)
+                                    HStack(spacing: 6) {
+                                        Text(provider.displayName)
+                                            .foregroundStyle(.primary)
+                                        if let status = connectionStatus[provider.id] {
+                                            Text(status.display)
+                                                .font(.caption.weight(.semibold))
+                                                .foregroundStyle(VeyraColors.cyan)
+                                                .padding(.horizontal, 6)
+                                                .padding(.vertical, 2)
+                                                .background(VeyraColors.cyan.opacity(0.14), in: Capsule())
+                                        }
+                                    }
                                     Text(subtitle(for: provider))
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
@@ -44,6 +58,9 @@ struct IPTVAccountsView: View {
                                         .foregroundStyle(VeyraColors.cyan)
                                 }
                             }
+                        }
+                        .task(id: provider.id) {
+                            await loadConnectionStatus(for: provider)
                         }
                         .swipeActions {
                             Button("Verwijderen", role: .destructive) {
@@ -110,6 +127,16 @@ struct IPTVAccountsView: View {
         }
         .onAppear(perform: reload)
         .onReceive(NotificationCenter.default.publisher(for: .iptvConfigurationDidChange)) { _ in reload() }
+    }
+
+    /// Enkel voor Xtream-providers (M3U kent dit begrip niet) -- vraagt
+    /// stil op de achtergrond op, faalt geruisloos (bv. server offline) zodat
+    /// de lijst gewoon normaal blijft tonen zonder badge.
+    private func loadConnectionStatus(for provider: IPTVStoredProvider) async {
+        guard case .xtream(let configuration) = provider.configuration else { return }
+        let status = try? await XtreamClient(configuration: configuration).connectionStatus()
+        guard let status else { return }
+        connectionStatus[provider.id] = status
     }
 
     private func subtitle(for provider: IPTVStoredProvider) -> String {

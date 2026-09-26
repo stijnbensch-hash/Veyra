@@ -76,6 +76,14 @@ struct IPTVLiveVisibilityView: View {
                     }
                     .disabled(groups.isEmpty)
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        Task { await load() }
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .accessibilityLabel("Kanalen nu vernieuwen")
+                }
             }
             .task { await load() }
             .onReceive(NotificationCenter.default.publisher(for: .iptvConfigurationDidChange)) { _ in

@@ -187,6 +187,7 @@ extension SportEvent {
             leagueSymbol: match.league.symbol,
             homeTeamID: match.home.id,
             awayTeamID: match.away.id,
+            situation: match.situation,
             tvBroadcast: match.tvBroadcast)
     }
 }

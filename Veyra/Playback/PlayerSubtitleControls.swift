@@ -17,9 +17,29 @@ struct PlayerSubtitleControls: View {
     var title: String? = nil
     var item: MediaItem? = nil
     var sourceMetadata: SourceMetadata? = nil
+    var source: PlayableSource? = nil
 
     var onRequestExit: () -> Void = {}
     var onPlayNextEpisode: (MediaItem) -> Void = { _ in }
+
+    // Actieve/maximale gelijktijdige verbindingen van de Xtream-provider
+    // waarmee deze IPTV-stream loopt (bv. "1/2") -- enkel voor IPTV.
+    @State private var connectionStatus: XtreamConnectionStatus?
+
+    private var isIPTV: Bool {
+        source?.kind == .liveTV || source?.kind == .iptvVOD
+    }
+
+    private func loadConnectionStatus() async {
+        guard isIPTV else { return }
+        let store = IPTVConfigurationStore()
+        guard let activeID = try? store.activeProviderID(),
+              let providers = try? store.loadProviders(),
+              let provider = providers.first(where: { $0.id == activeID }),
+              case .xtream(let configuration) = provider.configuration
+        else { return }
+        connectionStatus = try? await XtreamClient(configuration: configuration).connectionStatus()
+    }
 
     @Environment(\.scenePhase) private var scenePhase
 
@@ -214,7 +234,7 @@ struct PlayerSubtitleControls: View {
         }.onAppear {
             presentation.revealControls()
             restoreControlFocus(.timeline)
-        }.onChange(of: focused) { _, _ in interaction += 1 }.onChange(of: audioFocused) { _, _ in
+        }.task { await loadConnectionStatus() }.onChange(of: focused) { _, _ in interaction += 1 }.onChange(of: audioFocused) { _, _ in
             interaction += 1
         }.onDisappear {
             seekController.cancel()
@@ -382,6 +402,16 @@ struct PlayerSubtitleControls: View {
                                     .lineLimit(1)
                             }
 
+                            if let connectionStatus {
+                                Text(connectionStatus.display)
+                                    .font(.system(size: 12, weight: .bold))
+                                    .padding(.horizontal, 9).padding(.vertical, 4)
+                                    .background(
+                                        VeyraColors.cyan.opacity(0.28),
+                                        in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    ).foregroundStyle(.white)
+                            }
+
                             if let sourceMetadata {
                                 HStack(spacing: 6) {
                                     ForEach(metadataBadges(sourceMetadata), id: \.self) { badge in
@@ -396,6 +426,10 @@ struct PlayerSubtitleControls: View {
                             }
                         }
                     }
+                }
+
+                if let source, source.kind == .liveTV {
+                    IPTVLiveProviderStatusBadge(source: source, item: item)
                 }
 
                 Spacer()

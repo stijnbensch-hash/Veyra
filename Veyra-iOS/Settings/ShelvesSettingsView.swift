@@ -40,6 +40,59 @@ struct ShelvesSettingsView: View {
                                     viewModel.remove(shelf)
                                 }
                             }
+                            .contextMenu {
+                                if case .mediaServer = shelf.source {
+                                    Menu {
+                                        ForEach(ShelfItemOrder.allCases) { order in
+                                            Button {
+                                                var updated = shelf
+                                                updated.itemOrder = order
+                                                viewModel.update(updated)
+                                            } label: {
+                                                if shelf.effectiveItemOrder == order {
+                                                    Label(order.label, systemImage: "checkmark")
+                                                } else {
+                                                    Text(order.label)
+                                                }
+                                            }
+                                        }
+                                    } label: {
+                                        Label("Item-volgorde", systemImage: "arrow.up.arrow.down")
+                                    }
+
+                                    Menu {
+                                        ForEach(ShelfSortDirection.allCases) { direction in
+                                            Button {
+                                                var updated = shelf
+                                                updated.sortDirection = direction
+                                                viewModel.update(updated)
+                                            } label: {
+                                                if shelf.effectiveSortDirection == direction {
+                                                    Label(direction.label, systemImage: "checkmark")
+                                                } else {
+                                                    Text(direction.label)
+                                                }
+                                            }
+                                        }
+                                    } label: {
+                                        Label("Richting", systemImage: "arrow.up.and.down.text.horizontal")
+                                    }
+
+                                    Divider()
+                                }
+
+                                Button {
+                                    editingShelf = shelf
+                                } label: {
+                                    Label("Bewerken", systemImage: "pencil")
+                                }
+
+                                Button(role: .destructive) {
+                                    viewModel.remove(shelf)
+                                } label: {
+                                    Label("Verwijderen", systemImage: "trash")
+                                }
+                            }
                         }
                         .onMove { source, destination in
                             viewModel.move(fromOffsets: source, toOffset: destination)

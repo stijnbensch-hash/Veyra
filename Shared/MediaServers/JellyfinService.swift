@@ -39,6 +39,7 @@ struct JellyfinService {
         recursive: Bool = true,
         searchTerm: String? = nil,
         sortBy: String = "SortName",
+        sortOrder: String = "Ascending",
         limit: Int? = nil,
         ids: [String]? = nil
     ) async throws -> [JellyfinItem] {
@@ -62,7 +63,7 @@ struct JellyfinService {
 
             URLQueryItem(
                 name: "SortOrder",
-                value: "Ascending"
+                value: sortOrder
             ),
 
             URLQueryItem(

@@ -107,22 +107,34 @@ struct IPTVVODManagementView: View {
     // MARK: - Header
 
     private var header: some View {
-        VStack(
-            alignment: .leading,
-            spacing: 8
-        ) {
-            Text("VOD beheren")
-                .font(.system(size: 48, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
+        HStack(alignment: .top) {
+            VStack(
+                alignment: .leading,
+                spacing: 8
+            ) {
+                Text("VOD beheren")
+                    .font(.system(size: 48, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
 
-            Text(
-                "CATEGORIEËN & TITELS"
-            )
-            .font(.caption)
-            .tracking(3)
-            .foregroundStyle(
-                .cyan.opacity(0.75)
-            )
+                Text(
+                    "CATEGORIEËN & TITELS"
+                )
+                .font(.caption)
+                .tracking(3)
+                .foregroundStyle(
+                    .cyan.opacity(0.75)
+                )
+            }
+
+            Spacer()
+
+            Button {
+                Task { await load() }
+            } label: {
+                Image(systemName: "arrow.clockwise")
+                    .frame(width: 48, height: 48)
+            }
+            .accessibilityLabel("Categorieën en titels nu vernieuwen")
         }
     }
 
@@ -854,20 +866,32 @@ private struct IPTVVODItemManagementView:
     }
 
     private var header: some View {
-        VStack(
-            alignment: .leading,
-            spacing: 8
-        ) {
-            Text(category.name)
-                .font(.system(size: 46, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
+        HStack(alignment: .top) {
+            VStack(
+                alignment: .leading,
+                spacing: 8
+            ) {
+                Text(category.name)
+                    .font(.system(size: 46, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
 
-            Text("VOD TITELS")
-                .font(.caption)
-                .tracking(3)
-                .foregroundStyle(
-                    .cyan.opacity(0.75)
-                )
+                Text("VOD TITELS")
+                    .font(.caption)
+                    .tracking(3)
+                    .foregroundStyle(
+                        .cyan.opacity(0.75)
+                    )
+            }
+
+            Spacer()
+
+            Button {
+                Task { await loadItems() }
+            } label: {
+                Image(systemName: "arrow.clockwise")
+                    .frame(width: 48, height: 48)
+            }
+            .accessibilityLabel("Titels nu vernieuwen")
         }
     }
 

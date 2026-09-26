@@ -123,7 +123,10 @@ struct SeasonEpisodesView: View {
                 }
             }
             .padding(.vertical, 4)
+            .opacity(episode.isUnreleased ? 0.45 : 1)
         }
+        // Nog niet uitgebracht: alleen ter info, niet aantikbaar naar afspelen.
+        .disabled(episode.isUnreleased)
     }
 
     @ViewBuilder

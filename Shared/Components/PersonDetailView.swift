@@ -1,9 +1,9 @@
 import SwiftUI
 
 /// Infopagina van een acteur/regisseur/producer -- geopend door op iemand
-/// in `CastRow` te tikken. Toont portret, korte bio-info, "Bekend van" en de
+/// in `CastRow` te tikken. Toont portret, biografie, "Bekend van" en de
 /// volledige filmografie (films + series, als acteur of crewlid), op
-/// zowel tvOS als iOS.
+/// tvOS, iOS, iPadOS en macOS.
 struct PersonDetailView: View {
     let personID: Int
     let name: String
@@ -11,6 +11,13 @@ struct PersonDetailView: View {
     @State private var details: TMDBPersonDetails?
     @State private var credits: [TMDBPersonCredit] = []
     @State private var filter: Filter = .all
+    @State private var isLoading = true
+    @State private var biographyExpanded = false
+
+#if os(tvOS)
+    @Environment(\.dismiss) private var dismiss
+    @FocusState private var backFocused: Bool
+#endif
 
     private enum Filter: String, CaseIterable {
         case all = "Alle"
@@ -40,55 +47,89 @@ struct PersonDetailView: View {
     }
 
     private var knownFor: [TMDBPersonCredit] {
-        Array(
-            credits
-                .filter { $0.posterPath != nil }
-                .sorted { ($0.voteAverage ?? 0) > ($1.voteAverage ?? 0) }
-                .prefix(6)
-        )
+        let actingCredits = credits.filter { $0.job == nil }
+        let candidates = actingCredits.isEmpty ? credits : actingCredits
+        return Array(candidates
+            .filter { ($0.isMovie || $0.mediaType == "tv") && $0.posterPath != nil }
+            .sorted {
+                if ($0.voteCount ?? 0) != ($1.voteCount ?? 0) {
+                    return ($0.voteCount ?? 0) > ($1.voteCount ?? 0)
+                }
+                return ($0.popularity ?? 0) > ($1.popularity ?? 0)
+            }
+            .prefix(8))
     }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: sectionSpacing) {
+#if os(tvOS)
+                Button { dismiss() } label: {
+                    Label("Terug", systemImage: "chevron.left")
+                }
+                .buttonStyle(VeyraFocusButtonStyle())
+                .focused($backFocused)
+#endif
+
                 header
 
                 if !knownFor.isEmpty {
                     knownForSection
                 }
 
+                biographySection
+
                 filmographySection
             }
-            .padding(.bottom, 50)
+            .padding(.bottom, 80)
+#if os(tvOS)
+            .padding(.horizontal, 40)
+            .padding(.top, 32)
+            .frame(maxWidth: .infinity, alignment: .leading)
+#else
             .frame(maxWidth: 1400)
             .frame(maxWidth: .infinity)
+#endif
         }
+#if os(tvOS)
+        // De scrollweergave zelf begint onder de navigatie. Dit blijft ook zo
+        // wanneer tvOS automatisch naar een gefocust element scrolt.
+        .padding(.top, 120)
+        // Zonder focusbaar element boven de posterstrip kiest tvOS meteen de
+        // eerste film en scrolt het portret deels uit beeld. Begin bovenaan.
+        .defaultFocus($backFocused, true)
+#endif
         .background(VeyraColors.background.ignoresSafeArea())
+#if !os(tvOS)
         .navigationTitle(name)
+#endif
         .task(id: personID) { await load() }
     }
 
     // MARK: - Header
 
     private var header: some View {
-        VStack(spacing: 14) {
-            AsyncImage(
-                url: details?.profilePath.flatMap { URL(string: "https://image.tmdb.org/t/p/h632\($0)") }
-            ) { phase in
-                switch phase {
-                case .success(let image):
-                    image.resizable().scaledToFill()
-                default:
-                    ZStack {
-                        VeyraColors.surface
-                        Image(systemName: "person.fill")
-                            .foregroundStyle(.white.opacity(0.4))
-                            .font(.system(size: photoSize * 0.35))
-                    }
+#if os(tvOS)
+        HStack(alignment: .center, spacing: 48) {
+            portrait
+            VStack(alignment: .leading, spacing: 14) {
+                Text(name)
+                    .font(titleFont)
+                    .foregroundStyle(.white)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if !subtitleParts.isEmpty {
+                    Text(subtitleParts.joined(separator: " · "))
+                        .font(subtitleFont)
+                        .foregroundStyle(.white.opacity(0.7))
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .frame(width: photoSize, height: photoSize * 1.35)
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            Spacer(minLength: 0)
+        }
+#else
+        VStack(spacing: 14) {
+            portrait
 
             Text(name)
                 .font(titleFont)
@@ -100,19 +141,62 @@ struct PersonDetailView: View {
                     .font(subtitleFont)
                     .foregroundStyle(.secondary)
             }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 24)
+        .padding(.horizontal)
+#endif
+    }
 
-            if let biography = details?.biography, !biography.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+    private var portrait: some View {
+        AsyncImage(
+            url: details?.profilePath.flatMap { URL(string: "https://image.tmdb.org/t/p/h632\($0)") }
+        ) { phase in
+            switch phase {
+            case .success(let image):
+                image.resizable().scaledToFill()
+            default:
+                ZStack {
+                    VeyraColors.surface
+                    Image(systemName: "person.fill")
+                        .foregroundStyle(.white.opacity(0.4))
+                        .font(.system(size: photoSize * 0.35))
+                }
+            }
+        }
+        .frame(width: photoSize, height: photoSize * 1.35)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private var biographySection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            VeyraSectionHeader(title: "Biografie")
+
+            if let biography = details?.biography,
+               !biography.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Text(biography)
                     .font(bodyFont)
                     .foregroundStyle(.white.opacity(0.82))
                     .multilineTextAlignment(.leading)
-                    .lineLimit(8)
-                    .frame(maxWidth: 900, alignment: .leading)
-                    .padding(.top, 6)
+                    .lineSpacing(5)
+                    .lineLimit(biographyExpanded ? nil : 5)
+                    .frame(maxWidth: 1100, alignment: .leading)
+
+                if biography.count > 350 {
+                    Button(biographyExpanded ? "Minder tonen" : "Volledige biografie") {
+                        biographyExpanded.toggle()
+                    }
+#if os(tvOS)
+                    .buttonStyle(VeyraFocusButtonStyle())
+#endif
+                }
+            } else if isLoading {
+                ProgressView()
+            } else {
+                Text("Geen biografie beschikbaar.")
+                    .foregroundStyle(.secondary)
             }
         }
-        .frame(maxWidth: .infinity)
-        .padding(.top, 24)
         .padding(.horizontal)
     }
 
@@ -178,24 +262,49 @@ struct PersonDetailView: View {
             }
             .padding(.horizontal)
 
+            if isLoading {
+                ProgressView("Filmografie laden…")
+                    .padding(.horizontal)
+            } else if groupedByYear.isEmpty {
+                Text("Geen filmografie beschikbaar.")
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal)
+            }
+
             ForEach(groupedByYear, id: \.year) { group in
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 14) {
                     Text(group.year)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(yearFont)
                         .foregroundStyle(.secondary)
                         .padding(.horizontal)
 
-                    ForEach(group.credits, id: \.self) { credit in
-                        NavigationLink {
-                            ShelfItemDestination(item: credit.mediaItem())
-                        } label: {
-                            filmographyRow(credit)
+#if os(tvOS)
+                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 18), GridItem(.flexible(), spacing: 18)], spacing: 18) {
+                        ForEach(group.credits, id: \.self) { credit in
+                            filmographyLink(credit)
                         }
-                        .buttonStyle(.plain)
                     }
+#else
+                    ForEach(group.credits, id: \.self) { credit in
+                        filmographyLink(credit)
+                    }
+#endif
                 }
             }
         }
+    }
+
+    private func filmographyLink(_ credit: TMDBPersonCredit) -> some View {
+        NavigationLink {
+            ShelfItemDestination(item: credit.mediaItem())
+        } label: {
+            filmographyRow(credit)
+        }
+#if os(tvOS)
+        .buttonStyle(PersonFilmographyFocusStyle())
+#else
+        .buttonStyle(.plain)
+#endif
     }
 
     // tvOS heeft geen `.segmented` Picker-stijl -- daar een eigen rijtje
@@ -232,27 +341,31 @@ struct PersonDetailView: View {
                     VeyraColors.surface
                 }
             }
-            .frame(width: 46, height: 64)
+            .frame(width: filmographyPosterWidth, height: filmographyPosterHeight)
             .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text(credit.displayTitle)
-                    .font(.system(size: 17, weight: .medium))
+                    .font(filmographyTitleFont)
                     .foregroundStyle(.white)
-                    .lineLimit(1)
+                    .lineLimit(2)
 
                 if let role = credit.roleLabel, !role.isEmpty {
                     Text(role)
-                        .font(.system(size: 14))
+                        .font(filmographyRoleFont)
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        .lineLimit(2)
                 }
             }
 
             Spacer()
         }
         .padding(.horizontal)
-        .padding(.vertical, 6)
+        .padding(.vertical, 10)
+#if os(tvOS)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(VeyraColors.surface.opacity(0.55), in: RoundedRectangle(cornerRadius: 14))
+#endif
     }
 
     // MARK: - Load
@@ -263,6 +376,7 @@ struct PersonDetailView: View {
         let (loadedDetails, loadedCredits) = await (detailsTask, creditsTask)
         details = loadedDetails
         credits = loadedCredits
+        isLoading = false
     }
 
     // MARK: - Metrics
@@ -322,4 +436,68 @@ struct PersonDetailView: View {
         24
 #endif
     }
+
+    private var yearFont: Font {
+#if os(tvOS)
+        .system(size: 24, weight: .semibold)
+#else
+        .system(size: 16, weight: .semibold)
+#endif
+    }
+
+    private var filmographyPosterWidth: CGFloat {
+#if os(tvOS)
+        80
+#else
+        46
+#endif
+    }
+
+    private var filmographyPosterHeight: CGFloat {
+#if os(tvOS)
+        112
+#else
+        64
+#endif
+    }
+
+    private var filmographyTitleFont: Font {
+#if os(tvOS)
+        .system(size: 24, weight: .semibold)
+#else
+        .system(size: 17, weight: .medium)
+#endif
+    }
+
+    private var filmographyRoleFont: Font {
+#if os(tvOS)
+        .system(size: 19)
+#else
+        .system(size: 14)
+#endif
+    }
 }
+
+#if os(tvOS)
+private struct PersonFilmographyFocusStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        FocusedRow(configuration: configuration)
+            .focusEffectDisabled()
+    }
+
+    private struct FocusedRow: View {
+        let configuration: ButtonStyleConfiguration
+        @Environment(\.isFocused) private var isFocused
+
+        var body: some View {
+            configuration.label
+                .overlay {
+                    RoundedRectangle(cornerRadius: 14)
+                        .strokeBorder(VeyraColors.cyan.opacity(isFocused ? 1 : 0), lineWidth: 3)
+                }
+                .scaleEffect(isFocused ? 1.03 : 1)
+                .animation(.easeOut(duration: 0.16), value: isFocused)
+        }
+    }
+}
+#endif

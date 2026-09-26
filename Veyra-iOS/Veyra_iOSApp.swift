@@ -28,6 +28,7 @@ struct Veyra_iOSApp: App {
     // kleine laadanimatie die verdwijnt zodra het klaar is. Zie
     // `Shared/LiveTV/IPTVStartupRefreshCoordinator.swift`.
     @StateObject private var iptvStartupRefresh = IPTVStartupRefreshCoordinator()
+    @StateObject private var iptvStartupGuide = VeyraEPGStore()
 
     var body: some Scene {
         WindowGroup {
@@ -44,12 +45,13 @@ struct Veyra_iOSApp: App {
                         // `Shared/Sync/VeyraHubSyncService.swift`.
                         VeyraHubSyncService.shared.start()
 
-                        // Bestaande schermen (LiveTVView, IPTVRecentlyAddedRows)
-                        // verversen zichzelf al zodra ze de
-                        // `.iptvConfigurationDidChange`-notificatie ontvangen —
-                        // dus bij opstarten alleen het startsein geven, net als
-                        // tvOS (`VeyraApp.iptvHomeRefreshRequested`).
+                        // Vul de bestaande zender- en EPG-schijfcache al bij
+                        // opstarten; de melding na afloop ververst open schermen.
                         await iptvStartupRefresh.beginRefresh {
+                            if UIDevice.current.userInterfaceIdiom == .pad {
+                                await iptvStartupGuide.reload()
+                                await IPTVDiskCache.flush()
+                            }
                             NotificationCenter.default.post(name: .iptvConfigurationDidChange, object: nil)
                         }
                     }
