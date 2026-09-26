@@ -96,8 +96,15 @@ final class VeyraHubSyncService {
         "sourceBadges.packs", "sourceBadges.mode",
     ]
 
+    private static let sportsDataKeys: [String] = [
+        // Welke sporten/competities getoond worden op Home en in het Sport-menu —
+        // zie Shared/Sports/SportsDisplayPreferences.swift. JSON-gecodeerde `Data`,
+        // zelfde generieke plist-opslag als de andere Data-sleutels hier.
+        "sports.displayPreferences",
+    ]
+
     private static var settingsDataKeys: [String] {
-        shelfHeroDataKeys + sourceOrderDataKeys + addonDataKeys + sourceBadgeDataKeys + recorderDataKeys
+        shelfHeroDataKeys + sourceOrderDataKeys + addonDataKeys + sourceBadgeDataKeys + recorderDataKeys + sportsDataKeys
     }
 
     private static let metadataPrefix = "metadata.rating."

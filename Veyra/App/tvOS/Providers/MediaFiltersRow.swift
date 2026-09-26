@@ -9,6 +9,7 @@ struct MediaFiltersRow: View {
     @Binding var selectedGenreID: Int?
     @Binding var selectedDecade: VeyraDecadeFilter?
     @Binding var selectedRating: VeyraRatingFilter?
+    @Binding var selectedSort: VeyraSortOption
 
     private var genreOptions: [(id: Int, name: String)] {
         let source = kind == .movie ? TMDBGenreNames.movie : TMDBGenreNames.tv
@@ -25,6 +26,22 @@ struct MediaFiltersRow: View {
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 22) {
+                // Sorteren staat vooraan (i.p.v. na de andere filters), anders dan
+                // de andere filters hieronder heeft het altijd een actieve waarde
+                // (default "Populair") — dus geen resetButton naar "geen sortering".
+                filterMenu(
+                    symbol: "arrow.up.arrow.down",
+                    label: "Sorteren",
+                    value: selectedSort.displayName,
+                    isActive: selectedSort != .newest
+                ) {
+                    ForEach(VeyraSortOption.allCases) { option in
+                        optionButton(title: option.displayName, selected: selectedSort == option) {
+                            selectedSort = option
+                        }
+                    }
+                }
+
                 filterMenu(
                     symbol: "square.stack.3d.up",
                     label: "Genre",

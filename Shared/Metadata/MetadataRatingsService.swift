@@ -8,8 +8,9 @@ import Foundation
 ///   API-sleutel van omdbapi.com, in te stellen via Account of Secrets.xcconfig).
 /// - Trakt komt van Trakt's publieke ratings-endpoint (geen aanmelding nodig,
 ///   enkel de al aanwezige Trakt Client ID/Secret).
-/// - Popcornmeter (de publieksscore van Rotten Tomatoes) heeft geen publiek
-///   toegankelijke API en blijft daarom altijd leeg.
+/// - Popcornmeter (de publieksscore van Rotten Tomatoes), Letterboxd en
+///   MyAnimeList hebben geen publiek toegankelijke API die hier is
+///   aangesloten en blijven daarom altijd leeg.
 enum MetadataRatingsService {
     // MARK: - Public
 
@@ -25,7 +26,9 @@ enum MetadataRatingsService {
             tomatometer: omdbValue?.tomatometer,
             metacritic: omdbValue?.metacritic,
             trakt: traktValue,
-            popcornmeter: nil
+            popcornmeter: nil,
+            letterboxd: nil,
+            mal: nil
         )
     }
 
@@ -48,7 +51,9 @@ enum MetadataRatingsService {
             tomatometer: omdbValue?.tomatometer,
             metacritic: omdbValue?.metacritic,
             trakt: traktValue,
-            popcornmeter: nil
+            popcornmeter: nil,
+            letterboxd: nil,
+            mal: nil
         )
     }
 

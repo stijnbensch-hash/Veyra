@@ -1,30 +1,40 @@
 // VeyraBentoSportSection.swift — tvOS 17+
 // Home-sectie "Sport", gevoed door het Sport-menu (via VeyraSportViewModel / SportMenuProvider).
-// Vereist: VeyraBentoSportViews.swift, VeyraBentoSportModel.swift, VeyraBentoStyle.swift, VeyraBentoFocus.swift
-//          (VeyraHomeFocus, VeyraTileStyle).
+// Vereist: VeyraSportMatchCard.swift (kaart, cross-platform met tvOS-maten), VeyraBentoSportModel.swift,
+//          VeyraBentoStyle.swift, VeyraBentoFocus.swift (VeyraHomeFocus).
 //
-// Indeling (raster van 6 kolommen, 273 pt breed, 24 pt tussenruimte):
-//   SPORT   uitgelichte wedstrijd (4 kol. x 472)  |  glazen lijst "Vandaag & straks" (2 kol.)
-//           daaronder tot 6 competitietegels (1 kol. x 184)
+// Indeling (dezelfde structuur als de iOS-Sport-sectie, zie VeyraBentoSportSectionIOS.swift, maar met
+// tvOS-conventies: grotere 10-foot-kaarten + focus-navigatie i.p.v. een grid):
+//   "Favorieten"        wedstrijden van favoriete teams, over alle competities heen -- horizontaal
+//                        scrollbare rij focusbare kaarten, net als de andere tvOS bento-shelves
+//                        (bv. "Nieuwe films" in VeyraBentoHome.swift).
+//   per sport           (bv. "College Football") één horizontale rij per hoofdsport: de losse
+//                        competitie-entries die tot dezelfde sport horen (bv. alle
+//                        "College Football · <conference>") worden samengevoegd (zie
+//                        `VeyraSportViewModel.sportGroupSections`), één subsectie per sport met
+//                        minstens 1 relevante wedstrijd in een aangezette competitie.
+//   kaart                klok+tijdstip linksboven, de twee teams (logo + naam) daaronder,
+//                        onderaan een sport-icoon + competitie-label -- zie VeyraSportMatchCard,
+//                        als Button met VeyraSportCardStyle (cyaan/rood focus-kader, net als voorheen).
 //
-// Bediening:
+// Focus: elke kaart krijgt `.focused(focus, equals: .sport(section: <rijtitel>, id: event.id))` --
+// de rijtitel is nodig als onderdeel van de focus-identiteit, anders claimen twee kaarten in
+// verschillende rijen dezelfde `.sport`-waarde zodra hetzelfde event-id in meerdere rijen voorkomt
+// (interconference-wedstrijden, of ook in "Favorieten"), wat de Siri Remote-focus liet vastlopen.
+//
+// Bediening (ongewijzigd):
 //   select op wedstrijd      -> live: afspelen · straks: herinnering aan/uit
 //   lang indrukken           -> "Vanaf het begin" (als de zender terugkijken heeft) · herinnering
-//   select op competitie     -> onOpenCompetition (spring naar het Sport-menu, gefilterd)
-//
-// Vervang bij het inpassen: VeyraTileStyle/VeyraRowStyle -> VeyraFocusButtonStyle, veyraGlassSurface -> .veyraGlass(...).
 
 #if os(tvOS)
 import SwiftUI
 
 private enum TVSport {
-    static let col: CGFloat = 273
     static let gap: CGFloat = 24
-    static func span(_ n: Int) -> CGFloat { CGFloat(n) * col + CGFloat(n - 1) * gap }
-    static let mainHeight: CGFloat = 472
+    static let rowSpacing: CGFloat = 32
 }
 
-// MARK: - Rijstijl (cyaan focus in het glazen paneel)
+// MARK: - Rijstijl (cyaan focus in het glazen paneel) -- ook gebruikt door VeyraBentoHome.swift
 
 struct VeyraRowStyle: ButtonStyle {
     var cornerRadius: CGFloat = 20
@@ -51,6 +61,38 @@ struct VeyraRowStyle: ButtonStyle {
     }
 }
 
+// MARK: - Kaartstijl (altijd zichtbaar cyaan/rood kader) -- gebruikt door de wedstrijdkaarten hieronder
+
+struct VeyraSportCardStyle: ButtonStyle {
+    var isLive: Bool
+    var cornerRadius: CGFloat = 18
+
+    func makeBody(configuration: ButtonStyleConfiguration) -> some View {
+        Inner(configuration: configuration, isLive: isLive, cornerRadius: cornerRadius)
+            .focusEffectDisabled()
+    }
+
+    private struct Inner: View {
+        let configuration: ButtonStyleConfiguration
+        let isLive: Bool
+        let cornerRadius: CGFloat
+        @Environment(\.isFocused) private var isFocused
+
+        private var tint: Color { isLive ? VeyraHomeStyle.live : VeyraHomeStyle.cyan }
+
+        var body: some View {
+            let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            configuration.label
+                .background(isFocused ? tint.opacity(0.18) : Color.clear, in: shape)
+                .overlay(shape.strokeBorder(tint.opacity(isFocused ? 1 : 0.85), lineWidth: isFocused ? 3 : 2))
+                .shadow(color: isFocused ? tint.opacity(0.35) : .clear, radius: 16)
+                .opacity(configuration.isPressed ? 0.85 : 1)
+                .animation(.easeOut(duration: 0.15), value: isFocused)
+                .scaleEffect(isFocused ? 1.04 : 1)
+        }
+    }
+}
+
 // MARK: - Sport
 
 struct SportSection: View {
@@ -71,73 +113,62 @@ struct SportSection: View {
     private func content(now: Date) -> some View {
         let live = model.liveEvents(at: now).count
         let coming = model.upcomingCount(at: now)
-        let featured = model.featured(at: now)
-        let rows = Array(model.fixtures(at: now, limit: 7, excluding: featured?.id).prefix(5))
-        let competitions = Array(model.competitions(at: now).prefix(6))
+        // "Mijn teams": wedstrijden van favoriete teams, over alle competities heen -- daarna per
+        // competitie ("College Football", ...) dezelfde kaartstijl, elk in een horizontaal scrollbare
+        // rij focusbare kaarten. Vervangt de oude combinatie van één losse uitgelichte kaart + een
+        // glazen "Vandaag & straks"-lijst + competitietegels.
+        let favoriteIDs = SportsFavorites.ids()
+        let myTeams = model.myTeamEvents(at: now, favoriteIDs: favoriteIDs, limit: 10)
+        let sportGroups = model.sportGroupSections(at: now, limitPerGroup: 10)
 
         VStack(alignment: .leading, spacing: 18) {
             VeyraHomeSectionHeader(title: "Sport", trailing: "\(live) live · \(coming) komende")
 
-            VStack(alignment: .leading, spacing: TVSport.gap) {
-                HStack(alignment: .top, spacing: TVSport.gap) {
-                    if let featured {
-                        matchTile(featured, now: now)
-                            .frame(width: TVSport.span(4), height: TVSport.mainHeight)
-                    }
-                    fixturesPanel(rows, live: live, now: now)
-                        .frame(width: TVSport.span(2), height: TVSport.mainHeight)
+            VStack(alignment: .leading, spacing: TVSport.rowSpacing) {
+                if !myTeams.isEmpty {
+                    matchRow(title: "Favorieten", events: myTeams, now: now)
                 }
 
-                if !competitions.isEmpty {
-                    HStack(spacing: TVSport.gap) {
-                        ForEach(competitions) { competition in
-                            Button { onOpenCompetition(competition) } label: {
-                                VeyraCompetitionContent(competition: competition, now: now)
-                            }
-                            .buttonStyle(VeyraTileStyle())
-                            .focused(focus, equals: .competition(competition.id))
-                            .frame(width: TVSport.span(1), height: 184)
+                ForEach(sportGroups, id: \.name) { section in
+                    matchRow(title: section.name, events: section.events, now: now)
+                }
+
+                if myTeams.isEmpty && sportGroups.isEmpty {
+                    Text("Geen wedstrijden gevonden")
+                        .font(.title3)
+                        .foregroundStyle(VeyraHomeStyle.dim)
+                }
+            }
+        }
+    }
+
+    // MARK: Subsectie: kop + horizontaal scrollbare rij wedstrijdkaarten
+
+    private func matchRow(title: String, events: [SportEvent], now: Date) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            // Zelfde stijl als "Filmcollecties" op Home: cyaan, dezelfde grootte.
+            Text(title)
+                .font(.system(size: 20, weight: .bold))
+                .tracking(2)
+                .textCase(.uppercase)
+                .foregroundStyle(VeyraHomeStyle.cyan.opacity(0.85))
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: TVSport.gap) {
+                    ForEach(events) { event in
+                        Button { primaryAction(event, now: now) } label: {
+                            VeyraSportMatchCard(event: event, now: now, reminderOn: model.reminderIDs.contains(event.id))
                         }
+                        .buttonStyle(VeyraSportCardStyle(isLive: event.isLive(at: now)))
+                        .focused(focus, equals: .sport(section: title, id: event.id))
+                        .contextMenu { menu(for: event, now: now) }
                     }
                 }
+                .padding(.vertical, 8)
+                .padding(.horizontal, 4)
             }
+            .scrollClipDisabled()
         }
-    }
-
-    // MARK: Uitgelichte wedstrijd
-
-    private func matchTile(_ event: SportEvent, now: Date) -> some View {
-        Button { primaryAction(event, now: now) } label: {
-            VeyraLiveMatchContent(event: event, now: now, reminderOn: model.reminderIDs.contains(event.id))
-        }
-        .buttonStyle(VeyraTileStyle())
-        .focused(focus, equals: .sport(event.id))
-        .contextMenu { menu(for: event, now: now) }
-    }
-
-    // MARK: Lijst
-
-    private func fixturesPanel(_ rows: [SportEvent], live: Int, now: Date) -> some View {
-        VStack(spacing: 0) {
-            VeyraFixturesHeader(liveCount: live)
-            VStack(spacing: 4) {
-                ForEach(rows) { event in
-                    Button { primaryAction(event, now: now) } label: {
-                        VeyraFixtureRowContent(event: event, now: now, reminderOn: model.reminderIDs.contains(event.id))
-                    }
-                    .buttonStyle(VeyraRowStyle())
-                    .focused(focus, equals: .sport(event.id))
-                    .contextMenu { menu(for: event, now: now) }
-                }
-            }
-            .padding(.horizontal, 10)
-            .padding(.top, 6)
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(VeyraFrame.fill)
-        .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
-        .veyraGlassSurface()
     }
 
     // MARK: Acties

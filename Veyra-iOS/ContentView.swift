@@ -4,9 +4,10 @@
 //
 
 import SwiftUI
+import UIKit
 
 private enum AppTab: Hashable {
-    case home, movies, series, live, sports, settings
+    case home, movies, series, search, live, sports, settings
 }
 
 struct ContentView: View {
@@ -15,6 +16,10 @@ struct ContentView: View {
     @ObservedObject private var homeNavigation = HomeNavigationState.shared
     @State private var showSearch = false
     @Environment(\.horizontalSizeClass) private var sizeClass
+
+    private var isPad: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad || ProcessInfo.processInfo.isiOSAppOnMac
+    }
 
     // iPad-navigatie: zijbalk of menubalk boven (Instellingen → Algemeen) —
     // nooit allebei, in tegenstelling tot het systeem-eigen wisselknopje dat
@@ -26,20 +31,25 @@ struct ContentView: View {
         IPadNavigationStyle(rawValue: ipadNavigationStyleRaw) ?? .sidebar
     }
 
-    /// iPad (regular): navigatie via een zijbalk en Instellingen als eigen onderdeel; iPhone blijft een tabbalk.
+    /// Een brede iPad gebruikt de gekozen zijbalk of menubalk; een smal iPad-venster behoudt dezelfde menu-items.
     private var isRegular: Bool { sizeClass == .regular }
 
     private var tabViewContent: some View {
         TabView(selection: $selectedTab) {
             Tab("Home", systemImage: "house.fill", value: AppTab.home) {
-                HomeView(floatingButtons: true, showsSettings: !isRegular,
+                HomeView(floatingButtons: !isPad, showsSettings: !isPad,
                          onSearch: { showSearch = true }, onSettings: { showSettings = true })
             }
             Tab("Films", systemImage: "film.fill", value: AppTab.movies) { MoviesView() }
             Tab("Series", systemImage: "tv.fill", value: AppTab.series) { SeriesView() }
+            if isPad {
+                Tab("Zoeken", systemImage: "magnifyingglass", value: AppTab.search) {
+                    SearchView()
+                }
+            }
             Tab("Live", systemImage: "antenna.radiowaves.left.and.right", value: AppTab.live) { LiveTVView() }
             Tab("Sport", systemImage: "trophy", value: AppTab.sports) { SportsView() }
-            if isRegular {
+            if isPad {
                 Tab("Instellingen", systemImage: "gearshape.fill", value: AppTab.settings) { SettingsView() }
             }
         }
@@ -71,6 +81,7 @@ struct ContentView: View {
                 Label("Home", systemImage: "house.fill").tag(AppTab.home)
                 Label("Films", systemImage: "film.fill").tag(AppTab.movies)
                 Label("Series", systemImage: "tv.fill").tag(AppTab.series)
+                Label("Zoeken", systemImage: "magnifyingglass").tag(AppTab.search)
                 Label("Live", systemImage: "antenna.radiowaves.left.and.right").tag(AppTab.live)
                 Label("Sport", systemImage: "trophy").tag(AppTab.sports)
                 Label("Instellingen", systemImage: "gearshape.fill").tag(AppTab.settings)
@@ -79,8 +90,7 @@ struct ContentView: View {
             .listStyle(.sidebar)
         } detail: {
             // Elke bestemming (HomeView, MoviesView, …) wikkelt zichzelf al
-            // in een eigen `NavigationStack` (SettingsView zelfs in een
-            // eigen `NavigationSplitView` op iPad) — hier nog een stack
+            // in een eigen `NavigationStack` — hier nog een stack
             // omheen zetten zou die nesten, met dubbele navigatiebalken
             // tot gevolg. De vaste balk erboven (met de zijbalk-knop) duwt
             // die inhoud gewoon omlaag i.p.v. eroverheen te zweven, en
@@ -137,6 +147,7 @@ struct ContentView: View {
         case .home: HomeView()
         case .movies: MoviesView()
         case .series: SeriesView()
+        case .search: SearchView()
         case .live: LiveTVView()
         case .sports: SportsView()
         case .settings: SettingsView()
@@ -166,16 +177,12 @@ struct ContentView: View {
             selectedTab = tab == .live ? .live : .sports
             homeNavigation.requestedTab = nil
         }
-        .onChange(of: isRegular) { _, regular in
-            // Van iPad-indeling naar compact (bv. Split View): Instellingen bestaat dan alleen nog als sheet.
-            if !regular, selectedTab == .settings { selectedTab = .home }
-        }
         .sheet(isPresented: $showSettings) {
             SettingsView()
                 .presentationSizing(.page)
         }
         .sheet(isPresented: $showSearch) {
-            PlaceholderTab(title: "Zoeken", symbol: "magnifyingglass")
+            SearchView()
         }
     }
 }
@@ -200,36 +207,6 @@ struct FloatingIconButton: View {
                 )
         }
         .accessibilityLabel(accessibilityLabel)
-    }
-}
-
-private struct PlaceholderTab: View {
-    let title: String
-    let symbol: String
-
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                VeyraColors.background.ignoresSafeArea()
-
-                VStack(spacing: 16) {
-                    Image(systemName: symbol)
-                        .font(.system(size: 44))
-                        .foregroundStyle(VeyraColors.cyan)
-
-                    Text(title)
-                        .font(.title2.weight(.semibold))
-                        .foregroundStyle(.white)
-
-                    Text("Binnenkort beschikbaar op iPhone/iPad.")
-                        .font(.subheadline)
-                        .foregroundStyle(VeyraColors.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 32)
-                }
-            }
-            .navigationTitle(title)
-        }
     }
 }
 

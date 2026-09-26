@@ -39,6 +39,16 @@ struct TVGeneralSettingsView: View {
                         }
                     }
                     .veyraCardRow()
+
+                    NavigationLink {
+                        SportsDisplaySettingsView()
+                    } label: {
+                        VeyraSettingsCardRowLabel(icon: "sportscourt", title: "Getoonde sporten",
+                                                  subtitle: "Kies welke sporten en competities getoond worden") {
+                            VeyraSettingsCardRowValue(value: nil)
+                        }
+                    }
+                    .veyraCardRow()
                 } header: {
                     Text("Sport")
                 }

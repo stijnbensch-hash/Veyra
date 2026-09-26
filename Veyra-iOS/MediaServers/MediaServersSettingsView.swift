@@ -10,11 +10,24 @@ struct MediaServersSettingsView: View {
             VeyraColors.background.ignoresSafeArea()
 
             List {
+            Section("VeyraHub-synchronisatie") {
+                if viewModel.servers.contains(where: \.isVeyraHub) {
+                    Label("VeyraHub toegevoegd", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(VeyraColors.cyan)
+                    Text("Veyra synchroniseert instellingen, brongegevens en API-sleutels automatisch via deze server.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("Verbind VeyraHub op dit toestel met hetzelfde serveradres en account als op je andere Veyra-toestellen. Daarna start de synchronisatie automatisch.")
+                        .foregroundStyle(.secondary)
+                    Button("VeyraHub verbinden") { showAddSheet = true }
+                }
+            }
+
             if viewModel.servers.isEmpty {
                 ContentUnavailableView(
                     "Geen mediaservers",
                     systemImage: "play.tv",
-                    description: Text("Voeg een Jellyfin-server toe.")
+                    description: Text("Voeg VeyraHub of een Jellyfin-server toe.")
                 )
             } else {
                 Section {
@@ -135,6 +148,9 @@ private struct MediaServerAddView: View {
                 }
                 .pickerStyle(.inline)
                 .labelsHidden()
+                Text("Voor VeyraHub kies je Jellyfin en gebruik je het serveradres en account waarmee je op je andere Veyra-toestellen bent ingelogd.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
 
             if selectedKind.isAvailable {

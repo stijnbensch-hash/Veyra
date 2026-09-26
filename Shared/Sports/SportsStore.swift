@@ -25,7 +25,7 @@ struct ESPNScoreProvider: SportsScoreProvider {
             try Task.checkCancellation()
             var components = URLComponents(string: "\(VeyraEndpoints.sports)/\(league.path)/scoreboard")!
             components.queryItems = [URLQueryItem(name: "dates", value: key), URLQueryItem(name: "limit", value: "1000")]
-            if league.id == "college-football" { components.queryItems?.append(URLQueryItem(name: "groups", value: "80")) }
+            if let groups = league.groups { components.queryItems?.append(URLQueryItem(name: "groups", value: groups)) }
             var request = URLRequest(url: components.url!)
             request.timeoutInterval = 15
             request.cachePolicy = .reloadIgnoringLocalCacheData
@@ -89,7 +89,7 @@ final class SportsStore: ObservableObject {
         selectedDate = day
         isLoading = true
         let results = await withTaskGroup(of: (String, [SportsMatch]?).self) { group in
-            for league in SportsLeague.all {
+            for league in SportsLeague.all where SportsDisplayPreferences.isLeagueEnabled(league.id, defaults: defaults) {
                 group.addTask { @MainActor [provider] in
                     do { return (league.id, try await provider.matches(league: league, date: day)) }
                     catch { return (league.id, nil) }
@@ -109,6 +109,9 @@ final class SportsStore: ObservableObject {
             if let events { next.removeAll { $0.league.id == league }; next += events }
             else { failedLeagues.append(league) }
         }
+        // Competities die intussen uitgezet zijn in de sportvoorkeuren: ook meteen weg,
+        // anders blijven hun oude wedstrijden zichtbaar tot de volgende dagwissel.
+        next.removeAll { !SportsDisplayPreferences.isLeagueEnabled($0.league.id, defaults: defaults) }
         matches = next.sorted { $0.date == $1.date ? $0.id < $1.id : $0.date < $1.date }
         if failedLeagues.isEmpty { updatedAt = Date() }
     }

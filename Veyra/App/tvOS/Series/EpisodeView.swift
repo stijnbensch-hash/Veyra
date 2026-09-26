@@ -159,7 +159,8 @@ struct EpisodeView: View {
                 } label: {
                     VeyraActionLabel(
                         title: "Afspelen",
-                        symbol: "play.fill"
+                        symbol: "play.fill",
+                        compact: true
                     )
                 }
                 .buttonStyle(

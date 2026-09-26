@@ -91,6 +91,11 @@ struct GeneralSettingsView: View {
                     } label: {
                         Label("Favoriete teams", systemImage: "star")
                     }
+                    NavigationLink {
+                        SportsDisplaySettingsView()
+                    } label: {
+                        Label("Getoonde sporten", systemImage: "sportscourt")
+                    }
                 } header: {
                     sectionHeader("Sport", symbol: "sportscourt", tint: VeyraColors.red)
                 } footer: {

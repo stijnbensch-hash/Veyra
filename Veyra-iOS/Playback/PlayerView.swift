@@ -17,7 +17,10 @@ struct PlayerView: View {
     private var viewModel: PlaybackViewModel
 
     @State
-    private var nextEpisodeRequest: MediaItem?
+    private var nextEpisodeRequest: NextPlaybackRequest?
+
+    @State
+    private var isResolvingNextEpisode = false
 
     // "Automatisch draaien naar liggend" (Afspelen-instellingen). Uit =
     // speler blijft in staand vergrendeld, ongeacht toestelrotatie.
@@ -78,7 +81,20 @@ struct PlayerView: View {
                         // aflevering niet als "bekeken" geregistreerd bij
                         // Trakt wanneer je op "Volgende" drukt.
                         viewModel.stopForDisappear()
-                        nextEpisodeRequest = next
+
+                        // Dezelfde bron (provider/resolutie/audio/...)
+                        // zoeken voor de volgende aflevering, zodat de
+                        // speler blijft doorspelen i.p.v. terug te vallen
+                        // op het bronkeuzescherm — zie de tvOS PlayerView
+                        // voor dezelfde aanpak.
+                        isResolvingNextEpisode = true
+                        Task {
+                            let matchedSource = await NextEpisodeSourceResolver.resolve(
+                                matching: source, for: next
+                            )
+                            isResolvingNextEpisode = false
+                            nextEpisodeRequest = NextPlaybackRequest(item: next, source: matchedSource)
+                        }
                     }
                 )
 
@@ -88,8 +104,12 @@ struct PlayerView: View {
                         ProgressView()
                             .tint(.white)
                     }
-                    Text("Veyra Player starten…")
-                        .foregroundStyle(.white.opacity(0.8))
+                    Text(
+                        isResolvingNextEpisode
+                            ? "Volgende aflevering zoeken…"
+                            : "Veyra Player starten…"
+                    )
+                    .foregroundStyle(.white.opacity(0.8))
                 }
             }
         }
@@ -112,10 +132,21 @@ struct PlayerView: View {
         .onChange(of: scenePhase) { _, phase in
             viewModel.handleScenePhaseChange(phase)
         }
-        .navigationDestination(item: $nextEpisodeRequest) { next in
-            SourceSelectionView(item: next)
+        .navigationDestination(item: $nextEpisodeRequest) { request in
+            if let matchedSource = request.source {
+                PlayerView(source: matchedSource, item: request.item)
+            } else {
+                SourceSelectionView(item: request.item)
+            }
         }
     }
+}
+
+/// Zie de tvOS PlayerView voor de toelichting.
+private struct NextPlaybackRequest: Identifiable, Hashable {
+    let id = UUID()
+    let item: MediaItem
+    let source: PlayableSource?
 }
 
 private enum IOSPlayerPanel: String, Identifiable {

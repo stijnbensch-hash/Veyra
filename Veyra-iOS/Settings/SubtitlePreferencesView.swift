@@ -34,6 +34,18 @@ struct SubtitlePreferencesView: View {
             } header: {
                 Text("OpenSubtitles")
             }
+
+            Section {
+                NavigationLink {
+                    SubtitleAppearanceSettingsView()
+                } label: {
+                    Label("Ondertitelweergave", systemImage: "textformat.size")
+                }
+            } header: {
+                Text("Weergave")
+            } footer: {
+                Text("Grootte, plaatsing, achtergrond en sync.")
+            }
             }
             .scrollContentBackground(.hidden)
         }

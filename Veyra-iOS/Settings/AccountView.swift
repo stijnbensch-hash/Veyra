@@ -64,6 +64,7 @@ struct AccountView: View {
                 } footer: {
                     Text("Alleen nodig om zelf een Trakt-koppeling mogelijk te maken — dezelfde sleutels als op je andere Veyra-toestellen.")
                 }
+
             }
             .scrollContentBackground(.hidden)
         }

@@ -19,7 +19,6 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             homeContent
-                .overlay(alignment: .top) { floatingBar }
                 .toolbar(.hidden, for: .navigationBar)
                 .sportChannelSheet($sportQuery) { bentoChannel = $0 }
                 .modifier(HomeDestinations(
@@ -31,22 +30,11 @@ struct HomeView: View {
         }
     }
 
-    @ViewBuilder
-    private var floatingBar: some View {
-        if floatingButtons {
-            HStack {
-                FloatingIconButton(symbol: "magnifyingglass", accessibilityLabel: "Zoeken", action: onSearch)
-                Spacer()
-                if showsSettings {
-                    FloatingIconButton(symbol: "gearshape.fill", accessibilityLabel: "Instellingen", action: onSettings)
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
-        }
-    }
-
     private var homeContent: some View {
+        // De zoek-/instellingenknoppen worden nu ALS DEEL VAN de scrollende inhoud getekend (eerste
+        // element bovenaan in VeyraBentoHomeIOS.swift), niet als losse vaste/zwevende balk erboven --
+        // ze schuiven dus gewoon mee omhoog en verdwijnen bij het scrollen, i.p.v. altijd zichtbaar
+        // te blijven staan (en dus ook geen apart achtergrond-/toolbar-gedoe meer nodig).
         VeyraBentoHomeView(
             model: VeyraBentoServices.shared.bento,
             sportModel: VeyraBentoServices.shared.sport,
@@ -58,7 +46,11 @@ struct HomeView: View {
             onOpenTMDBTitle: { bentoRelease = $0 },
             onOpenCatalog: { bentoCatalog = $0 },
             onPlaySport: { event, _ in sportQuery = SportChannelQuery(event: event) },
-            onOpenCompetition: { _ in openTab(.sports) }
+            onOpenCompetition: { _ in openTab(.sports) },
+            floatingButtons: floatingButtons,
+            showsSettings: showsSettings,
+            onSearch: onSearch,
+            onSettings: onSettings
         )
     }
 

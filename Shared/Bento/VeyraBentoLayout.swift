@@ -34,7 +34,7 @@ nonisolated enum BentoTile: String, CaseIterable, Hashable, Sendable {
 extension BentoTile {
     /// De blokken die de gebruiker kan aan- of uitzetten en herschikken.
     static let configurable: [BentoTile] = [
-        .verder, .releasesFilms, .releasesSeries, .volgende, .live, .vandaag,
+        .volgende, .releasesFilms, .releasesSeries, .live, .vandaag,
         .iptvFilms, .iptvSeries, .streaming, .collecties
     ]
 
@@ -173,9 +173,13 @@ extension BentoTile {
     /// Natuurlijke breedte in kolommen (van 12; op de telefoon altijd de volle 2).
     fileprivate func span(_ device: BentoDevice) -> Int {
         if device == .phone { return 2 }
+        // "Binnenkort" als losse kaartenrij: volle breedte, eigen rij, net als "Verder kijken"
+        // (phone is hierboven al altijd volle breedte).
+        if self == .vandaag { return 12 }
+        // "IPTV films"/"IPTV series" op tv als 2 aparte rijen onder elkaar i.p.v. naast elkaar.
+        if device == .tv, self == .iptvFilms || self == .iptvSeries { return 12 }
         switch self {
-        case .verder, .live, .vandaag, .iptvFilms, .iptvSeries: return 6
-        case .releasesFilms, .releasesSeries: return 3
+        case .live, .iptvFilms, .iptvSeries, .releasesFilms, .releasesSeries: return 6
         default: return 12
         }
     }
@@ -188,20 +192,21 @@ extension BentoTile {
         switch device {
         case .tv:
             switch self {
-            case .verder, .releasesFilms, .releasesSeries: return 504
-            case .volgende: return 202
-            case .live, .vandaag: return 520
+            case .releasesFilms, .releasesSeries: return 504
+            case .volgende: return 340
+            case .vandaag: return 236
+            case .live: return 520
             case .iptvFilms, .iptvSeries: return 450
-            case .streaming: return 156
+            case .streaming: return 220
             case .collecties: return names ? 306 : 272
             default: return 300
             }
         case .tablet:
             switch self {
-            case .verder, .releasesFilms, .releasesSeries: return 392
-            case .volgende: return 116
+            case .releasesFilms, .releasesSeries: return 392
+            case .volgende: return 205
             case .live: return 300
-            case .vandaag: return 308
+            case .vandaag: return 205
             case .iptvFilms, .iptvSeries: return 280
             case .streaming: return 76
             case .collecties: return names ? 216 : 194
@@ -209,14 +214,13 @@ extension BentoTile {
             }
         case .phone:
             switch self {
-            case .verder: return 292
             case .live: return 300
-            case .volgende: return 92
+            case .volgende: return 165
             case .releasesFilms, .releasesSeries: return 300
             case .iptvFilms, .iptvSeries: return 270
             case .streaming: return 60
             case .collecties: return names ? 177 : 155
-            case .vandaag: return 308
+            case .vandaag: return 165
             default: return 200
             }
         }
@@ -227,16 +231,7 @@ extension BentoProfile {
     /// Legt de opgegeven blokken op volgorde in rijen: blokken die samen in 12 kolommen passen delen een rij,
     /// en de overgebleven kolommen worden over de blokken van die rij verdeeld (zodat er geen gaten vallen).
     static func make(_ device: BentoDevice, order requested: [BentoTile]) -> BentoProfile {
-        var order = requested
-        // Op tv en iPad staan Nieuwe films en Nieuwe series naast het grote Verder kijken (6 + 3 + 3 kolommen),
-        // ook als de volgorde (bv. via iPhone gesynchroniseerd) ze ergens anders heeft gezet.
-        if device != .phone, order.contains(.verder) {
-            let pair = order.filter { $0 == .releasesFilms || $0 == .releasesSeries }
-            order.removeAll { pair.contains($0) }
-            if let verder = order.firstIndex(of: .verder) {
-                order.insert(contentsOf: pair, at: verder + 1)
-            }
-        }
+        let order = requested
         let columns = device == .phone ? 2 : 12
         let spacing: CGFloat = device == .tv ? 24 : 12
 

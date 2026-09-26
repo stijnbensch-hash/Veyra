@@ -50,6 +50,16 @@ nonisolated struct SportEvent: Identifiable, Equatable, Sendable {
     var awayLogoURL: URL? = nil
     /// Logo van de competitie/federatie (NFL, Champions League, ...), als zachte achtergrond.
     var leagueLogoURL: URL? = nil
+    /// SF Symbol van de sport (bv. "american.football", "soccerball") -- gebruikt in de compacte
+    /// wedstrijdkaarten ("Mijn teams" / per-competitie) van de iOS-Sport-sectie.
+    var leagueSymbol: String? = nil
+    /// `SportsTeam.id` van thuis/uit, als de bron een Sport-menu-wedstrijd is (`SportsMatch`).
+    /// Gebruikt om "Mijn teams" te bepalen (vergelijking met `SportsFavorites`); `nil` bij EPG-afgeleide events.
+    var homeTeamID: String? = nil
+    var awayTeamID: String? = nil
+    /// Extra live-situatie naast de resterende tijd, indien de bron dit levert
+    /// (bv. "Eerste kwart", "3rd & 7", "Rust"). `nil` als onbekend.
+    var situation: String? = nil
 
     enum PhaseHint: Sendable { case auto, live, scheduled, finished }
 
@@ -348,6 +358,78 @@ final class VeyraSportViewModel {
             if $0.liveCount != $1.liveCount { return $0.liveCount > $1.liveCount }
             return ($0.nextStart ?? .distantFuture) < ($1.nextStart ?? .distantFuture)
         }
+    }
+
+    /// Wedstrijden van favoriete teams (over alle competities heen), voor de "Mijn teams"-subsectie
+    /// van de iOS-Sport-sectie. Live + komende eerst (zelfde volgorde als `fixtures`), anders de
+    /// meest recente afgelopen wedstrijden van die teams.
+    func myTeamEvents(at now: Date, favoriteIDs: Set<String>, limit: Int = 8) -> [SportEvent] {
+        guard !favoriteIDs.isEmpty else { return [] }
+        let mine = events.filter { event in
+            (event.homeTeamID.map(favoriteIDs.contains) ?? false)
+                || (event.awayTeamID.map(favoriteIDs.contains) ?? false)
+        }
+        let live = mine.filter { $0.isLive(at: now) }
+        let soon = mine.filter { $0.start > now }.sorted { $0.start < $1.start }
+        let coming = Array((live + soon).prefix(limit))
+        if !coming.isEmpty { return coming }
+        return Array(mine.filter { $0.isPast(at: now) }.suffix(limit).reversed())
+    }
+
+    /// Per-competitie-subsecties (bv. "College Football") voor de iOS-Sport-sectie: elke competitie
+    /// met minstens 1 relevante wedstrijd krijgt een rij kaarten, live/soonste competitie eerst.
+    func leagueSections(at now: Date, limitPerLeague: Int = 6) -> [(name: String, events: [SportEvent])] {
+        let grouped = Dictionary(grouping: events) { $0.competition ?? "Overig" }
+        return grouped.compactMap { name, group -> (String, [SportEvent], Int, Date)? in
+            let live = group.filter { $0.isLive(at: now) }
+            let soon = group.filter { $0.start > now }.sorted { $0.start < $1.start }
+            var picks = Array((live + soon).prefix(limitPerLeague))
+            if picks.isEmpty {
+                picks = Array(group.filter { $0.isPast(at: now) }.suffix(limitPerLeague).reversed())
+            }
+            guard !picks.isEmpty else { return nil }
+            let nextStart = group.filter { $0.start > now }.map(\.start).min() ?? .distantFuture
+            return (name, picks, live.count, nextStart)
+        }
+        .sorted {
+            if $0.2 != $1.2 { return $0.2 > $1.2 }
+            return $0.3 < $1.3
+        }
+        .map { (name: $0.0, events: $0.1) }
+    }
+
+    /// Groepeert per "hoofdsport"-naam in plaats van per exacte `SportsLeague`-entry: het deel van de
+    /// competitienaam VOOR een "·"-scheidingsteken is de groepsnaam (bv. "College Football · SEC" en
+    /// "College Football · ACC" vallen samen onder "College Football"); een naam zonder "·" (bv. "NFL",
+    /// "Belgische Pro League") is zijn eigen groep. De wedstrijden van alle onderliggende, aangezette
+    /// competities (de filtering op `SportsDisplayPreferences.isLeagueEnabled` gebeurt al upstream in
+    /// `SportsStore`/de adapters, dus `events` bevat alleen aangezette competities) komen door elkaar in
+    /// dezelfde rij, gesorteerd op tijd (live/soonste eerst) -- net als `leagueSections`, maar dan één rij
+    /// per hoofdsport i.p.v. één rij per losse competitie-entry.
+    func sportGroupSections(at now: Date, limitPerGroup: Int = 6) -> [(name: String, events: [SportEvent])] {
+        let grouped = Dictionary(grouping: events) { Self.sportGroupName(for: $0.competition ?? "Overig") }
+        return grouped.compactMap { name, group -> (String, [SportEvent], Int, Date)? in
+            let live = group.filter { $0.isLive(at: now) }
+            let soon = group.filter { $0.start > now }.sorted { $0.start < $1.start }
+            var picks = Array((live + soon).prefix(limitPerGroup))
+            if picks.isEmpty {
+                picks = Array(group.filter { $0.isPast(at: now) }.suffix(limitPerGroup).reversed())
+            }
+            guard !picks.isEmpty else { return nil }
+            let nextStart = group.filter { $0.start > now }.map(\.start).min() ?? .distantFuture
+            return (name, picks, live.count, nextStart)
+        }
+        .sorted {
+            if $0.2 != $1.2 { return $0.2 > $1.2 }
+            return $0.3 < $1.3
+        }
+        .map { (name: $0.0, events: $0.1) }
+    }
+
+    /// "College Football · SEC" -> "College Football" · "NFL" -> "NFL" (geen "·": eigen groep).
+    private static func sportGroupName(for competition: String) -> String {
+        guard let range = competition.range(of: " · ") else { return competition }
+        return String(competition[..<range.lowerBound]).trimmingCharacters(in: .whitespaces)
     }
 
     // MARK: Hero-mapping

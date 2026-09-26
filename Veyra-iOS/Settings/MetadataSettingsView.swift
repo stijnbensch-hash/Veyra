@@ -28,6 +28,8 @@ struct MetadataSettingsView: View {
     @AppStorage(MetadataRatingProvider.metacritic.storageKey) private var metacritic = true
     @AppStorage(MetadataRatingProvider.trakt.storageKey) private var trakt = true
     @AppStorage(MetadataRatingProvider.popcornmeter.storageKey) private var popcornmeter = true
+    @AppStorage(MetadataRatingProvider.letterboxd.storageKey) private var letterboxd = true
+    @AppStorage(MetadataRatingProvider.mal.storageKey) private var mal = true
 
     var body: some View {
         ZStack {
@@ -95,6 +97,8 @@ struct MetadataSettingsView: View {
                     toggleRow(.metacritic, isOn: $metacritic)
                     toggleRow(.trakt, isOn: $trakt)
                     toggleRow(.popcornmeter, isOn: $popcornmeter)
+                    toggleRow(.letterboxd, isOn: $letterboxd)
+                    toggleRow(.mal, isOn: $mal)
                 } header: {
                     Text("Ratings")
                 } footer: {
@@ -123,11 +127,10 @@ struct MetadataSettingsView: View {
 
                     if let assetName = provider.assetImageName {
                         Image(assetName)
-                            .renderingMode(.template)
+                            .renderingMode(.original)
                             .resizable()
                             .scaledToFit()
-                            .frame(width: 18, height: 18)
-                            .foregroundStyle(iconForeground(provider))
+                            .frame(width: 34, height: 34)
                     } else {
                         Image(systemName: provider.systemImage)
                             .font(.system(size: 16, weight: .bold))
@@ -149,6 +152,8 @@ struct MetadataSettingsView: View {
         case .metacritic: return .yellow.opacity(0.18)
         case .trakt: return .pink.opacity(0.22)
         case .popcornmeter: return .orange.opacity(0.22)
+        case .letterboxd: return .green.opacity(0.22)
+        case .mal: return .blue.opacity(0.22)
         }
     }
 
@@ -160,6 +165,8 @@ struct MetadataSettingsView: View {
         case .metacritic: return .yellow
         case .trakt: return .pink
         case .popcornmeter: return .orange
+        case .letterboxd: return .green
+        case .mal: return .blue
         }
     }
 
@@ -172,6 +179,8 @@ struct MetadataSettingsView: View {
         metacritic = enabled
         trakt = enabled
         popcornmeter = enabled
+        letterboxd = enabled
+        mal = enabled
     }
 }
 

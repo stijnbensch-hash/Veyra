@@ -77,6 +77,22 @@ struct SeriesService {
         )
     }
 
+    /// De trailers/teasers van TMDB zelf (meestal YouTube-video's), voor de
+    /// "Trailer"-knop op het seriedetailscherm.
+    func videos(forSeriesID seriesID: Int) async throws -> [TMDBVideo] {
+        let response: TMDBVideosResponse = try await request(
+            path: "/3/tv/\(seriesID)/videos"
+        )
+        return response.results
+    }
+
+    /// Series "van hetzelfde type/genre" als de opgegeven serie, voor de
+    /// "Vergelijkbaar"-rij onderaan het seriedetailscherm.
+    func similarSeries(id: Int) async throws -> [TMDBSeries] {
+        let response: TMDBSeriesPage = try await request(path: "/3/tv/\(id)/similar")
+        return response.results.filter { TMDBCatalogLanguageFilter.allows($0.originalLanguage) }
+    }
+
     func season(
         seriesID: Int,
         seasonNumber: Int

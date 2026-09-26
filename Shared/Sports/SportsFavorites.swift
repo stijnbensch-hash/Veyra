@@ -17,11 +17,54 @@ enum SportsFavorites {
     static let idsKey = "sports.favoriteTeams"
     static let infoKey = "sports.favoriteTeamInfo"
 
+    // Voor deze wijziging gebruikten team-ID's het korte `SportsLeague.id` als voorvoegsel
+    // (bv. "nfl:2555", "college-football:52"). Sinds meerdere `SportsLeague`-entries hetzelfde
+    // ESPN-pad kunnen delen (de losse college-football-conferences) is het voorvoegsel `SportsLeague.path`
+    // geworden (bv. "football/nfl:2555", "football/college-football:52"), zodat wedstrijd- en
+    // favorieten-ID's altijd hetzelfde namespace gebruiken. Favorieten die vóór die wijziging bewaard
+    // zijn, staan nog in het oude formaat: zonder migratie matchen ze nooit meer met een wedstrijd en
+    // blijft de "Favorieten"-rij op Home leeg. Zet ze eenmalig om.
+    private static let legacyPrefixMigrationKey = "sports.favoriteTeams.legacyPrefixMigrated"
+    private static let legacyPrefixMap: [String: String] = [
+        "nfl": "football/nfl",
+        "nba": "basketball/nba",
+        "euroleague": "basketball/euroleague",
+        "college-football": "football/college-football"
+    ]
+
+    private static func migratedID(_ id: String) -> String {
+        guard let colon = id.firstIndex(of: ":") else { return id }
+        let prefix = String(id[..<colon])
+        guard let newPrefix = legacyPrefixMap[prefix] else { return id }
+        return newPrefix + id[colon...]
+    }
+
+    private static func migrateLegacyPrefixesIfNeeded(_ defaults: UserDefaults) {
+        guard !defaults.bool(forKey: legacyPrefixMigrationKey) else { return }
+        defaults.set(true, forKey: legacyPrefixMigrationKey)
+
+        let oldIDs = defaults.stringArray(forKey: idsKey) ?? []
+        let newIDs = oldIDs.map(migratedID)
+        if newIDs != oldIDs { defaults.set(newIDs, forKey: idsKey) }
+
+        if let data = defaults.data(forKey: infoKey),
+           let list = try? JSONDecoder().decode([StoredFavoriteTeam].self, from: data) {
+            let migrated = list.map {
+                StoredFavoriteTeam(id: migratedID($0.id), name: $0.name, abbreviation: $0.abbreviation, logo: $0.logo)
+            }
+            if migrated.map(\.id) != list.map(\.id), let encoded = try? JSONEncoder().encode(migrated) {
+                defaults.set(encoded, forKey: infoKey)
+            }
+        }
+    }
+
     static func ids(_ defaults: UserDefaults = .standard) -> Set<String> {
-        Set(defaults.stringArray(forKey: idsKey) ?? [])
+        migrateLegacyPrefixesIfNeeded(defaults)
+        return Set(defaults.stringArray(forKey: idsKey) ?? [])
     }
 
     static func info(_ defaults: UserDefaults = .standard) -> [String: StoredFavoriteTeam] {
+        migrateLegacyPrefixesIfNeeded(defaults)
         guard let data = defaults.data(forKey: infoKey),
               let list = try? JSONDecoder().decode([StoredFavoriteTeam].self, from: data) else { return [:] }
         return Dictionary(list.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
@@ -116,7 +159,7 @@ final class SportsTeamDirectory: ObservableObject {
     private nonisolated static func fetch(league: SportsLeague, base: String) async -> [SportsTeam] {
         guard var components = URLComponents(string: "\(base)/\(league.path)/teams") else { return [] }
         components.queryItems = [URLQueryItem(name: "limit", value: "1000")]
-        if league.id == "college-football" { components.queryItems?.append(URLQueryItem(name: "groups", value: "80")) }
+        if let groups = league.groups { components.queryItems?.append(URLQueryItem(name: "groups", value: groups)) }
         guard let url = components.url else { return [] }
         var request = URLRequest(url: url)
         request.timeoutInterval = 15
@@ -124,8 +167,10 @@ final class SportsTeamDirectory: ObservableObject {
               let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
               let decoded = try? JSONDecoder().decode(ESPNTeamsResponse.self, from: data) else { return [] }
 
-        // Zelfde id-opbouw als de scoreboard-decoder: voetbalclubs delen één id over competities.
-        let sport = league.path.hasPrefix("soccer/") ? "soccer" : league.id
+        // Zelfde id-opbouw als de scoreboard-decoder: voetbalclubs delen één id over competities,
+        // en meerdere `SportsLeague`-entries die hetzelfde ESPN-pad delen (bv. de losse
+        // college-football-conferences) moeten ook hetzelfde team-ID opleveren.
+        let sport = league.path.hasPrefix("soccer/") ? "soccer" : league.path
         let entries = (decoded.sports ?? []).flatMap { $0.leagues ?? [] }.flatMap { $0.teams ?? [] }
         return entries.map { entry in
             let t = entry.team

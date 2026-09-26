@@ -11,6 +11,8 @@ enum MetadataRatingProvider:
     case metacritic
     case trakt
     case popcornmeter
+    case letterboxd
+    case mal
 
     var id: String {
         rawValue
@@ -35,6 +37,12 @@ enum MetadataRatingProvider:
 
         case .popcornmeter:
             return "Popcornmeter"
+
+        case .letterboxd:
+            return "Letterboxd"
+
+        case .mal:
+            return "MyAnimeList"
         }
     }
 
@@ -61,14 +69,16 @@ enum MetadataRatingProvider:
 
         case .popcornmeter:
             return "popcorn.fill"
+
+        case .letterboxd:
+            return "circle.grid.3x1.fill"
+
+        case .mal:
+            return "textformat"
         }
     }
 
-    /// Naam van het echte merklogo in Assets.xcassets (als "Template Image",
-    /// zodat de bestaande kleur-badge er nog steeds achter kan zitten). `nil`
-    /// betekent: geen eigen logo beschikbaar, val terug op `systemImage`.
-    /// Popcornmeter heeft geen apart merk (het is Rotten Tomatoes' publieksscore),
-    /// dus die houdt het SF Symbool.
+    /// Naam van het gekleurde vectorlogo in Assets.xcassets.
     var assetImageName: String? {
         switch self {
         case .imdb:
@@ -87,7 +97,13 @@ enum MetadataRatingProvider:
             return "rating-trakt"
 
         case .popcornmeter:
-            return nil
+            return "rating-popcornmeter"
+
+        case .letterboxd:
+            return "rating-letterboxd"
+
+        case .mal:
+            return "rating-mal"
         }
     }
 }
@@ -147,5 +163,13 @@ enum MetadataPreferences {
 
     static var showPopcornmeter: Bool {
         isEnabled(.popcornmeter)
+    }
+
+    static var showLetterboxd: Bool {
+        isEnabled(.letterboxd)
+    }
+
+    static var showMAL: Bool {
+        isEnabled(.mal)
     }
 }

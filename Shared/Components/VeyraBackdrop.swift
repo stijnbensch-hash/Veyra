@@ -33,6 +33,15 @@ struct VeyraBackground: View {
     }
 }
 
+
+/// Effen, iets grijzere achtergrond (i.p.v. cyaan/rood of puur zwart) voor
+/// de rustende Home-achtergrond.
+struct VeyraPlainBackground: View {
+    var body: some View {
+        Color(white: 0.085).ignoresSafeArea()
+    }
+}
+
 private struct VeyraLightRibbon: View {
     let color: Color
 

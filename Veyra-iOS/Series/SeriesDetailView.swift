@@ -70,14 +70,12 @@ struct SeriesDetailView: View {
                             alignment: .center,
                             spacing: 10
                         ) {
-                            Text(
-                                details.name
-                            )
-                            .font(
-                                .title
-                                    .weight(
-                                        .bold
-                                    )
+                            VeyraClearLogo(
+                                item: mediaItem(from: details),
+                                fallbackTitle: details.name,
+                                maxWidth: 320,
+                                maxHeight: 80,
+                                font: .title.weight(.bold)
                             )
 
                             if hasAnyWatchedEpisode {
@@ -121,13 +119,12 @@ struct SeriesDetailView: View {
                             )
                         }
 
-                        WatchlistToggleButton(
-                            item:
-                                mediaItem(
-                                    from:
-                                        details
-                                )
-                        )
+                        HStack(spacing: 10) {
+                            TrailerButton(tmdbID: details.id, isShow: true, compact: true)
+                            WatchedToggleButton(item: mediaItem(from: details))
+                            FavoriteToggleButton(item: mediaItem(from: details), compact: true)
+                            WatchlistToggleButton(item: mediaItem(from: details), compact: true)
+                        }
 
                         let seasons =
                             details.seasons
@@ -218,6 +215,10 @@ struct SeriesDetailView: View {
                 .padding(
                     .horizontal
                 )
+
+                CastRow(item: MediaItem(title: series.name, type: .series, tmdbID: series.id))
+
+                SimilarTitlesRow(item: MediaItem(title: series.name, type: .series, tmdbID: series.id))
             }
             .padding(
                 .bottom,
@@ -230,12 +231,12 @@ struct SeriesDetailView: View {
                 .background
                 .ignoresSafeArea()
         )
-        .navigationTitle(
-            series.name
-        )
-        .navigationBarTitleDisplayMode(
-            .inline
-        )
+        .toolbar(.hidden, for: .navigationBar)
+        .overlay(alignment: .topLeading) {
+            BackButtonCircle()
+                .padding(.leading, 16)
+                .padding(.top, 50)
+        }
         .ignoresSafeArea(
             edges: .top
         )
@@ -269,39 +270,30 @@ struct SeriesDetailView: View {
 
     // MARK: - Backdrop
 
-    private var backdrop:
-        some View
-    {
-        AsyncImage(
-            url:
-                imageURL(
-                    path:
-                        viewModel
-                        .details?
-                        .backdropPath
-                        ?? series
-                        .backdropPath,
-                    size:
-                        "w1280"
+    private var backdrop: some View {
+        // Expliciet breedte EN hoogte geven via GeometryReader -- met enkel
+        // een vaste hoogte berekent een resizable/scaledToFill-Image zijn
+        // eigen "ideale" breedte uit de beeldverhouding, en die lekte door
+        // naar de VStack erboven (breder dan het scherm, gecentreerd
+        // overlopend aan beide kanten).
+        GeometryReader { geo in
+            AsyncImage(
+                url: imageURL(
+                    path: viewModel.details?.backdropPath ?? series.backdropPath,
+                    size: "w1280"
                 )
-        ) { phase in
-            switch phase {
-            case .success(
-                let image
-            ):
-                image
-                    .resizable()
-                    .scaledToFill()
-
-            default:
-                VeyraColors
-                    .surface
+            ) { phase in
+                switch phase {
+                case .success(let image):
+                    image.resizable().scaledToFill()
+                default:
+                    VeyraColors.surface
+                }
             }
+            .frame(width: geo.size.width, height: geo.size.height)
+            .clipped()
         }
-        .frame(
-            height: VeyraPosterMetrics(regular: sizeClass == .regular).backdropHeight
-        )
-        .clipped()
+        .frame(height: VeyraPosterMetrics(regular: sizeClass == .regular).backdropHeight)
     }
 
     // MARK: - Watched

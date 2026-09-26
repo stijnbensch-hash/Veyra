@@ -12,6 +12,8 @@ struct VeyraHeroContent: Identifiable, Equatable {
     let overview: String?
     let metadata: [String]
     let backdropURL: URL?
+    var tmdbID: Int? = nil
+    var isMovie: Bool? = nil
 }
 
 /// Gedeelde staat: welk item heeft momenteel focus in een van de Home-rijen.
@@ -116,7 +118,9 @@ private struct VeyraHeroTMDBReporter: ViewModifier {
                     title: title,
                     overview: overview,
                     metadata: metadata,
-                    backdropURL: backdropURL
+                    backdropURL: backdropURL,
+                    tmdbID: tmdbID,
+                    isMovie: isMovie
                 )
             )
             .task(id: tmdbID) {

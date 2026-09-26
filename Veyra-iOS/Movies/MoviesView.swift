@@ -12,6 +12,7 @@ struct MoviesView: View {
     @State private var selectedGenreID: Int?
     @State private var selectedDecade: VeyraDecadeFilter?
     @State private var selectedRating: VeyraRatingFilter?
+    @State private var selectedSort: VeyraSortOption = .newest
 
     @AppStorage("catalog.watchRegion")
     private var watchRegion = "BE"
@@ -105,7 +106,9 @@ struct MoviesView: View {
                                 selectedDecade:
                                     $selectedDecade,
                                 selectedRating:
-                                    $selectedRating
+                                    $selectedRating,
+                                selectedSort:
+                                    $selectedSort
                             )
                         }
 
@@ -197,7 +200,7 @@ struct MoviesView: View {
     }
 
     private var filterSummary: String {
-        var parts: [String] = []
+        var parts: [String] = [selectedSort.displayName]
 
         if let selectedProvider {
             parts.append(
@@ -226,11 +229,6 @@ struct MoviesView: View {
             )
         }
 
-        guard !parts.isEmpty else {
-            return
-                "Populair · \(watchRegion)"
-        }
-
         parts.append(watchRegion)
 
         return parts.joined(
@@ -256,6 +254,7 @@ struct MoviesView: View {
                 String($0.rawValue)
             }
             ?? "-",
+            selectedSort.rawValue,
         ]
         .joined(
             separator: "|"
@@ -429,11 +428,53 @@ struct MoviesView: View {
             let result:
                 [TMDBMovie]
 
-            if selectedProvider != nil
-                || selectedGenreID != nil
-                || selectedDecade != nil
-                || selectedRating != nil
-            {
+            switch selectedSort {
+            case .trending:
+                // TMDB's trending-endpoint ondersteunt geen discover-filters
+                // (provider/genre/decennium/beoordeling); bekende beperking:
+                // bij "Trending" worden overige filters genegeerd.
+                result =
+                    try await TMDBClient(
+                        readAccessToken:
+                            token
+                    )
+                    .trendingMovies()
+
+            case .popular:
+                if selectedProvider != nil
+                    || selectedGenreID != nil
+                    || selectedDecade != nil
+                    || selectedRating != nil
+                {
+                    result =
+                        try await TMDBClient(
+                            readAccessToken:
+                                token
+                        )
+                        .movies(
+                            providerID:
+                                selectedProvider?.id,
+                            region:
+                                watchRegion,
+                            genreID:
+                                selectedGenreID,
+                            minimumYear:
+                                selectedDecade?.startYear,
+                            maximumYear:
+                                selectedDecade?.endYear,
+                            minimumRating:
+                                selectedRating?.rawValue,
+                            sortBy:
+                                "popularity.desc"
+                        )
+
+                } else {
+                    result =
+                        try await service
+                        .popularMovies()
+                }
+
+            case .topRated:
                 result =
                     try await TMDBClient(
                         readAccessToken:
@@ -451,13 +492,37 @@ struct MoviesView: View {
                         maximumYear:
                             selectedDecade?.endYear,
                         minimumRating:
-                            selectedRating?.rawValue
+                            selectedRating?.rawValue,
+                        sortBy:
+                            "vote_average.desc"
                     )
 
-            } else {
+            case .newest:
+                // Zelfde recent-uitgebracht-lijst (laatste 45 dagen, op
+                // populariteit) als de "Nieuwe films"-rij op Home.
                 result =
-                    try await service
-                    .popularMovies()
+                    try await TMDBClient(
+                        readAccessToken:
+                            token
+                    )
+                    .movies(
+                        providerID:
+                            selectedProvider?.id,
+                        region:
+                            watchRegion,
+                        genreID:
+                            selectedGenreID,
+                        minimumYear:
+                            selectedDecade?.startYear,
+                        maximumYear:
+                            selectedDecade?.endYear,
+                        minimumRating:
+                            selectedRating?.rawValue,
+                        sortBy:
+                            "popularity.desc",
+                        recentDays:
+                            selectedDecade == nil ? 45 : nil
+                    )
             }
 
             try Task

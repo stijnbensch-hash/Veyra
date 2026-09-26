@@ -8,7 +8,6 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
     case mediaServers
     case general
     case subtitles
-    case subtitleAppearance
     case metadata
     case playback
     case shelves
@@ -27,7 +26,6 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
         case .mediaServers: return "Mediaservers"
         case .general: return "Algemeen"
         case .subtitles: return "Ondertitels"
-        case .subtitleAppearance: return "Ondertitelweergave"
         case .metadata: return "Metadata"
         case .playback: return "Afspelen"
         case .shelves: return "Planken"
@@ -46,7 +44,6 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
         case .mediaServers: return "Jellyfin en andere eigen servers"
         case .general: return "Startscherm, sport en kaartweergave"
         case .subtitles: return "Taal en OpenSubtitles"
-        case .subtitleAppearance: return "Grootte, plaatsing, achtergrond en sync"
         case .metadata: return "Ratings op film- en seriepagina's"
         case .playback: return "Resolutie, taal en oversla-segmenten"
         case .shelves: return "Eigen rijen op het hoofdmenu"
@@ -65,7 +62,6 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
         case .mediaServers: return "server.rack"
         case .general: return "slider.horizontal.3"
         case .subtitles: return "captions.bubble"
-        case .subtitleAppearance: return "textformat.size"
         case .metadata: return "star.leadinghalf.filled"
         case .playback: return "play.circle"
         case .shelves: return "rectangle.grid.1x2"
@@ -77,15 +73,12 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
 }
 
 struct SettingsView: View {
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-
     @ObservedObject private var trakt = TraktStore.shared
 
     @State private var iptvProviderCount = 0
     @State private var addonCount = 0
     @State private var mediaServerCount = 0
     @State private var iptvErrored = false
-    @State private var selection: SettingsDestination?
     @State private var settingsPath = NavigationPath()
     @State private var categoryOrder: [SourceCategory] = SourceOrderDefaults.loadCategoryOrder()
 
@@ -94,50 +87,11 @@ struct SettingsView: View {
     private let mediaServerStore = MediaServerStore()
 
     var body: some View {
-        Group {
-            if horizontalSizeClass == .regular {
-                // iPad: sidebar + detail, zodat instellingen en detail tegelijk zichtbaar zijn.
-                NavigationSplitView {
-                    sidebarList
-                        .navigationSplitViewColumnWidth(min: 340, ideal: 400, max: 460)
-                } detail: {
-                    Group {
-                        if let selection {
-                            destinationView(selection)
-                        } else {
-                            ZStack {
-                                VeyraColors.background.ignoresSafeArea()
-                                ContentUnavailableView(
-                                    "Kies een instelling",
-                                    systemImage: "gearshape",
-                                    description: Text("Selecteer een onderdeel in de zijbalk.")
-                                )
-                            }
-                        }
-                    }
-                    // Het systeem-eigen zijbalk-knopje zit in de toolbar
-                    // van de detail-kolom, dus daar (en niet op de hele
-                    // NavigationSplitView) moet het verwijderd worden. Dit
-                    // is Instellingen's eigen (geneste) zijbalk, niet de
-                    // hoofd-zijbalk uit ContentView — het systeem-eigen
-                    // knopje daarvoor zou hier als een extra, verwarrende
-                    // tweede zijbalk-knop verschijnen.
-                    .toolbar(removing: .sidebarToggle)
+        NavigationStack(path: $settingsPath) {
+            settingsList
+                .navigationDestination(for: SettingsDestination.self) { destination in
+                    destinationView(destination)
                 }
-            } else {
-                // iPhone: klassieke gestapelde navigatie.
-                //
-                // Instellingen wordt vanuit ContentView.swift altijd als sheet getoond (niet
-                // meer als tabblad), dus deze NavigationStack zit nooit meer genest in iOS'
-                // automatische "More"-navigatie — daardoor is er hier maar één navigatiebalk
-                // mogelijk en volstaat de gewone, automatische balkzichtbaarheid.
-                NavigationStack(path: $settingsPath) {
-                    sidebarList
-                        .navigationDestination(for: SettingsDestination.self) { destination in
-                            destinationView(destination)
-                        }
-                }
-            }
         }
         .onAppear { reload() }
         .onReceive(NotificationCenter.default.publisher(for: .iptvConfigurationDidChange)) { _ in reload() }
@@ -146,9 +100,9 @@ struct SettingsView: View {
         .task { await trakt.refreshIfNeeded() }
     }
 
-    // MARK: - Sidebar / main list
+    // MARK: - Settings list
 
-    private var sidebarList: some View {
+    private var settingsList: some View {
         ZStack {
             VeyraColors.background.ignoresSafeArea()
 
@@ -190,7 +144,6 @@ struct SettingsView: View {
 
                         settingsCard(.general, status: "", statusColor: VeyraColors.cyan)
                         settingsCard(.subtitles, status: "", statusColor: VeyraColors.cyan)
-                        settingsCard(.subtitleAppearance, status: "", statusColor: VeyraColors.cyan)
                         settingsCard(.metadata, status: "", statusColor: VeyraColors.cyan)
                         settingsCard(.playback, status: "", statusColor: VeyraColors.cyan)
                         settingsCard(.home, status: "", statusColor: VeyraColors.cyan)
@@ -218,6 +171,8 @@ struct SettingsView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 12)
                 .padding(.bottom, 40)
+                .frame(maxWidth: 640)
+                .frame(maxWidth: .infinity)
             }
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -295,21 +250,10 @@ struct SettingsView: View {
         .padding(.vertical, 16)
         .veyraGlass(radius: VeyraRadius.card)
 
-        return Group {
-            if horizontalSizeClass == .regular {
-                Button {
-                    selection = destination
-                } label: {
-                    card
-                }
-                .buttonStyle(.plain)
-            } else {
-                NavigationLink(value: destination) {
-                    card
-                }
-                .buttonStyle(.plain)
-            }
+        return NavigationLink(value: destination) {
+            card
         }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Bronnen (categorievolgorde)
@@ -401,7 +345,6 @@ struct SettingsView: View {
         case .mediaServers: MediaServersSettingsView()
         case .general: GeneralSettingsView()
         case .subtitles: SubtitlePreferencesView()
-        case .subtitleAppearance: SubtitleAppearanceSettingsView()
         case .metadata: MetadataSettingsView()
         case .playback: PlaybackSettingsView()
         case .shelves: ShelvesSettingsView()

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 extension View {
     /// Begrenst tekstrijke inhoud op iPad tot een gecentreerde kolom, zodat regels niet over het hele scherm lopen.
@@ -18,5 +19,12 @@ struct VeyraPosterMetrics {
         [GridItem(.adaptive(minimum: posterWidth), spacing: regular ? 26 : 16)]
     }
     var rowSpacing: CGFloat { regular ? 22 : 14 }
-    var backdropHeight: CGFloat { regular ? 380 : 220 }
+    // Op iPhone schaalt de hero mee met de schermhoogte, zodat hij
+    // schermvullend en passend blijft op elk toestel -- een vaste waarde
+    // (340) oogde op sommige schermen veel te groot.
+    var backdropHeight: CGFloat {
+        guard !regular else { return 380 }
+        let screenHeight = UIScreen.main.bounds.height
+        return min(420, max(300, screenHeight * 0.46))
+    }
 }

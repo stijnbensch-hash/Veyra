@@ -187,6 +187,8 @@ private struct MetadataRatingsSettingsView: View {
     @AppStorage("metadata.rating.metacritic") private var metacritic = true
     @AppStorage("metadata.rating.trakt") private var trakt = true
     @AppStorage("metadata.rating.popcornmeter") private var popcornmeter = true
+    @AppStorage("metadata.rating.letterboxd") private var letterboxd = true
+    @AppStorage("metadata.rating.mal") private var mal = true
 
     var body: some View {
         Form {
@@ -197,6 +199,8 @@ private struct MetadataRatingsSettingsView: View {
                 ratingToggleRow(providerRow(.metacritic), isOn: $metacritic)
                 ratingToggleRow(providerRow(.trakt), isOn: $trakt)
                 ratingToggleRow(providerRow(.popcornmeter), isOn: $popcornmeter)
+                ratingToggleRow(providerRow(.letterboxd), isOn: $letterboxd)
+                ratingToggleRow(providerRow(.mal), isOn: $mal)
             } footer: {
                 Text("Kies welke ratings zichtbaar zijn op film- en seriepagina's.")
             }
@@ -270,11 +274,10 @@ private struct MetadataRatingsSettingsView: View {
 
             if let assetName = provider.assetImageName {
                 Image(assetName)
-                    .renderingMode(.template)
+                    .renderingMode(.original)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 22, height: 22)
-                    .foregroundStyle(iconForeground(provider))
+                    .frame(width: 40, height: 40)
             } else {
                 Image(systemName: provider.systemImage)
                     .font(.system(size: 20, weight: .bold))
@@ -291,6 +294,8 @@ private struct MetadataRatingsSettingsView: View {
         case .metacritic: return .yellow.opacity(0.18)
         case .trakt: return .pink.opacity(0.22)
         case .popcornmeter: return .orange.opacity(0.22)
+        case .letterboxd: return .green.opacity(0.22)
+        case .mal: return .blue.opacity(0.22)
         }
     }
 
@@ -302,6 +307,8 @@ private struct MetadataRatingsSettingsView: View {
         case .metacritic: return .yellow
         case .trakt: return .pink
         case .popcornmeter: return .orange
+        case .letterboxd: return .green
+        case .mal: return .blue
         }
     }
 
@@ -314,6 +321,8 @@ private struct MetadataRatingsSettingsView: View {
         metacritic = true
         trakt = true
         popcornmeter = true
+        letterboxd = true
+        mal = true
     }
 
     private func disableAll() {
@@ -323,6 +332,8 @@ private struct MetadataRatingsSettingsView: View {
         metacritic = false
         trakt = false
         popcornmeter = false
+        letterboxd = false
+        mal = false
     }
 
     private func resetDefaults() {

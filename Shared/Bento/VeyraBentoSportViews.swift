@@ -327,15 +327,15 @@ struct VeyraFixtureRowContent: View {
     var body: some View {
         HStack(spacing: compact ? 12 : 20) {
             timeColumn
-                .frame(width: compact ? 58 : 110, alignment: .leading)
+                .frame(width: compact ? 50 : 84, alignment: .leading)
 
             VStack(alignment: .leading, spacing: compact ? 1 : 3) {
                 Text(event.title)
-                    .font(.system(size: compact ? 15 : 26, weight: .bold))
-                    .tracking(compact ? 0.8 : 1.8)
+                    .font(.system(size: compact ? 15 : 22, weight: .bold))
+                    .tracking(compact ? 0.8 : 1.4)
                     .textCase(.uppercase)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                    .minimumScaleFactor(0.6)
                 Text([event.competition, event.channelName.isEmpty ? nil : event.channelName].compactMap { $0 }.joined(separator: " · "))
                     .font(compact ? .footnote : .callout)
                     .foregroundStyle(VeyraHomeStyle.dim)
@@ -343,36 +343,45 @@ struct VeyraFixtureRowContent: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
+            if live, let score = event.score {
+                Text(score.text)
+                    .font(.system(size: compact ? 20 : 28, weight: .bold))
+                    .monospacedDigit()
+                    .foregroundStyle(.white)
+            }
+
             trailing
         }
-        .padding(.horizontal, compact ? 14 : 24)
+        .padding(.horizontal, compact ? 14 : 22)
         .padding(.vertical, compact ? 10 : 14)
         .foregroundStyle(.white)
         .contentShape(Rectangle())
+        // Enkel de vulling hier -- het cyaan/rode kader komt van de
+        // omliggende ButtonStyle (VeyraSportCardStyle), zodat er geen
+        // dubbele rand ontstaat.
+        .background(
+            RoundedRectangle(cornerRadius: compact ? 14 : 18, style: .continuous)
+                .fill(.ultraThinMaterial)
+        )
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(live
-            ? "Live: \(event.title)"
+            ? "Live: \(event.title)\(event.score.map { ", stand \($0.text)" } ?? "")"
             : "\(event.title), \(VeyraSportFormat.kickoff(event.start, now: now))")
     }
 
     @ViewBuilder
     private var timeColumn: some View {
         if live {
-            VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: compact ? 4 : 6) {
+                Circle().fill(VeyraHomeStyle.live).frame(width: compact ? 6 : 8, height: compact ? 6 : 8)
                 Text(event.score?.minute ?? "LIVE")
-                    .font(.system(size: compact ? 15 : 24, weight: .heavy))
+                    .font(.system(size: compact ? 14 : 18, weight: .heavy))
                     .foregroundStyle(VeyraHomeStyle.live)
-                if let score = event.score {
-                    Text(score.text)
-                        .font(.system(size: compact ? 13 : 20, weight: .bold))
-                        .monospacedDigit()
-                        .foregroundStyle(VeyraHomeStyle.dim)
-                }
             }
         } else {
             VStack(alignment: .leading, spacing: 0) {
                 Text(event.start.formatted(.dateTime.hour().minute().locale(VeyraHomeFormat.locale)))
-                    .font(.system(size: compact ? 17 : 28, weight: .bold))
+                    .font(.system(size: compact ? 17 : 25, weight: .bold))
                     .monospacedDigit()
                     .foregroundStyle(VeyraHomeStyle.cyan)
                 if !Calendar.current.isDate(event.start, inSameDayAs: now) {
@@ -436,29 +445,37 @@ struct VeyraCompetitionContent: View {
     var compact = false
 
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            VeyraSportBackdrop(url: nil, seed: competition.name, leagueLogoURL: competition.logoURL)
-            LinearGradient(colors: [.clear, .black.opacity(0.85)], startPoint: UnitPoint(x: 0.5, y: 0.2), endPoint: .bottom)
-            VStack(alignment: .leading, spacing: compact ? 2 : 4) {
+        HStack(spacing: compact ? 10 : 16) {
+            competitionLogo
+            VStack(alignment: .leading, spacing: 2) {
                 Text("Competitie")
-                    .font(.system(size: compact ? 10 : 15, weight: .bold))
-                    .tracking(compact ? 1.4 : 2.4)
+                    .font(.system(size: compact ? 9 : 13, weight: .bold))
+                    .tracking(compact ? 1.2 : 2.2)
                     .textCase(.uppercase)
                     .foregroundStyle(VeyraHomeStyle.faint)
-                Spacer(minLength: 0)
                 Text(competition.name)
-                    .font(.system(size: compact ? 15 : 26, weight: .bold))
-                    .tracking(compact ? 1.2 : 2.4)
+                    .font(.system(size: compact ? 14 : 22, weight: .bold))
+                    .tracking(compact ? 0.6 : 1.4)
                     .textCase(.uppercase)
-                    .lineLimit(2)
+                    .lineLimit(1)
                     .minimumScaleFactor(0.7)
-                    .multilineTextAlignment(.leading)
                 status
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .padding(compact ? 12 : 22)
-            .padding(.bottom, 4)
+            Spacer(minLength: 0)
         }
+        .padding(.horizontal, compact ? 14 : 22)
+        .padding(.vertical, compact ? 10 : 14)
+        .foregroundStyle(.white)
+        // Smalle balk i.p.v. het vierkante kader van voorheen -- zelfde
+        // stijl als de wedstrijdenrijen in "Vandaag & straks".
+        .background(
+            RoundedRectangle(cornerRadius: compact ? 14 : 18, style: .continuous)
+                .fill(.ultraThinMaterial)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: compact ? 14 : 18, style: .continuous)
+                .strokeBorder(competition.liveCount > 0 ? VeyraHomeStyle.live.opacity(0.4) : Color.white.opacity(0.10), lineWidth: 1)
+        )
         .overlay(alignment: .bottom) {
             if competition.liveCount > 0 {
                 VeyraHairline(progress: 1, tint: VeyraHomeStyle.live)
@@ -466,9 +483,36 @@ struct VeyraCompetitionContent: View {
                 VeyraHairline(progress: VeyraSportFormat.countdownProgress(to: next, now: now))
             }
         }
-        .foregroundStyle(.white)
+        .clipShape(RoundedRectangle(cornerRadius: compact ? 14 : 18, style: .continuous))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(competition.name), \(competition.liveCount) live, \(competition.eventCount) wedstrijden")
+    }
+
+    @ViewBuilder
+    private var competitionLogo: some View {
+        let size: CGFloat = compact ? 28 : 40
+        Group {
+            if let url = competition.logoURL {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image.resizable().scaledToFit()
+                    default:
+                        competitionPlaceholder
+                    }
+                }
+            } else {
+                competitionPlaceholder
+            }
+        }
+        .frame(width: size, height: size)
+    }
+
+    private var competitionPlaceholder: some View {
+        Image(systemName: "sportscourt.fill")
+            .resizable()
+            .scaledToFit()
+            .foregroundStyle(VeyraHomeStyle.dim)
     }
 
     @ViewBuilder

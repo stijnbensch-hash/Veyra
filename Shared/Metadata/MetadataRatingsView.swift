@@ -88,6 +88,38 @@ struct MetadataRatingsView: View {
                             "\(value)%"
                     )
                 }
+
+                if MetadataPreferences.showLetterboxd,
+                   let value =
+                        ratings.letterboxd
+                {
+                    ratingItem(
+                        provider:
+                            .letterboxd,
+                        value:
+                            String(
+                                format:
+                                    "%.1f",
+                                value
+                            )
+                    )
+                }
+
+                if MetadataPreferences.showMAL,
+                   let value =
+                        ratings.mal
+                {
+                    ratingItem(
+                        provider:
+                            .mal,
+                        value:
+                            String(
+                                format:
+                                    "%.1f",
+                                value
+                            )
+                    )
+                }
             }
         }
     }
@@ -112,7 +144,7 @@ struct MetadataRatingsView: View {
             )
             .font(
                 .system(
-                    size: 26,
+                    size: valueFontSize,
                     weight: .bold,
                     design: .rounded
                 )
@@ -124,6 +156,16 @@ struct MetadataRatingsView: View {
         }
     }
 
+    /// Losstaand van het icoon-formaat, dat op originele grootte staat --
+    /// enkel het cijfer zelf is kleiner gemaakt.
+    private var valueFontSize: CGFloat {
+        #if os(iOS)
+        18
+        #else
+        22
+        #endif
+    }
+
     // MARK: - Icon
 
     @ViewBuilder
@@ -131,50 +173,26 @@ struct MetadataRatingsView: View {
         _ provider:
             MetadataRatingProvider
     ) -> some View {
-        switch provider {
-        case .imdb:
-            Text("IMDb")
-                .font(.system(size: 21, weight: .black, design: .rounded))
-                .foregroundStyle(.black)
-                .padding(.horizontal, 7)
-                .padding(.vertical, 4)
-                .background(
-                    Color(red: 0.96, green: 0.77, blue: 0.09),
-                    in: RoundedRectangle(cornerRadius: 5, style: .continuous)
+        if let assetName = provider.assetImageName {
+            Image(assetName)
+                .renderingMode(.original)
+                .resizable()
+                .scaledToFit()
+                .frame(
+                    width: iconSize(for: provider),
+                    height: iconSize(for: provider)
                 )
-
-        case .tmdb:
-            Image("rating-tmdb")
-                .renderingMode(.template)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 30, height: 24)
-                .foregroundStyle(Color(red: 0.37, green: 0.82, blue: 0.78))
-
-        case .tomatometer:
-            Text("🍅")
-                .font(.system(size: 22))
-
-        case .metacritic:
-            Image("rating-metacritic")
-                .renderingMode(.template)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 24, height: 24)
-                .foregroundStyle(Color(red: 0.96, green: 0.78, blue: 0.16))
-
-        case .trakt:
-            Image("rating-trakt")
-                .renderingMode(.template)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 24, height: 24)
-                .foregroundStyle(Color(red: 0.79, green: 0.40, blue: 0.76))
-
-        case .popcornmeter:
-            Text("🍿")
-                .font(.system(size: 22))
         }
+    }
+
+    /// Op iOS staan de ratingbadges op een klein telefoonscherm i.p.v. een
+    /// tv op afstand, dus mogen de logo's zelf kleiner dan op tvOS.
+    private func iconSize(for provider: MetadataRatingProvider) -> CGFloat {
+        #if os(iOS)
+        provider == .imdb ? 34 : 24
+        #else
+        provider == .imdb ? 44 : 32
+        #endif
     }
 }
 
@@ -191,7 +209,9 @@ struct MetadataRatingsView: View {
                     tomatometer: 80,
                     metacritic: 64,
                     trakt: 8.4,
-                    popcornmeter: 83
+                    popcornmeter: 83,
+                    letterboxd: 3.8,
+                    mal: 8.1
                 )
         )
     }

@@ -22,13 +22,21 @@ struct MetadataRatings:
     var popcornmeter:
         Int?
 
+    var letterboxd:
+        Double?
+
+    var mal:
+        Double?
+
     init(
         imdb: Double? = nil,
         tmdb: Double? = nil,
         tomatometer: Int? = nil,
         metacritic: Int? = nil,
         trakt: Double? = nil,
-        popcornmeter: Int? = nil
+        popcornmeter: Int? = nil,
+        letterboxd: Double? = nil,
+        mal: Double? = nil
     ) {
         self.imdb = imdb
         self.tmdb = tmdb
@@ -36,6 +44,8 @@ struct MetadataRatings:
         self.metacritic = metacritic
         self.trakt = trakt
         self.popcornmeter = popcornmeter
+        self.letterboxd = letterboxd
+        self.mal = mal
     }
 
     var hasVisibleRatings: Bool {
@@ -71,6 +81,18 @@ struct MetadataRatings:
 
         if MetadataPreferences.showPopcornmeter,
            popcornmeter != nil
+        {
+            return true
+        }
+
+        if MetadataPreferences.showLetterboxd,
+           letterboxd != nil
+        {
+            return true
+        }
+
+        if MetadataPreferences.showMAL,
+           mal != nil
         {
             return true
         }

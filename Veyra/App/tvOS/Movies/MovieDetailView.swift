@@ -4,43 +4,69 @@ struct MovieDetailView: View {
     let movie: MediaItem
 
     @State private var ratings = MetadataRatings()
+    @ObservedObject private var traktStore = TraktStore.shared
 
     var body: some View {
-        ZStack {
-            background
+        GeometryReader { geometry in
+            ZStack(alignment: .topLeading) {
+                background
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .clipped()
+                    .overlay {
+                        ZStack {
+                            Color.black.opacity(0.25)
+                            LinearGradient(
+                                colors: [.black.opacity(0.55), .clear],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                            LinearGradient(
+                                colors: [.black.opacity(0.40), .clear],
+                                startPoint: .top,
+                                endPoint: UnitPoint(x: 0.5, y: 0.35)
+                            )
+                        }
+                        .allowsHitTesting(false)
+                    }
 
-            LinearGradient(
-                colors: [
-                    .black.opacity(0.15),
-                    .black.opacity(0.55),
-                    Color(red: 0.01, green: 0.04, blue: 0.07)
-                ],
-                startPoint: .topTrailing,
-                endPoint: .bottomLeading
-            )
-            .ignoresSafeArea()
+                ScrollView {
+                    hero
 
-            HStack(alignment: .center, spacing: 50) {
+                    CastRow(item: movie)
+                        .padding(.horizontal, 48)
+                        .padding(.top, 12)
+
+                    SimilarTitlesRow(item: movie)
+                        .padding(.horizontal, 48)
+                        .padding(.top, 12)
+                        .padding(.bottom, 60)
+                }
+                .contentMargins(.top, 0, for: .scrollContent)
+                .contentMargins(.horizontal, 0, for: .scrollContent)
+                .scrollClipDisabled()
+                .frame(width: geometry.size.width, height: geometry.size.height)
+            }
+        }
+        .ignoresSafeArea()
+        .task(id: movie.id) {
+            guard let tmdbID = movie.tmdbID else { return }
+            ratings = await MetadataRatingsService.movieRatings(tmdbID: tmdbID, imdbID: movie.imdbID)
+        }
+    }
+
+    // MARK: - Hero
+
+    /// De inhoud bepaalt de hoogte, zodat de rijen onder de knoppen aansluiten.
+    private var hero: some View {
+        HStack(alignment: .center, spacing: 50) {
                 VStack(alignment: .leading, spacing: 26) {
-                    VeyraWatchedBadge(
-                        target: .movie(
-                            TraktIDs(
-                                imdb: movie.imdbID,
-                                tmdb: movie.tmdbID
-                            )
-                        )
+                    VeyraClearLogo(
+                        item: movie,
+                        fallbackTitle: movie.title,
+                        maxWidth: 620,
+                        maxHeight: 140,
+                        font: .system(size: 54, weight: .bold, design: .rounded)
                     )
-
-                    Text(movie.title)
-                        .font(
-                            .system(
-                                size: 54,
-                                weight: .bold,
-                                design: .rounded
-                            )
-                        )
-                        .foregroundStyle(.white)
-                        .lineLimit(2)
 
                     if let year = releaseYear {
                         Text(year)
@@ -93,63 +119,48 @@ struct MovieDetailView: View {
                         )
                     }
 
-                    HStack(spacing: 20) {
+                    HStack(spacing: 12) {
                         NavigationLink {
                             SourceSelectionView(
                                 item: movie
                             )
                         } label: {
-                            Label(
-                                "AFSPELEN",
-                                systemImage: "play.fill"
-                            )
-                            .font(
-                                .system(
-                                    size: 22,
-                                    weight: .bold
-                                )
-                            )
-                            .padding(
-                                .horizontal,
-                                12
+                            VeyraActionLabel(
+                                title: traktStore.progress(for: movie) != nil ? "HERVATTEN" : "AFSPELEN",
+                                symbol: "play.fill",
+                                compact: true
                             )
                         }
+                        .buttonStyle(VeyraFocusButtonStyle(primary: true))
 
+                        TrailerButton(tmdbID: movie.tmdbID, isShow: false)
+
+                        WatchedToggleButton(item: movie)
+                        FavoriteToggleButton(item: movie)
                         WatchlistToggleButton(item: movie)
                     }
 
-                    Spacer()
                 }
                 .traktMarkWatchedMenu(movie)
-                .padding(
-                    .top,
-                    40
-                )
-                .frame(maxWidth: 1000, alignment: .leading)
+                .frame(maxWidth: 1400, alignment: .leading)
 
                 Spacer(
                     minLength: 0
                 )
             }
 
-            // Compactere marge voor tvOS
             .padding(
                 .horizontal,
                 48
             )
             .padding(
                 .top,
-                36
+                130
             )
             .padding(
                 .bottom,
-                50
+                18
             )
-        }
-        .task(id: movie.id) {
-            guard let tmdbID = movie.tmdbID else { return }
-            ratings = await MetadataRatingsService.movieRatings(tmdbID: tmdbID, imdbID: movie.imdbID)
-        }
     }
 
     // MARK: - Background
@@ -170,7 +181,6 @@ struct MovieDetailView: View {
                     image
                         .resizable()
                         .scaledToFill()
-                        .ignoresSafeArea()
 
                 case .failure:
                     baseBackground

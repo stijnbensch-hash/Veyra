@@ -21,7 +21,10 @@ struct PlayerView: View {
     private var viewModel: PlaybackViewModel
 
     @State
-    private var nextEpisodeRequest: MediaItem?
+    private var nextEpisodeRequest: NextPlaybackRequest?
+
+    @State
+    private var isResolvingNextEpisode = false
 
     init(source: PlayableSource, item: MediaItem? = nil, resumeProgress: Double? = nil) {
         self.source = source
@@ -108,7 +111,23 @@ struct PlayerView: View {
                         // geregistreerd bij Trakt wanneer je op "Volgende"
                         // drukt i.p.v. de aflevering te laten uitspelen.
                         viewModel.stopForDisappear()
-                        nextEpisodeRequest = next
+
+                        // Dezelfde bron (provider/resolutie/audio/...)
+                        // zoeken voor de volgende aflevering, zodat de
+                        // speler gewoon blijft doorspelen i.p.v. terug te
+                        // vallen op het bronkeuzescherm. Enkel wanneer daar
+                        // niets bij dezelfde provider gevonden wordt, valt
+                        // dit terug op SourceSelectionView (zie
+                        // `NextPlaybackRequest`/`navigationDestination`
+                        // hieronder).
+                        isResolvingNextEpisode = true
+                        Task {
+                            let matchedSource = await NextEpisodeSourceResolver.resolve(
+                                matching: source, for: next
+                            )
+                            isResolvingNextEpisode = false
+                            nextEpisodeRequest = NextPlaybackRequest(item: next, source: matchedSource)
+                        }
                     }
                 )
                 .ignoresSafeArea()
@@ -120,7 +139,9 @@ struct PlayerView: View {
                     ProgressView()
 
                     Text(
-                        "Veyra Player starten…"
+                        isResolvingNextEpisode
+                            ? "Volgende aflevering zoeken…"
+                            : "Veyra Player starten…"
                     )
                     .font(
                         .system(
@@ -145,8 +166,23 @@ struct PlayerView: View {
         ) { _, phase in
             viewModel.handleScenePhaseChange(phase)
         }
-        .navigationDestination(item: $nextEpisodeRequest) { next in
-            SourceSelectionView(item: next)
+        .navigationDestination(item: $nextEpisodeRequest) { request in
+            if let matchedSource = request.source {
+                PlayerView(source: matchedSource, item: request.item)
+            } else {
+                SourceSelectionView(item: request.item)
+            }
         }
     }
+}
+
+/// Draagt zowel de volgende aflevering als (indien gevonden) de daarbij
+/// passende bron door de `navigationDestination`-push heen: met een bron
+/// speelt de player meteen door, zonder bron valt dit terug op
+/// `SourceSelectionView`, precies zoals wanneer je de aflevering zelf had
+/// opgezocht.
+private struct NextPlaybackRequest: Identifiable, Hashable {
+    let id = UUID()
+    let item: MediaItem
+    let source: PlayableSource?
 }

@@ -308,7 +308,14 @@ nonisolated final class TraktHomeAPI: TraktHomeProviding {
     // MARK: Verder kijken
 
     func continueWatching(limit: Int) async throws -> [ContinueItem] {
-        await withEpisodeCounts(try await baseContinueWatching(limit: limit))
+        let items = await withEpisodeCounts(try await baseContinueWatching(limit: limit))
+        // Een verlopen/niet-opgeschoonde sync/playback-checkpoint kan blijven bestaan nadat een
+        // serie al volledig is bijgewerkt (bv. via de "Bekeken"-knop) -- zonder deze check zou zo'n
+        // stale record de serie hier laten verschijnen terwijl er niets meer te vervolgen is
+        // ("0 te gaan"). Alleen weren als de aflevering-telling daadwerkelijk gelukt is
+        // (episodesLeft != nil); bij een throttled/mislukte telling blijft het item conservatief
+        // staan in plaats van ten onrechte te verdwijnen.
+        return items.filter { $0.kind != .episode || ($0.episodesLeft ?? 1) > 0 }
     }
 
     /// Voortgang van één serie: uit de cache, anders van Trakt (niet tijdens een limiet-pauze).

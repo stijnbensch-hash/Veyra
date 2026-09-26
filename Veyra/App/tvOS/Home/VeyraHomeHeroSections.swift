@@ -4,7 +4,8 @@ struct VeyraMovieHero: View {
     let movie: TMDBMovie
     var body: some View {
         VeyraHero(title: movie.title, eyebrow: "Uitgelicht", overview: movie.overview,
-                  metadata: movie.releaseDate.map { [String($0.prefix(4))] } ?? []) {
+                  metadata: movie.releaseDate.map { [String($0.prefix(4))] } ?? [],
+                  item: MediaItem(title: movie.title, type: .movie, tmdbID: movie.id)) {
             NavigationLink { VeyraMovieDestination(movie: movie, play: true) } label: {
                 VeyraActionLabel(title: "Afspelen", symbol: "play.fill")
             }.buttonStyle(VeyraFocusButtonStyle(primary: true))
@@ -27,7 +28,12 @@ struct VeyraSpotlightHero: View {
             title: content.title,
             eyebrow: content.eyebrow,
             overview: content.overview,
-            metadata: content.metadata
+            metadata: content.metadata,
+            item: content.tmdbID.flatMap { tmdbID in
+                content.isMovie.map { isMovie in
+                    MediaItem(title: content.title, type: isMovie ? .movie : .series, tmdbID: tmdbID)
+                }
+            }
         ) {
             EmptyView()
         }
@@ -42,7 +48,9 @@ extension VeyraHeroContent {
             title: movie.title,
             overview: movie.overview,
             metadata: movie.releaseDate.map { [String($0.prefix(4))] } ?? [],
-            backdropURL: movie.backdropPath.flatMap { URL(string: "https://image.tmdb.org/t/p/w1280" + $0) }
+            backdropURL: movie.backdropPath.flatMap { URL(string: "https://image.tmdb.org/t/p/w1280" + $0) },
+            tmdbID: movie.id,
+            isMovie: true
         )
     }
 
@@ -53,7 +61,9 @@ extension VeyraHeroContent {
             title: series.name,
             overview: series.overview,
             metadata: series.firstAirDate.map { [String($0.prefix(4))] } ?? [],
-            backdropURL: series.backdropPath.flatMap { URL(string: "https://image.tmdb.org/t/p/w1280" + $0) }
+            backdropURL: series.backdropPath.flatMap { URL(string: "https://image.tmdb.org/t/p/w1280" + $0) },
+            tmdbID: series.id,
+            isMovie: false
         )
     }
 }
@@ -62,7 +72,8 @@ struct VeyraSeriesHero: View {
     let series: TMDBSeries
     var body: some View {
         VeyraHero(title: series.name, eyebrow: "Serie uitgelicht", overview: series.overview,
-                  metadata: series.firstAirDate.map { [String($0.prefix(4))] } ?? []) {
+                  metadata: series.firstAirDate.map { [String($0.prefix(4))] } ?? [],
+                  item: MediaItem(title: series.name, type: .series, tmdbID: series.id)) {
             NavigationLink { SeriesDetailView(series: series) } label: {
                 VeyraActionLabel(title: "Afleveringen bekijken", symbol: "play.rectangle")
             }.buttonStyle(VeyraFocusButtonStyle(primary: true))

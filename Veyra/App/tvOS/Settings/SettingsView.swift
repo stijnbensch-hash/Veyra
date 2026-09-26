@@ -1973,6 +1973,7 @@ struct AccountView:
                 } footer: {
                     Text("Optioneel: echte banners in de kleine Verder kijken-kaartjes op Home.")
                 }
+
             }
             .frame(maxWidth: 1000)
         }

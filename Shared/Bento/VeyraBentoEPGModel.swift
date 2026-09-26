@@ -10,7 +10,7 @@ import Foundation
 
 // MARK: - Model
 
-nonisolated enum SourceHealth: Equatable {
+nonisolated enum SourceHealth: Equatable, Codable, Sendable {
     case good, degraded, down
 
     var label: String {
@@ -22,7 +22,7 @@ nonisolated enum SourceHealth: Equatable {
     }
 }
 
-nonisolated struct EPGProgram: Identifiable, Equatable {
+nonisolated struct EPGProgram: Identifiable, Equatable, Codable, Sendable {
     let id: String
     let title: String
     let subtitle: String?        // "S2E4 · Woe's Hollow"
@@ -57,7 +57,7 @@ nonisolated struct EPGProgram: Identifiable, Equatable {
     }
 }
 
-nonisolated struct EPGChannel: Identifiable, Equatable {
+nonisolated struct EPGChannel: Identifiable, Equatable, Codable, Sendable {
     let id: String
     let number: Int
     let name: String

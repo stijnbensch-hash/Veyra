@@ -20,7 +20,8 @@ struct WatchlistToggleButton: View {
             } label: {
                 VeyraActionLabel(
                     title: isWatchlisted ? "OP WATCHLIST" : "WATCHLIST",
-                    symbol: isWatchlisted ? "bookmark.fill" : "bookmark"
+                    symbol: isWatchlisted ? "bookmark.fill" : "bookmark",
+                    compact: true
                 )
             }
             .buttonStyle(VeyraFocusButtonStyle())

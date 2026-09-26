@@ -23,6 +23,8 @@ nonisolated struct BentoLiveRow: Identifiable, Equatable {
     let isSports: Bool
     let health: SourceHealth
     var logoURL: URL? = nil
+    /// Titel van het eerstvolgende programma op deze zender, indien bekend.
+    var nextTitle: String? = nil
 }
 
 nonisolated struct BentoToday: Equatable {
@@ -118,7 +120,12 @@ final class VeyraBentoViewModel {
         self.providersSource = streaming
         self.collectionsSource = collections
         self.availableMinutes = availableMinutes
+        // "Live nu" meteen tonen met de laatst bekende zenders, i.p.v. leeg te wachten tot de
+        // eerste EPG-fetch klaar is; hieronder ververst load()/refreshLive() dit stilletjes verder.
+        self.channels = IPTVDiskCache.read([EPGChannel].self, key: Self.liveChannelsCacheKey)?.value ?? []
     }
+
+    private static let liveChannelsCacheKey = "bento.liveChannels"
 
     // MARK: Laden
 
@@ -166,7 +173,10 @@ final class VeyraBentoViewModel {
             group.addTask { @MainActor in await self.home.load() }
             group.addTask { @MainActor in
                 let c = await Self.fetchChannels(epg)
-                if epg != nil { self.channels = c }
+                if epg != nil {
+                    self.channels = c
+                    IPTVDiskCache.write(c, key: Self.liveChannelsCacheKey)
+                }
             }
             group.addTask { @MainActor in
                 let n = await Self.fetchNew(added)
@@ -221,7 +231,10 @@ final class VeyraBentoViewModel {
         async let liveChannels = Self.fetchChannels(epg)
         async let health = Self.fetchSources(status)
         let (c, s) = await (liveChannels, health)
-        if epg != nil { channels = c }
+        if epg != nil {
+            channels = c
+            IPTVDiskCache.write(c, key: Self.liveChannelsCacheKey)
+        }
         if status != nil { sources = s }
     }
 
@@ -268,7 +281,8 @@ final class VeyraBentoViewModel {
                 title: program.title,
                 remainingMinutes: max(1, Int((program.end.timeIntervalSince(now) / 60).rounded(.up))),
                 progress: program.progress(at: now) ?? 0,
-                isSports: program.isSports, health: channel.health, logoURL: channel.logoURL)
+                isSports: program.isSports, health: channel.health, logoURL: channel.logoURL,
+                nextTitle: channel.nextProgram(after: program.end)?.title)
         }
     }
 

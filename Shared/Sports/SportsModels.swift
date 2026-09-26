@@ -2,6 +2,39 @@ import Foundation
 
 // MARK: - League
 
+// MARK: - Sport category
+
+/// Bredere sport-groepering boven de individuele competities (`SportsLeague`),
+/// gebruikt om in Instellingen per sport (i.p.v. per competitie) te kunnen
+/// tonen/verbergen. Uitbreidbaar: een nieuwe competitie krijgt gewoon een van
+/// deze cases (of een nieuwe case erbij) op `SportsLeague.sport`.
+nonisolated enum SportCategory:
+    String,
+    CaseIterable,
+    Identifiable,
+    Codable,
+    Sendable
+{
+    case football
+    case americanFootball
+    case basketball
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .football:
+            return "Voetbal"
+
+        case .americanFootball:
+            return "American Football"
+
+        case .basketball:
+            return "Basketbal"
+        }
+    }
+}
+
 nonisolated struct SportsLeague:
     Identifiable,
     Hashable,
@@ -11,43 +44,168 @@ nonisolated struct SportsLeague:
     let name: String
     let path: String
     let symbol: String
+    let sport: SportCategory
+    /// Optionele ESPN "groups"-queryparameter, gebruikt om binnen één ESPN-sport/competitie-pad
+    /// (zoals `football/college-football`) te filteren op een specifieke conference.
+    var groups: String? = nil
 
     static let all: [SportsLeague] = [
         .init(
             id: "bel.1",
             name: "Belgische Pro League",
             path: "soccer/bel.1",
-            symbol: "soccerball"
+            symbol: "soccerball",
+            sport: .football
         ),
         .init(
             id: "uefa.champions",
             name: "Champions League",
             path: "soccer/uefa.champions",
-            symbol: "soccerball"
+            symbol: "soccerball",
+            sport: .football
         ),
         .init(
             id: "uefa.europa",
             name: "Europa League",
             path: "soccer/uefa.europa",
-            symbol: "soccerball"
+            symbol: "soccerball",
+            sport: .football
+        ),
+        .init(
+            id: "eng.1",
+            name: "Premier League",
+            path: "soccer/eng.1",
+            symbol: "soccerball",
+            sport: .football
+        ),
+        .init(
+            id: "esp.1",
+            name: "La Liga",
+            path: "soccer/esp.1",
+            symbol: "soccerball",
+            sport: .football
+        ),
+        .init(
+            id: "ita.1",
+            name: "Serie A",
+            path: "soccer/ita.1",
+            symbol: "soccerball",
+            sport: .football
+        ),
+        .init(
+            id: "ger.1",
+            name: "Bundesliga",
+            path: "soccer/ger.1",
+            symbol: "soccerball",
+            sport: .football
+        ),
+        .init(
+            id: "fra.1",
+            name: "Ligue 1",
+            path: "soccer/fra.1",
+            symbol: "soccerball",
+            sport: .football
         ),
         .init(
             id: "nfl",
             name: "NFL",
             path: "football/nfl",
-            symbol: "american.football"
+            symbol: "american.football",
+            sport: .americanFootball
         ),
         .init(
-            id: "college-football",
-            name: "College Football",
+            id: "college-football-acc",
+            name: "College Football · ACC",
             path: "football/college-football",
-            symbol: "american.football"
+            symbol: "american.football",
+            sport: .americanFootball,
+            groups: "1"
+        ),
+        .init(
+            id: "college-football-big12",
+            name: "College Football · Big 12",
+            path: "football/college-football",
+            symbol: "american.football",
+            sport: .americanFootball,
+            groups: "4"
+        ),
+        .init(
+            id: "college-football-big-ten",
+            name: "College Football · Big Ten (B1G)",
+            path: "football/college-football",
+            symbol: "american.football",
+            sport: .americanFootball,
+            groups: "5"
+        ),
+        .init(
+            id: "college-football-sec",
+            name: "College Football · SEC",
+            path: "football/college-football",
+            symbol: "american.football",
+            sport: .americanFootball,
+            groups: "8"
+        ),
+        .init(
+            id: "college-football-pac12",
+            name: "College Football · Pac-12",
+            path: "football/college-football",
+            symbol: "american.football",
+            sport: .americanFootball,
+            groups: "9"
+        ),
+        .init(
+            id: "college-football-aac",
+            name: "College Football · American (AAC)",
+            path: "football/college-football",
+            symbol: "american.football",
+            sport: .americanFootball,
+            groups: "151"
+        ),
+        .init(
+            id: "college-football-cusa",
+            name: "College Football · Conference USA",
+            path: "football/college-football",
+            symbol: "american.football",
+            sport: .americanFootball,
+            groups: "12"
+        ),
+        .init(
+            id: "college-football-mac",
+            name: "College Football · MAC",
+            path: "football/college-football",
+            symbol: "american.football",
+            sport: .americanFootball,
+            groups: "15"
+        ),
+        .init(
+            id: "college-football-mwc",
+            name: "College Football · Mountain West",
+            path: "football/college-football",
+            symbol: "american.football",
+            sport: .americanFootball,
+            groups: "17"
+        ),
+        .init(
+            id: "college-football-sunbelt",
+            name: "College Football · Sun Belt",
+            path: "football/college-football",
+            symbol: "american.football",
+            sport: .americanFootball,
+            groups: "37"
         ),
         .init(
             id: "nba",
             name: "NBA",
             path: "basketball/nba",
-            symbol: "basketball"
+            symbol: "basketball",
+            sport: .basketball
+        ),
+        .init(
+            id: "euroleague",
+            name: "EuroLeague",
+            path: "basketball/euroleague",
+            symbol: "basketball",
+            sport: .basketball
         )
     ]
 }
@@ -320,13 +478,16 @@ struct ESPNScoreboard: Decodable {
             }
 
             // Voetbalclubs kunnen bij ESPN in meerdere
-            // competities hetzelfde team-ID gebruiken.
+            // competities hetzelfde team-ID gebruiken. Gebruik `path`
+            // (niet `id`) als namespace: meerdere `SportsLeague`-entries
+            // (bv. de losse college-football-conferences) delen hetzelfde
+            // ESPN-pad en moeten daarom hetzelfde team-ID opleveren.
             let sport =
                 league.path.hasPrefix(
                     "soccer/"
                 )
                 ? "soccer"
-                : league.id
+                : league.path
 
             func makeTeam(
                 _ source: Team

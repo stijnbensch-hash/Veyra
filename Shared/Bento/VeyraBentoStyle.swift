@@ -9,6 +9,30 @@
 // VeyraHomeStyle verwijst naar VeyraColors. Wil je later het echte glas: veyraGlassSurface -> .veyraGlass(...).
 
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
+
+// MARK: - Veilige zone (notch/Dynamic Island/statusbalk)
+
+/// Eén bron van waarheid voor de echte top-safe-area-inset van het venster, zodat losstaande
+/// plekken in de UI (bv. de bento-content EN een zwevende zoek-/instellingenbalk erboven, die
+/// in twee verschillende bestanden leven) dezelfde effectieve top-positie gebruiken en niet los
+/// van elkaar bewegen. Werkt op elk toestel (met notch, Dynamic Island, of zonder).
+enum VeyraSafeArea {
+    static var top: CGFloat {
+        #if os(iOS)
+        let windowScene = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first { $0.activationState == .foregroundActive }
+            ?? UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+        let window = windowScene?.windows.first { $0.isKeyWindow } ?? windowScene?.windows.first
+        return window?.safeAreaInsets.top ?? 0
+        #else
+        return 0
+        #endif
+    }
+}
 
 // MARK: - Tokens (afgeleid, vervang door Veyra-tokens)
 
@@ -177,8 +201,8 @@ struct VeyraHomeSectionHeader: View {
             Rectangle().fill(Color.white.opacity(0.14)).frame(height: 1)
             if let trailing {
                 Text(trailing)
-                    .font(compact ? .footnote : .title3)
-                    .foregroundStyle(VeyraHomeStyle.dim)
+                    .font(compact ? .caption2 : .callout)
+                    .foregroundStyle(VeyraHomeStyle.cyan)
             }
         }
     }

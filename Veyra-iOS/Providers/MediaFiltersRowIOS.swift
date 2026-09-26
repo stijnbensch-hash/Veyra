@@ -10,6 +10,7 @@ struct MediaFiltersRowIOS: View {
     @Binding var selectedGenreID: Int?
     @Binding var selectedDecade: VeyraDecadeFilter?
     @Binding var selectedRating: VeyraRatingFilter?
+    @Binding var selectedSort: VeyraSortOption
 
     private var genreOptions: [(id: Int, name: String)] {
         let source = kind == .movie ? TMDBGenreNames.movie : TMDBGenreNames.tv
@@ -29,6 +30,7 @@ struct MediaFiltersRowIOS: View {
                 genreMenu
                 decadeMenu
                 ratingMenu
+                sortMenu
             }
             .padding(.horizontal, 2)
             .padding(.vertical, 2)
@@ -97,6 +99,26 @@ struct MediaFiltersRowIOS: View {
                 systemImage: "star.fill",
                 title: selectedRating?.title ?? "Beoordeling",
                 isActive: selectedRating != nil
+            )
+        }
+    }
+
+    // MARK: - Sorteren
+
+    // Anders dan de andere menu's hierboven heeft Sorteren altijd een actieve
+    // waarde (default "Populair"), dus zonder resetButton naar "geen sortering".
+    private var sortMenu: some View {
+        Menu {
+            ForEach(VeyraSortOption.allCases) { option in
+                optionButton(title: option.displayName, selected: selectedSort == option) {
+                    selectedSort = option
+                }
+            }
+        } label: {
+            filterPillLabel(
+                systemImage: "arrow.up.arrow.down",
+                title: selectedSort.displayName,
+                isActive: selectedSort != .newest
             )
         }
     }

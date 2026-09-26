@@ -36,60 +36,65 @@ struct SeriesDetailView: View {
     }
 
     var body: some View {
-        ZStack {
-            background
+        GeometryReader { geometry in
+            ZStack {
+                background
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .clipped()
+                    .overlay {
+                        ZStack {
+                            Color.black.opacity(0.25)
+                            LinearGradient(
+                                colors: [.black.opacity(0.55), .clear],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                            LinearGradient(
+                                colors: [.black.opacity(0.40), .clear],
+                                startPoint: .top,
+                                endPoint: UnitPoint(x: 0.5, y: 0.35)
+                            )
+                        }
+                        .allowsHitTesting(false)
+                    }
 
-            LinearGradient(
-                colors: [
-                    .black.opacity(0.15),
-                    .black.opacity(0.55),
-                    Color(
-                        red: 0.01,
-                        green: 0.04,
-                        blue: 0.07
+                if viewModel.isLoading {
+                    ProgressView(
+                        "Serie laden…"
                     )
-                ],
-                startPoint:
-                    .topTrailing,
-                endPoint:
-                    .bottomLeading
-            )
-            .ignoresSafeArea()
+                    .font(.title3)
 
-            if viewModel.isLoading {
-                ProgressView(
-                    "Serie laden…"
-                )
-                .font(.title3)
+                } else if let errorMessage =
+                    viewModel.errorMessage
+                {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 16
+                    ) {
+                        Text(
+                            "Serie kon niet worden geladen"
+                        )
+                        .font(.title2)
 
-            } else if let errorMessage =
-                viewModel.errorMessage
-            {
-                VStack(
-                    alignment: .leading,
-                    spacing: 16
-                ) {
-                    Text(
-                        "Serie kon niet worden geladen"
-                    )
-                    .font(.title2)
+                        Text(
+                            errorMessage
+                        )
+                        .foregroundStyle(
+                            .secondary
+                        )
+                    }
 
-                    Text(
-                        errorMessage
+                } else if let details =
+                    viewModel.details
+                {
+                    detailContent(
+                        details
                     )
-                    .foregroundStyle(
-                        .secondary
-                    )
+                    .frame(width: geometry.size.width, height: geometry.size.height)
                 }
-
-            } else if let details =
-                viewModel.details
-            {
-                detailContent(
-                    details
-                )
             }
         }
+        .ignoresSafeArea()
         .task {
             await viewModel
                 .loadDetails()
@@ -119,7 +124,7 @@ struct SeriesDetailView: View {
         ) {
             VStack(
                 alignment: .leading,
-                spacing: 42
+                spacing: 24
             ) {
                 HStack(
                     alignment: .top,
@@ -129,20 +134,13 @@ struct SeriesDetailView: View {
                         alignment: .leading,
                         spacing: 24
                     ) {
-                        Text(
-                            details.name
+                        VeyraClearLogo(
+                            item: MediaItem(title: details.name, type: .series, tmdbID: details.id),
+                            fallbackTitle: details.name,
+                            maxWidth: 620,
+                            maxHeight: 140,
+                            font: .system(size: 54, weight: .bold, design: .rounded)
                         )
-                        .font(
-                            .system(
-                                size: 54,
-                                weight: .bold,
-                                design: .rounded
-                            )
-                        )
-                        .foregroundStyle(
-                            .white
-                        )
-                        .lineLimit(2)
 
                         if let year =
                             releaseYear(
@@ -184,10 +182,15 @@ struct SeriesDetailView: View {
                             )
                         }
 
-                        Spacer()
+                        HStack(spacing: 12) {
+                            TrailerButton(tmdbID: details.id, isShow: true)
+                            WatchedToggleButton(item: MediaItem(title: details.name, type: .series, tmdbID: details.id))
+                            FavoriteToggleButton(item: MediaItem(title: details.name, type: .series, tmdbID: details.id))
+                            WatchlistToggleButton(item: MediaItem(title: details.name, type: .series, tmdbID: details.id))
+                        }
+
                     }
-                    .padding(.top, 30)
-                    .frame(maxWidth: 1050, alignment: .leading)
+                    .frame(maxWidth: 1450, alignment: .leading)
 
                     Spacer(
                         minLength: 0
@@ -197,6 +200,11 @@ struct SeriesDetailView: View {
                 seasonsSection(
                     details
                 )
+
+                CastRow(item: MediaItem(title: details.name, type: .series, tmdbID: details.id))
+
+                SimilarTitlesRow(item: MediaItem(title: details.name, type: .series, tmdbID: details.id))
+                    .padding(.top, 6)
 
                 Spacer(
                     minLength: 20
@@ -208,7 +216,7 @@ struct SeriesDetailView: View {
             )
             .padding(
                 .top,
-                28
+                130
             )
             .padding(
                 .bottom,
@@ -220,7 +228,13 @@ struct SeriesDetailView: View {
             0,
             for: .scrollContent
         )
+        .contentMargins(
+            .top,
+            0,
+            for: .scrollContent
+        )
         .scrollClipDisabled()
+        .ignoresSafeArea(.container, edges: .top)
     }
 
     // MARK: - Seasons
@@ -507,7 +521,6 @@ struct SeriesDetailView: View {
                     image
                         .resizable()
                         .scaledToFill()
-                        .ignoresSafeArea()
 
                 case .failure:
                     baseBackground

@@ -145,10 +145,10 @@ extension SportEvent {
         guard match.phase != .postponed else { return nil }
 
         let minutes: Double
-        switch match.league.id {
-        case "nfl", "college-football": minutes = 200
-        case "nba": minutes = 150
-        default: minutes = 110
+        switch match.league.sport {
+        case .americanFootball: minutes = 200
+        case .basketball: minutes = 150
+        case .football: minutes = 110
         }
 
         let hint: PhaseHint
@@ -183,7 +183,10 @@ extension SportEvent {
             score: score,
             phaseHint: hint,
             homeLogoURL: match.home.logoURL ?? SportsTeam.fallbackLogoURL(abbreviation: match.home.abbreviation),
-            awayLogoURL: match.away.logoURL ?? SportsTeam.fallbackLogoURL(abbreviation: match.away.abbreviation))
+            awayLogoURL: match.away.logoURL ?? SportsTeam.fallbackLogoURL(abbreviation: match.away.abbreviation),
+            leagueSymbol: match.league.symbol,
+            homeTeamID: match.home.id,
+            awayTeamID: match.away.id)
     }
 }
 
@@ -289,7 +292,7 @@ private final class SportDayCache {
             var all: [SportsMatch] = []
             var succeeded = 0
             await withTaskGroup(of: [SportsMatch]?.self) { group in
-                for league in SportsLeague.all {
+                for league in SportsLeague.all where SportsDisplayPreferences.isLeagueEnabled(league.id) {
                     group.addTask { @MainActor in try? await provider.matches(league: league, date: key) }
                 }
                 for await part in group {
@@ -352,7 +355,10 @@ final class VeyraLiveGuideSource {
     func sportChannels(teams: [String], start: Date) async -> [SportChannelMatch] {
         await reloadIfNeeded()
         let index = guide.programmeIndex
-        let channels = guide.channels.map { row in
+        // `allChannels` i.p.v. `channels`: sportwedstrijd-matching moet alle
+        // providerzenders met een EPG-naam-match kunnen vinden, ook zenders die
+        // de gebruiker niet zichtbaar heeft gezet in de Live TV-instellingen.
+        let channels = guide.allChannels.map { row in
             SportGuideChannel(
                 id: row.id,
                 name: ChannelNameOverrideStore.effectiveName(channelID: row.channel.id, defaultName: row.channel.name),

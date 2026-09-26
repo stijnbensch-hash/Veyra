@@ -3,16 +3,22 @@ import SwiftUI
 struct VeyraActionLabel: View {
     let title: String
     let symbol: String
+    var compact = false
     var body: some View {
         Label(title, systemImage: symbol).font(.system(size: fontSize, weight: .semibold))
+            .lineLimit(compact ? 1 : nil)
             .foregroundStyle(.white).padding(.horizontal, horizontalPadding).frame(height: height)
+            // Zonder dit knijpt SwiftUI de tekst samen (en laat 'm afbreken)
+            // zodra meerdere van deze knoppen niet allemaal naast elkaar
+            // passen -- de knop mag daarom breder worden dan zijn buren.
+            .fixedSize(horizontal: true, vertical: false)
     }
 
     // Op tvOS blijft dit knopformaat groot genoeg om vanaf de bank te lezen;
     // op iPhone is diezelfde maat een veel te grote pil naast een kleinere titel.
     private var fontSize: CGFloat {
         #if os(tvOS)
-        24
+        compact ? 20 : 24
         #else
         15
         #endif
@@ -20,7 +26,7 @@ struct VeyraActionLabel: View {
 
     private var horizontalPadding: CGFloat {
         #if os(tvOS)
-        26
+        compact ? 18 : 26
         #else
         18
         #endif
@@ -28,7 +34,7 @@ struct VeyraActionLabel: View {
 
     private var height: CGFloat {
         #if os(tvOS)
-        68
+        compact ? 56 : 68
         #else
         40
         #endif
@@ -40,6 +46,7 @@ struct VeyraHero<Actions: View>: View {
     var eyebrow: String = ""
     var overview: String?
     var metadata: [String] = []
+    var item: MediaItem? = nil
     @ViewBuilder let actions: () -> Actions
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -49,11 +56,22 @@ struct VeyraHero<Actions: View>: View {
                     Text(eyebrow.uppercased()).font(.system(size: 18, weight: .medium)).tracking(4).foregroundStyle(VeyraColors.ice)
                 }
             }
-            Text(title)
-                .font(.system(size: titleFontSize, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-                .lineLimit(2)
+            if let item {
+                VeyraClearLogo(
+                    item: item,
+                    fallbackTitle: title,
+                    maxWidth: logoWidth,
+                    maxHeight: logoHeight,
+                    font: .system(size: titleFontSize, weight: .bold, design: .rounded)
+                )
                 .shadow(color: .black.opacity(0.6), radius: 18, y: 8)
+            } else {
+                Text(title)
+                    .font(.system(size: titleFontSize, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .lineLimit(2)
+                    .shadow(color: .black.opacity(0.6), radius: 18, y: 8)
+            }
             if !metadata.isEmpty {
                 HStack(spacing: 12) {
                     ForEach(metadata, id: \.self) { value in
@@ -84,6 +102,22 @@ struct VeyraHero<Actions: View>: View {
         58
         #else
         34
+        #endif
+    }
+
+    private var logoWidth: CGFloat {
+        #if os(tvOS)
+        620
+        #else
+        320
+        #endif
+    }
+
+    private var logoHeight: CGFloat {
+        #if os(tvOS)
+        140
+        #else
+        80
         #endif
     }
 }

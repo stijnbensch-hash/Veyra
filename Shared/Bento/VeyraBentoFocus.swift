@@ -7,11 +7,37 @@ import SwiftUI
 
 enum VeyraHomeFocus: Hashable {
     case cont(String)
-    case sport(String)
+    /// `section` = de rijtitel ("Mijn teams", "College Football", ...), zodat dezelfde wedstrijd
+    /// die in meerdere rijen voorkomt (interconference, of ook in "Mijn teams") toch een gegarandeerd
+    /// unieke focus-identiteit heeft -- anders claimen twee kaarten in verschillende rijen dezelfde
+    /// `.sport(id)`-waarde en raakt de Siri Remote-focus in de war.
+    case sport(section: String, id: String)
     case competition(String)
     case channel(String)
     case shelf(String)
     case bento(BentoTile)
+}
+
+/// Zoals `VeyraTileStyle`, maar zonder eigen achtergrond/rand/schaduw op het hele label: gebruikt
+/// wanneer een kaart een onderschrift ONDER het kader heeft (bv. "Verder kijken"/"Binnenkort") en het
+/// kader dus zelf zijn eigen achtergrond/rand tekent, i.p.v. de knop rond alles heen.
+struct VeyraCaptionedTileStyle: ButtonStyle {
+    func makeBody(configuration: ButtonStyleConfiguration) -> some View {
+        Inner(configuration: configuration)
+            .focusEffectDisabled()
+    }
+
+    private struct Inner: View {
+        let configuration: ButtonStyleConfiguration
+        @Environment(\.isFocused) private var isFocused
+
+        var body: some View {
+            configuration.label
+                .scaleEffect(isFocused ? 1.03 : (configuration.isPressed ? 0.98 : 1))
+                .zIndex(isFocused ? 1 : 0)
+                .animation(.easeOut(duration: 0.16), value: isFocused)
+        }
+    }
 }
 
 struct VeyraTileStyle: ButtonStyle {

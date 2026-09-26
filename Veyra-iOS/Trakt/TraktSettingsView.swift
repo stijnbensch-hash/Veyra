@@ -69,10 +69,14 @@ struct TraktSettingsView: View {
                 }
             } else if let code = deviceCode {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Open op je computer of een andere telefoon:")
-                    Text(code.activationURL).foregroundStyle(VeyraColors.cyan)
+                    Text("Open de activatiepagina en voer deze code in:")
+                    if let activationURL = URL(string: code.activationURL) {
+                        Link(code.activationURL, destination: activationURL)
+                            .foregroundStyle(VeyraColors.cyan)
+                    }
                     Text(code.userCode)
                         .font(.system(size: 32, weight: .bold, design: .monospaced))
+                        .textSelection(.enabled)
                     ProgressView("Wachten op jouw toestemming…")
                 }
                 .padding(.vertical, 4)

@@ -26,6 +26,11 @@ nonisolated private struct VeyraGuideSnapshot: Codable, Sendable {
 @MainActor
 final class VeyraEPGStore: ObservableObject {
     @Published private(set) var channels: [VeyraGuideChannel] = []
+    /// Alle providerzenders, ongefilterd door de Live TV-zichtbaarheidsinstellingen
+    /// van de gebruiker (`isLiveCategoryVisible`/`isLiveChannelVisible`). Bedoeld voor
+    /// gebruik buiten de Live TV-gids zelf, zoals sportwedstrijd-kanaalmatching, die
+    /// alle kanalen met een naam-match moet kunnen vinden, ook verborgen zenders.
+    @Published private(set) var allChannels: [VeyraGuideChannel] = []
     @Published private(set) var categories: [IPTVCategory] = []
     @Published private(set) var providers: [IPTVStoredProvider] = []
     @Published private(set) var activeProviderID: UUID?
@@ -422,7 +427,9 @@ final class VeyraEPGStore: ObservableObject {
         preferences: IPTVProviderPreferences
     ) {
         var seen = Set<String>()
+        var seenAll = Set<String>()
         var rows: [VeyraGuideChannel] = []
+        var allRows: [VeyraGuideChannel] = []
 
             for channel
                 in catalog.channels
@@ -441,19 +448,6 @@ final class VeyraEPGStore: ObservableObject {
                 case .xtream:
                     groupID =
                         channel.group ?? ""
-                }
-
-                guard
-                    preferences
-                        .isLiveCategoryVisible(
-                            groupID
-                        ),
-                    preferences
-                        .isLiveChannelVisible(
-                            channel.id
-                        )
-                else {
-                    continue
                 }
 
                 // M3U kan dezelfde tvg-id gebruiken
@@ -477,18 +471,40 @@ final class VeyraEPGStore: ObservableObject {
                     }
                     .joined()
 
-                if seen.insert(id).inserted {
-                    rows.append(
-                        VeyraGuideChannel(
-                            id: id,
-                            channel: channel,
-                            categoryID: groupID
+                let row = VeyraGuideChannel(
+                    id: id,
+                    channel: channel,
+                    categoryID: groupID
+                )
+
+                // Ongefilterde lijst (alle providerzenders, ook zenders die de
+                // gebruiker niet zichtbaar heeft gezet in Live TV) — gebruikt door
+                // functionaliteit zoals sportwedstrijd-kanaalmatching die niet
+                // beperkt mag worden door de Live TV-zichtbaarheidsinstellingen.
+                if seenAll.insert(id).inserted {
+                    allRows.append(row)
+                }
+
+                guard
+                    preferences
+                        .isLiveCategoryVisible(
+                            groupID
+                        ),
+                    preferences
+                        .isLiveChannelVisible(
+                            channel.id
                         )
-                    )
+                else {
+                    continue
+                }
+
+                if seen.insert(id).inserted {
+                    rows.append(row)
                 }
             }
 
             channels = rows
+            allChannels = allRows
 
             normalizeFavoriteOrder()
 
@@ -850,8 +866,16 @@ final class VeyraEPGStore: ObservableObject {
         configuration: IPTVStoredConfiguration,
         token: UUID
     ) async {
+        // Gebruik `allChannels` (ongefilterd door Live TV-zichtbaarheid) i.p.v.
+        // `channels`, zodat de EPG-programmadata ook beschikbaar is voor niet-
+        // zichtbaar-gezette zenders (nodig voor sportwedstrijd-kanaalmatching).
+        // Dit kost geen extra netwerkverkeer: `epgService.load` downloadt
+        // altijd het volledige XMLTV-bestand van de provider en gebruikt
+        // `channelIDs` alleen als lokaal filter tijdens het parsen — een
+        // grotere set kost dus enkel wat extra parse-/geheugengebruik, geen
+        // extra download.
         let ids = Set(
-            channels
+            allChannels
                 .compactMap {
                     $0.channel.tvgID?
                         .trimmingCharacters(
@@ -865,7 +889,7 @@ final class VeyraEPGStore: ObservableObject {
 
         guard !ids.isEmpty else {
             guideMessage =
-                "De zichtbare zenders hebben geen EPG-ID. Kijk live blijft beschikbaar."
+                "Geen van de providerzenders heeft een EPG-ID. Kijk live blijft beschikbaar."
 
             return
         }

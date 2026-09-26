@@ -16,6 +16,26 @@ nonisolated enum TMDBCatalogLanguageFilter {
     }
 }
 
+/// Filter titels die nog niet uitgebracht zijn (toekomstige releasedatum, of
+/// helemaal geen releasedatum bekend) uit de filterknoppen (Genre/Decennium/
+/// Beoordeling/Sorteren) op Films en Series -- alleen al uitgebrachte titels
+/// horen daar te verschijnen.
+nonisolated enum TMDBReleaseFilter {
+    private static let formatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+
+    static func isReleased(_ dateString: String?, now: Date = .now) -> Bool {
+        guard let dateString, !dateString.isEmpty, let date = formatter.date(from: dateString) else {
+            return false
+        }
+        return date <= now
+    }
+}
+
 struct TMDBClient {
     private let session: URLSession
     private let readAccessToken: String
@@ -93,6 +113,22 @@ struct TMDBClient {
         try await request(
             path: "/3/movie/\(movieID)/external_ids"
         )
+    }
+
+    /// De trailers/teasers van TMDB zelf (meestal YouTube-video's), voor de
+    /// "Trailer"-knop op het filmdetailscherm.
+    func videos(forMovieID movieID: Int) async throws -> [TMDBVideo] {
+        let response: TMDBVideosResponse = try await request(
+            path: "/3/movie/\(movieID)/videos"
+        )
+        return response.results
+    }
+
+    /// Films "van hetzelfde type/genre" als de opgegeven film, voor de
+    /// "Vergelijkbaar"-rij onderaan het filmdetailscherm.
+    func similarMovies(id: Int) async throws -> [TMDBMovie] {
+        let response: TMDBMoviePage = try await request(path: "/3/movie/\(id)/similar")
+        return response.results.filter { TMDBCatalogLanguageFilter.allows($0.originalLanguage) }
     }
 
     /// Haalt een publieke TMDB-lijst op (bv. een eigen lijst van de

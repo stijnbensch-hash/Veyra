@@ -1,15 +1,25 @@
 // VeyraBentoSportSectionIOS.swift — iOS 17+ / macOS 14+
 // Home-sectie "Sport", gevoed door het Sport-menu (via VeyraSportViewModel / SportMenuProvider).
-// Vereist: VeyraBentoSportViews.swift, VeyraBentoSportModel.swift, VeyraBentoStyle.swift, VeyraBentoFocus.swift (VeyraPressStyle).
+// Vereist: VeyraSportMatchCard.swift, VeyraBentoSportModel.swift, VeyraBentoStyle.swift, VeyraBentoFocus.swift (VeyraPressStyle),
+//          SportsFavorites.swift (favoriete teams voor "Mijn teams").
 //
-// Indeling:
-//   iPhone (compact)   live/eerstvolgende kaart · glazen lijst "Vandaag & straks" · horizontale competitietegels
-//   iPad (regular)     kaart | lijst naast elkaar, daaronder de competitietegels
+// Indeling (naar het voorbeeld van een "gidsachtige" sport-widget uit een andere app):
+//   "Favorieten"        wedstrijden van favoriete teams, over alle competities heen -- 2 kaarten
+//                        naast elkaar (iPhone) of 4 (iPad), zelfde kaartstijl als hieronder.
+//   per sport           (bv. "College Football") één rij per hoofdsport: de losse competitie-
+//                        entries die tot dezelfde sport horen (bv. alle "College Football · <conference>")
+//                        worden samengevoegd (zie `VeyraSportViewModel.sportGroupSections`), één
+//                        subsectie per sport met minstens 1 relevante wedstrijd in een aangezette
+//                        competitie.
+//   kaart                klok+tijdstip linksboven, de twee teams (logo + naam) daaronder,
+//                        onderaan een sport-icoon + competitie-label -- zie VeyraSportMatchCard.
 //
 // Bediening:
 //   tik op wedstrijd    -> live: afspelen · straks: herinnering aan/uit (met haptiek)
 //   lang indrukken      -> "Vanaf het begin" (als de zender terugkijken heeft) · herinnering
-//   tik op competitie   -> onOpenCompetition
+//
+// tvOS blijft ongewijzigd bij de oude stijl (losse uitgelichte kaart + "Vandaag & straks"-lijst
+// + competitietegels): zie VeyraBentoSportSection.swift, een apart bestand achter #if os(tvOS).
 
 #if !os(tvOS)
 import SwiftUI
@@ -32,98 +42,56 @@ struct SportSection: View {
     private func content(now: Date) -> some View {
         let live = model.liveEvents(at: now).count
         let coming = model.upcomingCount(at: now)
-        let featured = model.featured(at: now)
-        let rows = Array(model.fixtures(at: now, limit: 7, excluding: featured?.id).prefix(regular ? 5 : 4))
-        let competitions = Array(model.competitions(at: now).prefix(8))
+        // "Mijn teams": wedstrijden van favoriete teams, over alle competities heen -- daarna per
+        // competitie ("College Football", ...) dezelfde kaartstijl. Vervangt de oude combinatie van
+        // één losse uitgelichte kaart + een glazen "Vandaag & straks"-lijst.
+        let favoriteIDs = SportsFavorites.ids()
+        let myTeams = model.myTeamEvents(at: now, favoriteIDs: favoriteIDs, limit: regular ? 8 : 6)
+        let sportGroups = model.sportGroupSections(at: now, limitPerGroup: regular ? 8 : 6)
 
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 20) {
             VeyraHomeSectionHeader(title: "Sport", trailing: "\(live) live · \(coming) komende", compact: true)
 
-            if regular {
-                HStack(alignment: .top, spacing: 12) {
-                    if let featured {
-                        matchCard(featured, now: now).frame(maxWidth: .infinity).frame(height: 380)
-                    }
-                    fixturesPanel(rows, live: live, now: now).frame(maxWidth: .infinity)
-                }
-            } else {
-                VStack(spacing: 12) {
-                    if let featured {
-                        matchCard(featured, now: now).aspectRatio(16.0 / 11.0, contentMode: .fit)
-                    }
-                    fixturesPanel(rows, live: live, now: now)
-                }
+            if !myTeams.isEmpty {
+                matchSection(title: "Favorieten", events: myTeams, now: now)
             }
 
-            if !competitions.isEmpty {
-                if competitions.count <= (regular ? 4 : 2) {
-                    // Weinig competities: gelijk verdeeld over de volle breedte.
-                    HStack(spacing: 10) {
-                        ForEach(competitions) { competition in
-                            competitionButton(competition, now: now)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 96)
-                        }
-                    }
-                } else {
-                    ScrollView(.horizontal) {
-                        HStack(spacing: 10) {
-                            ForEach(competitions) { competition in
-                                competitionButton(competition, now: now)
-                                    .frame(width: 150, height: 96)
-                            }
-                        }
-                    }
-                    .scrollIndicators(.hidden)
-                }
+            ForEach(sportGroups, id: \.name) { section in
+                matchSection(title: section.name, events: section.events, now: now)
             }
-        }
-    }
 
-    private func competitionButton(_ competition: SportCompetition, now: Date) -> some View {
-        Button { onOpenCompetition(competition) } label: {
-            VeyraCompetitionContent(competition: competition, now: now, compact: true)
-        }
-        .buttonStyle(VeyraPressStyle(cornerRadius: 18))
-    }
-
-    // MARK: Kaart
-
-    private func matchCard(_ event: SportEvent, now: Date) -> some View {
-        Button { primaryAction(event, now: now) } label: {
-            VeyraLiveMatchContent(event: event, now: now, reminderOn: model.reminderIDs.contains(event.id), compact: true)
-        }
-        .buttonStyle(VeyraPressStyle())
-        .contextMenu { menu(for: event, now: now) }
-        .sensoryFeedback(.selection, trigger: model.reminderIDs.contains(event.id))
-    }
-
-    // MARK: Lijst
-
-    private func fixturesPanel(_ rows: [SportEvent], live: Int, now: Date) -> some View {
-        VStack(spacing: 0) {
-            VeyraFixturesHeader(liveCount: live, compact: true)
-            ForEach(Array(rows.enumerated()), id: \.element.id) { index, event in
-                if index > 0 { Divider().overlay(Color.white.opacity(0.08)).padding(.horizontal, 14) }
-                Button { primaryAction(event, now: now) } label: {
-                    VeyraFixtureRowContent(event: event, now: now, reminderOn: model.reminderIDs.contains(event.id), compact: true)
-                }
-                .buttonStyle(.plain)
-                .contextMenu { menu(for: event, now: now) }
-                .sensoryFeedback(.selection, trigger: model.reminderIDs.contains(event.id))
-            }
-            if rows.isEmpty {
-                Text("Geen andere wedstrijden de komende 24 uur")
+            if myTeams.isEmpty && sportGroups.isEmpty {
+                Text("Geen wedstrijden gevonden")
                     .font(.footnote)
                     .foregroundStyle(VeyraHomeStyle.dim)
-                    .padding(16)
             }
         }
-        .padding(.bottom, 4)
-        .frame(maxWidth: .infinity, alignment: .top)
-        .background(VeyraFrame.fill)
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .veyraGlassSurface(cornerRadius: 22)
+    }
+
+    // MARK: Subsectie: kop + horizontale rij van wedstrijdkaarten (één rij, opzij scrollen)
+
+    private func matchSection(title: String, events: [SportEvent], now: Date) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.system(size: 12, weight: .bold))
+                .tracking(1.5)
+                .textCase(.uppercase)
+                .foregroundStyle(VeyraHomeStyle.cyan.opacity(0.85))
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(alignment: .top, spacing: 10) {
+                    ForEach(events) { event in
+                        Button { primaryAction(event, now: now) } label: {
+                            VeyraSportMatchCard(event: event, now: now, reminderOn: model.reminderIDs.contains(event.id))
+                        }
+                        .frame(width: regular ? 300 : 240)
+                        .buttonStyle(VeyraPressStyle(cornerRadius: 16))
+                        .contextMenu { menu(for: event, now: now) }
+                        .sensoryFeedback(.selection, trigger: model.reminderIDs.contains(event.id))
+                    }
+                }
+            }
+        }
     }
 
     // MARK: Acties

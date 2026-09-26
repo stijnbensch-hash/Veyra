@@ -17,7 +17,7 @@ nonisolated struct VeyraHomeLayout: Codable, Equatable, Sendable {
     var preset: String?
 
     static let defaultOrder: [String] = [
-        "verder", "releasesFilms", "releasesSeries", "volgende", "live", "vandaag",
+        "volgende", "vandaag", "releasesFilms", "releasesSeries", "live",
         "iptvFilms", "iptvSeries", "streaming", "collecties"
     ]
 
@@ -79,22 +79,22 @@ nonisolated struct VeyraHomePreset: Identifiable, Sendable {
                         detail: "Verder kijken, nieuwe titels, streamingdiensten en collecties. Geen live-tv of sport.",
                         symbol: "film",
                         layout: make("filmsSeries",
-                                     order: ["verder", "releasesFilms", "releasesSeries", "volgende", "streaming", "collecties", "vandaag"],
-                                     show: ["verder", "releasesFilms", "releasesSeries", "volgende", "streaming", "collecties", "vandaag"],
+                                     order: ["volgende", "releasesFilms", "releasesSeries", "streaming", "collecties", "vandaag"],
+                                     show: ["volgende", "releasesFilms", "releasesSeries", "streaming", "collecties", "vandaag"],
                                      sport: false)),
         VeyraHomePreset(id: "liveSport", title: "Live-tv en sport",
                         detail: "Live nu, sport en je IPTV-planken. Geen nieuwe releases.",
                         symbol: "sportscourt",
                         layout: make("liveSport",
-                                     order: ["live", "vandaag", "iptvFilms", "iptvSeries", "verder", "volgende"],
-                                     show: ["live", "vandaag", "iptvFilms", "iptvSeries", "verder", "volgende"],
+                                     order: ["live", "vandaag", "iptvFilms", "iptvSeries", "volgende"],
+                                     show: ["live", "vandaag", "iptvFilms", "iptvSeries", "volgende"],
                                      sport: true)),
         VeyraHomePreset(id: "minimaal", title: "Minimaal",
                         detail: "Alleen Verder kijken en je streamingdiensten.",
                         symbol: "circle.grid.2x1",
                         layout: make("minimaal",
-                                     order: ["verder", "volgende", "streaming"],
-                                     show: ["verder", "volgende", "streaming"],
+                                     order: ["volgende", "streaming"],
+                                     show: ["volgende", "streaming"],
                                      sport: false, shelves: false)),
     ]
 }

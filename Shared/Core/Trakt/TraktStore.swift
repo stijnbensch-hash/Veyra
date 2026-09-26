@@ -13,6 +13,7 @@ final class TraktStore: ObservableObject {
     @Published private(set) var user: TraktUser?
 
     @Published private(set) var watchlist: [TraktEntry] = []
+    @Published private(set) var favorites: [TraktEntry] = []
     @Published private(set) var playback: [TraktEntry] = []
 
     @Published private(set) var upNext: [TraktUpNext] = []
@@ -266,6 +267,20 @@ final class TraktStore: ObservableObject {
                     "sync/watchlist/episodes/added/desc"
                 )
 
+            // Trakt kent enkel favorieten voor films en series, geen
+            // losse afleveringen.
+            let favoriteMovies:
+                [TraktEntry] =
+                try await client.allPages(
+                    "sync/favorites/movies/added/desc"
+                )
+
+            let favoriteShows:
+                [TraktEntry] =
+                try await client.allPages(
+                    "sync/favorites/shows/added/desc"
+                )
+
             let movieProgress:
                 [TraktEntry] =
                 try await client.allPages(
@@ -321,6 +336,10 @@ final class TraktStore: ObservableObject {
                 movies
                 + shows
                 + episodes
+
+            favorites =
+                favoriteMovies
+                + favoriteShows
 
             playback =
                 (
@@ -589,6 +608,7 @@ final class TraktStore: ObservableObject {
         user = nil
 
         watchlist = []
+        favorites = []
         playback = []
 
         upNext = []
@@ -615,6 +635,14 @@ final class TraktStore: ObservableObject {
         _ item: MediaItem
     ) -> Bool {
         watchlist.contains {
+            $0.matches(item)
+        }
+    }
+
+    func isFavorited(
+        _ item: MediaItem
+    ) -> Bool {
+        favorites.contains {
             $0.matches(item)
         }
     }
@@ -662,7 +690,13 @@ final class TraktStore: ObservableObject {
             let episode =
                 item.episodeNumber
         else {
-            return false
+            // Geen seizoen/aflevering -- dit is de serie zelf (bv. de
+            // "bekeken"-knop op de serie-infopagina), niet één aflevering.
+            // "Bekeken" betekent dan: de hele serie volledig uitgekeken.
+            guard item.type == .series else { return false }
+            return TraktWatchedStatus.resolve(
+                .show(item.traktIDs), movies: watchedMovies, shows: watchedShows, progress: upNext
+            ) == .watched
         }
 
         return watchedShows.contains {
@@ -751,6 +785,23 @@ final class TraktStore: ObservableObject {
     ) async throws {
         try await mutate(
             "sync/watchlist"
+                + (
+                    included
+                    ? ""
+                    : "/remove"
+                ),
+            item: item
+        )
+
+        await refreshAfterMutation()
+    }
+
+    func setFavorite(
+        _ item: MediaItem,
+        included: Bool
+    ) async throws {
+        try await mutate(
+            "sync/favorites"
                 + (
                     included
                     ? ""

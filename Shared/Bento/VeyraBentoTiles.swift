@@ -73,19 +73,26 @@ struct VeyraBentoContinueHeroContent: View {
                     .font(compact ? .caption.weight(.semibold) : .title3.weight(.semibold))
                     .foregroundStyle(.white.opacity(0.9))
                     .lineLimit(1)
-                HStack(spacing: compact ? 8 : 14) {
-                    if let episodeTitle = item.episodeTitle {
-                        Text(episodeTitle)
-                            .font(compact ? .caption2 : .callout)
-                            .foregroundStyle(VeyraHomeStyle.dim)
-                            .lineLimit(1)
-                    }
-                    if let counts = item.countsText {
-                        Text(counts)
-                            .font(.system(size: compact ? 13 : 20, weight: .semibold))
-                            .foregroundStyle(VeyraHomeStyle.cyan.opacity(0.9))
-                            .lineLimit(1)
-                            .fixedSize()
+                // Alleen tonen (en dus ook alleen dan de VStack-spacing
+                // eronder reserveren) als er iets in staat -- bij een film
+                // (geen episodeTitle/aantallen) blijft de onderste tekst zo
+                // even compact als bij een serie, i.p.v. een lege regel met
+                // dode ruimte eronder.
+                if item.episodeTitle != nil || item.countsText != nil {
+                    HStack(spacing: compact ? 8 : 14) {
+                        if let episodeTitle = item.episodeTitle {
+                            Text(episodeTitle)
+                                .font(compact ? .caption2 : .callout)
+                                .foregroundStyle(VeyraHomeStyle.dim)
+                                .lineLimit(1)
+                        }
+                        if let counts = item.countsText {
+                            Text(counts)
+                                .font(.system(size: compact ? 13 : 20, weight: .semibold))
+                                .foregroundStyle(VeyraHomeStyle.cyan.opacity(0.9))
+                                .lineLimit(1)
+                                .fixedSize()
+                        }
                     }
                 }
             }
@@ -123,29 +130,44 @@ struct VeyraBentoContinueMiniContent: View {
     let item: ContinueItem
     var compact = false
     var thumbnailWidth: CGFloat? = nil
+    var cornerRadius: CGFloat = 22
+
+    @Environment(\.isFocused) private var isFocused
 
     var body: some View {
-        ZStack {
-            VeyraArt(url: item.bannerURL ?? item.backdropURL, seed: item.title)
-            LinearGradient(colors: [.black.opacity(0.88), .black.opacity(0.45), .black.opacity(0.10)],
-                           startPoint: .leading, endPoint: .trailing)
-            VeyraTitleLogo(title: item.title, logoURL: item.logoURL,
-                           size: compact ? 13 : 20, maxLogoHeight: compact ? 30 : 56, alignment: .leading)
-                .padding(.horizontal, compact ? 12 : 22)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-            Text(compact ? item.shortMetaText : item.metaText)
-                .font(.system(size: compact ? 15 : 23, weight: .bold))
-                .foregroundStyle(VeyraHomeStyle.cyan)
-                .shadow(color: .black.opacity(0.6), radius: compact ? 1.5 : 2, x: 0, y: 1)
-                .shadow(color: .black.opacity(0.3), radius: compact ? 3 : 5)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                .padding(.horizontal, compact ? 12 : 22)
-                .padding(.bottom, compact ? 8 : 14)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-        }
-        .overlay(alignment: .bottom) {
-            if item.progress > 0 { VeyraHairline(progress: item.progress, height: compact ? 3 : 4) }
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+
+        VStack(alignment: .leading, spacing: compact ? 4 : 8) {
+            ZStack {
+                // Enkel de afbeelding in het kader -- geen titeltekst/clearlogo meer overheen
+                // (die staat, samen met de meta-tekst, al los onder het kader).
+                VeyraArt(url: item.bannerURL ?? item.backdropURL, seed: item.title)
+                LinearGradient(colors: [.black.opacity(0.45), .clear, .black.opacity(0.10)],
+                               startPoint: .top, endPoint: .bottom)
+            }
+            .overlay(alignment: .bottom) {
+                if item.progress > 0 { VeyraHairline(progress: item.progress, height: compact ? 3 : 4) }
+            }
+            // Het cyaan/rode kader zit alleen rond de banner, niet rond de tekst eronder.
+            .clipShape(shape)
+            .overlay(shape.strokeBorder(isFocused ? VeyraFrame.active : VeyraFrame.resting,
+                                        lineWidth: isFocused ? 3 : 1.5))
+            .shadow(color: isFocused ? VeyraColors.cyan.opacity(0.32) : Color.black.opacity(0.3),
+                    radius: isFocused ? 22 : 14, x: isFocused ? -5 : 0, y: isFocused ? 3 : 10)
+            .shadow(color: isFocused ? VeyraColors.red.opacity(0.20) : .clear, radius: 22, x: 8, y: 3)
+
+            // Zelfde onderschriftstijl als Binnenkort: clearlogo links, cyaan info rechts.
+            HStack(alignment: .center, spacing: compact ? 8 : 14) {
+                VeyraTitleLogo(title: item.title, logoURL: item.logoURL,
+                               size: compact ? 15 : 20, maxLogoHeight: compact ? 26 : 38)
+
+                Text(compact ? item.shortMetaText : item.metaText)
+                    .font(.system(size: compact ? 14 : 18, weight: .bold))
+                    .foregroundStyle(VeyraHomeStyle.cyan)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+            .padding(.horizontal, compact ? 10 : 14)
         }
         .foregroundStyle(.white)
         .accessibilityElement(children: .ignore)
@@ -183,14 +205,23 @@ struct VeyraBentoLiveRowContent: View {
             channelLogo
 
             VStack(alignment: .leading, spacing: compact ? 1 : 2) {
-                Text(row.channelName)
-                    .font(.system(size: compact ? 15 : 26, weight: .bold))
-                    .lineLimit(1)
                 HStack(spacing: compact ? 5 : 8) {
                     if row.isSports {
                         Circle().fill(VeyraHomeStyle.live).frame(width: compact ? 6 : 10, height: compact ? 6 : 10)
                     }
-                    Text("\(row.title) · nog \(row.remainingMinutes) min")
+                    (
+                        Text("\(row.title) · ")
+                            .font(compact ? .caption : .callout)
+                        + Text("nog \(row.remainingMinutes) min")
+                            .font(compact ? .caption2 : .footnote)
+                    )
+                        .foregroundStyle(VeyraHomeStyle.dim)
+                        .lineLimit(1)
+                }
+                // I.p.v. de zendernaam: het eerstvolgende programma, in
+                // dezelfde tekstgrootte als het huidige programma erboven.
+                if let nextTitle = row.nextTitle {
+                    Text("Straks: \(nextTitle)")
                         .font(compact ? .caption : .callout)
                         .foregroundStyle(VeyraHomeStyle.dim)
                         .lineLimit(1)
@@ -209,7 +240,7 @@ struct VeyraBentoLiveRowContent: View {
         .foregroundStyle(.white)
         .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(row.channelName), \(row.title), nog \(row.remainingMinutes) minuten")
+        .accessibilityLabel("\(row.channelName), \(row.title), nog \(row.remainingMinutes) minuten" + (row.nextTitle.map { ", straks \($0)" } ?? ""))
     }
 
     private var channelLogo: some View {
@@ -311,6 +342,71 @@ struct VeyraBentoTodayContent: View {
             }
         }
         .padding(.vertical, compact ? 6 : 11)
+    }
+}
+
+// MARK: - Binnenkort (losse kaart)
+
+/// Eén losse kaart voor "Binnenkort", zonder gedeeld kader — gebruikt op tv Home in een
+/// horizontale rij direct onder "Verder kijken".
+struct VeyraBentoUpcomingCardContent: View {
+    let item: UpcomingItem
+    let now: Date
+    let isReminded: Bool
+    var compact = false
+    var cornerRadius: CGFloat = 22
+
+    @Environment(\.isFocused) private var isFocused
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+
+        VStack(alignment: .leading, spacing: compact ? 4 : 8) {
+            ZStack {
+                VeyraArt(url: item.backdropURL, seed: item.title)
+                LinearGradient(colors: [.black.opacity(0.55), .clear],
+                               startPoint: .bottom, endPoint: .top)
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack {
+                        Spacer(minLength: 0)
+                        Image(systemName: isReminded ? "bell.fill" : "bell")
+                            .font(compact ? .caption : .callout)
+                            .foregroundStyle(isReminded ? VeyraHomeStyle.cyan : .white.opacity(0.85))
+                            .padding(compact ? 7 : 10)
+                            .background(.black.opacity(0.35), in: Circle())
+                    }
+                    Spacer(minLength: 0)
+                    Text(item.episodeCode ?? (item.kind == .movie ? "Film" : "Nieuw"))
+                        .font(compact ? .caption2 : .caption)
+                        .foregroundStyle(.white.opacity(0.9))
+                        .lineLimit(1)
+                }
+                .padding(compact ? 10 : 14)
+            }
+            // Het cyaan/rode kader zit alleen rond de banner, niet rond de tekst eronder.
+            .clipShape(shape)
+            .overlay(shape.strokeBorder(isFocused ? VeyraFrame.active : VeyraFrame.resting,
+                                        lineWidth: isFocused ? 3 : 1.5))
+            .shadow(color: isFocused ? VeyraColors.cyan.opacity(0.32) : Color.black.opacity(0.3),
+                    radius: isFocused ? 22 : 14, x: isFocused ? -5 : 0, y: isFocused ? 3 : 10)
+            .shadow(color: isFocused ? VeyraColors.red.opacity(0.20) : .clear, radius: 22, x: 8, y: 3)
+
+            // Titel-clearlogo en datum staan samen onder het beeldkader.
+            HStack(alignment: .center, spacing: compact ? 8 : 14) {
+                VeyraTitleLogo(title: item.title, logoURL: item.logoURL,
+                               size: compact ? 15 : 20, maxLogoHeight: compact ? 26 : 38)
+
+                Text(VeyraHomeFormat.when(item.airDate, now: now, dateOnly: true))
+                    .font(.system(size: compact ? 14 : 18, weight: .bold))
+                    .foregroundStyle(VeyraHomeStyle.cyan)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+            .padding(.horizontal, compact ? 10 : 14)
+        }
+        .foregroundStyle(.white)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(item.title), \(VeyraHomeFormat.when(item.airDate, now: now, dateOnly: true))")
     }
 }
 
@@ -459,8 +555,10 @@ struct VeyraBentoPosterContent: View {
             }
             .overlay(alignment: .topTrailing) {
                 if let watchedID {
-                    VeyraWatchedBadge(target: watchedKind == .movie ? .movie(TraktIDs(tmdb: watchedID)) : .show(TraktIDs(tmdb: watchedID)),
-                                      partialDisplay: .hidden)
+                    // Enkel het vinkje i.p.v. de tekstbadge -- de tekst "Bekeken" nam op de
+                    // smalle plankkaarten te veel ruimte in.
+                    VeyraWatchedCheckmark(target: watchedKind == .movie ? .movie(TraktIDs(tmdb: watchedID)) : .show(TraktIDs(tmdb: watchedID)),
+                                          partialDisplay: .hidden)
                         .padding(compact ? 6 : 12)
                         .scaleEffect(compact ? 0.75 : 1, anchor: .topTrailing)
                 }

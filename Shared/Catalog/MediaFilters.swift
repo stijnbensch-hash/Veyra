@@ -55,3 +55,33 @@ enum VeyraRatingFilter: Double, CaseIterable, Identifiable {
 
     var title: String { "\(Int(rawValue))+ ★" }
 }
+
+/// Sorteeroptie voor Films/Series, naast de Genre/Decennium/Beoordeling-filters.
+/// Anders dan die filters heeft deze altijd een actieve waarde (default `.popular`)
+/// — er is bewust geen "geen sortering"-staat.
+enum VeyraSortOption: String, CaseIterable, Identifiable {
+    case popular
+    case trending
+    case topRated
+    case newest
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .popular: return "Populair"
+        case .trending: return "Trending"
+        case .topRated: return "Top beoordeeld"
+        case .newest: return "Nieuw"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .popular: return "flame"
+        case .trending: return "chart.line.uptrend.xyaxis"
+        case .topRated: return "star.circle"
+        case .newest: return "sparkles"
+        }
+    }
+}
