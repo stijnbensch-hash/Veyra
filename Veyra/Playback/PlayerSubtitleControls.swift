@@ -22,6 +22,7 @@ struct PlayerSubtitleControls: View {
     var onSelectLiveChannel: (VeyraGuideChannel) -> Void = { _ in }
 
     var onRequestExit: () -> Void = {}
+    var onUserActivity: () -> Void = {}
     var onPlayNextEpisode: (MediaItem) -> Void = { _ in }
 
     // Actieve/maximale gelijktijdige verbindingen van de Xtream-provider
@@ -174,15 +175,16 @@ struct PlayerSubtitleControls: View {
     private var activeSkipSegment: (kind: SkipSegmentKind, segment: IntroDBSegment)? {
         guard !showNextEpisodeOverlay, !panelVisible else { return nil }
 
-        if showSkipIntroButton, let intro = introDBSegments.intro, intro.contains(engine.currentTime) {
+        if showSkipIntroButton,
+           let intro = introDBSegments.intros.first(where: { $0.contains(engine.currentTime) }) {
             return (.intro, intro)
         }
-        if showSkipRecapButton, let recap = introDBSegments.recap, recap.contains(engine.currentTime) {
+        if showSkipRecapButton,
+           let recap = introDBSegments.recaps.first(where: { $0.contains(engine.currentTime) }) {
             return (.recap, recap)
         }
-        if showSkipCreditsButton, let credits = introDBSegments.credits,
-            credits.contains(engine.currentTime)
-        {
+        if showSkipCreditsButton,
+           let credits = introDBSegments.creditsSegments.first(where: { $0.contains(engine.currentTime) }) {
             return (.credits, credits)
         }
         return nil
@@ -195,8 +197,9 @@ struct PlayerSubtitleControls: View {
     }
 
     private func handleAutoSkip(at time: Double) {
-        guard autoSkipIntro, !autoSkippedIntro, let intro = introDBSegments.intro,
-            let end = intro.end, intro.contains(time)
+        guard autoSkipIntro, !autoSkippedIntro,
+            let intro = introDBSegments.intros.first(where: { $0.contains(time) }),
+            let end = intro.end
         else { return }
         autoSkippedIntro = true
         Task { await engine.seek(to: end) }
@@ -206,6 +209,7 @@ struct PlayerSubtitleControls: View {
         ZStack(alignment: .bottom) {
             Color.clear.contentShape(Rectangle()).focusable(!controlsVisible && !panelVisible)
                 .focused($focused, equals: .surface).focusEffectDisabled().onMoveCommand { direction in
+                    onUserActivity()
                     guard !panelVisible else { return }
                     if source?.kind == .liveTV, liveGuide != nil {
                         switch direction {
@@ -226,11 +230,26 @@ struct PlayerSubtitleControls: View {
 
             PlayerSubtitleOverlay(engine: engine).allowsHitTesting(false)
 
+            if controlsVisible && !panelVisible { playbackControls }
+
             if let active = activeSkipSegment {
-                skipSegmentButton(active.kind, active.segment)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.leading, 72)
-                    .padding(.bottom, controlsVisible ? 190 : 48)
+                HStack {
+                    skipSegmentButton(active.kind, active.segment)
+                    Spacer(minLength: 0)
+                }
+                .padding(.leading, 72)
+                .padding(.bottom, controlsVisible ? 190 : 48)
+                .focusSection()
+                .onAppear {
+                    revealControls()
+                    restoreControlFocus(.skipSegment)
+                }
+                .onDisappear {
+                    if focused == .skipSegment {
+                        focused = controlsVisible && !panelVisible
+                            ? (canSeek ? .timeline : .play) : .surface
+                    }
+                }
             }
 
             if showNextEpisodeOverlay, let nextEpisode {
@@ -241,7 +260,6 @@ struct PlayerSubtitleControls: View {
                     .onAppear { startCountdownIfNeeded(for: nextEpisode) }
             }
 
-            if controlsVisible && !panelVisible { playbackControls }
         }.onChange(of: isNearEndOfEpisode) { _, isNear in
             guard isNear, showNextEpisodeOverlay else { return }
             focused = .nextEpisode
@@ -279,6 +297,9 @@ struct PlayerSubtitleControls: View {
                 // gewoon zichtbaar bleef staan tot het einde van de
                 // aflevering -- de knop was dan niet meer selecteerbaar.
                 guard !showNextEpisodeOverlay else { continue }
+                // Houd de bediening en de focus ook bij een actief
+                // intro-/recap-/aftitelingsegment in beeld.
+                guard case .none = activeSkipSegment else { continue }
                 presentation.hideControls()
                 focused = .surface
                 return
@@ -306,7 +327,8 @@ struct PlayerSubtitleControls: View {
         }
         // One handler outside the overlay owns Back for both the controls and
         // every submenu. A single command changes exactly one presentation layer.
-        .onExitCommand { handleExitCommand() }.onPlayPauseCommand {
+        .onExitCommand { onUserActivity(); handleExitCommand() }.onPlayPauseCommand {
+            onUserActivity()
             togglePlayback()
             if !panelVisible {
                 revealControls(focus: source?.kind == .liveTV ? .play : .timeline)
@@ -316,15 +338,22 @@ struct PlayerSubtitleControls: View {
             countdownTask = nil
             countdownRemaining = nil
             countdownCancelled = false
+            nextEpisode = nil
+            let resolved = await NextEpisodeResolver.resolve(after: item)
+            guard !Task.isCancelled else { return }
+            nextEpisode = resolved
+        }.task(id: item?.id) {
             autoSkippedIntro = false
             introDBSegments = .empty
-            nextEpisode = await NextEpisodeResolver.resolve(after: item)
-            introDBSegments = await IntroDBClient.shared.segments(
+            let loaded = await IntroDBClient.shared.segments(
                 tmdbID: item?.tmdbID,
+                imdbID: item?.imdbID,
                 season: item?.type == .series ? item?.seasonNumber : nil,
                 episode: item?.type == .series ? item?.episodeNumber : nil,
-                durationSeconds: engine.duration > 0 ? engine.duration : nil
+                durationSeconds: canSeek ? engine.duration : nil
             )
+            guard !Task.isCancelled else { return }
+            introDBSegments = loaded
         }.onChange(of: engine.currentTime) { _, time in
             handleAutoSkip(at: time)
         }
@@ -342,7 +371,7 @@ struct PlayerSubtitleControls: View {
             }.padding(.horizontal, 24).padding(.vertical, 16)
         }.buttonStyle(VeyraFocusButtonStyle(radius: VeyraRadius.pill)).focused(
             $focused, equals: .skipSegment
-        ).focusSection()
+        )
     }
 
     // MARK: - Next episode overlay
@@ -465,7 +494,7 @@ struct PlayerSubtitleControls: View {
 
                 TimelineView(.periodic(from: .now, by: 30)) { context in
                     Text(context.date.formatted(date: .omitted, time: .shortened)).font(
-                        .system(size: 18, weight: .semibold, design: .rounded)
+                        .system(size: 22, weight: .semibold, design: .rounded)
                     ).monospacedDigit().foregroundStyle(.white.opacity(0.72))
                 }
             }
@@ -502,7 +531,12 @@ struct PlayerSubtitleControls: View {
             switch direction {
             case .left: requestSeek(by: -30)
             case .right: requestSeek(by: 30)
-            case .up: openTopMenu()
+            case .up:
+                if activeSkipSegment != nil {
+                    restoreControlFocus(.skipSegment)
+                } else {
+                    openTopMenu()
+                }
             default: break
             }
         }.accessibilityLabel("Voortgang").accessibilityHint(
@@ -727,7 +761,7 @@ struct PlayerSubtitleControls: View {
                         }
 
                         if let metadataInfoLine {
-                            Text(metadataInfoLine).font(.system(size: 16, weight: .semibold))
+                            Text(metadataInfoLine).font(.system(size: 20, weight: .semibold))
                                 .foregroundStyle(.white.opacity(0.55))
                         }
 
@@ -780,9 +814,9 @@ struct PlayerSubtitleControls: View {
         guard let tmdbID = item?.tmdbID else { return }
 
         if item?.type == .series {
-            ratings = await MetadataRatingsService.seriesRatings(tmdbID: tmdbID, imdbID: item?.imdbID)
+            ratings = await MetadataRatingsService.seriesRatings(tmdbID: tmdbID, imdbID: item?.imdbID, title: item?.title ?? "")
         } else {
-            ratings = await MetadataRatingsService.movieRatings(tmdbID: tmdbID, imdbID: item?.imdbID)
+            ratings = await MetadataRatingsService.movieRatings(tmdbID: tmdbID, imdbID: item?.imdbID, title: item?.title ?? "")
         }
     }
 
@@ -1095,8 +1129,6 @@ private struct VeyraPlaybackTimeline: View {
                         if displayedTime != nil {
                             Text(isSeeking ? "Spoelen..." : "Nieuwe positie").foregroundStyle(
                                 VeyraColors.cyan)
-                        } else if isFocused {
-                            Text("Links/rechts: 30 sec").foregroundStyle(VeyraColors.cyan)
                         }
 
                         Spacer()

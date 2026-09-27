@@ -112,11 +112,11 @@ struct VeyraHero<Actions: View>: View {
             switch item.type {
             case .movie:
                 loaded = await MetadataRatingsService.movieRatings(
-                    tmdbID: tmdbID, imdbID: item.imdbID, knownTMDBRating: item.rating
+                    tmdbID: tmdbID, imdbID: item.imdbID, title: item.title, knownTMDBRating: item.rating
                 )
             case .series:
                 loaded = await MetadataRatingsService.seriesRatings(
-                    tmdbID: tmdbID, imdbID: item.imdbID, knownTMDBRating: item.rating
+                    tmdbID: tmdbID, imdbID: item.imdbID, title: item.title, knownTMDBRating: item.rating
                 )
             case .liveTV, .iptvSeries:
                 return

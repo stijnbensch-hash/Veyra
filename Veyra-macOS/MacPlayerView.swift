@@ -1,5 +1,6 @@
 import SwiftUI
 import AetherEngine
+import AppKit
 
 struct PlayerView: View {
     let source: PlayableSource
@@ -8,6 +9,8 @@ struct PlayerView: View {
 
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel: PlaybackViewModel
+    @StateObject private var pip = MacPictureInPictureController()
+    @StateObject private var fullscreen = MacPlayerWindowController()
     @State private var nextEpisode: MediaItem?
     @State private var nextRequest: MacNextPlaybackRequest?
     @State private var resolvingNextEpisode = false
@@ -45,7 +48,10 @@ struct PlayerView: View {
                     source: source,
                     nextEpisode: nextEpisode,
                     resolvingNextEpisode: resolvingNextEpisode,
-                    onPlayNextEpisode: playNextEpisode
+                    onPlayNextEpisode: playNextEpisode,
+                    pip: pip,
+                    fullscreen: fullscreen,
+                    onUserActivity: { viewModel.registerActivity() }
                 )
             } else {
                 ProgressView("Veyra Player starten…")
@@ -57,9 +63,28 @@ struct PlayerView: View {
                 Button("Sluiten", systemImage: "xmark") { dismiss() }
             }
         }
+        .alert("Kijk je nog?", isPresented: Binding(
+            get: { viewModel.showStillWatchingPrompt },
+            set: { if !$0 { viewModel.registerActivity() } }
+        )) {
+            Button("Ja, doorgaan") { viewModel.registerActivity() }
+        } message: {
+            Text("Afspelen stopt zo als er geen reactie komt.")
+        }
         .task { await viewModel.startPlayback() }
         .task(id: item?.id) { nextEpisode = await NextEpisodeResolver.resolve(after: item) }
-        .onDisappear { viewModel.stopForDisappear() }
+        .onDisappear {
+            if fullscreen.mode == .floating {
+                MacFloatingPlayerSession.shared.keep(viewModel: viewModel, controller: fullscreen)
+                return
+            }
+            fullscreen.close()
+            if pip.keepsPlaybackAlive {
+                MacPictureInPictureSession.shared.keep(viewModel: viewModel, pip: pip)
+            } else {
+                viewModel.stopForDisappear()
+            }
+        }
         .navigationDestination(item: $nextRequest) { request in
             if let source = request.source {
                 PlayerView(source: source, item: request.item)
@@ -72,6 +97,8 @@ struct PlayerView: View {
 
     private func playNextEpisode(_ next: MediaItem) {
         guard !resolvingNextEpisode else { return }
+        fullscreen.close()
+        pip.stop()
         // Finish the previous episode's tracking before opening its successor.
         viewModel.stopForDisappear()
         resolvingNextEpisode = true
@@ -89,6 +116,227 @@ private struct MacNextPlaybackRequest: Identifiable, Hashable {
     let source: PlayableSource?
 }
 
+@MainActor
+final class MacPlayerWindowController: NSObject, ObservableObject, NSWindowDelegate {
+    enum Mode { case normal, fullscreen, floating }
+
+    @Published private(set) var mode: Mode = .normal
+    var isPresented: Bool { mode != .normal }
+    var onClosed: (() -> Void)?
+
+    private var window: NSWindow?
+
+    // Menubalk (en Dock) in fullscreen: automatisch verbergen, en even
+    // tevoorschijn laten komen zodra de muis beweegt of een toets wordt
+    // ingedrukt -- daarna, bij inactiviteit, weer verbergen. Standaard
+    // AppKit-fullscreen toont de menubalk enkel bij hover helemaal bovenaan
+    // het scherm; met `NSApp.presentationOptions` sturen we dat hier zelf
+    // aan zodat elke muisbeweging of toetsaanslag volstaat.
+    private var menuBarEventMonitor: Any?
+    private var menuBarHideWorkItem: DispatchWorkItem?
+
+    private func startAutoHidingMenuBar() {
+        NSApp.presentationOptions = [.autoHideMenuBar, .autoHideDock]
+        guard menuBarEventMonitor == nil else { return }
+        menuBarEventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .keyDown]) { [weak self] event in
+            self?.revealMenuBarBriefly()
+            return event
+        }
+    }
+
+    private func revealMenuBarBriefly() {
+        guard mode == .fullscreen else { return }
+        NSApp.presentationOptions = []
+        menuBarHideWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self, self.mode == .fullscreen else { return }
+            NSApp.presentationOptions = [.autoHideMenuBar, .autoHideDock]
+        }
+        menuBarHideWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3, execute: workItem)
+    }
+
+    private func stopAutoHidingMenuBar() {
+        if let menuBarEventMonitor { NSEvent.removeMonitor(menuBarEventMonitor) }
+        menuBarEventMonitor = nil
+        menuBarHideWorkItem?.cancel()
+        menuBarHideWorkItem = nil
+        NSApp.presentationOptions = []
+    }
+
+    func present<Content: View>(title: String, content: Content) {
+        guard window == nil else { return }
+
+        let frame = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1280, height: 800)
+        let window = NSWindow(
+            contentRect: frame,
+            styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = title
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        window.collectionBehavior = [.fullScreenPrimary]
+        window.isReleasedWhenClosed = false
+        window.delegate = self
+        window.contentView = NSHostingView(rootView: AnyView(content))
+
+        self.window = window
+        mode = .fullscreen
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+
+        // AppKit kan pas naar volledig scherm nadat het venster zichtbaar is.
+        DispatchQueue.main.async { [weak self, weak window] in
+            guard let self, let window, self.window === window else { return }
+            window.toggleFullScreen(nil)
+        }
+    }
+
+    func presentFloating<Content: View>(title: String, content: Content) {
+        guard window == nil else { return }
+
+        let screen = NSApp.keyWindow?.screen ?? NSScreen.main
+        let visibleFrame = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1280, height: 800)
+        let width: CGFloat = 440
+        let height: CGFloat = 290
+        let panel = NSPanel(
+            contentRect: NSRect(x: visibleFrame.maxX - width - 20, y: visibleFrame.minY + 20,
+                                width: width, height: height),
+            styleMask: [.titled, .closable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        panel.title = title
+        panel.level = .floating
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        panel.hidesOnDeactivate = false
+        panel.isFloatingPanel = true
+        panel.minSize = NSSize(width: 320, height: 210)
+        panel.isReleasedWhenClosed = false
+        panel.delegate = self
+        panel.contentView = NSHostingView(rootView: AnyView(content))
+
+        window = panel
+        mode = .floating
+        panel.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func exit() {
+        guard let window else { return }
+        stopAutoHidingMenuBar()
+        if window.styleMask.contains(.fullScreen) {
+            window.toggleFullScreen(nil)
+        } else {
+            window.close()
+        }
+    }
+
+    func update<Content: View>(content: Content) {
+        guard mode == .fullscreen else { return }
+        guard let hostingView = window?.contentView as? NSHostingView<AnyView> else { return }
+        hostingView.rootView = AnyView(content)
+    }
+
+    func close() {
+        stopAutoHidingMenuBar()
+        window?.close()
+        window = nil
+        mode = .normal
+    }
+
+    func windowDidEnterFullScreen(_ notification: Notification) {
+        if mode == .fullscreen { startAutoHidingMenuBar() }
+    }
+
+    func windowDidExitFullScreen(_ notification: Notification) {
+        stopAutoHidingMenuBar()
+        if mode == .fullscreen { close() }
+    }
+
+    func windowDidFailToEnterFullScreen(_ window: NSWindow) {
+        stopAutoHidingMenuBar()
+        close()
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        stopAutoHidingMenuBar()
+        window = nil
+        mode = .normal
+        let callback = onClosed
+        onClosed = nil
+        callback?()
+    }
+}
+
+@MainActor
+private final class MacPictureInPictureSession {
+    static let shared = MacPictureInPictureSession()
+
+    private var sessions: [ObjectIdentifier: (PlaybackViewModel, MacPictureInPictureController)] = [:]
+
+    func keep(viewModel: PlaybackViewModel, pip: MacPictureInPictureController) {
+        let id = ObjectIdentifier(pip)
+        sessions[id] = (viewModel, pip)
+        pip.onEnded = { [weak self] in
+            guard let session = self?.sessions.removeValue(forKey: id) else { return }
+            session.0.stopForDisappear()
+            session.1.onEnded = nil
+        }
+    }
+}
+
+@MainActor
+private final class MacFloatingPlayerSession {
+    static let shared = MacFloatingPlayerSession()
+
+    private var sessions: [ObjectIdentifier: (PlaybackViewModel, MacPlayerWindowController)] = [:]
+
+    func keep(viewModel: PlaybackViewModel, controller: MacPlayerWindowController) {
+        let id = ObjectIdentifier(controller)
+        sessions[id] = (viewModel, controller)
+        controller.onClosed = { [weak self] in
+            guard let session = self?.sessions.removeValue(forKey: id) else { return }
+            session.0.stopForDisappear()
+        }
+    }
+}
+
+private struct MacCompactPlayerSurface: View {
+    @ObservedObject var engine: AetherEngine
+    let title: String
+    @ObservedObject var controller: MacPlayerWindowController
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            AetherPlayerSurface(engine: engine)
+            MacSubtitleOverlay(engine: engine)
+                .allowsHitTesting(false)
+
+            HStack(spacing: 14) {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .lineLimit(1)
+                Spacer()
+                Button(engine.state == .playing ? "Pauzeren" : "Afspelen",
+                       systemImage: engine.state == .playing ? "pause.fill" : "play.fill") {
+                    if engine.state == .playing { engine.pause() } else { engine.play() }
+                }
+                Button("Terug naar speler", systemImage: "arrow.down.right.and.arrow.up.left") {
+                    controller.close()
+                }
+            }
+            .buttonStyle(.borderless)
+            .padding(12)
+            .background(.black.opacity(0.8))
+        }
+        .foregroundStyle(.white)
+        .background(.black)
+    }
+}
+
 private struct MacPlayerSurface: View {
     @ObservedObject var engine: AetherEngine
     let title: String
@@ -97,6 +345,10 @@ private struct MacPlayerSurface: View {
     let nextEpisode: MediaItem?
     let resolvingNextEpisode: Bool
     let onPlayNextEpisode: (MediaItem) -> Void
+    @ObservedObject var pip: MacPictureInPictureController
+    @ObservedObject var fullscreen: MacPlayerWindowController
+    var isFullscreenPresentation = false
+    var onUserActivity: () -> Void = {}
 
     // Actieve/maximale gelijktijdige verbindingen van de Xtream-provider
     // waarmee deze IPTV-stream loopt (bv. "1/2") -- enkel voor IPTV, zie de
@@ -127,7 +379,6 @@ private struct MacPlayerSurface: View {
     @State private var countdownTask: Task<Void, Never>?
     @State private var countdownCancelled = false
     @State private var playbackRate: Float = 1
-    @StateObject private var pip = MacPictureInPictureController()
 
     @AppStorage(PlaybackSettingsDefaults.showSkipIntroButtonKey) private var showSkipIntro = true
     @AppStorage(PlaybackSettingsDefaults.autoSkipIntroKey) private var autoSkipIntro = false
@@ -142,9 +393,9 @@ private struct MacPlayerSurface: View {
 
     private var activeSkip: (String, IntroDBSegment)? {
         let time = engine.currentTime
-        if showSkipIntro, let segment = skipSegments.intro, segment.contains(time) { return ("Intro overslaan", segment) }
-        if showSkipRecap, let segment = skipSegments.recap, segment.contains(time) { return ("Samenvatting overslaan", segment) }
-        if showSkipCredits, let segment = skipSegments.credits, segment.contains(time) { return ("Aftiteling overslaan", segment) }
+        if showSkipIntro, let segment = skipSegments.intros.first(where: { $0.contains(time) }) { return ("Intro overslaan", segment) }
+        if showSkipRecap, let segment = skipSegments.recaps.first(where: { $0.contains(time) }) { return ("Samenvatting overslaan", segment) }
+        if showSkipCredits, let segment = skipSegments.creditsSegments.first(where: { $0.contains(time) }) { return ("Aftiteling overslaan", segment) }
         return nil
     }
 
@@ -155,8 +406,12 @@ private struct MacPlayerSurface: View {
     var body: some View {
         VStack(spacing: 0) {
             ZStack {
-                AetherPlayerSurface(engine: engine)
-                MacSubtitleOverlay(engine: engine).allowsHitTesting(false)
+                if !fullscreen.isPresented || isFullscreenPresentation {
+                    AetherPlayerSurface(engine: engine)
+                    MacSubtitleOverlay(engine: engine).allowsHitTesting(false)
+                } else {
+                    Color.black
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(.black)
@@ -186,8 +441,11 @@ private struct MacPlayerSurface: View {
                     }
                 }
 
-                HStack(spacing: 18) {
-                    Text(title).font(.headline).lineLimit(1)
+                HStack(spacing: 12) {
+                    Text(title)
+                        .font(.headline)
+                        .lineLimit(1)
+                        .frame(maxWidth: 180, alignment: .leading)
                     if source.kind == .liveTV {
                         IPTVLiveProviderStatusBadge(source: source, item: item)
                     }
@@ -254,8 +512,33 @@ private struct MacPlayerSurface: View {
                         .help("AirPlay")
 
                     if pip.isAvailable {
-                        Button("Beeld in beeld", systemImage: "pip") { pip.toggle() }
+                        Button(pip.isActive ? "Beeld in beeld stoppen" : "Beeld in beeld", systemImage: "pip") {
+                            pip.toggle()
+                        }
+                    } else {
+                        // macOS ondersteunt systeem-PiP niet voor softwarevideo;
+                        // een zwevend venster houdt dezelfde Aether-sessie zichtbaar.
+                        Button(
+                            fullscreen.mode == .floating ? "Beeld in beeld stoppen" : "Beeld in beeld",
+                            systemImage: "pip"
+                        ) {
+                            enterFloatingPlayer()
+                        }
                     }
+
+                    Button(
+                        isFullscreenPresentation ? "Volledig scherm sluiten" : "Volledig scherm",
+                        systemImage: isFullscreenPresentation
+                            ? "arrow.down.right.and.arrow.up.left"
+                            : "arrow.up.left.and.arrow.down.right"
+                    ) {
+                        if isFullscreenPresentation {
+                            fullscreen.exit()
+                        } else {
+                            enterFullscreen()
+                        }
+                    }
+                    .help(isFullscreenPresentation ? "Volledig scherm sluiten" : "Volledig scherm")
 
                     if let nextEpisode {
                         Button(
@@ -291,6 +574,11 @@ private struct MacPlayerSurface: View {
             .background(.black.opacity(0.92))
         }
         .foregroundStyle(.white)
+        .onContinuousHover { _ in onUserActivity() }
+        .onKeyPress { _ in
+            onUserActivity()
+            return .ignored
+        }
         .sheet(isPresented: $showOpenSubtitles) {
             OpenSubtitlesSearchView(item: item, engine: engine)
                 .frame(minWidth: 680, minHeight: 500)
@@ -298,14 +586,16 @@ private struct MacPlayerSurface: View {
         .task(id: item?.id) {
             skipSegments = await IntroDBClient.shared.segments(
                 tmdbID: item?.tmdbID,
+                imdbID: item?.imdbID,
                 season: item?.type == .series ? item?.seasonNumber : nil,
                 episode: item?.type == .series ? item?.episodeNumber : nil,
                 durationSeconds: canSeek ? engine.duration : nil
             )
         }
         .onChange(of: engine.currentTime) { _, time in
+            guard !fullscreen.isPresented || isFullscreenPresentation else { return }
             if autoSkipIntro, !autoSkippedIntro,
-               let intro = skipSegments.intro, let end = intro.end, intro.contains(time) {
+               let intro = skipSegments.intros.first(where: { $0.contains(time) }), let end = intro.end {
                 autoSkippedIntro = true
                 Task { await engine.seek(to: end) }
             }
@@ -315,6 +605,52 @@ private struct MacPlayerSurface: View {
         .onAppear { pip.attach(engine: engine) }
         .task { await loadConnectionStatus() }
         .onChange(of: engine.state) { _, _ in pip.attach(engine: engine) }
+        .onChange(of: fullscreen.isPresented) { _, isPresented in
+            if isPresented && !isFullscreenPresentation {
+                countdownTask?.cancel()
+                countdownTask = nil
+                countdownRemaining = nil
+            }
+        }
+        .onChange(of: nextEpisode) { _, _ in updateFullscreen() }
+        .onChange(of: resolvingNextEpisode) { _, _ in updateFullscreen() }
+    }
+
+    private func enterFullscreen() {
+        if fullscreen.mode == .floating { fullscreen.close() }
+        fullscreen.present(title: title, content: fullscreenContent)
+    }
+
+    private func enterFloatingPlayer() {
+        if fullscreen.mode == .floating {
+            fullscreen.close()
+            return
+        }
+        if fullscreen.mode == .fullscreen { fullscreen.close() }
+        fullscreen.presentFloating(
+            title: title,
+            content: MacCompactPlayerSurface(engine: engine, title: title, controller: fullscreen)
+        )
+    }
+
+    private func updateFullscreen() {
+        guard fullscreen.isPresented, !isFullscreenPresentation else { return }
+        fullscreen.update(content: fullscreenContent)
+    }
+
+    private var fullscreenContent: some View {
+        MacPlayerSurface(
+            engine: engine,
+            title: title,
+            item: item,
+            source: source,
+            nextEpisode: nextEpisode,
+            resolvingNextEpisode: resolvingNextEpisode,
+            onPlayNextEpisode: onPlayNextEpisode,
+            pip: pip,
+            fullscreen: fullscreen,
+            isFullscreenPresentation: true
+        )
     }
 
     private func startCountdownIfNeeded() {

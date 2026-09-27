@@ -12,6 +12,11 @@ struct TraktSeriesOverviewView: View {
     @State private var episodeError: String?
     @State private var retry = 0
 
+    // Lange seizoenen (soaps met honderden afleveringen) in stukken van 50
+    // knippen met chips ("1-50 / 51-100 / ...") i.p.v. één eindeloze grid.
+    @State private var selectedChunk = 0
+    private let chunkSize = 50
+
     var body: some View {
         ZStack {
             VeyraArtworkBackground(url: details?.backdropPath.flatMap {
@@ -58,8 +63,11 @@ struct TraktSeriesOverviewView: View {
                         } else if episodes.isEmpty {
                             Text("Geen afleveringen beschikbaar in dit seizoen.").foregroundStyle(.secondary)
                         } else {
+                            if episodeChunks.count > 1 {
+                                episodeChunkPicker
+                            }
                             LazyVGrid(columns: [GridItem(.adaptive(minimum: 350), spacing: 28)], spacing: 30) {
-                                ForEach(episodes.sorted { $0.episodeNumber < $1.episodeNumber }) { episode in
+                                ForEach(episodesInSelectedChunk) { episode in
                                     NavigationLink {
                                         EpisodeView(series: details, episode: episode)
                                     } label: {
@@ -83,6 +91,43 @@ struct TraktSeriesOverviewView: View {
             else { await loadSeason() }
         }
         .task(id: selectedSeason) { await loadSeason() }
+    }
+
+    // MARK: - Paginering
+
+    private var sortedEpisodes: [TMDBEpisode] {
+        episodes.sorted { $0.episodeNumber < $1.episodeNumber }
+    }
+
+    private var episodeChunks: [[TMDBEpisode]] {
+        stride(from: 0, to: sortedEpisodes.count, by: chunkSize).map {
+            Array(sortedEpisodes[$0..<min($0 + chunkSize, sortedEpisodes.count)])
+        }
+    }
+
+    private var episodesInSelectedChunk: [TMDBEpisode] {
+        guard episodeChunks.indices.contains(selectedChunk) else { return sortedEpisodes }
+        return episodeChunks[selectedChunk]
+    }
+
+    private func episodeChunkLabel(_ index: Int) -> String {
+        guard episodeChunks.indices.contains(index),
+              let first = episodeChunks[index].first, let last = episodeChunks[index].last
+        else { return "" }
+        return first.episodeNumber == last.episodeNumber
+            ? "\(first.episodeNumber)"
+            : "\(first.episodeNumber)-\(last.episodeNumber)"
+    }
+
+    private var episodeChunkPicker: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 16) {
+                ForEach(episodeChunks.indices, id: \.self) { index in
+                    Button(episodeChunkLabel(index)) { selectedChunk = index }
+                        .buttonStyle(VeyraFocusButtonStyle(primary: selectedChunk == index))
+                }
+            }.padding(.vertical, 4)
+        }
     }
 
     private var hasProgress: Bool {
@@ -128,6 +173,7 @@ struct TraktSeriesOverviewView: View {
         guard let details, let number = selectedSeason, let service = SeriesService() else { return }
         episodeError = nil
         episodes = []
+        selectedChunk = 0
         if let cached = cachedSeasons[number] { episodes = cached; loadingEpisodes = false; return }
         loadingEpisodes = true
         do {

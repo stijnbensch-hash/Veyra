@@ -6,8 +6,8 @@ struct ContentView: View {
     @State private var navigationRootID = UUID()
     @State private var bentoTitle: ContinueItem?
     @State private var bentoChannel: PlayableSource?
-    @State private var bentoFilm: IPTVVODItem?
-    @State private var bentoSeries: XtreamSeriesItem?
+    @State private var bentoFilm: IPTVHomeFilm?
+    @State private var bentoSeries: IPTVHomeSeries?
     @State private var bentoRelease: BentoTMDBTitle?
     @State private var bentoCatalog: BentoCatalog?
     @State private var sportQuery: SportChannelQuery?
@@ -62,7 +62,8 @@ struct ContentView: View {
                 PlayerView(source: film.playableSource)
             }
             .navigationDestination(item: $bentoSeries) { series in
-                IPTVSeriesDetailView(series: series)
+                IPTVSeriesDetailView(series: series.item, providerID: series.providerID,
+                                     providerName: series.providerName)
             }
             .navigationDestination(item: $bentoCatalog) { catalog in
                 VeyraBentoCatalogView(catalog: catalog, onOpen: { bentoRelease = $0 })

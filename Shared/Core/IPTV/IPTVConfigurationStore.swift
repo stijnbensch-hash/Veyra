@@ -1,14 +1,14 @@
 import Foundation
 import Security
 
-enum IPTVStoredConfiguration: Hashable {
+enum IPTVStoredConfiguration: Hashable, Sendable {
     case m3u(M3UConfiguration)
     case xtream(XtreamConfiguration)
 }
 
 // MARK: - Stored Provider
 
-struct IPTVStoredProvider: Identifiable, Hashable {
+struct IPTVStoredProvider: Identifiable, Hashable, Sendable {
     let id: UUID
     var configuration: IPTVStoredConfiguration
 
@@ -288,8 +288,10 @@ struct IPTVConfigurationStore {
             )
         )
 
-        state.activeProviderID =
-            provider.id
+        // Een extra provider mag de Live TV-keuze niet stilzwijgend wijzigen.
+        if state.activeProviderID == nil {
+            state.activeProviderID = provider.id
+        }
 
         try saveState(state)
 
@@ -803,8 +805,10 @@ private struct StoredConfigurationPayload:
     let displayName: String?
 
     let playlistURL: String?
+    let backupPlaylistURL: String?
 
     let serverURL: String?
+    let backupServerURL: String?
     let username: String?
     let password: String?
 
@@ -826,7 +830,13 @@ private struct StoredConfigurationPayload:
                     .playlistURL
                     .absoluteString
 
+            backupPlaylistURL =
+                configuration
+                    .backupPlaylistURL?
+                    .absoluteString
+
             serverURL = nil
+            backupServerURL = nil
             username = nil
             password = nil
 
@@ -839,10 +849,16 @@ private struct StoredConfigurationPayload:
                 configuration.displayName
 
             playlistURL = nil
+            backupPlaylistURL = nil
 
             serverURL =
                 configuration
                     .serverURL
+                    .absoluteString
+
+            backupServerURL =
+                configuration
+                    .backupServerURL?
                     .absoluteString
 
             username =
@@ -880,7 +896,9 @@ private struct StoredConfigurationPayload:
                     displayName:
                         resolvedDisplayName,
                     playlistURL:
-                        url
+                        url,
+                    backupPlaylistURL:
+                        backupPlaylistURL.flatMap { URL(string: $0) }
                 )
             )
 
@@ -908,7 +926,9 @@ private struct StoredConfigurationPayload:
                     username:
                         username,
                     password:
-                        password
+                        password,
+                    backupServerURL:
+                        backupServerURL.flatMap { URL(string: $0) }
                 )
             )
         }

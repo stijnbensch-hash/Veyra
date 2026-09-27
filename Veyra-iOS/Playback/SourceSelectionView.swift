@@ -1,12 +1,16 @@
 import SwiftUI
 
+@MainActor
 struct SourceSelectionView: View {
     let item: MediaItem
 
     @StateObject private var viewModel: SourceSelectionViewModel
     @ObservedObject private var traktStore = TraktStore.shared
+    @ObservedObject private var badgeStore = SourceBadgeStore.shared
     @State private var selectedSource: PlayableSource?
     @State private var selectedFilter: SourceFilter = .all
+    @State private var hoveredFilterID: String?
+    @State private var hoveredSourceID: UUID?
 
     // "Eerste bron automatisch selecteren" (Afspelen-instellingen).
     @AppStorage(PlaybackSettingsDefaults.autoSelectFirstSourceKey)
@@ -18,55 +22,30 @@ struct SourceSelectionView: View {
     }
 
     var body: some View {
-        ZStack {
-            VeyraColors.background.ignoresSafeArea()
+        GeometryReader { geometry in
+            let isWide = geometry.size.width >= 720
 
-            VStack(spacing: 0) {
-                sourceHeader
+            ZStack {
+                VeyraBackground()
 
-                if !viewModel.sources.isEmpty {
-                    filterBar
+                VStack(alignment: .leading, spacing: isWide ? 22 : 16) {
+                    sourceHeader(isWide: isWide)
+                    filterBar(isWide: isWide)
+                    sourceContent(isWide: isWide)
                 }
-
-                List {
-                    if viewModel.isLoadingAddons && viewModel.sources.isEmpty {
-                        HStack {
-                            ProgressView()
-                            Text("Bronnen zoeken…")
-                        }
-                    } else if filteredSources.isEmpty && viewModel.hasLoaded {
-                        ContentUnavailableView(
-                            emptyMessage,
-                            systemImage: "play.slash"
-                        )
-                    } else {
-                        ForEach(filteredSources) { resolved in
-                            Button {
-                                selectedSource = resolved.source
-                            } label: {
-                                sourceRow(resolved)
-                            }
-                            .buttonStyle(.plain)
-                            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
-                            .listRowSeparator(.hidden)
-                            .listRowBackground(Color.clear)
-                        }
-
-                        if viewModel.isLoadingIPTV {
-                            HStack {
-                                ProgressView()
-                                Text("IPTV-bronnen worden toegevoegd…")
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                }
-                .scrollContentBackground(.hidden)
+                .padding(.horizontal, isWide ? 32 : 16)
+                .padding(.top, isWide ? 26 : 14)
+                .padding(.bottom, 12)
+                .frame(maxWidth: 1280)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
         }
         .navigationTitle("Selecteer bron")
-        .navigationBarTitleDisplayMode(.inline)
+        .sourceSelectionInlineTitle()
         .task { await viewModel.loadSources() }
+        .onReceive(NotificationCenter.default.publisher(for: .iptvConfigurationDidChange)) { _ in
+            Task { await viewModel.loadSources() }
+        }
         .onChange(of: viewModel.hasLoaded) { _, hasLoaded in
             guard hasLoaded, autoSelectFirstSource, selectedSource == nil,
                   let first = viewModel.sources.first
@@ -89,18 +68,44 @@ struct SourceSelectionView: View {
         }
     }
 
-    private var sourceHeader: some View {
+    @ViewBuilder
+    private func sourceHeader(isWide: Bool) -> some View {
+        if isWide {
+            HStack(alignment: .center, spacing: 24) {
+                headerLabels(isWide: true)
+                Spacer(minLength: 16)
+                mediaLogo(isWide: true)
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 12) {
+                headerLabels(isWide: false)
+                mediaLogo(isWide: false)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+        }
+    }
+
+    private func headerLabels(isWide: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Selecteer bron")
+                .font(.system(size: isWide ? 38 : 30, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+            Text(mediaDescription)
+                .font(.system(size: isWide ? 16 : 14))
+                .foregroundStyle(.white.opacity(0.58))
+        }
+    }
+
+    private func mediaLogo(isWide: Bool) -> some View {
         VeyraClearLogo(
             item: item,
             fallbackTitle: item.title,
-            maxWidth: 300,
-            maxHeight: 80,
-            font: .system(size: 24, weight: .semibold, design: .rounded),
+            maxWidth: isWide ? 380 : 220,
+            maxHeight: isWide ? 92 : 58,
+            font: .system(size: isWide ? 28 : 22, weight: .semibold, design: .rounded),
             alignment: .trailing
         )
-        .frame(maxWidth: .infinity, minHeight: 80, alignment: .trailing)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
+        .frame(width: isWide ? 380 : 220, height: isWide ? 92 : 58, alignment: .trailing)
         .accessibilityLabel(item.title)
     }
 
@@ -128,12 +133,9 @@ struct SourceSelectionView: View {
     private var filters: [SourceFilter] {
         var result: [SourceFilter] = [.all]
 
-        // IPTV VOD beschikbaar bij films én series/afleveringen.
+        // De tvOS-filterbalk toont IPTV ook terwijl die bronnen nog laden.
         if item.type == .movie || item.type == .series {
-            let hasIPTV = viewModel.sources.contains { $0.source.kind == .iptvVOD }
-            if hasIPTV || viewModel.isLoadingIPTV {
-                result.append(.iptv)
-            }
+            result.append(.iptv)
         }
 
         var comboSeen = Set<String>()
@@ -195,70 +197,95 @@ struct SourceSelectionView: View {
         }
     }
 
-    private var filterBar: some View {
+    private func filterBar(isWide: Bool) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
+            HStack(spacing: isWide ? 12 : 8) {
                 ForEach(filters, id: \.id) { filter in
-                    filterChip(filter)
+                    filterChip(filter, isWide: isWide)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            .padding(.horizontal, 2)
+            .padding(.vertical, 6)
         }
-        .background(VeyraColors.background)
+        .scrollClipDisabled()
     }
 
     /// Paars/indigo tint voor filterknoppen van bronnen die via VeyraHub
     /// binnenkomen — duidelijk anders dan het gewone cyaan, zodat zo'n knop
     /// meteen herkenbaar is als "komt van de mediaserver", ook naast een
     /// gelijknamige, rechtstreekse addon-knop.
-    private static let hubTint = Color(red: 0.62, green: 0.42, blue: 1.0)
+    private static let hubFrameResting = LinearGradient(
+        colors: [Color(red: 0.62, green: 0.42, blue: 1).opacity(0.55),
+                 .white.opacity(0.10), Color(red: 0.38, green: 0.2, blue: 0.85).opacity(0.4)],
+        startPoint: .leading, endPoint: .trailing
+    )
+    private static let hubFrameFill = LinearGradient(
+        colors: [Color(red: 0.62, green: 0.42, blue: 1).opacity(0.30),
+                 Color(red: 0.62, green: 0.42, blue: 1).opacity(0.08),
+                 Color(red: 0.38, green: 0.2, blue: 0.85).opacity(0.22)],
+        startPoint: .topLeading, endPoint: .bottomTrailing
+    )
+    private static let hubFrameActive = LinearGradient(
+        colors: [.white, Color(red: 0.72, green: 0.55, blue: 1),
+                 Color(red: 0.46, green: 0.26, blue: 0.95).opacity(0.85)],
+        startPoint: .leading, endPoint: .trailing
+    )
 
-    private func filterChip(_ filter: SourceFilter) -> some View {
+    private func filterChip(_ filter: SourceFilter, isWide: Bool) -> some View {
         let isSelected = selectedFilter == filter
+        let isHighlighted = isSelected || hoveredFilterID == filter.id
 
         let isHubFilter: Bool = {
             if case .origin(_, let isHub) = filter { return isHub }
             return false
         }()
 
-        let tint = isHubFilter ? Self.hubTint : VeyraColors.cyan
-
         return Button {
             selectedFilter = filter
         } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 if isHubFilter {
                     Image(systemName: "server.rack")
-                        .font(.caption.weight(.semibold))
+                        .font(.system(size: isWide ? 15 : 13, weight: .semibold))
                 }
 
-                VStack(alignment: .leading, spacing: 0) {
+                VStack(spacing: 2) {
                     Text(filterTitle(filter))
-                        .font(.subheadline.weight(isSelected ? .semibold : .medium))
+                        .font(.system(size: isWide ? 18 : 15,
+                                      weight: isSelected ? .bold : .semibold))
 
                     if isHubFilter {
                         Text("VEYRAHUB")
-                            .font(.system(size: 9, weight: .bold))
-                            .tracking(1)
-                            .opacity(0.75)
+                            .font(.system(size: isWide ? 10 : 9, weight: .bold))
+                            .tracking(1.3)
+                            .opacity(0.8)
                     }
                 }
             }
-            .foregroundStyle(isSelected ? Color.black : tint)
-            .padding(.horizontal, 16)
-            .padding(.vertical, isHubFilter ? 6 : 8)
+            .foregroundStyle(.white)
+            .padding(.horizontal, isWide ? 22 : 15)
+            .padding(.vertical, isHubFilter ? (isWide ? 9 : 7) : (isWide ? 12 : 10))
             .background(
-                Capsule()
-                    .fill(isSelected ? tint : tint.opacity(0.12))
+                isHighlighted
+                    ? (isHubFilter ? AnyShapeStyle(Self.hubFrameFill) : AnyShapeStyle(VeyraFrame.fill))
+                    : AnyShapeStyle(Color.clear),
+                in: Capsule()
             )
-            .overlay {
-                if isHubFilter {
-                    Capsule().strokeBorder(tint.opacity(isSelected ? 0 : 0.5), lineWidth: 1)
-                }
-            }
+            .overlay(
+                Capsule().strokeBorder(
+                    isHubFilter
+                        ? AnyShapeStyle(isHighlighted ? Self.hubFrameActive : Self.hubFrameResting)
+                        : AnyShapeStyle(isHighlighted ? VeyraFrame.active : VeyraFrame.resting),
+                    lineWidth: isHighlighted ? 2 : 1.5
+                )
+            )
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+        .onHover { hovering in
+            if hovering { hoveredFilterID = filter.id }
+            else if hoveredFilterID == filter.id { hoveredFilterID = nil }
+        }
     }
 
     private func filterTitle(_ filter: SourceFilter) -> String {
@@ -269,68 +296,144 @@ struct SourceSelectionView: View {
         }
     }
 
+    // MARK: - Content
+
+    @ViewBuilder
+    private func sourceContent(isWide: Bool) -> some View {
+        if viewModel.sources.isEmpty && (viewModel.isLoadingAddons || viewModel.isLoadingIPTV) {
+            HStack(spacing: 12) {
+                ProgressView()
+                Text(viewModel.isLoadingAddons ? "Beschikbare bronnen zoeken…" : "IPTV-bronnen zoeken…")
+                    .foregroundStyle(.white.opacity(0.72))
+            }
+            .font(.system(size: isWide ? 18 : 15))
+            .padding(.top, 12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        } else if filteredSources.isEmpty {
+            VStack(alignment: .leading, spacing: 16) {
+                if selectedFilter == .iptv && viewModel.isLoadingIPTV {
+                    HStack(spacing: 12) {
+                        ProgressView()
+                        Text("IPTV-bronnen worden gezocht…")
+                    }
+                } else {
+                    Text(emptyMessage)
+                }
+
+                if viewModel.hasLoaded {
+                    Button("Opnieuw zoeken", systemImage: "arrow.clockwise") {
+                        Task { await viewModel.loadSources() }
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(VeyraColors.cyan)
+                }
+            }
+            .font(.system(size: isWide ? 19 : 16, weight: .medium))
+            .foregroundStyle(.white.opacity(0.78))
+            .padding(.top, 12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        } else {
+            ScrollView(.vertical, showsIndicators: false) {
+                LazyVStack(alignment: .leading, spacing: isWide ? 16 : 12) {
+                    ForEach(filteredSources) { resolved in
+                        sourceRow(resolved, isWide: isWide)
+                    }
+
+                    if selectedFilter == .all && viewModel.isLoadingIPTV {
+                        HStack(spacing: 10) {
+                            ProgressView().controlSize(.small)
+                            Text("IPTV-bronnen worden nog toegevoegd…")
+                                .font(.system(size: isWide ? 15 : 13))
+                                .foregroundStyle(.white.opacity(0.55))
+                        }
+                        .padding(.vertical, 10)
+                    }
+                }
+                .padding(.vertical, 8)
+                .padding(.horizontal, 3)
+            }
+        }
+    }
+
     // MARK: - Row
 
-    private func sourceRow(_ resolved: ResolvedSource) -> some View {
-        HStack(alignment: .top, spacing: 14) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(VeyraColors.cyan.opacity(0.08))
-                Image(systemName: sourceIconName(resolved.source))
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(VeyraColors.cyan)
-            }
-            .frame(width: 44, height: 44)
+    private func sourceRow(_ resolved: ResolvedSource, isWide: Bool) -> some View {
+        let isHovered = hoveredSourceID == resolved.source.id
+        let badges = sourceBadges(for: resolved)
 
-            VStack(alignment: .leading, spacing: 5) {
-                HStack(spacing: 8) {
+        return Button {
+            selectedSource = resolved.source
+        } label: {
+            HStack(alignment: .top, spacing: isWide ? 20 : 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 13, style: .continuous)
+                        .fill(VeyraColors.cyan.opacity(0.08))
+                    Image(systemName: sourceIconName(resolved.source))
+                        .font(.system(size: isWide ? 28 : 21, weight: .medium))
+                        .foregroundStyle(.cyan)
+                }
+                .frame(width: isWide ? 64 : 46, height: isWide ? 64 : 46)
+
+                VStack(alignment: .leading, spacing: isWide ? 9 : 7) {
                     Text(resolved.source.name)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
+                        .font(.system(size: isWide ? 22 : 17, weight: .semibold))
+                        .foregroundStyle(.white)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    ForEach(sourceBadges(for: resolved)) { badge in
-                        sourceBadgeChip(badge)
+                    if let description = resolved.source.description?
+                        .trimmingCharacters(in: .whitespacesAndNewlines), !description.isEmpty {
+                        Text(description)
+                            .font(.system(size: isWide ? 16 : 13))
+                            .foregroundStyle(.white.opacity(0.72))
+                            .lineSpacing(isWide ? 4 : 2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Text(sourceFooter(resolved))
+                        .font(.system(size: isWide ? 13 : 11, weight: .semibold))
+                        .foregroundStyle(.cyan.opacity(0.85))
+
+                    if !badges.isEmpty {
+                        SourceBadgeFlowLayout(spacing: isWide ? 9 : 6) {
+                            ForEach(badges) { badge in
+                                sourceBadgeChip(badge, isWide: isWide)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 3)
                     }
                 }
 
-                // Geen regelbeperking — anders knipt SwiftUI een tweede/derde
-                // regel (kwaliteit, codec, HDR, grootte…) halverwege af met
-                // een "…", wat er rommelig uitziet. tvOS toont deze tekst ook
-                // altijd volledig.
-                if let description = resolved.source.description?.trimmingCharacters(in: .whitespacesAndNewlines), !description.isEmpty {
-                    Text(description)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineSpacing(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                Spacer(minLength: 4)
 
-                Text(resolved.source.kind == .iptvVOD ? "IPTV VOD" : resolved.originName)
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(VeyraColors.cyan)
+                Image(systemName: "play.fill")
+                    .font(.system(size: isWide ? 21 : 16, weight: .semibold))
+                    .foregroundStyle(isHovered ? .white : .cyan)
+                    .padding(.top, 9)
             }
-
-            Spacer(minLength: 12)
-
-            Image(systemName: "play.fill")
-                .font(.subheadline)
-                .foregroundStyle(VeyraColors.cyan)
-                .padding(.top, 10)
+            .padding(.horizontal, isWide ? 22 : 13)
+            .padding(.vertical, isWide ? 21 : 14)
+            .frame(maxWidth: .infinity, minHeight: isWide ? 110 : 94, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(isHovered ? Color.cyan.opacity(0.14) : Color.white.opacity(0.035))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(isHovered ? Color.cyan : Color.cyan.opacity(0.10),
+                                  lineWidth: isHovered ? 2 : 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
-        .padding(14)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.white.opacity(0.045))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(VeyraColors.cyan.opacity(0.10), lineWidth: 1)
-        )
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            if hovering { hoveredSourceID = resolved.source.id }
+            else if hoveredSourceID == resolved.source.id { hoveredSourceID = nil }
+        }
     }
 
     private func sourceBadges(for resolved: ResolvedSource) -> [SourceBadge] {
-        SourceBadgeStore.shared.badges(matching: [
+        badgeStore.badges(matching: [
             resolved.originName,
             resolved.source.providerName ?? "",
             resolved.source.name,
@@ -342,38 +445,65 @@ struct SourceSelectionView: View {
     /// zelf, niet alleen bij de tekst-terugval — een geladen afbeelding komt
     /// dus ook binnenin dezelfde pil te zitten, net als in het bronpakket
     /// bedoeld is (`tagStyle`: "filled and bordered" / "bordered").
-    private func sourceBadgeChip(_ badge: SourceBadge) -> some View {
-        sourceBadgeChipContent(badge)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
+    private func sourceBadgeChip(_ badge: SourceBadge, isWide: Bool) -> some View {
+        sourceBadgeChipContent(badge, isWide: isWide)
+            .padding(.horizontal, isWide ? 11 : 8)
+            .padding(.vertical, isWide ? 5 : 4)
             .background(
                 Capsule().fill(Color(sourceBadgeHex: badge.tagColor) ?? VeyraColors.cyan.opacity(0.6))
             )
             .overlay(
-                Capsule().strokeBorder(Color(sourceBadgeHex: badge.borderColor) ?? .clear, lineWidth: 1)
+                Capsule().strokeBorder(Color(sourceBadgeHex: badge.borderColor) ?? .clear, lineWidth: 1.3)
             )
+            .fixedSize(horizontal: true, vertical: false)
     }
 
     @ViewBuilder
-    private func sourceBadgeChipContent(_ badge: SourceBadge) -> some View {
+    private func sourceBadgeChipContent(_ badge: SourceBadge, isWide: Bool) -> some View {
         if let imageURL = badge.imageURL {
             AsyncImage(url: imageURL) { phase in
                 if let image = phase.image {
                     image.resizable().scaledToFit()
                 } else {
-                    sourceBadgeFallback(badge)
+                    sourceBadgeFallback(badge, isWide: isWide)
                 }
             }
-            .frame(height: 10)
+            .frame(height: isWide ? 22 : 17)
         } else {
-            sourceBadgeFallback(badge)
+            sourceBadgeFallback(badge, isWide: isWide)
         }
     }
 
-    private func sourceBadgeFallback(_ badge: SourceBadge) -> some View {
+    private func sourceBadgeFallback(_ badge: SourceBadge, isWide: Bool) -> some View {
         Text(badge.name)
-            .font(.system(size: 10, weight: .bold))
+            .font(.system(size: isWide ? 17 : 12, weight: .bold))
             .foregroundStyle(Color(sourceBadgeHex: badge.textColor) ?? .white)
+    }
+
+    private var mediaDescription: String {
+        switch item.type {
+        case .movie:
+            return "Beschikbare filmbronnen"
+        case .series:
+            if let season = item.seasonNumber, let episode = item.episodeNumber {
+                return "Seizoen \(season) · Aflevering \(episode)"
+            }
+            return "Beschikbare seriebronnen"
+        case .liveTV, .iptvSeries:
+            return "Beschikbare livebron"
+        }
+    }
+
+    private func sourceFooter(_ resolved: ResolvedSource) -> String {
+        if resolved.source.kind == .iptvVOD {
+            if let providerName = resolved.source.providerName,
+               !providerName.isEmpty {
+                return "IPTV VOD · \(providerName)"
+            }
+            return "IPTV VOD"
+        }
+        if resolved.isFromHub { return "\(resolved.originName) · via VeyraHub" }
+        return resolved.originName
     }
 
     private func sourceIconName(_ source: PlayableSource) -> String {
@@ -384,5 +514,64 @@ struct SourceSelectionView: View {
         case .liveTV: return "antenna.radiowaves.left.and.right"
         case .direct: return "play.rectangle.fill"
         }
+    }
+}
+
+/// De tvOS-badges staan op een eigen regel; op smalle schermen lopen ze door
+/// naar een volgende regel zodat alle passende badges zichtbaar blijven.
+private struct SourceBadgeFlowLayout: Layout {
+    let spacing: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let proposedWidth = proposal.width ?? .greatestFiniteMagnitude
+        let availableWidth = proposedWidth.isFinite ? max(0, proposedWidth) : .greatestFiniteMagnitude
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowHeight: CGFloat = 0
+        var widest: CGFloat = 0
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x > 0 && x + size.width > availableWidth {
+                y += rowHeight + spacing
+                x = 0
+                rowHeight = 0
+            }
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+            widest = max(widest, x - spacing)
+        }
+
+        return CGSize(width: proposal.width ?? widest, height: y + rowHeight)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowHeight: CGFloat = 0
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x > 0 && x + size.width > bounds.width {
+                y += rowHeight + spacing
+                x = 0
+                rowHeight = 0
+            }
+            subview.place(at: CGPoint(x: bounds.minX + x, y: bounds.minY + y),
+                          proposal: ProposedViewSize(size))
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+        }
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func sourceSelectionInlineTitle() -> some View {
+        #if os(iOS)
+        self.navigationBarTitleDisplayMode(.inline)
+        #else
+        self
+        #endif
     }
 }

@@ -58,6 +58,16 @@ struct LiveTVFoldersListView: View {
         }
         #else
         foldersList
+            #if os(macOS)
+            // Zonder expliciete maat sizet macOS z'n `.sheet` naar de
+            // "ideale" grootte van de inhoud -- en een `List` met maar één
+            // rij meldt daarvoor een heel klein formaat, vandaar het krappe,
+            // vreemd zwevende kadertje uit het bugreport. Zelfde patroon als
+            // `MacPlayerView`'s "Open Subtitles"-sheet: een expliciete
+            // `.frame(minWidth:minHeight:)` + effen achtergrond.
+            .frame(minWidth: 480, minHeight: 420)
+            .background(VeyraColors.background)
+            #endif
         #endif
     }
 

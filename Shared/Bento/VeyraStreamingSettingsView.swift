@@ -9,6 +9,10 @@ import PhotosUI
 struct VeyraStreamingSettingsView: View {
     @State private var entries: [BentoStreamingEntry] = []
     @State private var loading = true
+    // Zelfde breed woordmerk + merkkleur als Home (VeyraBentoStreamingContent), zodat het logo
+    // hier niet meer het kale/vierkante TMDB-providericoon toont maar de herkenbare bannerversie --
+    // opgezocht via VeyraCatalogSource().providers() en per dienst-id bijgehouden.
+    @State private var catalogs: [String: BentoCatalog] = [:]
 
     var body: some View {
         Form {
@@ -31,7 +35,7 @@ struct VeyraStreamingSettingsView: View {
                             .foregroundStyle(.secondary)
                         #endif
                         NavigationLink {
-                            VeyraStreamingEditorView(entryID: entry.id, entries: $entries)
+                            VeyraStreamingEditorView(entryID: entry.id, entries: $entries, catalogs: catalogs)
                         } label: {
                             row(entry)
                         }
@@ -87,7 +91,7 @@ struct VeyraStreamingSettingsView: View {
         HStack(spacing: 14) {
             logo(entry)
                 .frame(width: 84, height: 48)
-                .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.name)
                 Text(entry.isAddon ? "Addon-catalogus" : "Streamingdienst")
@@ -108,10 +112,17 @@ struct VeyraStreamingSettingsView: View {
 
     @ViewBuilder
     private func logo(_ entry: BentoStreamingEntry) -> some View {
-        let url = VeyraStreamingStore.logoURL(for: entry)
-            ?? entry.logoPath.flatMap { URL(string: "https://image.tmdb.org/t/p/w154\($0)") }
-        AsyncImage(url: url) { phase in
-            if let image = phase.image { image.resizable().scaledToFit().padding(4) } else { Color.clear }
+        if let catalog = catalogs[entry.id] {
+            VeyraBentoStreamingContent(name: catalog.name, iconURL: catalog.imageURL, wideURL: catalog.wideURL,
+                                       brand: catalog.brand, compact: true, customURL: catalog.customLogoURL)
+        } else {
+            // Terugval zolang het brede woordmerk nog niet is opgehaald (of onbekend is).
+            let url = VeyraStreamingStore.logoURL(for: entry)
+                ?? entry.logoPath.flatMap { URL(string: "https://image.tmdb.org/t/p/w154\($0)") }
+            AsyncImage(url: url) { phase in
+                if let image = phase.image { image.resizable().scaledToFit().padding(4) } else { Color.clear }
+            }
+            .background(Color.white.opacity(0.08))
         }
     }
 
@@ -123,6 +134,10 @@ struct VeyraStreamingSettingsView: View {
             entries = await VeyraCatalogSource().defaultStreamingEntries()
         }
         loading = false
+        // Zelfde bannerlogo's als Home ophalen (netwerk-woordmerk + merkkleur) -- ná het tonen van
+        // de lijst zelf, zodat de namen meteen staan en de logo's stilletjes bijkomen.
+        let list = await VeyraCatalogSource().providers()
+        catalogs = Dictionary(uniqueKeysWithValues: list.map { ($0.id, $0) })
     }
 
     private func reset() {
@@ -304,6 +319,9 @@ struct VeyraStreamingAddonPickerView: View {
 struct VeyraStreamingEditorView: View {
     let entryID: String
     @Binding var entries: [BentoStreamingEntry]
+    /// Zelfde breed-woordmerk-opzoeking als de lijst hierboven (VeyraStreamingSettingsView) --
+    /// meegegeven i.p.v. hier opnieuw op te zoeken, zodat de preview meteen de juiste banner toont.
+    var catalogs: [String: BentoCatalog] = [:]
 
     @Environment(\.dismiss) private var dismiss
     @State private var urlText = ""
@@ -345,7 +363,7 @@ struct VeyraStreamingEditorView: View {
                 } header: {
                     Text("Logo")
                 } footer: {
-                    Text("Een https-adres wordt ook op je andere apparaten gebruikt; een foto blijft op dit apparaat.")
+                    Text("Een https-adres wordt ook op je andere apparaten gebruikt; een foto blijft op dit apparaat. Gebruik een liggende afbeelding van ongeveer 500×280 px (verhouding 16:9) met een transparante achtergrond (PNG) voor het beste resultaat -- een vierkant of staand logo wordt kleiner weergegeven zodat het past.")
                 }
 
                 Section {
@@ -363,10 +381,21 @@ struct VeyraStreamingEditorView: View {
 
     @ViewBuilder
     private func preview(_ entry: BentoStreamingEntry) -> some View {
-        let url = VeyraStreamingStore.logoURL(for: entry)
-            ?? entry.logoPath.flatMap { URL(string: "https://image.tmdb.org/t/p/w154\($0)") }
-        AsyncImage(url: url) { phase in
-            if let image = phase.image { image.resizable().scaledToFit().padding(14) } else { Text(entry.name).font(.title3.bold()) }
+        // Eigen logo (indien ingesteld) telt altijd het zwaarst -- ook als het opgehaalde
+        // woordmerk-logo (`catalogs`) nog een oud logo bevat van vóór deze wijziging.
+        let custom = VeyraStreamingStore.logoURL(for: entry)
+        if let custom {
+            AsyncImage(url: custom) { phase in
+                if let image = phase.image { image.resizable().scaledToFit().padding(14) } else { Text(entry.name).font(.title3.bold()) }
+            }
+        } else if let catalog = catalogs[entry.id] {
+            VeyraBentoStreamingContent(name: catalog.name, iconURL: catalog.imageURL, wideURL: catalog.wideURL,
+                                       brand: catalog.brand, customURL: nil)
+        } else {
+            let url = entry.logoPath.flatMap { URL(string: "https://image.tmdb.org/t/p/w154\($0)") }
+            AsyncImage(url: url) { phase in
+                if let image = phase.image { image.resizable().scaledToFit().padding(14) } else { Text(entry.name).font(.title3.bold()) }
+            }
         }
     }
 

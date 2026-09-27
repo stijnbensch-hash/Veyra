@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct IPTVVODManagementView: View {
+struct IPTVSeriesManagementView: View {
     var providerID: UUID? = nil
 
     @State private var configuration:
@@ -24,12 +24,12 @@ struct IPTVVODManagementView: View {
     @State private var selectedCategoryID:
         String?
 
-    @State private var showTitles =
+    @State private var showSeries =
         false
 
     @FocusState
     private var focusedControl:
-        VODManagementFocus?
+        SeriesManagementFocus?
 
     private let configurationStore =
         IPTVConfigurationStore()
@@ -83,13 +83,13 @@ struct IPTVVODManagementView: View {
             reloadPreferences()
         }
         .navigationDestination(
-            isPresented: $showTitles
+            isPresented: $showSeries
         ) {
             if let configuration,
                let category =
                 selectedCategory
             {
-                IPTVVODItemManagementView(
+                IPTVSeriesItemManagementView(
                     configuration:
                         configuration,
                     category:
@@ -114,12 +114,12 @@ struct IPTVVODManagementView: View {
                 alignment: .leading,
                 spacing: 8
             ) {
-                Text("VOD beheren")
+                Text("Series beheren")
                     .font(.system(size: 48, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
 
                 Text(
-                    "CATEGORIEËN & TITELS"
+                    "CATEGORIEËN & SERIES"
                 )
                 .font(.caption)
                 .tracking(3)
@@ -136,7 +136,7 @@ struct IPTVVODManagementView: View {
                 Image(systemName: "arrow.clockwise")
                     .frame(width: 48, height: 48)
             }
-            .accessibilityLabel("Categorieën en titels nu vernieuwen")
+            .accessibilityLabel("Categorieën en series nu vernieuwen")
         }
     }
 
@@ -153,7 +153,7 @@ struct IPTVVODManagementView: View {
                 systemImage:
                     "eye.fill"
             ) {
-                setAllVODVisible()
+                setAllSeriesVisible()
             }
 
             bulkControl(
@@ -163,14 +163,14 @@ struct IPTVVODManagementView: View {
                 systemImage:
                     "eye.slash.fill"
             ) {
-                setAllVODHidden()
+                setAllSeriesHidden()
             }
         }
         .focusSection()
     }
 
     private func bulkControl(
-        focus: VODManagementFocus,
+        focus: SeriesManagementFocus,
         title: String,
         systemImage: String,
         action: @escaping () -> Void
@@ -239,7 +239,7 @@ struct IPTVVODManagementView: View {
     private var content: some View {
         if isLoading {
             ProgressView(
-                "VOD laden…"
+                "Series laden…"
             )
             .font(.title3)
 
@@ -249,7 +249,7 @@ struct IPTVVODManagementView: View {
                 spacing: 16
             ) {
                 Text(
-                    "VOD kon niet worden geladen"
+                    "Series konden niet worden geladen"
                 )
                 .font(.title2)
 
@@ -263,7 +263,7 @@ struct IPTVVODManagementView: View {
 
         } else if categories.isEmpty {
             Text(
-                "Geen VOD-categorieën gevonden."
+                "Geen series-categorieën gevonden."
             )
             .foregroundStyle(
                 .secondary
@@ -355,7 +355,7 @@ struct IPTVVODManagementView: View {
     ) -> some View {
         let visible =
             preferences
-                .isVODCategoryVisible(
+                .isSeriesCategoryVisible(
                     category.id
                 )
 
@@ -365,7 +365,7 @@ struct IPTVVODManagementView: View {
                 visible: visible
             )
 
-            categoryTitlesControl(
+            categorySeriesControl(
                 category
             )
         }
@@ -382,7 +382,7 @@ struct IPTVVODManagementView: View {
         visible: Bool
     ) -> some View {
         let focus =
-            VODManagementFocus
+            SeriesManagementFocus
                 .category(
                     category.id
                 )
@@ -407,7 +407,7 @@ struct IPTVVODManagementView: View {
                         .white
                     )
 
-                Text("VOD-lijst")
+                Text("Series-lijst")
                     .font(.body)
                     .foregroundStyle(
                         .secondary
@@ -489,12 +489,12 @@ struct IPTVVODManagementView: View {
         }
     }
 
-    private func categoryTitlesControl(
+    private func categorySeriesControl(
         _ category: IPTVCategory
     ) -> some View {
         let focus =
-            VODManagementFocus
-                .titles(
+            SeriesManagementFocus
+                .series(
                     category.id
                 )
 
@@ -505,7 +505,7 @@ struct IPTVVODManagementView: View {
         return VStack(spacing: 8) {
             Image(
                 systemName:
-                    "film.stack"
+                    "tv.badge.wifi"
             )
             .font(
                 .system(
@@ -514,7 +514,7 @@ struct IPTVVODManagementView: View {
                 )
             )
 
-            Text("TITELS")
+            Text("SERIES")
                 .font(
                     .system(
                         size: 15,
@@ -566,7 +566,7 @@ struct IPTVVODManagementView: View {
             selectedCategoryID =
                 category.id
 
-            showTitles =
+            showSeries =
                 true
         }
     }
@@ -601,7 +601,7 @@ struct IPTVVODManagementView: View {
         var updated =
             preferences
 
-        updated.setVODCategory(
+        updated.setSeriesCategory(
             category.id,
             visible: visible
         )
@@ -613,7 +613,7 @@ struct IPTVVODManagementView: View {
         )
     }
 
-    private func setAllVODVisible() {
+    private func setAllSeriesVisible() {
         guard
             let configuration
         else {
@@ -624,11 +624,11 @@ struct IPTVVODManagementView: View {
             preferences
 
         updated
-            .hiddenVODCategoryIDs
+            .hiddenSeriesCategoryIDs
             .removeAll()
 
         updated
-            .hiddenVODItemIDs
+            .hiddenSeriesItemIDs
             .removeAll()
 
         savePreferences(
@@ -638,10 +638,10 @@ struct IPTVVODManagementView: View {
         )
 
         confirmationMessage =
-            "Alle VOD-categorieën en titels zijn zichtbaar."
+            "Alle series-categorieën en series zijn zichtbaar."
     }
 
-    private func setAllVODHidden() {
+    private func setAllSeriesHidden() {
         guard
             let configuration
         else {
@@ -651,13 +651,13 @@ struct IPTVVODManagementView: View {
         var updated =
             preferences
 
-        updated.hiddenVODCategoryIDs =
+        updated.hiddenSeriesCategoryIDs =
             Set(
                 categories.map(\.id)
             )
 
         updated
-            .hiddenVODItemIDs
+            .hiddenSeriesItemIDs
             .removeAll()
 
         savePreferences(
@@ -667,7 +667,7 @@ struct IPTVVODManagementView: View {
         )
 
         confirmationMessage =
-            "Alle VOD-categorieën zijn verborgen."
+            "Alle series-categorieën zijn verborgen."
     }
 
     private func savePreferences(
@@ -742,7 +742,7 @@ struct IPTVVODManagementView: View {
                 categories = []
 
                 errorMessage =
-                    "VOD-beheer is alleen beschikbaar voor Xtream."
+                    "Series-beheer is alleen beschikbaar voor Xtream."
 
                 isLoading = false
                 return
@@ -750,7 +750,7 @@ struct IPTVVODManagementView: View {
 
             categories =
                 try await service
-                    .loadXtreamVODCategories(
+                    .loadXtreamSeriesCategories(
                         configuration:
                             xtreamConfiguration
                     )
@@ -782,19 +782,19 @@ struct IPTVVODManagementView: View {
 
 // MARK: - Focus
 
-private enum VODManagementFocus:
+private enum SeriesManagementFocus:
     Hashable
 {
     case showAll
     case hideAll
     case retry
     case category(String)
-    case titles(String)
+    case series(String)
 }
 
-// MARK: - VOD items
+// MARK: - Series items
 
-private struct IPTVVODItemManagementView:
+private struct IPTVSeriesItemManagementView:
     View
 {
     let configuration:
@@ -804,7 +804,7 @@ private struct IPTVVODItemManagementView:
         IPTVCategory
 
     @State private var items:
-        [IPTVVODItem] = []
+        [XtreamSeriesItem] = []
 
     @State private var preferences =
         IPTVProviderPreferences()
@@ -815,15 +815,9 @@ private struct IPTVVODItemManagementView:
     @State private var errorMessage:
         String?
 
-    @State private var selectedVODItem:
-        IPTVVODItem?
-
-    @State private var showPlayer =
-        false
-
     @FocusState
     private var focusedControl:
-        VODItemFocus?
+        SeriesItemFocus?
 
     private let service =
         IPTVService()
@@ -851,17 +845,6 @@ private struct IPTVVODItemManagementView:
         .task {
             await loadItems()
         }
-        .navigationDestination(
-            isPresented: $showPlayer
-        ) {
-            if let selectedVODItem {
-                PlayerView(
-                    source:
-                        selectedVODItem
-                            .playableSource
-                )
-            }
-        }
     }
 
     private var background:
@@ -881,7 +864,7 @@ private struct IPTVVODItemManagementView:
                     .font(.system(size: 46, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
 
-                Text("VOD TITELS")
+                Text("SERIES")
                     .font(.caption)
                     .tracking(3)
                     .foregroundStyle(
@@ -897,7 +880,7 @@ private struct IPTVVODItemManagementView:
                 Image(systemName: "arrow.clockwise")
                     .frame(width: 48, height: 48)
             }
-            .accessibilityLabel("Titels nu vernieuwen")
+            .accessibilityLabel("Series nu vernieuwen")
         }
     }
 
@@ -905,7 +888,7 @@ private struct IPTVVODItemManagementView:
     private var content: some View {
         if isLoading {
             ProgressView(
-                "VOD-titels laden…"
+                "Series laden…"
             )
 
         } else if let errorMessage {
@@ -914,7 +897,7 @@ private struct IPTVVODItemManagementView:
                 spacing: 16
             ) {
                 Text(
-                    "VOD-titels konden niet worden geladen"
+                    "Series konden niet worden geladen"
                 )
                 .font(.title2)
 
@@ -926,7 +909,7 @@ private struct IPTVVODItemManagementView:
 
         } else if items.isEmpty {
             Text(
-                "Geen VOD-titels gevonden."
+                "Geen series gevonden."
             )
             .foregroundStyle(
                 .secondary
@@ -954,22 +937,18 @@ private struct IPTVVODItemManagementView:
     }
 
     private func itemRow(
-        _ item: IPTVVODItem
+        _ item: XtreamSeriesItem
     ) -> some View {
         let visible =
             preferences
-                .isVODItemVisible(
-                    item.id
+                .isSeriesItemVisible(
+                    String(item.id)
                 )
 
-        return HStack(spacing: 14) {
-            visibilityControl(
-                item,
-                visible: visible
-            )
-
-            playControl(item)
-        }
+        return visibilityControl(
+            item,
+            visible: visible
+        )
         .frame(maxWidth: 1000)
         .opacity(
             visible
@@ -979,11 +958,11 @@ private struct IPTVVODItemManagementView:
     }
 
     private func visibilityControl(
-        _ item: IPTVVODItem,
+        _ item: XtreamSeriesItem,
         visible: Bool
     ) -> some View {
         let focus =
-            VODItemFocus
+            SeriesItemFocus
                 .visibility(
                     item.id
                 )
@@ -1078,93 +1057,14 @@ private struct IPTVVODItemManagementView:
         }
     }
 
-    private func playControl(
-        _ item: IPTVVODItem
-    ) -> some View {
-        let focus =
-            VODItemFocus
-                .play(
-                    item.id
-                )
-
-        let isFocused =
-            focusedControl ==
-                focus
-
-        return VStack(spacing: 7) {
-            Image(
-                systemName:
-                    "play.fill"
-            )
-            .font(
-                .system(size: 24)
-            )
-
-            Text("SPEEL")
-                .font(
-                    .system(
-                        size: 14,
-                        weight: .semibold
-                    )
-                )
-        }
-        .foregroundStyle(
-            isFocused
-                ? .white
-                : .cyan
-        )
-        .frame(
-            width: 115,
-            height: 145
-        )
-        .background(
-            RoundedRectangle(
-                cornerRadius: 18,
-                style: .continuous
-            )
-            .fill(
-                isFocused
-                    ? Color.cyan.opacity(0.16)
-                    : Color.cyan.opacity(0.06)
-            )
-        )
-        .overlay(
-            RoundedRectangle(
-                cornerRadius: 18,
-                style: .continuous
-            )
-            .strokeBorder(
-                isFocused
-                    ? Color.cyan
-                    : Color.cyan.opacity(0.18),
-                lineWidth:
-                    isFocused ? 2 : 1
-            )
-        )
-        .contentShape(Rectangle())
-        .focusable(true)
-        .focused(
-            $focusedControl,
-            equals: focus
-        )
-        .focusEffectDisabled()
-        .onTapGesture {
-            selectedVODItem =
-                item
-
-            showPlayer =
-                true
-        }
-    }
-
     // MARK: - Poster
 
     @ViewBuilder
     private func poster(
-        _ item: IPTVVODItem
+        _ item: XtreamSeriesItem
     ) -> some View {
         AsyncImage(
-            url: item.posterURL
+            url: item.coverURL
         ) { phase in
             switch phase {
             case .success(let image):
@@ -1209,7 +1109,7 @@ private struct IPTVVODItemManagementView:
             )
 
             Image(
-                systemName: "film"
+                systemName: "tv"
             )
             .foregroundStyle(
                 .secondary
@@ -1220,14 +1120,14 @@ private struct IPTVVODItemManagementView:
     // MARK: - Visibility
 
     private func setItemVisibility(
-        _ item: IPTVVODItem,
+        _ item: XtreamSeriesItem,
         visible: Bool
     ) {
         var updated =
             preferences
 
-        updated.setVODItem(
-            item.id,
+        updated.setSeriesItem(
+            String(item.id),
             visible: visible
         )
 
@@ -1276,7 +1176,7 @@ private struct IPTVVODItemManagementView:
             items = []
 
             errorMessage =
-                "VOD-beheer is alleen beschikbaar voor Xtream."
+                "Series-beheer is alleen beschikbaar voor Xtream."
 
             isLoading = false
             return
@@ -1285,7 +1185,7 @@ private struct IPTVVODItemManagementView:
         do {
             items =
                 try await service
-                    .loadXtreamVOD(
+                    .loadXtreamSeries(
                         configuration:
                             xtreamConfiguration,
                         categoryID:
@@ -1303,15 +1203,14 @@ private struct IPTVVODItemManagementView:
     }
 }
 
-private enum VODItemFocus:
+private enum SeriesItemFocus:
     Hashable
 {
-    case visibility(String)
-    case play(String)
+    case visibility(Int)
 }
 
 #Preview {
     NavigationStack {
-        IPTVVODManagementView()
+        IPTVSeriesManagementView()
     }
 }

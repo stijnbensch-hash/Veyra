@@ -635,8 +635,8 @@ actor VeyraPosterSearch {
 
 // MARK: - IPTV: nieuw toegevoegde films en series
 
-/// Zelfde bron en schijf-cache als de klassieke rijen "IPTV nieuw toegevoegde films/series".
-/// Gebruikt de cache als die jonger is dan 6 uur; anders wordt de Xtream-lijst opnieuw opgehaald.
+/// VOD van alle gekoppelde Xtream-providers. Per provider blijft de catalogus
+/// zes uur in de schijf-cache; zichtbaarheid wordt altijd opnieuw toegepast.
 @MainActor
 final class VeyraIPTVNewSource {
     private let maxAge: TimeInterval = 6 * 3600
@@ -653,64 +653,134 @@ final class VeyraIPTVNewSource {
         return preferences.isSeriesItemVisible(String(series.id))
     }
 
-    func films() async -> [IPTVVODItem] {
-        guard let configuration = try? IPTVConfigurationStore().load() else { return [] }
-        let preferences = IPTVProviderPreferencesStore().load(for: configuration)
-        let key = "recentlyAdded.vod.\(configuration.providerIdentifier)"
-        let cached = IPTVDiskCache.read([IPTVVODItem].self, key: key)
-        let cachedItems = (cached?.value ?? []).filter { Self.isVisible($0, preferences) }
-        if let cached, !cachedItems.isEmpty, Date().timeIntervalSince(cached.savedAt) < maxAge {
-            return Array(cachedItems.prefix(limit))
+    private func providers() -> [IPTVStoredProvider] {
+        guard let loaded = try? IPTVConfigurationStore().loadProviders() else {
+            return []
         }
-        guard case .xtream(let xtream) = configuration else { return Array(cachedItems.prefix(limit)) }
+        return SourceOrderDefaults.sortedProviders(
+            loaded,
+            order: SourceOrderDefaults.loadIPTVProviderOrder(),
+            id: { $0.id }
+        )
+    }
 
-        do {
-            let service = IPTVService()
-            let categories = try await service.loadXtreamVODCategories(configuration: xtream)
-                .filter { preferences.isVODCategoryVisible($0.id) }
-            var all: [IPTVVODItem] = []
-            for category in categories {
-                if let batch = try? await service.loadXtreamVOD(configuration: xtream, categoryID: category.id) {
-                    all.append(contentsOf: batch.filter { preferences.isVODItemVisible($0.id) })
+    func films() async -> [IPTVHomeFilm] {
+        let providers = providers()
+        let resultLimit = max(limit, providers.count)
+        let batches = await withTaskGroup(of: [IPTVHomeFilm].self) { group in
+            for (index, provider) in providers.enumerated() {
+                guard case .xtream = provider.configuration else { continue }
+                group.addTask { @MainActor in
+                    await self.films(from: provider, order: index)
                 }
             }
-            func streamID(_ id: String) -> Int { id.split(separator: "-").last.flatMap { Int($0) } ?? 0 }
-            var seen = Set<String>()
-            let sorted = all.filter { seen.insert($0.id).inserted }.sorted { streamID($0.id) > streamID($1.id) }
-            IPTVDiskCache.write(sorted, key: key)
-            return Array(sorted.prefix(limit))
-        } catch {
-            return Array(cachedItems.prefix(limit))
+            var values: [IPTVHomeFilm] = []
+            for await batch in group { values.append(contentsOf: batch) }
+            return values
+        }
+        return Array(batches.sorted {
+            if $0.providerRank != $1.providerRank {
+                return $0.providerRank < $1.providerRank
+            }
+            if $0.item.added != $1.item.added {
+                return ($0.item.added ?? .distantPast) > ($1.item.added ?? .distantPast)
+            }
+            if $0.providerOrder != $1.providerOrder {
+                return $0.providerOrder < $1.providerOrder
+            }
+            return $0.item.id > $1.item.id
+        }.prefix(resultLimit))
+    }
+
+    private func films(from provider: IPTVStoredProvider, order: Int) async -> [IPTVHomeFilm] {
+        guard case .xtream(let xtream) = provider.configuration else { return [] }
+        let key = "recentlyAdded.vod.raw.\(provider.configuration.providerIdentifier)"
+        let cached = IPTVDiskCache.read([IPTVVODItem].self, key: key)
+        let catalog: [IPTVVODItem]
+        if let cached, Date().timeIntervalSince(cached.savedAt) < maxAge {
+            catalog = cached.value
+        } else {
+            do {
+                catalog = try await IPTVService().loadXtreamVOD(configuration: xtream)
+                IPTVDiskCache.write(catalog, key: key)
+            } catch {
+                catalog = cached?.value ?? []
+            }
+        }
+        let preferences = IPTVProviderPreferencesStore().load(for: provider.configuration)
+        var seenIDs = Set<String>()
+        let visible = catalog.filter {
+            Self.isVisible($0, preferences) && seenIDs.insert($0.id).inserted
+        }.sorted {
+            if $0.added != $1.added {
+                return ($0.added ?? .distantPast) > ($1.added ?? .distantPast)
+            }
+            let firstID = Int($0.id.split(separator: "-").last ?? "") ?? 0
+            let secondID = Int($1.id.split(separator: "-").last ?? "") ?? 0
+            return firstID > secondID
+        }
+        return visible.prefix(limit).enumerated().map { rank, item in
+            IPTVHomeFilm(providerID: provider.id, providerName: provider.displayName,
+                         providerOrder: order, providerRank: rank, item: item)
         }
     }
 
-    func series() async -> [XtreamSeriesItem] {
-        guard let configuration = try? IPTVConfigurationStore().load() else { return [] }
-        let preferences = IPTVProviderPreferencesStore().load(for: configuration)
-        let key = "recentlyAdded.series.\(configuration.providerIdentifier)"
-        let cached = IPTVDiskCache.read([XtreamSeriesItem].self, key: key)
-        let cachedItems = (cached?.value ?? []).filter { Self.isVisible($0, preferences) }
-        if let cached, !cachedItems.isEmpty, Date().timeIntervalSince(cached.savedAt) < maxAge {
-            return Array(cachedItems.prefix(limit))
-        }
-        guard case .xtream(let xtream) = configuration else { return Array(cachedItems.prefix(limit)) }
-
-        do {
-            let all = try await IPTVService().loadXtreamSeries(configuration: xtream, categoryID: nil)
-            let visible = all.filter { series in
-                let categoryVisible: Bool
-                if let categoryID = series.categoryID, !categoryID.isEmpty {
-                    categoryVisible = preferences.isSeriesCategoryVisible(categoryID)
-                } else {
-                    categoryVisible = true
+    func series() async -> [IPTVHomeSeries] {
+        let providers = providers()
+        let resultLimit = max(limit, providers.count)
+        let batches = await withTaskGroup(of: [IPTVHomeSeries].self) { group in
+            for (index, provider) in providers.enumerated() {
+                guard case .xtream = provider.configuration else { continue }
+                group.addTask { @MainActor in
+                    await self.series(from: provider, order: index)
                 }
-                return categoryVisible && preferences.isSeriesItemVisible(String(series.id))
             }
-            let sorted = visible.sorted { $0.id > $1.id }
-            IPTVDiskCache.write(sorted, key: key)
-            return Array(sorted.prefix(limit))
-        } catch {
-            return Array(cachedItems.prefix(limit))
+            var values: [IPTVHomeSeries] = []
+            for await batch in group { values.append(contentsOf: batch) }
+            return values
+        }
+        return Array(batches.sorted {
+            if $0.providerRank != $1.providerRank {
+                return $0.providerRank < $1.providerRank
+            }
+            if $0.item.added != $1.item.added {
+                return ($0.item.added ?? .distantPast) > ($1.item.added ?? .distantPast)
+            }
+            if $0.providerOrder != $1.providerOrder {
+                return $0.providerOrder < $1.providerOrder
+            }
+            return $0.item.id > $1.item.id
+        }.prefix(resultLimit))
+    }
+
+    private func series(from provider: IPTVStoredProvider, order: Int) async -> [IPTVHomeSeries] {
+        guard case .xtream(let xtream) = provider.configuration else { return [] }
+        let key = "recentlyAdded.series.raw.\(provider.configuration.providerIdentifier)"
+        let cached = IPTVDiskCache.read([XtreamSeriesItem].self, key: key)
+        let catalog: [XtreamSeriesItem]
+        if let cached, Date().timeIntervalSince(cached.savedAt) < maxAge {
+            catalog = cached.value
+        } else {
+            do {
+                catalog = try await IPTVService().loadXtreamSeries(configuration: xtream)
+                IPTVDiskCache.write(catalog, key: key)
+            } catch {
+                catalog = cached?.value ?? []
+            }
+        }
+        let preferences = IPTVProviderPreferencesStore().load(for: provider.configuration)
+        var seenIDs = Set<Int>()
+        let visible = catalog.filter {
+            Self.isVisible($0, preferences) && seenIDs.insert($0.id).inserted
+        }.sorted {
+            if $0.added != $1.added {
+                return ($0.added ?? .distantPast) > ($1.added ?? .distantPast)
+            }
+            return $0.id > $1.id
+        }
+        return visible.prefix(limit).enumerated().map { rank, item in
+            IPTVHomeSeries(providerID: provider.id, providerName: provider.displayName,
+                           providerOrder: order, providerRank: rank, item: item)
         }
     }
 }

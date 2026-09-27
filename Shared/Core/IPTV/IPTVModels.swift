@@ -105,34 +105,49 @@ nonisolated struct IPTVCategory: Identifiable, Hashable, Codable, Sendable {
     let contentType: IPTVContentType
 }
 
-struct M3UConfiguration: Hashable {
+struct M3UConfiguration: Hashable, Sendable {
     let displayName: String
     let playlistURL: URL
 
+    /// Optioneel reserveadres: als de hoofd-URL niet meer reageert, schakelt
+    /// Veyra hier zelf naar over -- zowel bij het verversen van de playlist
+    /// als (impliciet, via een vernieuwde playlist) bij afspelen.
+    let backupPlaylistURL: URL?
+
     init(
         displayName: String = "IPTV",
-        playlistURL: URL
+        playlistURL: URL,
+        backupPlaylistURL: URL? = nil
     ) {
         self.displayName = displayName
         self.playlistURL = playlistURL
+        self.backupPlaylistURL = backupPlaylistURL
     }
 }
 
-struct XtreamConfiguration: Hashable {
+struct XtreamConfiguration: Hashable, Sendable {
     let displayName: String
     let serverURL: URL
     let username: String
     let password: String
 
+    /// Optioneel reserveadres (zelfde account) -- als het hoofdadres niet
+    /// meer reageert, schakelt Veyra hier zelf naar over, voor zowel
+    /// verversen (categorieën/zenders/VOD ophalen) als afspelen (live-
+    /// stream-URL's herbouwd met dit adres).
+    let backupServerURL: URL?
+
     init(
         displayName: String = "IPTV",
         serverURL: URL,
         username: String,
-        password: String
+        password: String,
+        backupServerURL: URL? = nil
     ) {
         self.displayName = displayName
         self.serverURL = serverURL
         self.username = username
         self.password = password
+        self.backupServerURL = backupServerURL
     }
 }

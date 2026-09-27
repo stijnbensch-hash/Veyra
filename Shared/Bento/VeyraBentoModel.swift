@@ -40,6 +40,41 @@ nonisolated struct BentoNewItem: Identifiable, Equatable, Sendable {
     var posterURL: URL? = nil
 }
 
+/// Home bewaart de provider bij de titel: Xtream-ID's zijn alleen binnen
+/// één provider uniek en afleveringen moeten bij die provider laden.
+nonisolated struct IPTVHomeFilm: Identifiable, Hashable, Sendable {
+    let providerID: UUID
+    let providerName: String
+    let providerOrder: Int
+    let providerRank: Int
+    let item: IPTVVODItem
+
+    var id: String { "\(providerID.uuidString):\(item.id)" }
+    var name: String { item.name }
+    var posterURL: URL? { item.posterURL }
+    var playableSource: PlayableSource {
+        PlayableSource(
+            name: item.name,
+            description: "IPTV VOD",
+            url: item.streamURL,
+            kind: .iptvVOD,
+            providerName: providerName
+        )
+    }
+}
+
+nonisolated struct IPTVHomeSeries: Identifiable, Hashable, Sendable {
+    let providerID: UUID
+    let providerName: String
+    let providerOrder: Int
+    let providerRank: Int
+    let item: XtreamSeriesItem
+
+    var id: String { "\(providerID.uuidString):\(item.id)" }
+    var name: String { item.name }
+    var coverURL: URL? { item.coverURL }
+}
+
 nonisolated struct BentoSource: Identifiable, Equatable, Sendable {
     let id: String
     let name: String             // "Veyra Hub", "AIOStreams", "IPTV"
@@ -79,8 +114,8 @@ final class VeyraBentoViewModel {
     private(set) var channels: [EPGChannel] = []
     private(set) var newItems: [BentoNewItem] = []
     private(set) var sources: [BentoSource] = []
-    private(set) var iptvFilms: [IPTVVODItem] = []
-    private(set) var iptvSeries: [XtreamSeriesItem] = []
+    private(set) var iptvFilms: [IPTVHomeFilm] = []
+    private(set) var iptvSeries: [IPTVHomeSeries] = []
     private(set) var releaseFilms: [BentoTMDBTitle] = []
     private(set) var releaseSeries: [BentoTMDBTitle] = []
     private(set) var providers: [BentoCatalog] = []
@@ -91,8 +126,8 @@ final class VeyraBentoViewModel {
     @ObservationIgnored private let epg: (@Sendable () async -> [EPGChannel])?
     @ObservationIgnored private let added: (any RecentlyAddedProviding)?
     @ObservationIgnored private let status: (any SourceStatusProviding)?
-    @ObservationIgnored private let filmsSource: (@Sendable () async -> [IPTVVODItem])?
-    @ObservationIgnored private let seriesSource: (@Sendable () async -> [XtreamSeriesItem])?
+    @ObservationIgnored private let filmsSource: (@Sendable () async -> [IPTVHomeFilm])?
+    @ObservationIgnored private let seriesSource: (@Sendable () async -> [IPTVHomeSeries])?
     @ObservationIgnored private let releaseFilmsSource: (@Sendable () async -> [BentoTMDBTitle])?
     @ObservationIgnored private let releaseSeriesSource: (@Sendable () async -> [BentoTMDBTitle])?
     @ObservationIgnored private let providersSource: (@Sendable () async -> [BentoCatalog])?
@@ -102,8 +137,8 @@ final class VeyraBentoViewModel {
          epg: (@Sendable () async -> [EPGChannel])? = nil,
          recentlyAdded: (any RecentlyAddedProviding)? = nil,
          sourceStatus: (any SourceStatusProviding)? = nil,
-         iptvFilms: (@Sendable () async -> [IPTVVODItem])? = nil,
-         iptvSeries: (@Sendable () async -> [XtreamSeriesItem])? = nil,
+         iptvFilms: (@Sendable () async -> [IPTVHomeFilm])? = nil,
+         iptvSeries: (@Sendable () async -> [IPTVHomeSeries])? = nil,
          releasesFilms: (@Sendable () async -> [BentoTMDBTitle])? = nil,
          releasesSeries: (@Sendable () async -> [BentoTMDBTitle])? = nil,
          streaming: (@Sendable () async -> [BentoCatalog])? = nil,

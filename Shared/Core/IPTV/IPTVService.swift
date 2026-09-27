@@ -16,9 +16,19 @@ struct IPTVService {
     func loadM3UChannels(
         configuration: M3UConfiguration
     ) async throws -> [IPTVChannel] {
-        var request = URLRequest(
-            url: configuration.playlistURL
-        )
+        do {
+            return try await loadM3UChannels(url: configuration.playlistURL)
+        } catch {
+            // Hoofdadres onbereikbaar: meteen het reserveadres proberen,
+            // als dat ingesteld staat -- zelfde aanpak als bij Xtream, zie
+            // `withXtreamFailover` hieronder.
+            guard let backupPlaylistURL = configuration.backupPlaylistURL else { throw error }
+            return try await loadM3UChannels(url: backupPlaylistURL)
+        }
+    }
+
+    private func loadM3UChannels(url: URL) async throws -> [IPTVChannel] {
+        var request = URLRequest(url: url)
 
         request.timeoutInterval = 30
         request.cachePolicy =
@@ -65,31 +75,47 @@ struct IPTVService {
         return channels
     }
 
+    // MARK: - Reserveadres
+
+    /// Probeert eerst het hoofdadres; lukt dat niet en is er een
+    /// `backupServerURL` ingesteld, dan wordt exact dezelfde aanvraag
+    /// meteen herhaald bij het reserveadres (zelfde account/inloggegevens).
+    /// Geldt voor elke Xtream-aanroep hieronder -- categorieën, zenders,
+    /// VOD en series -- dus zowel bij verversen als (via een vers geladen
+    /// stream-URL) bij afspelen.
+    private func withXtreamFailover<T>(
+        configuration: XtreamConfiguration,
+        _ operation: (XtreamClient) async throws -> T
+    ) async throws -> T {
+        do {
+            return try await operation(XtreamClient(configuration: configuration, session: session))
+        } catch {
+            guard let backupServerURL = configuration.backupServerURL else { throw error }
+            let backupConfiguration = XtreamConfiguration(
+                displayName: configuration.displayName,
+                serverURL: backupServerURL,
+                username: configuration.username,
+                password: configuration.password
+            )
+            return try await operation(XtreamClient(configuration: backupConfiguration, session: session))
+        }
+    }
+
     // MARK: - Xtream Live
 
     func loadXtreamLiveCategories(
         configuration: XtreamConfiguration
     ) async throws -> [IPTVCategory] {
-        let client = XtreamClient(
-            configuration: configuration,
-            session: session
-        )
-
-        return try await client.liveCategories()
+        try await withXtreamFailover(configuration: configuration) { try await $0.liveCategories() }
     }
 
     func loadXtreamLiveChannels(
         configuration: XtreamConfiguration,
         categoryID: String? = nil
     ) async throws -> [IPTVChannel] {
-        let client = XtreamClient(
-            configuration: configuration,
-            session: session
-        )
-
-        return try await client.liveChannels(
-            categoryID: categoryID
-        )
+        try await withXtreamFailover(configuration: configuration) {
+            try await $0.liveChannels(categoryID: categoryID)
+        }
     }
 
     // MARK: - Xtream VOD
@@ -97,26 +123,16 @@ struct IPTVService {
     func loadXtreamVODCategories(
         configuration: XtreamConfiguration
     ) async throws -> [IPTVCategory] {
-        let client = XtreamClient(
-            configuration: configuration,
-            session: session
-        )
-
-        return try await client.vodCategories()
+        try await withXtreamFailover(configuration: configuration) { try await $0.vodCategories() }
     }
 
     func loadXtreamVOD(
         configuration: XtreamConfiguration,
         categoryID: String? = nil
     ) async throws -> [IPTVVODItem] {
-        let client = XtreamClient(
-            configuration: configuration,
-            session: session
-        )
-
-        return try await client.vodStreams(
-            categoryID: categoryID
-        )
+        try await withXtreamFailover(configuration: configuration) {
+            try await $0.vodStreams(categoryID: categoryID)
+        }
     }
 
     // MARK: - Xtream Series
@@ -124,40 +140,25 @@ struct IPTVService {
     func loadXtreamSeriesCategories(
         configuration: XtreamConfiguration
     ) async throws -> [IPTVCategory] {
-        let client = XtreamClient(
-            configuration: configuration,
-            session: session
-        )
-
-        return try await client.seriesCategories()
+        try await withXtreamFailover(configuration: configuration) { try await $0.seriesCategories() }
     }
 
     func loadXtreamSeries(
         configuration: XtreamConfiguration,
         categoryID: String? = nil
     ) async throws -> [XtreamSeriesItem] {
-        let client = XtreamClient(
-            configuration: configuration,
-            session: session
-        )
-
-        return try await client.series(
-            categoryID: categoryID
-        )
+        try await withXtreamFailover(configuration: configuration) {
+            try await $0.series(categoryID: categoryID)
+        }
     }
 
     func loadXtreamSeriesInfo(
         configuration: XtreamConfiguration,
         seriesID: Int
     ) async throws -> XtreamSeriesInfo {
-        let client = XtreamClient(
-            configuration: configuration,
-            session: session
-        )
-
-        return try await client.seriesInfo(
-            seriesID: seriesID
-        )
+        try await withXtreamFailover(configuration: configuration) {
+            try await $0.seriesInfo(seriesID: seriesID)
+        }
     }
 
     // MARK: - Playback

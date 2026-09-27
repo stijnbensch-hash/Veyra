@@ -107,7 +107,8 @@ struct PlayerView: View {
                             isResolvingNextEpisode = false
                             nextEpisodeRequest = NextPlaybackRequest(item: next, source: matchedSource)
                         }
-                    }
+                    },
+                    onUserActivity: { viewModel.registerActivity() }
                 )
 
             } else {
@@ -127,6 +128,14 @@ struct PlayerView: View {
         }
         .navigationBarHidden(true)
         .toolbar(.hidden, for: .tabBar)
+        .alert("Kijk je nog?", isPresented: Binding(
+            get: { viewModel.showStillWatchingPrompt },
+            set: { if !$0 { viewModel.registerActivity() } }
+        )) {
+            Button("Ja, doorgaan") { viewModel.registerActivity() }
+        } message: {
+            Text("Afspelen stopt zo als er geen reactie komt.")
+        }
         .task {
             await viewModel.startPlayback()
         }
@@ -194,6 +203,7 @@ private struct iOSPlayerSurface: View {
     @ObservedObject var pip: AetherPictureInPictureController
     let onClose: () -> Void
     var onPlayNextEpisode: (MediaItem) -> Void = { _ in }
+    var onUserActivity: () -> Void = {}
 
     // Actieve/maximale gelijktijdige verbindingen van de Xtream-provider
     // waarmee deze IPTV-stream loopt (bv. "1/2") -- enkel voor IPTV, en
@@ -314,15 +324,16 @@ private struct iOSPlayerSurface: View {
     private var activeSkipSegment: (kind: SkipSegmentKind, segment: IntroDBSegment)? {
         guard !showNextEpisodeOverlay else { return nil }
 
-        if showSkipIntroButton, let intro = introDBSegments.intro, intro.contains(engine.currentTime) {
+        if showSkipIntroButton,
+           let intro = introDBSegments.intros.first(where: { $0.contains(engine.currentTime) }) {
             return (.intro, intro)
         }
-        if showSkipRecapButton, let recap = introDBSegments.recap, recap.contains(engine.currentTime) {
+        if showSkipRecapButton,
+           let recap = introDBSegments.recaps.first(where: { $0.contains(engine.currentTime) }) {
             return (.recap, recap)
         }
-        if showSkipCreditsButton, let credits = introDBSegments.credits,
-            credits.contains(engine.currentTime)
-        {
+        if showSkipCreditsButton,
+           let credits = introDBSegments.creditsSegments.first(where: { $0.contains(engine.currentTime) }) {
             return (.credits, credits)
         }
         return nil
@@ -335,8 +346,9 @@ private struct iOSPlayerSurface: View {
     }
 
     private func handleAutoSkip(at time: Double) {
-        guard autoSkipIntro, !autoSkippedIntro, let intro = introDBSegments.intro,
-            let end = intro.end, intro.contains(time)
+        guard autoSkipIntro, !autoSkippedIntro,
+            let intro = introDBSegments.intros.first(where: { $0.contains(time) }),
+            let end = intro.end
         else { return }
         autoSkippedIntro = true
         Task { await engine.seek(to: end) }
@@ -432,6 +444,7 @@ private struct iOSPlayerSurface: View {
             nextEpisode = await NextEpisodeResolver.resolve(after: item)
             introDBSegments = await IntroDBClient.shared.segments(
                 tmdbID: item?.tmdbID,
+                imdbID: item?.imdbID,
                 season: item?.type == .series ? item?.seasonNumber : nil,
                 episode: item?.type == .series ? item?.episodeNumber : nil,
                 durationSeconds: engine.duration > 0 ? engine.duration : nil
@@ -832,6 +845,7 @@ private struct iOSPlayerSurface: View {
     }
 
     private func scheduleAutoHide() {
+        onUserActivity()
         hideTask?.cancel()
         guard controlsVisible else { return }
 

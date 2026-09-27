@@ -19,6 +19,15 @@ struct VeyraHomeSettingsView: View {
                     .veyraCardRow()
 
                     NavigationLink {
+                        VeyraHomeContinueWatchingSettingsView()
+                    } label: {
+                        VeyraSettingsCardRowLabel(icon: "clock.arrow.circlepath", title: "Verder kijken & Binnenkort") {
+                            VeyraSettingsCardRowValue(value: nil)
+                        }
+                    }
+                    .veyraCardRow()
+
+                    NavigationLink {
                         VeyraStreamingSettingsView()
                     } label: {
                         VeyraSettingsCardRowLabel(icon: "play.rectangle.on.rectangle", title: "Streamingdiensten") {
@@ -63,6 +72,11 @@ struct VeyraHomeSettingsView: View {
                     VeyraHeroSpotlightSettingsView()
                 } label: {
                     Label("Hero", systemImage: "sparkles")
+                }
+                NavigationLink {
+                    VeyraHomeContinueWatchingSettingsView()
+                } label: {
+                    Label("Verder kijken & Binnenkort", systemImage: "clock.arrow.circlepath")
                 }
                 NavigationLink {
                     VeyraStreamingSettingsView()

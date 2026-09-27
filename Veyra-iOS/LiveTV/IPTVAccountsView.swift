@@ -6,7 +6,6 @@ extension Notification.Name {
 
 struct IPTVAccountsView: View {
     @StateObject private var viewModel = IPTVAccountsViewModel()
-    @State private var activeID: UUID?
     @State private var showAddSheet = false
     @State private var editingProvider: EditingProviderID?
     // Actieve/maximale gelijktijdige verbindingen per Xtream-provider (bv.
@@ -57,10 +56,6 @@ struct IPTVAccountsView: View {
                                         .foregroundStyle(.secondary)
                                 }
                                 Spacer()
-                                if provider.id == activeID {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(VeyraColors.cyan)
-                                }
                             }
                         }
                         .task(id: provider.id) {
@@ -69,14 +64,6 @@ struct IPTVAccountsView: View {
                         .swipeActions {
                             Button("Verwijderen", role: .destructive) {
                                 viewModel.remove(provider)
-                                refreshActiveID()
-                            }
-                            if provider.id != activeID {
-                                Button("Actief maken") {
-                                    viewModel.activate(provider)
-                                    refreshActiveID()
-                                }
-                                .tint(VeyraColors.cyan)
                             }
                             Button("Bewerken") {
                                 editingProvider = EditingProviderID(id: provider.id)
@@ -173,11 +160,6 @@ struct IPTVAccountsView: View {
 
     private func reload() {
         viewModel.load()
-        refreshActiveID()
-    }
-
-    private func refreshActiveID() {
-        activeID = viewModel.activeProviderID()
     }
 }
 
@@ -192,17 +174,13 @@ private func isXtream(_ provider: IPTVStoredProvider) -> Bool {
     return false
 }
 
-/// Temporarily makes the given provider the "active" one so the
-/// (otherwise active-provider-only) Live TV / VOD visibility screens
-/// operate on it, then restores the previously active provider when
-/// this view disappears. Mirrors the tvOS per-provider management launcher.
+/// Opent de instellingen voor deze provider zonder de Live TV-keuze te wijzigen.
 private struct IPTVProviderManagementLauncherView: View {
     let providerID: UUID
     let showsVOD: Bool
 
     @State private var isReady = false
     @State private var errorMessage: String?
-    @State private var previousActiveProviderID: UUID?
     @State private var showEditSheet = false
 
     private let configurationStore = IPTVConfigurationStore()
@@ -212,16 +190,22 @@ private struct IPTVProviderManagementLauncherView: View {
             if isReady {
                 List {
                     NavigationLink {
-                        IPTVLiveVisibilityView()
+                        IPTVLiveVisibilityView(providerID: providerID)
                     } label: {
                         Label("Live TV beheren", systemImage: "tv")
                     }
 
                     if showsVOD {
                         NavigationLink {
-                            IPTVVODVisibilityView()
+                            IPTVVODVisibilityView(providerID: providerID)
                         } label: {
                             Label("VOD beheren", systemImage: "film")
+                        }
+
+                        NavigationLink {
+                            IPTVSeriesVisibilityView(providerID: providerID)
+                        } label: {
+                            Label("Series beheren", systemImage: "tv.badge.wifi")
                         }
                     }
 
@@ -253,26 +237,18 @@ private struct IPTVProviderManagementLauncherView: View {
         .task {
             prepareProvider()
         }
-        .onDisappear {
-            restorePreviousProvider()
-        }
     }
 
     private func prepareProvider() {
         do {
-            previousActiveProviderID = try configurationStore.activeProviderID()
-            try configurationStore.setActiveProvider(id: providerID)
+            guard try configurationStore.loadProvider(id: providerID) != nil else {
+                errorMessage = "Deze provider is niet meer beschikbaar."
+                return
+            }
             isReady = true
         } catch {
             errorMessage = error.localizedDescription
         }
-    }
-
-    private func restorePreviousProvider() {
-        guard let previousActiveProviderID, previousActiveProviderID != providerID else {
-            return
-        }
-        try? configurationStore.setActiveProvider(id: previousActiveProviderID)
     }
 }
 

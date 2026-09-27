@@ -68,7 +68,7 @@ struct MovieDetailView: View {
         .ignoresSafeArea(edges: .top)
         .task(id: movie.id) {
             guard let tmdbID = movie.tmdbID else { return }
-            ratings = await MetadataRatingsService.movieRatings(tmdbID: tmdbID, imdbID: movie.imdbID)
+            ratings = await MetadataRatingsService.movieRatings(tmdbID: tmdbID, imdbID: movie.imdbID, title: movie.title)
         }
     }
 

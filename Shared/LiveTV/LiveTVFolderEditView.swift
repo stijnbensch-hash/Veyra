@@ -68,6 +68,13 @@ struct LiveTVFolderEditView: View {
         }
         #else
         form
+            #if os(macOS)
+            // Zelfde reden/patroon als `LiveTVFoldersListView`: zonder
+            // expliciete maat sizet macOS z'n `.sheet` te krap naar de
+            // inhoud toe.
+            .frame(minWidth: 520, minHeight: 480)
+            .background(VeyraColors.background)
+            #endif
         #endif
     }
 

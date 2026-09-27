@@ -30,8 +30,10 @@ struct IPTVSetupView: View {
     @State private var serverAddress = ""
     @State private var username = ""
     @State private var password = ""
+    @State private var backupServerAddress = ""
 
     @State private var playlistAddress = ""
+    @State private var backupPlaylistAddress = ""
 
     @State private var isSaving = false
     @State private var hasExistingConfiguration = false
@@ -202,8 +204,17 @@ struct IPTVSetupView: View {
                 )
             }
 
+            inputSection(
+                title: "RESERVEADRES (OPTIONEEL)"
+            ) {
+                TextField(
+                    "https://backup.example.com:1234",
+                    text: $backupServerAddress
+                )
+            }
+
             Text(
-                "Gebruik alleen het serveradres. Veyra bouwt de Xtream API- en stream-URL's zelf op."
+                "Gebruik alleen het serveradres. Veyra bouwt de Xtream API- en stream-URL's zelf op. Reserveadres: zelfde account, ander adres -- Veyra schakelt hier zelf naar over als het hoofdadres niet reageert."
             )
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -226,8 +237,17 @@ struct IPTVSetupView: View {
                 )
             }
 
+            inputSection(
+                title: "RESERVE-PLAYLIST (OPTIONEEL)"
+            ) {
+                TextField(
+                    "https://backup.example.com/playlist.m3u",
+                    text: $backupPlaylistAddress
+                )
+            }
+
             Text(
-                "De volledige M3U-URL wordt veilig in de Keychain bewaard."
+                "De volledige M3U-URL wordt veilig in de Keychain bewaard. Reserve-playlist: Veyra schakelt hier zelf naar over als de hoofd-playlist niet reageert."
             )
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -378,7 +398,8 @@ struct IPTVSetupView: View {
                 displayName: name,
                 serverURL: serverURL,
                 username: trimmedUsername,
-                password: trimmedPassword
+                password: trimmedPassword,
+                backupServerURL: httpURL(from: backupServerAddress)
             )
         )
     }
@@ -402,7 +423,8 @@ struct IPTVSetupView: View {
         return .m3u(
             M3UConfiguration(
                 displayName: name,
-                playlistURL: playlistURL
+                playlistURL: playlistURL,
+                backupPlaylistURL: httpURL(from: backupPlaylistAddress)
             )
         )
     }
@@ -493,7 +515,11 @@ struct IPTVSetupView: View {
             password =
                 configuration.password
 
+            backupServerAddress =
+                configuration.backupServerURL?.absoluteString ?? ""
+
             playlistAddress = ""
+            backupPlaylistAddress = ""
 
         case .m3u(let configuration):
             setupType = .m3u
@@ -506,9 +532,13 @@ struct IPTVSetupView: View {
                     .playlistURL
                     .absoluteString
 
+            backupPlaylistAddress =
+                configuration.backupPlaylistURL?.absoluteString ?? ""
+
             serverAddress = ""
             username = ""
             password = ""
+            backupServerAddress = ""
         }
     }
 

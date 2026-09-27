@@ -17,7 +17,9 @@ struct IPTVSetupView: View {
     @State private var serverAddress = ""
     @State private var username = ""
     @State private var password = ""
+    @State private var backupServerAddress = ""
     @State private var playlistAddress = ""
+    @State private var backupPlaylistAddress = ""
     @State private var isSaving = false
     @State private var hasLoadedConfiguration = false
     @State private var errorMessage: String?
@@ -61,6 +63,16 @@ struct IPTVSetupView: View {
                 } footer: {
                     Text("Veyra bouwt de Xtream API- en stream-URL's zelf op vanaf het serveradres.")
                 }
+                Section {
+                    TextField("https://backup.example.com:1234", text: $backupServerAddress)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .keyboardType(.URL)
+                } header: {
+                    Text("Reserveadres (optioneel)")
+                } footer: {
+                    Text("Zelfde account, ander adres -- Veyra schakelt hier zelf naar over als het hoofdadres niet reageert.")
+                }
             } else {
                 Section {
                     TextField("https://provider.example.com/playlist.m3u", text: $playlistAddress)
@@ -71,6 +83,16 @@ struct IPTVSetupView: View {
                     Text("M3U playlist")
                 } footer: {
                     Text("De volledige M3U-URL wordt veilig in de sleutelhanger bewaard.")
+                }
+                Section {
+                    TextField("https://backup.example.com/playlist.m3u", text: $backupPlaylistAddress)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .keyboardType(.URL)
+                } header: {
+                    Text("Reserve-playlist (optioneel)")
+                } footer: {
+                    Text("Veyra schakelt hier zelf naar over als de hoofd-playlist niet reageert.")
                 }
             }
 
@@ -148,7 +170,8 @@ struct IPTVSetupView: View {
                 displayName: name,
                 serverURL: serverURL,
                 username: trimmedUsername,
-                password: trimmedPassword
+                password: trimmedPassword,
+                backupServerURL: httpURL(from: backupServerAddress)
             )
         )
     }
@@ -160,7 +183,11 @@ struct IPTVSetupView: View {
             throw IPTVSetupError.invalidPlaylistURL
         }
 
-        return .m3u(M3UConfiguration(displayName: name, playlistURL: playlistURL))
+        return .m3u(M3UConfiguration(
+            displayName: name,
+            playlistURL: playlistURL,
+            backupPlaylistURL: httpURL(from: backupPlaylistAddress)
+        ))
     }
 
     private func validatedDisplayName() throws -> String {
@@ -201,11 +228,13 @@ struct IPTVSetupView: View {
             serverAddress = configuration.serverURL.absoluteString
             username = configuration.username
             password = configuration.password
+            backupServerAddress = configuration.backupServerURL?.absoluteString ?? ""
 
         case .m3u(let configuration):
             setupType = .m3u
             displayName = configuration.displayName
             playlistAddress = configuration.playlistURL.absoluteString
+            backupPlaylistAddress = configuration.backupPlaylistURL?.absoluteString ?? ""
         }
     }
 

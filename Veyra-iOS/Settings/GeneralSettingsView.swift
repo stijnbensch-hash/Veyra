@@ -4,18 +4,6 @@ import SwiftUI
 /// toegankelijkheid. Zie `GeneralSettings.swift` (Shared) voor per
 /// instelling wat al echt werkt en wat nog een stub is.
 struct GeneralSettingsView: View {
-    // Startscherm
-    @AppStorage(GeneralSettingsDefaults.showContinueWatchingKey)
-    private var showContinueWatching = true
-    @AppStorage(GeneralSettingsDefaults.continueWatchingLimitKey)
-    private var continueWatchingLimit = 10
-    @AppStorage(GeneralSettingsDefaults.hideContinueWatchingReleaseDateKey)
-    private var hideContinueWatchingReleaseDate = false
-    @AppStorage(GeneralSettingsDefaults.showUpcomingKey)
-    private var showUpcoming = true
-    @AppStorage(GeneralSettingsDefaults.includeWatchlistPremieresKey)
-    private var includeWatchlistPremieres = true
-
     // Sport
     @AppStorage(GeneralSettingsDefaults.hideScoreSpoilersKey)
     private var hideScoreSpoilers = false
@@ -58,29 +46,6 @@ struct GeneralSettingsView: View {
                     sectionHeader("TMDB-lijsten", symbol: "line.3.horizontal.decrease.circle", tint: VeyraColors.cyan)
                 } footer: {
                     Text("Filtert automatisch samengestelde lijsten, ook op Home. Zoeken en eigen lijsten blijven volledig beschikbaar.")
-                }
-
-                Section {
-                    Toggle("Verder kijken tonen", isOn: $showContinueWatching)
-
-                    Stepper(
-                        "Aantal tegels: \(continueWatchingLimit)",
-                        value: $continueWatchingLimit,
-                        in: 1...30
-                    )
-                    .disabled(!showContinueWatching)
-
-                    Toggle("Releasedatum verbergen op verder-kijken-kaarten", isOn: $hideContinueWatchingReleaseDate)
-                        .disabled(!showContinueWatching)
-
-                    Toggle("Binnenkort tonen", isOn: $showUpcoming)
-
-                    Toggle("Premières uit kijklijst meenemen", isOn: $includeWatchlistPremieres)
-                        .disabled(!showUpcoming)
-                } header: {
-                    sectionHeader("Startscherm", symbol: "rectangle.stack", tint: VeyraColors.cyan)
-                } footer: {
-                    Text("Verder kijken toont titels die je begonnen bent; Aantal tegels begrenst hoeveel er verschijnen (meest recente behouden). Binnenkort toont de volgende aflevering — en de uitzenddatum — voor series waar je bij bent. \"Releasedatum verbergen\" heeft nog geen effect: verder-kijken-kaarten tonen momenteel geen datum om te verbergen. \"Premières uit kijklijst\" is nog niet aangesloten — dat vraagt releasedata per kijklijst-item die Veyra nu nog niet opzoekt.")
                 }
 
                 Section {

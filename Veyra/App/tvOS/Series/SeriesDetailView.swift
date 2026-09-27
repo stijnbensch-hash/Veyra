@@ -101,7 +101,7 @@ struct SeriesDetailView: View {
         }
         .task(id: series.id) {
             ratings = await MetadataRatingsService.seriesRatings(
-                tmdbID: series.id, imdbID: nil
+                tmdbID: series.id, imdbID: nil, title: series.name
             )
         }
         .task {

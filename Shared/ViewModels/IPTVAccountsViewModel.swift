@@ -38,10 +38,6 @@ final class IPTVAccountsViewModel: ObservableObject {
         }
     }
 
-    func activeProviderID() -> UUID? {
-        (try? configurationStore.activeProviderID()) ?? nil
-    }
-
     func load() {
         guard !isLoading else { return }
 
@@ -130,15 +126,6 @@ final class IPTVAccountsViewModel: ObservableObject {
     func remove(_ provider: IPTVStoredProvider) {
         do {
             try configurationStore.removeProvider(id: provider.id)
-            NotificationCenter.default.post(name: .iptvConfigurationDidChange, object: nil)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    func activate(_ provider: IPTVStoredProvider) {
-        do {
-            try configurationStore.setActiveProvider(id: provider.id)
             NotificationCenter.default.post(name: .iptvConfigurationDidChange, object: nil)
         } catch {
             errorMessage = error.localizedDescription

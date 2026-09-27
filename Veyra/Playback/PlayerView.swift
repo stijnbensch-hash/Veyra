@@ -179,6 +179,9 @@ private struct PlayerSessionView: View {
                     onRequestExit: {
                         dismiss()
                     },
+                    onUserActivity: {
+                        viewModel.registerActivity()
+                    },
                     onPlayNextEpisode: { next in
                         // Stop de tracker/engine van de HUIDIGE aflevering
                         // hier expliciet, i.p.v. te wachten op onDisappear
@@ -246,6 +249,14 @@ private struct PlayerSessionView: View {
         }
         .onAppear {
             setPlayerVisible(true)
+        }
+        .alert("Kijk je nog?", isPresented: Binding(
+            get: { viewModel.showStillWatchingPrompt },
+            set: { if !$0 { viewModel.registerActivity() } }
+        )) {
+            Button("Ja, doorgaan") { viewModel.registerActivity() }
+        } message: {
+            Text("Afspelen stopt zo als er geen reactie komt.")
         }
         .task {
             await viewModel.startPlayback()

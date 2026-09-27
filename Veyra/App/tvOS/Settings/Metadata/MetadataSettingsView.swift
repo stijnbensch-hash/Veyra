@@ -186,8 +186,9 @@ private struct MetadataRatingsSettingsView: View {
     @AppStorage("metadata.rating.tomatometer") private var tomatometer = true
     @AppStorage("metadata.rating.metacritic") private var metacritic = true
     @AppStorage("metadata.rating.trakt") private var trakt = true
-    @AppStorage("metadata.rating.popcornmeter") private var popcornmeter = true
-    @AppStorage("metadata.rating.letterboxd") private var letterboxd = true
+    // Popcornmeter/Letterboxd hebben geen publiek toegankelijke API en tonen
+    // daarom altijd een uitgeschakelde rij (zie `ratingToggleRow` hieronder) --
+    // geen eigen @AppStorage nodig.
     @AppStorage("metadata.rating.mal") private var mal = true
 
     var body: some View {
@@ -198,11 +199,11 @@ private struct MetadataRatingsSettingsView: View {
                 ratingToggleRow(providerRow(.tomatometer), isOn: $tomatometer)
                 ratingToggleRow(providerRow(.metacritic), isOn: $metacritic)
                 ratingToggleRow(providerRow(.trakt), isOn: $trakt)
-                ratingToggleRow(providerRow(.popcornmeter), isOn: $popcornmeter)
-                ratingToggleRow(providerRow(.letterboxd), isOn: $letterboxd)
+                ratingToggleRow(providerRow(.popcornmeter), isOn: .constant(false), disabled: true)
+                ratingToggleRow(providerRow(.letterboxd), isOn: .constant(false), disabled: true)
                 ratingToggleRow(providerRow(.mal), isOn: $mal)
             } footer: {
-                Text("Kies welke ratings zichtbaar zijn op film- en seriepagina's.")
+                Text("Kies welke ratings zichtbaar zijn op film- en seriepagina's. Popcornmeter en Letterboxd staan uitgeschakeld: die bieden geen publiek toegankelijke API, dus die scores kunnen hier niet worden opgehaald.")
             }
 
             Section {
@@ -238,7 +239,7 @@ private struct MetadataRatingsSettingsView: View {
     /// `providerRow(_:)` + een eigen aan/uit-indicator i.p.v. een systeem-
     /// `Toggle` (die legt op tvOS binnen een List zijn eigen felwitte
     /// focus-highlight over de hele rij, zie `VeyraSettingsCardRow.swift`).
-    private func ratingToggleRow<Label: View>(_ label: Label, isOn: Binding<Bool>) -> some View {
+    private func ratingToggleRow<Label: View>(_ label: Label, isOn: Binding<Bool>, disabled: Bool = false) -> some View {
         Button {
             isOn.wrappedValue.toggle()
         } label: {
@@ -249,8 +250,10 @@ private struct MetadataRatingsSettingsView: View {
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 14)
+            .opacity(disabled ? 0.5 : 1)
         }
         .veyraCardRow()
+        .disabled(disabled)
     }
 
     @ViewBuilder
@@ -320,8 +323,8 @@ private struct MetadataRatingsSettingsView: View {
         tomatometer = true
         metacritic = true
         trakt = true
-        popcornmeter = true
-        letterboxd = true
+        // Popcornmeter/Letterboxd bewust overslaan: die toggles zijn uitgeschakeld
+        // omdat er geen publiek toegankelijke API voor is aangesloten.
         mal = true
     }
 
@@ -331,8 +334,6 @@ private struct MetadataRatingsSettingsView: View {
         tomatometer = false
         metacritic = false
         trakt = false
-        popcornmeter = false
-        letterboxd = false
         mal = false
     }
 

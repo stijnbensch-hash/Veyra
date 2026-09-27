@@ -492,6 +492,16 @@ struct XtreamClient {
                 httpResponse.statusCode
             )
         else {
+            // Te veel gelijktijdige verzoeken (bv. bij een geblokkeerd account
+            // of een provider die vernieuwen limiteert): "Retry-After" bevat
+            // meestal het aantal seconden dat je moet wachten -- als de
+            // provider dat meegeeft, tonen we dat aan de gebruiker i.p.v. een
+            // kale HTTP-429-melding.
+            if httpResponse.statusCode == 429 {
+                let retryAfter = (httpResponse.value(forHTTPHeaderField: "Retry-After"))
+                    .flatMap { Int($0) }
+                throw XtreamError.rateLimited(retryAfterSeconds: retryAfter)
+            }
             throw XtreamError.httpError(
                 httpResponse.statusCode
             )
@@ -714,7 +724,33 @@ private struct XtreamSeriesResponse:
         case categoryID =
             "category_id"
 
+        case categoryIDs =
+            "category_ids"
+
         case added
+    }
+
+    // Sommige Xtream-panelen geven series een `category_ids`-array (meerdere
+    // categorieën per serie) i.p.v. het enkelvoudige `category_id` dat VOD
+    // altijd gebruikt -- zonder deze fallback decodeert `categoryID` dan
+    // stil naar nil en werkt de categorie-zichtbaarheid van "Series beheren"
+    // niet, terwijl "VOD beheren" (altijd enkelvoudig `category_id`) wel
+    // werkt. We nemen de eerste ID uit de array als primaire categorie.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        seriesID = try container.decode(Int.self, forKey: .seriesID)
+        name = try container.decode(String.self, forKey: .name)
+        cover = try container.decodeIfPresent(String.self, forKey: .cover)
+        added = try container.decodeIfPresent(String.self, forKey: .added)
+
+        if let single = try container.decodeIfPresent(String.self, forKey: .categoryID) {
+            categoryID = single
+        } else if let list = try? container.decodeIfPresent([String].self, forKey: .categoryIDs),
+                  let first = list.first {
+            categoryID = first
+        } else {
+            categoryID = nil
+        }
     }
 }
 
@@ -830,6 +866,7 @@ enum XtreamError:
     case invalidURL
     case invalidResponse
     case httpError(Int)
+    case rateLimited(retryAfterSeconds: Int?)
     case decodingFailed(Error)
 
     var errorDescription: String? {
@@ -844,6 +881,12 @@ enum XtreamError:
             let statusCode
         ):
             return "De Xtream-server gaf HTTP-status \(statusCode)."
+
+        case .rateLimited(let retryAfterSeconds):
+            if let retryAfterSeconds, retryAfterSeconds > 0 {
+                return "Te veel verzoeken bij de provider. Probeer het over \(retryAfterSeconds) seconden opnieuw."
+            }
+            return "Te veel verzoeken bij de provider. Wacht even voor je opnieuw probeert -- te snel vernieuwen kan je account tijdelijk blokkeren."
 
         case .decodingFailed:
             return "Het antwoord van de Xtream-server kon niet worden verwerkt."

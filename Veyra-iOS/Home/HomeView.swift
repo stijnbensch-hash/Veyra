@@ -10,8 +10,8 @@ struct HomeView: View {
 
     @State private var bentoTitle: ContinueItem?
     @State private var bentoChannel: PlayableSource?
-    @State private var bentoFilm: IPTVVODItem?
-    @State private var bentoSeries: XtreamSeriesItem?
+    @State private var bentoFilm: IPTVHomeFilm?
+    @State private var bentoSeries: IPTVHomeSeries?
     @State private var bentoRelease: BentoTMDBTitle?
     @State private var bentoCatalog: BentoCatalog?
     @State private var sportQuery: SportChannelQuery?
@@ -71,8 +71,8 @@ struct HomeView: View {
 private struct HomeDestinations: ViewModifier {
     @Binding var title: ContinueItem?
     @Binding var channel: PlayableSource?
-    @Binding var film: IPTVVODItem?
-    @Binding var series: XtreamSeriesItem?
+    @Binding var film: IPTVHomeFilm?
+    @Binding var series: IPTVHomeSeries?
     @Binding var release: BentoTMDBTitle?
     @Binding var catalog: BentoCatalog?
 
@@ -88,7 +88,8 @@ private struct HomeDestinations: ViewModifier {
                 PlayerView(source: film.playableSource)
             }
             .navigationDestination(item: $series) { series in
-                IPTVSeriesEpisodesView(series: series)
+                IPTVSeriesEpisodesView(series: series.item, providerID: series.providerID,
+                                       providerName: series.providerName)
             }
             .navigationDestination(item: $catalog) { catalog in
                 VeyraBentoCatalogView(catalog: catalog, onOpen: { release = $0 })
@@ -103,8 +104,8 @@ private struct HomeDestinations: ViewModifier {
 private struct HomeActiveTracking: ViewModifier {
     let title: ContinueItem?
     let channel: PlayableSource?
-    let film: IPTVVODItem?
-    let series: XtreamSeriesItem?
+    let film: IPTVHomeFilm?
+    let series: IPTVHomeSeries?
     let release: BentoTMDBTitle?
     let catalog: BentoCatalog?
 

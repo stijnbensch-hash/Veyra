@@ -619,6 +619,21 @@ struct LiveTVView: View {
             }
         }
 
+        // Rechtstreeks verbergen vanuit de zenderlijst zelf, zonder naar
+        // "Live TV beheren" te moeten gaan -- zie VeyraEPGStore.setChannelVisible.
+        Button(role: .destructive) {
+            guide.setChannelVisible(
+                row.channel,
+                visible: false
+            )
+        } label: {
+            Label(
+                "Zender verbergen",
+                systemImage:
+                    "eye.slash"
+            )
+        }
+
         if ChannelLogoOverrideStore
             .logoURL(
                 forChannelID:

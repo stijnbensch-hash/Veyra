@@ -5,22 +5,20 @@ actor IPTVVODCatalogCache {
         IPTVVODCatalogCache()
 
     private struct MovieEntry {
-        let providerIdentifier: String
         let loadedAt: Date
         let items: [IPTVVODItem]
     }
 
     private struct SeriesEntry {
-        let providerIdentifier: String
         let loadedAt: Date
         let items: [XtreamSeriesItem]
     }
 
-    private var movieEntry:
-        MovieEntry?
+    private var movieEntries:
+        [String: MovieEntry] = [:]
 
-    private var seriesEntry:
-        SeriesEntry?
+    private var seriesEntries:
+        [String: SeriesEntry] = [:]
 
     private let lifetime:
         TimeInterval = 15 * 60
@@ -29,9 +27,7 @@ actor IPTVVODCatalogCache {
         providerIdentifier: String
     ) -> [IPTVVODItem]? {
         guard
-            let movieEntry,
-            movieEntry.providerIdentifier
-                == providerIdentifier,
+            let movieEntry = movieEntries[providerIdentifier],
             Date().timeIntervalSince(
                 movieEntry.loadedAt
             ) < lifetime
@@ -46,10 +42,8 @@ actor IPTVVODCatalogCache {
         _ items: [IPTVVODItem],
         providerIdentifier: String
     ) {
-        movieEntry =
+        movieEntries[providerIdentifier] =
             MovieEntry(
-                providerIdentifier:
-                    providerIdentifier,
                 loadedAt:
                     Date(),
                 items:
@@ -61,9 +55,7 @@ actor IPTVVODCatalogCache {
         providerIdentifier: String
     ) -> [XtreamSeriesItem]? {
         guard
-            let seriesEntry,
-            seriesEntry.providerIdentifier
-                == providerIdentifier,
+            let seriesEntry = seriesEntries[providerIdentifier],
             Date().timeIntervalSince(
                 seriesEntry.loadedAt
             ) < lifetime
@@ -78,10 +70,8 @@ actor IPTVVODCatalogCache {
         _ items: [XtreamSeriesItem],
         providerIdentifier: String
     ) {
-        seriesEntry =
+        seriesEntries[providerIdentifier] =
             SeriesEntry(
-                providerIdentifier:
-                    providerIdentifier,
                 loadedAt:
                     Date(),
                 items:
@@ -90,8 +80,8 @@ actor IPTVVODCatalogCache {
     }
 
     func invalidate() {
-        movieEntry = nil
-        seriesEntry = nil
+        movieEntries.removeAll()
+        seriesEntries.removeAll()
     }
 }
 
@@ -145,54 +135,62 @@ struct IPTVVODSourceProvider:
     ) async throws -> [PlayableSource] {
         try Task.checkCancellation()
 
-        guard
-            let configuration =
-                try configurationStore.load()
-        else {
-            return []
-        }
+        let providers = SourceOrderDefaults.sortedProviders(
+            try configurationStore.loadProviders(),
+            order: SourceOrderDefaults.loadIPTVProviderOrder(),
+            id: { $0.id }
+        )
 
-        guard
-            case .xtream(
-                let xtreamConfiguration
-            ) = configuration
-        else {
-            return []
-        }
+        // De actieve IPTV-provider bepaalt Live TV, maar de bronkeuze moet
+        // VOD van elke ingestelde Xtream-provider kunnen vinden.
+        return await withTaskGroup(of: (Int, [PlayableSource]).self) { group in
+            for (index, provider) in providers.enumerated() {
+                guard case .xtream(let xtreamConfiguration) = provider.configuration else {
+                    continue
+                }
 
-        switch item.type {
-        case .movie:
-            return try await movieSources(
-                for: item,
-                configuration:
-                    configuration,
-                xtreamConfiguration:
-                    xtreamConfiguration
-            )
+                group.addTask {
+                    do {
+                        switch item.type {
+                        case .movie:
+                            let values = try await movieSources(
+                                for: item,
+                                provider: provider,
+                                xtreamConfiguration: xtreamConfiguration
+                            )
+                            return (index, values)
 
-        default:
-            guard
-                let seasonNumber =
-                    item.seasonNumber,
-                let episodeNumber =
-                    item.episodeNumber,
-                seasonNumber >= 0,
-                episodeNumber > 0
-            else {
-                return []
+                        case .series, .iptvSeries:
+                            guard let season = item.seasonNumber,
+                                  let episode = item.episodeNumber,
+                                  season >= 0, episode > 0
+                            else { return (index, []) }
+
+                            let values = try await episodeSources(
+                                for: item,
+                                seasonNumber: season,
+                                episodeNumber: episode,
+                                provider: provider,
+                                xtreamConfiguration: xtreamConfiguration
+                            )
+                            return (index, values)
+
+                        case .liveTV:
+                            return (index, [])
+                        }
+                    } catch {
+                        // Een onbereikbare provider mag de andere resultaten
+                        // niet verbergen.
+                        return (index, [])
+                    }
+                }
             }
 
-            return try await episodeSources(
-                for: item,
-                seasonNumber:
-                    seasonNumber,
-                episodeNumber:
-                    episodeNumber,
-                configuration:
-                    configuration,
-                xtreamConfiguration:
-                    xtreamConfiguration
-            )
+            var results: [(Int, [PlayableSource])] = []
+            for await values in group {
+                results.append(values)
+            }
+            return results.sorted { $0.0 < $1.0 }.flatMap(\.1)
         }
     }
 
@@ -200,17 +198,13 @@ struct IPTVVODSourceProvider:
 
     private func movieSources(
         for item: MediaItem,
-        configuration:
-            IPTVStoredConfiguration,
+        provider: IPTVStoredProvider,
         xtreamConfiguration:
             XtreamConfiguration
     ) async throws -> [PlayableSource] {
-        let preferences =
-            preferencesStore.load(
-                for: configuration
-            )
+        let configuration = provider.configuration
 
-        let catalog:
+        let unfilteredCatalog:
             [IPTVVODItem]
 
         if let cached =
@@ -220,7 +214,7 @@ struct IPTVVODSourceProvider:
                         .providerIdentifier
             )
         {
-            catalog = cached
+            unfilteredCatalog = cached
         } else {
             let values =
                 try await service
@@ -232,42 +226,27 @@ struct IPTVVODSourceProvider:
 
             try Task.checkCancellation()
 
-            let filtered =
-                values.filter { vodItem in
-                    guard
-                        preferences
-                            .isVODItemVisible(
-                                vodItem.id
-                            )
-                    else {
-                        return false
-                    }
-
-                    guard
-                        let categoryID =
-                            vodItem.categoryID,
-                        !categoryID.isEmpty
-                    else {
-                        return true
-                    }
-
-                    return preferences
-                        .isVODCategoryVisible(
-                            categoryID
-                        )
-                }
-
             await cache.store(
-                filtered,
+                values,
                 providerIdentifier:
                     configuration
                         .providerIdentifier
             )
 
-            catalog = filtered
+            unfilteredCatalog = values
         }
 
         try Task.checkCancellation()
+
+        // Cache de volledige catalogus; zichtbaarheid wordt bij iedere
+        // zoekactie opnieuw toegepast, ook na een wijziging in Instellingen.
+        let preferences = preferencesStore.load(for: configuration)
+        let catalog = unfilteredCatalog.filter { vodItem in
+            guard preferences.isVODItemVisible(vodItem.id) else { return false }
+            guard let categoryID = vodItem.categoryID, !categoryID.isEmpty
+            else { return true }
+            return preferences.isVODCategoryVisible(categoryID)
+        }
 
         let target =
             Self.normalizedTitle(
@@ -339,13 +318,20 @@ struct IPTVVODSourceProvider:
                     == .orderedAscending
             }
 
+        // Alle duidelijke titelmatches tonen; alleen voor zwakke/fuzzy
+        // matches een limiet gebruiken om irrelevante resultaten te weren.
+        let strongMatches = sorted.filter { $0.score >= 600 }
+        let matches = strongMatches.isEmpty
+            ? Array(sorted.prefix(12))
+            : strongMatches
+
         var result:
             [PlayableSource] = []
 
         var seenURLs =
             Set<String>()
 
-        for candidate in sorted.prefix(12) {
+        for candidate in matches {
             let original =
                 candidate.item
                     .playableSource
@@ -373,6 +359,8 @@ struct IPTVVODSourceProvider:
                         original.url,
                     kind:
                         .iptvVOD,
+                    providerName:
+                        provider.displayName,
                     requiresSoftwareVideo:
                         original
                             .requiresSoftwareVideo
@@ -389,17 +377,13 @@ struct IPTVVODSourceProvider:
         for item: MediaItem,
         seasonNumber: Int,
         episodeNumber: Int,
-        configuration:
-            IPTVStoredConfiguration,
+        provider: IPTVStoredProvider,
         xtreamConfiguration:
             XtreamConfiguration
     ) async throws -> [PlayableSource] {
-        let preferences =
-            preferencesStore.load(
-                for: configuration
-            )
+        let configuration = provider.configuration
 
-        let catalog:
+        let unfilteredCatalog:
             [XtreamSeriesItem]
 
         if let cached =
@@ -409,7 +393,7 @@ struct IPTVVODSourceProvider:
                         .providerIdentifier
             )
         {
-            catalog = cached
+            unfilteredCatalog = cached
         } else {
             let values =
                 try await service
@@ -421,33 +405,27 @@ struct IPTVVODSourceProvider:
 
             try Task.checkCancellation()
 
-            let filtered =
-                values.filter { series in
-                    guard
-                        let categoryID =
-                            series.categoryID,
-                        !categoryID.isEmpty
-                    else {
-                        return true
-                    }
-
-                    return preferences
-                        .isVODCategoryVisible(
-                            categoryID
-                        )
-                }
-
             await cache.storeSeries(
-                filtered,
+                values,
                 providerIdentifier:
                     configuration
                         .providerIdentifier
             )
 
-            catalog = filtered
+            unfilteredCatalog = values
         }
 
         try Task.checkCancellation()
+
+        let preferences = preferencesStore.load(for: configuration)
+        let catalog = unfilteredCatalog.filter { series in
+            guard preferences.isSeriesItemVisible(String(series.id)) else {
+                return false
+            }
+            guard let categoryID = series.categoryID, !categoryID.isEmpty
+            else { return true }
+            return preferences.isSeriesCategoryVisible(categoryID)
+        }
 
         let target =
             Self.normalizedTitle(
@@ -486,6 +464,11 @@ struct IPTVVODSourceProvider:
                     $0.score > $1.score
                 }
 
+        let strongMatches = candidates.filter { $0.score >= 600 }
+        let matches = strongMatches.isEmpty
+            ? Array(candidates.prefix(4))
+            : strongMatches
+
         guard
             !candidates.isEmpty
         else {
@@ -499,12 +482,13 @@ struct IPTVVODSourceProvider:
             Set<String>()
 
         for candidate
-            in candidates.prefix(4)
+            in matches
         {
             try Task.checkCancellation()
 
-            let info =
-                try await service
+            let info: XtreamSeriesInfo
+            do {
+                info = try await service
                     .loadXtreamSeriesInfo(
                         configuration:
                             xtreamConfiguration,
@@ -513,6 +497,11 @@ struct IPTVVODSourceProvider:
                                 .series
                                 .id
                     )
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                continue
+            }
 
             try Task.checkCancellation()
 
@@ -546,12 +535,19 @@ struct IPTVVODSourceProvider:
                     continue
                 }
 
-                result.append(source)
+                result.append(
+                    PlayableSource(
+                        name: source.name,
+                        description: source.description,
+                        metadata: source.metadata,
+                        url: source.url,
+                        kind: source.kind,
+                        providerName: provider.displayName,
+                        requiresSoftwareVideo: source.requiresSoftwareVideo
+                    )
+                )
             }
 
-            if !result.isEmpty {
-                break
-            }
         }
 
         return result

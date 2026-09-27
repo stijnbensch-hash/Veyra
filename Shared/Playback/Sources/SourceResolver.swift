@@ -316,8 +316,14 @@ struct SourceResolver {
             [ResolvedSource] = []
 
         for value in values {
+            // De IPTV-provider haalt dubbels uit zijn eigen catalogus.
+            // Bewaar daarna elke bron apart, ook bij gelijke namen of URL's
+            // van verschillende ingestelde providers.
+            let providerKey = value.source.kind == .iptvVOD
+                ? "|\(value.source.id.uuidString)"
+                : ""
             let key =
-                "\(value.source.url.absoluteString)|\(value.isFromHub)"
+                "\(value.source.url.absoluteString)|\(value.isFromHub)\(providerKey)"
 
             guard
                 seenKeys.insert(key).inserted

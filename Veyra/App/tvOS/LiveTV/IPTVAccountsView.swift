@@ -526,59 +526,8 @@ struct IPTVAccountsView: View {
 private struct IPTVProviderManagementLauncherView: View {
     let providerID: UUID
 
-    @State private var isReady = false
-    @State private var errorMessage: String?
-
-    @State private var previousActiveProviderID: UUID?
-
-    private let configurationStore = IPTVConfigurationStore()
-
     var body: some View {
-        Group {
-            if isReady {
-                IPTVProviderManagementView()
-            } else if let errorMessage {
-                ZStack {
-                    VeyraBackground().ignoresSafeArea()
-
-                    VStack(spacing: 20) {
-                        Image(systemName: "exclamationmark.triangle")
-                            .font(.system(size: 53))
-
-                        Text("Provider kon niet worden geopend")
-                            .font(.system(size: 26))
-
-                        Text(errorMessage)
-                            .font(.system(size: 22))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            } else {
-                ZStack {
-                    VeyraBackground().ignoresSafeArea()
-
-                    ProgressView("Provider laden…")
-                        .font(.system(size: 22))
-                }
-            }
-        }
-        .task { prepareProvider() }
-        .onDisappear { restorePreviousProvider() }
-    }
-
-    private func prepareProvider() {
-        do {
-            previousActiveProviderID = try configurationStore.activeProviderID()
-            try configurationStore.setActiveProvider(id: providerID)
-            isReady = true
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    private func restorePreviousProvider() {
-        guard let previousActiveProviderID, previousActiveProviderID != providerID else { return }
-        try? configurationStore.setActiveProvider(id: previousActiveProviderID)
+        IPTVProviderManagementView(providerID: providerID)
     }
 }
 

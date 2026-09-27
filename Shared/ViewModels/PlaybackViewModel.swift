@@ -8,6 +8,16 @@ final class PlaybackViewModel: ObservableObject {
     @Published private(set) var playbackEngine: AetherPlaybackEngine?
     @Published private(set) var playbackError: String?
 
+    // "Kijk je nog?" -- na lange inactiviteit (geen tik/toets/remote-druk)
+    // vraagt de speler dit, en stopt vanzelf als er geen reactie komt.
+    // `registerActivity()` wordt aangeroepen vanuit elke bestaande
+    // interactie in de platform-spelers (tik, knop, remote-commando).
+    @Published private(set) var showStillWatchingPrompt = false
+    private var lastActivityAt = Date()
+    private var idleMonitorTask: Task<Void, Never>?
+    private static let idleTimeout: TimeInterval = 4 * 60 * 60
+    private static let idlePromptGrace: TimeInterval = 60
+
     private var tracker: TraktPlaybackTracker?
     private var veyraHubTracker: VeyraHubPlaybackTracker?
     private var recorderCleanupTracker: VeyraHubRecorderCleanupTracker?
@@ -16,6 +26,13 @@ final class PlaybackViewModel: ObservableObject {
     private let source: PlayableSource
     private let item: MediaItem?
     private let resumeProgress: Double?
+
+    // Live-zender die niet start: automatisch dezelfde zender bij een
+    // ANDERE ingestelde IPTV-playlist proberen (zie
+    // `LiveChannelFallbackResolver`), precies één keer per sessie, vóór de
+    // gewone foutmelding ("Opnieuw proberen") getoond wordt.
+    private var activeSource: PlayableSource!
+    private var attemptedLiveFallback = false
 
     // Sommige IPTV/live-TV-bronnen laten de onderliggende netwerkverbinding
     // hangen (time-outs bij de probe/handshake) zonder dat AetherEngine dat
@@ -29,11 +46,14 @@ final class PlaybackViewModel: ObservableObject {
         self.source = source
         self.item = item
         self.resumeProgress = resumeProgress
+        self.activeSource = source
     }
 
     func startPlayback() async {
         videoRecoveryTask?.cancel()
         videoRecoveryTask = nil
+        registerActivity()
+        startIdleMonitor()
         do {
             SubtitleService.shared.reset()
 
@@ -44,22 +64,22 @@ final class PlaybackViewModel: ObservableObject {
                 tracker = TraktPlaybackTracker(item: item, engine: engine.engine)
             }
 
-            if let sync = source.progressSync {
+            if let sync = activeSource.progressSync {
                 veyraHubTracker = VeyraHubPlaybackTracker(sync: sync, engine: engine.engine)
             }
 
-            if let cleanup = source.recorderCleanup {
+            if let cleanup = activeSource.recorderCleanup {
                 recorderCleanupTracker = VeyraHubRecorderCleanupTracker(cleanup: cleanup, engine: engine.engine)
             }
 
-            let playSource = source
+            let playSource = activeSource!
             let playResumeProgress = await Self.resolveResumeProgress(
-                source: source,
+                source: activeSource,
                 item: item,
                 fallback: resumeProgress
             )
 
-            try await Self.withTimeout(seconds: Self.playbackStartTimeout, isLiveTV: source.kind == .liveTV) {
+            try await Self.withTimeout(seconds: Self.playbackStartTimeout, isLiveTV: activeSource.kind == .liveTV) {
                 try await engine.play(playSource, resumeProgress: playResumeProgress)
             }
 
@@ -72,7 +92,7 @@ final class PlaybackViewModel: ObservableObject {
             // zwarte scherm dat daar zonder deze tak nooit hersteld of
             // gemeld werd) -- zie ook de tvOS-tak in `makeLoadOptions`
             // hierboven, in AetherPlaybackEngine.swift.
-            if source.kind == .liveTV || source.kind == .iptvVOD {
+            if activeSource.kind == .liveTV || activeSource.kind == .iptvVOD {
                 monitorFirstVideoFrame(engine)
             }
             #endif
@@ -98,6 +118,17 @@ final class PlaybackViewModel: ObservableObject {
             playbackEngine?.stop()
             SubtitleService.shared.reset()
 
+            // Live-zender die niet start: eerst, éénmalig, dezelfde zender
+            // bij een andere ingestelde playlist proberen vóór de gewone
+            // foutmelding getoond wordt.
+            if activeSource.kind == .liveTV, !attemptedLiveFallback,
+               let fallback = await LiveChannelFallbackResolver.resolve(after: activeSource) {
+                attemptedLiveFallback = true
+                activeSource = fallback
+                await startPlayback()
+                return
+            }
+
             playbackError = error.localizedDescription
         }
     }
@@ -110,6 +141,8 @@ final class PlaybackViewModel: ObservableObject {
     }
 
     func stopForDisappear() {
+        idleMonitorTask?.cancel()
+        idleMonitorTask = nil
         videoRecoveryTask?.cancel()
         videoRecoveryTask = nil
         tracker?.finish()
@@ -122,6 +155,41 @@ final class PlaybackViewModel: ObservableObject {
         veyraHubTracker = nil
         recorderCleanupTracker = nil
         playbackEngine = nil
+    }
+
+    // MARK: - "Kijk je nog?"
+
+    /// Door elke bestaande interactie in de spelers aangeroepen (tik, knop,
+    /// remote-commando) -- reset de inactiviteitsklok en sluit een eventuele
+    /// "Kijk je nog?"-vraag meteen af.
+    func registerActivity() {
+        lastActivityAt = Date()
+        if showStillWatchingPrompt { showStillWatchingPrompt = false }
+    }
+
+    private func startIdleMonitor() {
+        idleMonitorTask?.cancel()
+        idleMonitorTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 30_000_000_000)
+                guard let self, !Task.isCancelled else { return }
+                self.checkIdle()
+            }
+        }
+    }
+
+    private func checkIdle() {
+        let idleFor = Date().timeIntervalSince(lastActivityAt)
+        if showStillWatchingPrompt {
+            if idleFor >= Self.idleTimeout + Self.idlePromptGrace {
+                idleMonitorTask?.cancel()
+                idleMonitorTask = nil
+                stopForDisappear()
+                playbackError = "Afspelen gestopt: geen reactie op \"Kijk je nog?\"."
+            }
+        } else if idleFor >= Self.idleTimeout {
+            showStillWatchingPrompt = true
+        }
     }
 
     func handleScenePhaseChange(_ phase: ScenePhase) {

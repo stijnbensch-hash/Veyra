@@ -6,6 +6,22 @@ import Foundation
 /// Trakt-koppeling.
 enum NextEpisodeResolver {
     static func resolve(after item: MediaItem?) async -> MediaItem? {
+        guard let candidate = await resolveCandidate(after: item) else { return nil }
+
+        // TMDB kan een volgende aflevering (of zelfs een volgend seizoen)
+        // kennen die nergens bij een aangesloten addon/IPTV/mediaserver
+        // effectief speelbaar is (nog niet uitgezonden bij de provider, of
+        // gewoon niet aangeboden). Zonder deze check verscheen de "Volgende
+        // aflevering"-knop dan toch, en kwam je na een tik op een leeg
+        // bronkeuzescherm ("Geen afspeelbronnen gevonden.") terecht. Daarom
+        // hier al vooraf checken of er überhaupt een bron is.
+        let sources = await SourceResolver().sources(for: candidate)
+        guard !sources.isEmpty else { return nil }
+
+        return candidate
+    }
+
+    private static func resolveCandidate(after item: MediaItem?) async -> MediaItem? {
         guard let item, item.type == .series,
               let seriesID = item.tmdbID,
               let seasonNumber = item.seasonNumber,

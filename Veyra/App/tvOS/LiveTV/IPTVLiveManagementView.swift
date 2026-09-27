@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct IPTVLiveManagementView: View {
+    var providerID: UUID? = nil
+
     @State private var configuration:
         IPTVStoredConfiguration?
 
@@ -721,10 +723,14 @@ struct IPTVLiveManagementView: View {
         confirmationMessage = nil
 
         do {
+            let configuration: IPTVStoredConfiguration?
+            if let providerID {
+                configuration = try configurationStore.loadProvider(id: providerID)?.configuration
+            } else {
+                configuration = try configurationStore.load()
+            }
             guard
-                let configuration =
-                    try configurationStore
-                        .load()
+                let configuration
             else {
                 self.configuration =
                     nil

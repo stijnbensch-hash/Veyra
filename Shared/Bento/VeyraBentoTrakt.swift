@@ -475,23 +475,41 @@ nonisolated final class TraktHomeAPI: TraktHomeProviding {
         return try Self.decoder().decode(T.self, from: data)
     }
 
+    /// Trakt geeft af en toe een transiënte 500/502/503 terug (bekend bij vooral
+    /// `calendars/*` en `progress/watched`) zonder dat er iets mis is met het
+    /// verzoek zelf -- vandaar een korte retry met backoff vóór we de fout
+    /// laten zien. Geen retry op 4xx: dat is een verzoek-/auth-probleem dat
+    /// opnieuw proberen toch niet oplost.
+    private static let serverErrorRetryDelays: [UInt64] = [500_000_000, 1_500_000_000, 3_000_000_000] // ns: 0.5s, 1.5s, 3.0s
+
     private func send(_ path: String, method: String, query: [URLQueryItem]) async throws -> Data {
         var comps = URLComponents(url: base.appendingPathComponent(path), resolvingAgainstBaseURL: false)!
         if !query.isEmpty { comps.queryItems = query }
         var request = URLRequest(url: comps.url!)
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("2", forHTTPHeaderField: "trakt-api-version")
         request.setValue(clientID, forHTTPHeaderField: "trakt-api-key")
         request.setValue("Bearer \(try await tokens.accessToken())", forHTTPHeaderField: "Authorization")
 
-        let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse else { throw TraktHomeError.invalidResponse }
-        switch http.statusCode {
-        case 200..<300: return data
-        case 401: throw TraktHomeError.unauthorized
-        case 429: throw TraktHomeError.rateLimited(retryAfter: http.value(forHTTPHeaderField: "Retry-After").flatMap(Double.init))
-        default: throw TraktHomeError.http(http.statusCode)
+        var attempt = 0
+        while true {
+            let (data, response) = try await session.data(for: request)
+            guard let http = response as? HTTPURLResponse else { throw TraktHomeError.invalidResponse }
+            switch http.statusCode {
+            case 200..<300:
+                return data
+            case 401:
+                throw TraktHomeError.unauthorized
+            case 429:
+                throw TraktHomeError.rateLimited(retryAfter: http.value(forHTTPHeaderField: "Retry-After").flatMap(Double.init))
+            case 500..<600 where attempt < Self.serverErrorRetryDelays.count:
+                try? await Task.sleep(nanoseconds: Self.serverErrorRetryDelays[attempt])
+                attempt += 1
+            default:
+                throw TraktHomeError.http(http.statusCode)
+            }
         }
     }
 
@@ -554,14 +572,27 @@ final class VeyraHomeViewModel {
         do { return .success(try await work()) } catch { return .failure(error) }
     }
 
+    /// "Algemeen \u2192 Startscherm \u2192 Aantal tegels" (Instellingen) -- begrenst hoeveel
+    /// "Verder kijken"-kaarten getoond worden, meest recente behouden. Rechtstreeks uit
+    /// UserDefaults gelezen (i.p.v. @AppStorage, dat enkel in Views werkt); 10 als terugval
+    /// zolang de instelling nooit is opgeslagen (UserDefaults.integer geeft dan 0 terug).
+    private static var continueWatchingLimit: Int {
+        let stored = UserDefaults.standard.integer(forKey: GeneralSettingsDefaults.continueWatchingLimitKey)
+        return stored > 0 ? stored : 10
+    }
+
     func load() async {
         phase = .loading
         let provider = self.provider
+        // Ruimer ophalen dan uiteindelijk getoond wordt (zie `continueWatchingLimit` hieronder):
+        // Trakt-checkpoints die geen "te gaan" meer hebben, worden client-side weggefilterd
+        // (zie `continueWatching(limit:)`), dus een kleine instelling mag niet ook al de
+        // ruwe ophaling beperken -- anders houd je soms minder dan gevraagd over.
         async let cont = Self.capture { try await provider.continueWatching(limit: 80) }
         async let soon = Self.capture { try await provider.upcoming(days: 14) }
         let (c, u) = await (cont, soon)
 
-        if case .success(let items) = c { continueItems = items }
+        if case .success(let items) = c { continueItems = Array(items.prefix(Self.continueWatchingLimit)) }
         if case .success(let items) = u { upcoming = items }
         // Nieuw opgehaalde items hebben nog geen beeld: hergebruik wat al eerder is opgehaald.
         for (id, art) in artworkCache { apply(art, to: id) }
@@ -570,13 +601,11 @@ final class VeyraHomeViewModel {
         case (.failure(let e), .failure): phase = .failed(e.localizedDescription)
         default: phase = .loaded
         }
-        // Trakt-limiet met al bestaande gegevens: stil laten staan; de volgende verversing probeert het opnieuw.
-        func isRateLimit(_ error: Error) -> Bool {
-            if case TraktHomeError.rateLimited = error { return true }
-            return false
-        }
-        if case .failure(let e) = c { notice = (isRateLimit(e) && !continueItems.isEmpty) ? nil : e.localizedDescription }
-        else if case .failure(let e) = u { notice = (isRateLimit(e) && !upcoming.isEmpty) ? nil : e.localizedDescription }
+        // Toon de foutmelding alleen als er voor die sectie niets te laten zien is -- anders
+        // blokkeert een mislukte "Binnenkort"-call (bv. een tijdelijke Trakt 500) onterecht het
+        // hele scherm terwijl "Verder kijken" wel gewoon geladen is (en omgekeerd).
+        if case .failure(let e) = c, continueItems.isEmpty { notice = e.localizedDescription }
+        else if case .failure(let e) = u, upcoming.isEmpty { notice = e.localizedDescription }
         else { notice = nil }
         await enrichArtwork()
     }

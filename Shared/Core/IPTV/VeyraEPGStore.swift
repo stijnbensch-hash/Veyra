@@ -702,6 +702,42 @@ final class VeyraEPGStore: ObservableObject {
         }
     }
 
+    // MARK: - Channel visibility
+
+    /// Verbergt of toont een zender rechtstreeks vanuit de zenderlijst zelf (contextmenu),
+    /// zonder eerst naar "Live TV beheren" te moeten gaan. Bewaart dezelfde voorkeur als
+    /// dat beheerscherm (`IPTVProviderPreferences.hiddenLiveChannelIDs`) en past de
+    /// gefilterde lijst meteen aan -- geen reload nodig, dus geen hapering/deselectie.
+    func setChannelVisible(_ channel: IPTVChannel, visible: Bool) {
+        guard let configuration = loadedConfiguration else { return }
+        var preferences = loadedPreferences ?? preferencesStore.load(for: configuration)
+        preferences.setLiveChannel(channel.id, visible: visible)
+
+        do {
+            try preferencesStore.save(preferences, for: configuration)
+        } catch {
+            channelError = error.localizedDescription
+            return
+        }
+
+        loadedPreferences = preferences
+
+        channels = allChannels.filter {
+            preferences.isLiveCategoryVisible($0.categoryID)
+                && preferences.isLiveChannelVisible($0.channel.id)
+        }
+        normalizeFavoriteOrder()
+
+        let groupsWithChannels = Set(channels.map(\.categoryID))
+        categories = categories.filter {
+            groupsWithChannels.contains($0.id) && preferences.isLiveCategoryVisible($0.id)
+        }
+        if selectedCategory.hasPrefix("group:"),
+           !categories.contains(where: { "group:" + $0.id == selectedCategory }) {
+            selectedCategory = "favorites"
+        }
+    }
+
     // MARK: - Provider
 
     func selectProvider(

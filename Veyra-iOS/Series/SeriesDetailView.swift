@@ -264,7 +264,9 @@ struct SeriesDetailView: View {
                         tmdbID:
                             series.id,
                         imdbID:
-                            nil
+                            nil,
+                        title:
+                            series.name
                     )
         }
     }

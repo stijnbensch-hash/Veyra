@@ -11,6 +11,11 @@ struct SeasonEpisodesView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
 
+    // Lange seizoenen (soaps met honderden afleveringen) in stukken van 50
+    // knippen met chips ("1-50 / 51-100 / ...") i.p.v. één eindeloze lijst.
+    @State private var selectedChunk = 0
+    private let chunkSize = 50
+
     // "Verder kijken"-voortgang per aflevering (Trakt playback-status),
     // zodat een aflevering die al gedeeltelijk bekeken is een balkje
     // krijgt, net als de "Verder kijken"-rij op Home.
@@ -33,11 +38,16 @@ struct SeasonEpisodesView: View {
                     systemImage: "tv"
                 )
             } else {
-                List(episodes.sorted { $0.episodeNumber < $1.episodeNumber }) { episode in
-                    episodeRow(episode)
+                VStack(spacing: 0) {
+                    if chunks.count > 1 {
+                        chunkPicker
+                    }
+                    List(episodesInSelectedChunk) { episode in
+                        episodeRow(episode)
+                    }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
                 .veyraReadableWidth(860)
             }
             }
@@ -46,6 +56,53 @@ struct SeasonEpisodesView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             await loadSeason()
+        }
+    }
+
+    // MARK: - Paginering
+
+    private var sortedEpisodes: [TMDBEpisode] {
+        episodes.sorted { $0.episodeNumber < $1.episodeNumber }
+    }
+
+    /// Groepeert `sortedEpisodes` in stukken van `chunkSize`.
+    private var chunks: [[TMDBEpisode]] {
+        stride(from: 0, to: sortedEpisodes.count, by: chunkSize).map {
+            Array(sortedEpisodes[$0..<min($0 + chunkSize, sortedEpisodes.count)])
+        }
+    }
+
+    private var episodesInSelectedChunk: [TMDBEpisode] {
+        guard chunks.indices.contains(selectedChunk) else { return sortedEpisodes }
+        return chunks[selectedChunk]
+    }
+
+    private func chunkLabel(_ index: Int) -> String {
+        guard chunks.indices.contains(index),
+              let first = chunks[index].first, let last = chunks[index].last
+        else { return "" }
+        return first.episodeNumber == last.episodeNumber
+            ? "\(first.episodeNumber)"
+            : "\(first.episodeNumber)-\(last.episodeNumber)"
+    }
+
+    private var chunkPicker: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(chunks.indices, id: \.self) { index in
+                    Button(chunkLabel(index)) { selectedChunk = index }
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(
+                            selectedChunk == index ? VeyraColors.cyan.opacity(0.25) : VeyraColors.surface,
+                            in: Capsule()
+                        )
+                        .foregroundStyle(selectedChunk == index ? VeyraColors.cyan : .primary)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
         }
     }
 

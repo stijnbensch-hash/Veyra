@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct IPTVProviderManagementView: View {
+    var providerID: UUID? = nil
+
     @State private var configuration:
         IPTVStoredConfiguration?
 
@@ -125,7 +127,7 @@ struct IPTVProviderManagementView: View {
                 )
 
             NavigationLink {
-                IPTVLiveManagementView()
+                IPTVLiveManagementView(providerID: providerID)
             } label: {
                 managementRow(
                     icon: "tv",
@@ -139,7 +141,7 @@ struct IPTVProviderManagementView: View {
 
             if case .xtream = configuration {
                 NavigationLink {
-                    IPTVVODManagementView()
+                    IPTVVODManagementView(providerID: providerID)
                 } label: {
                     managementRow(
                         icon: "film",
@@ -147,6 +149,19 @@ struct IPTVProviderManagementView: View {
                         subtitle:
                             "VOD-lijsten en titels tonen of verbergen",
                         status: vodStatus
+                    )
+                }
+                .buttonStyle(.card)
+
+                NavigationLink {
+                    IPTVSeriesManagementView(providerID: providerID)
+                } label: {
+                    managementRow(
+                        icon: "tv.badge.wifi",
+                        title: "SERIES BEHEREN",
+                        subtitle:
+                            "Series-categorieën en series tonen of verbergen",
+                        status: seriesStatus
                     )
                 }
                 .buttonStyle(.card)
@@ -291,6 +306,28 @@ struct IPTVProviderManagementView: View {
         return "\(total) verborgen"
     }
 
+    private var seriesStatus: String {
+        let hiddenCategories =
+            preferences
+                .hiddenSeriesCategoryIDs
+                .count
+
+        let hiddenItems =
+            preferences
+                .hiddenSeriesItemIDs
+                .count
+
+        let total =
+            hiddenCategories +
+            hiddenItems
+
+        guard total > 0 else {
+            return "Alles zichtbaar"
+        }
+
+        return "\(total) verborgen"
+    }
+
     private var providerName: String {
         guard let configuration else {
             return "IPTV"
@@ -323,9 +360,14 @@ struct IPTVProviderManagementView: View {
 
     private func loadConfiguration() {
         do {
+            let configuration: IPTVStoredConfiguration?
+            if let providerID {
+                configuration = try configurationStore.loadProvider(id: providerID)?.configuration
+            } else {
+                configuration = try configurationStore.load()
+            }
             guard
-                let configuration =
-                    try configurationStore.load()
+                let configuration
             else {
                 self.configuration = nil
 

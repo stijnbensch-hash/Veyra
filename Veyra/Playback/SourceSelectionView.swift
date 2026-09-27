@@ -4,6 +4,9 @@ import SwiftUI
 struct SourceSelectionView: View {
     let item: MediaItem
 
+    @Environment(\.dismiss)
+    private var dismiss
+
     @ObservedObject
     private var traktStore = TraktStore.shared
 
@@ -78,6 +81,9 @@ struct SourceSelectionView: View {
         ) {
             await loadSources()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .iptvConfigurationDidChange)) { _ in
+            reloadID = UUID()
+        }
         .onChange(of: hasLoaded) { _, loaded in
             guard loaded, autoSelectFirstSource, selectedSource == nil,
                   let first = sources.first
@@ -95,6 +101,20 @@ struct SourceSelectionView: View {
                         for: item
                     )
             )
+        }
+        .onChange(of: selectedSource) { previous, current in
+            guard previous != nil, current == nil,
+                  item.type == .series,
+                  item.seasonNumber != nil,
+                  item.episodeNumber != nil
+            else { return }
+
+            // De speler is van de navigatiestapel gehaald. Sluit daarna ook
+            // de bronkeuze, zodat Terug weer bij de aflevering uitkomt.
+            Task { @MainActor in
+                await Task.yield()
+                dismiss()
+            }
         }
     }
 
@@ -1257,8 +1277,11 @@ struct SourceSelectionView: View {
         if resolved.source.kind
             == .iptvVOD
         {
-            return
-                "IPTV VOD"
+            if let providerName = resolved.source.providerName,
+               !providerName.isEmpty {
+                return "IPTV VOD · \(providerName)"
+            }
+            return "IPTV VOD"
         }
 
         // Naast de addonnaam ook vermelden dat dit via VeyraHub loopt, zo

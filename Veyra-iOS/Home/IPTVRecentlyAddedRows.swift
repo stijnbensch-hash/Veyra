@@ -216,6 +216,8 @@ struct IPTVHomeSeriesRow: View {
 /// Toont de afleveringen van een IPTV (Xtream)-serie en speelt ze rechtstreeks af.
 struct IPTVSeriesEpisodesView: View {
     let series: XtreamSeriesItem
+    var providerID: UUID? = nil
+    var providerName: String? = nil
 
     @State private var episodes: [XtreamSeriesEpisode] = []
     @State private var isLoading = true
@@ -243,7 +245,7 @@ struct IPTVSeriesEpisodesView: View {
                         ForEach(group.episodes) { episode in
                             NavigationLink {
                                 PlayerView(
-                                    source: IPTVService().playableSource(for: episode, seriesName: series.name)
+                                    source: episodeSource(episode)
                                 )
                             } label: {
                                 Text("Afl. \(episode.episodeNumber) · \(episode.title)")
@@ -268,13 +270,26 @@ struct IPTVSeriesEpisodesView: View {
         }
     }
 
+    private func episodeSource(_ episode: XtreamSeriesEpisode) -> PlayableSource {
+        let source = IPTVService().playableSource(for: episode, seriesName: series.name)
+        return PlayableSource(name: source.name, description: source.description,
+                              url: source.url, kind: source.kind, providerName: providerName)
+    }
+
     @MainActor
     private func load() async {
         isLoading = true
         errorMessage = nil
 
+        let store = IPTVConfigurationStore()
+        let configuration: IPTVStoredConfiguration?
+        if let providerID {
+            configuration = try? store.loadProvider(id: providerID)?.configuration
+        } else {
+            configuration = try? store.load()
+        }
         guard
-            let configuration = try? IPTVConfigurationStore().load(),
+            let configuration,
             case .xtream(let xtreamConfig) = configuration
         else {
             errorMessage = "Geen Xtream IPTV-provider ingesteld."

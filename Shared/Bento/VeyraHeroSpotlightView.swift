@@ -106,12 +106,12 @@ struct VeyraHeroSpotlightView: View {
             if item.isMovie {
                 loaded = await MetadataRatingsService.movieRatings(
                     tmdbID: tmdbID, imdbID: item.mediaItem.imdbID,
-                    knownTMDBRating: item.rating
+                    title: item.mediaItem.title, knownTMDBRating: item.rating
                 )
             } else {
                 loaded = await MetadataRatingsService.seriesRatings(
                     tmdbID: tmdbID, imdbID: item.mediaItem.imdbID,
-                    knownTMDBRating: item.rating
+                    title: item.mediaItem.title, knownTMDBRating: item.rating
                 )
             }
             guard !Task.isCancelled else { return }

@@ -24,8 +24,8 @@ struct VeyraBentoHomeView: View {
     var onToggleReminder: (UpcomingItem, Bool) -> Void
     var onOpenLiveTV: (String?) -> Void
     var onPlayChannel: (String) -> Void
-    var onOpenIPTVFilm: (IPTVVODItem) -> Void
-    var onOpenIPTVSeries: (XtreamSeriesItem) -> Void
+    var onOpenIPTVFilm: (IPTVHomeFilm) -> Void
+    var onOpenIPTVSeries: (IPTVHomeSeries) -> Void
     var onOpenTMDBTitle: (BentoTMDBTitle) -> Void
     var onOpenCatalog: (BentoCatalog) -> Void
     var onOpenNew: () -> Void
@@ -62,8 +62,8 @@ struct VeyraBentoHomeView: View {
          onToggleReminder: @escaping (UpcomingItem, Bool) -> Void = { _, _ in },
          onOpenLiveTV: @escaping (String?) -> Void = { _ in },
          onPlayChannel: @escaping (String) -> Void = { _ in },
-         onOpenIPTVFilm: @escaping (IPTVVODItem) -> Void = { _ in },
-         onOpenIPTVSeries: @escaping (XtreamSeriesItem) -> Void = { _ in },
+         onOpenIPTVFilm: @escaping (IPTVHomeFilm) -> Void = { _ in },
+         onOpenIPTVSeries: @escaping (IPTVHomeSeries) -> Void = { _ in },
          onOpenTMDBTitle: @escaping (BentoTMDBTitle) -> Void = { _ in },
          onOpenCatalog: @escaping (BentoCatalog) -> Void = { _ in },
          onOpenNew: @escaping () -> Void = {},
@@ -468,7 +468,8 @@ struct VeyraBentoHomeView: View {
                 VeyraBentoShelf(title: "IPTV films", subtitle: "Nieuw toegevoegd", compact: true) {
                     ForEach(model.iptvFilms) { film in
                         Button { onOpenIPTVFilm(film) } label: {
-                            VeyraBentoPosterContent(title: film.name, url: film.posterURL, compact: true, kind: .movie)
+                            VeyraBentoPosterContent(title: film.name, url: film.posterURL,
+                                                    compact: true, kind: .movie, sourceLabel: film.providerName)
                         }
                         .buttonStyle(.plain)
                     }
@@ -481,7 +482,8 @@ struct VeyraBentoHomeView: View {
                 VeyraBentoShelf(title: "IPTV series", subtitle: "Nieuw toegevoegd", compact: true) {
                     ForEach(model.iptvSeries) { series in
                         Button { onOpenIPTVSeries(series) } label: {
-                            VeyraBentoPosterContent(title: series.name, url: series.coverURL, compact: true, kind: .episode)
+                            VeyraBentoPosterContent(title: series.name, url: series.coverURL,
+                                                    compact: true, kind: .episode, sourceLabel: series.providerName)
                         }
                         .buttonStyle(.plain)
                     }

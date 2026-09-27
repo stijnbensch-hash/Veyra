@@ -696,7 +696,7 @@ struct VeyraBentoPosterContent: View {
             fallbackURL = await VeyraPosterSearch.posterURL(title: title, kind: kind)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(title)
+        .accessibilityLabel(sourceLabel.map { "\(title), \($0)" } ?? title)
     }
 }
 

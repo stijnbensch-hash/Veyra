@@ -691,6 +691,8 @@ struct AllSeriesListView: View {
 struct IPTVSeriesDetailView: View {
     let series:
         XtreamSeriesItem
+    var providerID: UUID? = nil
+    var providerName: String? = nil
 
     @State
     private var episodes:
@@ -836,15 +838,15 @@ struct IPTVSeriesDetailView: View {
             )
 
         return NavigationLink {
+            let source = IPTVService().playableSource(for: episode, seriesName: series.name)
             PlayerView(
-                source:
-                    IPTVService()
-                        .playableSource(
-                            for:
-                                episode,
-                            seriesName:
-                                series.name
-                        )
+                source: PlayableSource(
+                    name: source.name,
+                    description: source.description,
+                    url: source.url,
+                    kind: source.kind,
+                    providerName: providerName
+                )
             )
 
         } label: {
@@ -913,9 +915,15 @@ struct IPTVSeriesDetailView: View {
             let configStore =
                 IPTVConfigurationStore()
 
+            let configuration: IPTVStoredConfiguration?
+            if let providerID {
+                configuration = try configStore.loadProvider(id: providerID)?.configuration
+            } else {
+                configuration = try configStore.load()
+            }
+
             guard
-                let configuration =
-                    try configStore.load(),
+                let configuration,
                 case .xtream(
                     let xtreamConfig
                 ) = configuration

@@ -1,14 +1,26 @@
 import SwiftUI
 
 /// Edits the same per-provider visibility preferences used by tvOS.
+///
+/// Categorieën én kanalen worden rechtstreeks in deze ene lijst
+/// zichtbaar/verborgen gezet -- een tik op een rij wisselt meteen de
+/// zichtbaarheid, geen apart "kanaalmenu" meer nodig zoals voorheen
+/// (`IPTVChannelVisibilityView`, bereikt via een `NavigationLink`-push).
+/// Een categorie uitklappen (`DisclosureGroup`, geen navigatie) toont haar
+/// kanalen direct eronder, met dezelfde tik-om-te-wisselen-rij -- net als
+/// in de Strand-app.
 @MainActor
 struct IPTVLiveVisibilityView: View {
+    var providerID: UUID? = nil
+
     @State private var configuration: IPTVStoredConfiguration?
     @State private var groups: [LiveVisibilityGroup] = []
     @State private var channelsByGroup: [String: [IPTVChannel]] = [:]
     @State private var preferences = IPTVProviderPreferences()
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var expandedGroupIDs: Set<String> = []
+    @State private var searchText = ""
 
     private let configurationStore = IPTVConfigurationStore()
     private let preferencesStore = IPTVProviderPreferencesStore()
@@ -31,26 +43,13 @@ struct IPTVLiveVisibilityView: View {
                         systemImage: "tv"
                     )
                 } else {
-                    List(groups) { group in
-                        NavigationLink {
-                            IPTVChannelVisibilityView(
-                                group: group,
-                                channels: channelsByGroup[group.id] ?? [],
-                                preferences: $preferences,
-                                onSave: save
-                            )
-                        } label: {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(group.name)
-                                    .foregroundStyle(.primary)
-                                Text(status(for: group))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            .padding(.vertical, 4)
+                    List {
+                        ForEach(groups) { group in
+                            groupSection(group)
                         }
                     }
                     .scrollContentBackground(.hidden)
+                    .searchable(text: $searchText, prompt: "Zoek kanalen")
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -94,6 +93,102 @@ struct IPTVLiveVisibilityView: View {
         }
     }
 
+    // MARK: - Rijen
+
+    @ViewBuilder
+    private func groupSection(_ group: LiveVisibilityGroup) -> some View {
+        let channels = filteredChannels(for: group)
+
+        // Tijdens zoeken meteen elke categorie met een match uitklappen --
+        // anders moet je eerst raden in welke categorie een gezocht kanaal
+        // zit voordat je 'm kunt zien/wisselen.
+        let isExpanded = Binding<Bool>(
+            get: { !searchText.isEmpty || expandedGroupIDs.contains(group.id) },
+            set: { expanded in
+                if expanded { expandedGroupIDs.insert(group.id) }
+                else { expandedGroupIDs.remove(group.id) }
+            }
+        )
+
+        if searchText.isEmpty || !channels.isEmpty {
+            DisclosureGroup(isExpanded: isExpanded) {
+                ForEach(channels) { channel in
+                    channelRow(channel)
+                }
+            } label: {
+                groupRow(group)
+            }
+        }
+    }
+
+    private func groupRow(_ group: LiveVisibilityGroup) -> some View {
+        let isVisible = preferences.isLiveCategoryVisible(group.id)
+        return Button {
+            var updated = preferences
+            updated.setLiveCategory(group.id, visible: !isVisible)
+            save(updated)
+        } label: {
+            HStack(spacing: 14) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(group.name).foregroundStyle(.primary)
+                    Text(status(for: group))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Image(systemName: isVisible ? "checkmark.circle.fill" : "circle")
+                    .font(.title3)
+                    .foregroundStyle(isVisible ? VeyraColors.cyan : Color.secondary)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func channelRow(_ channel: IPTVChannel) -> some View {
+        let isVisible = preferences.isLiveChannelVisible(channel.id)
+        return Button {
+            var updated = preferences
+            updated.setLiveChannel(channel.id, visible: !isVisible)
+            save(updated)
+        } label: {
+            HStack(spacing: 12) {
+                AsyncImage(url: ChannelLogoOverrideStore.effectiveLogoURL(
+                    channelID: channel.id, defaultLogoURL: channel.logoURL
+                )) { phase in
+                    if let image = phase.image {
+                        image.resizable().scaledToFit()
+                    } else {
+                        Image(systemName: "tv").foregroundStyle(.secondary)
+                    }
+                }
+                .frame(width: 40, height: 36)
+
+                Text(ChannelNameOverrideStore.effectiveName(
+                    channelID: channel.id, defaultName: channel.name
+                ))
+                .foregroundStyle(.primary)
+
+                Spacer()
+
+                Image(systemName: isVisible ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(isVisible ? VeyraColors.cyan : Color.secondary)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func filteredChannels(for group: LiveVisibilityGroup) -> [IPTVChannel] {
+        let channels = channelsByGroup[group.id] ?? []
+        guard !searchText.isEmpty else { return channels }
+        return channels.filter {
+            ChannelNameOverrideStore.effectiveName(
+                channelID: $0.id, defaultName: $0.name
+            ).localizedCaseInsensitiveContains(searchText)
+        }
+    }
+
     private func status(for group: LiveVisibilityGroup) -> String {
         guard preferences.isLiveCategoryVisible(group.id) else {
             return "Categorie verborgen"
@@ -121,7 +216,13 @@ struct IPTVLiveVisibilityView: View {
         defer { isLoading = false }
 
         do {
-            guard let configuration = try configurationStore.load() else {
+            let configuration: IPTVStoredConfiguration?
+            if let providerID {
+                configuration = try configurationStore.loadProvider(id: providerID)?.configuration
+            } else {
+                configuration = try configurationStore.load()
+            }
+            guard let configuration else {
                 errorMessage = "Stel eerst een IPTV-provider in."
                 return
             }
@@ -174,80 +275,4 @@ struct IPTVLiveVisibilityView: View {
 private struct LiveVisibilityGroup: Identifiable {
     let id: String
     let name: String
-}
-
-@MainActor
-private struct IPTVChannelVisibilityView: View {
-    let group: LiveVisibilityGroup
-    let channels: [IPTVChannel]
-    @Binding var preferences: IPTVProviderPreferences
-    let onSave: (IPTVProviderPreferences) -> Void
-
-    @State private var searchText = ""
-
-    private var filteredChannels: [IPTVChannel] {
-        guard !searchText.isEmpty else { return channels }
-        return channels.filter {
-            ChannelNameOverrideStore.effectiveName(
-                channelID: $0.id, defaultName: $0.name
-            ).localizedCaseInsensitiveContains(searchText)
-        }
-    }
-
-    var body: some View {
-        List {
-            Section {
-                Toggle(
-                    "Categorie zichtbaar",
-                    isOn: Binding(
-                        get: { preferences.isLiveCategoryVisible(group.id) },
-                        set: { visible in
-                            var updated = preferences
-                            updated.setLiveCategory(group.id, visible: visible)
-                            onSave(updated)
-                        }
-                    )
-                )
-                .tint(VeyraColors.cyan)
-            } footer: {
-                Text("Een verborgen categorie verbergt al haar kanalen. De keuzes per kanaal blijven bewaard.")
-            }
-
-            Section("Kanalen") {
-                ForEach(filteredChannels) { channel in
-                    Toggle(
-                        isOn: Binding(
-                            get: { preferences.isLiveChannelVisible(channel.id) },
-                            set: { visible in
-                                var updated = preferences
-                                updated.setLiveChannel(channel.id, visible: visible)
-                                onSave(updated)
-                            }
-                        )
-                    ) {
-                        HStack(spacing: 12) {
-                            AsyncImage(url: ChannelLogoOverrideStore.effectiveLogoURL(
-                                channelID: channel.id, defaultLogoURL: channel.logoURL
-                            )) { phase in
-                                if let image = phase.image {
-                                    image.resizable().scaledToFit()
-                                } else {
-                                    Image(systemName: "tv").foregroundStyle(.secondary)
-                                }
-                            }
-                            .frame(width: 40, height: 36)
-                            Text(ChannelNameOverrideStore.effectiveName(
-                                channelID: channel.id, defaultName: channel.name
-                            ))
-                        }
-                    }
-                    .tint(VeyraColors.cyan)
-                }
-            }
-        }
-        .scrollContentBackground(.hidden)
-        .background(VeyraColors.background)
-        .navigationTitle(group.name)
-        .searchable(text: $searchText, prompt: "Zoek kanalen")
-    }
 }

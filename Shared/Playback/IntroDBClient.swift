@@ -18,10 +18,15 @@ struct IntroDBSegment: Equatable {
 /// zoals opgehaald bij TheIntroDB (zie `IntroDBClient`). Alle tijden in
 /// seconden vanaf het begin van de video.
 struct IntroDBSegments: Equatable {
-    var intro: IntroDBSegment?
-    var recap: IntroDBSegment?
-    var credits: IntroDBSegment?
-    var preview: IntroDBSegment?
+    var intros: [IntroDBSegment] = []
+    var recaps: [IntroDBSegment] = []
+    var creditsSegments: [IntroDBSegment] = []
+    var previews: [IntroDBSegment] = []
+
+    var intro: IntroDBSegment? { intros.first }
+    var recap: IntroDBSegment? { recaps.first }
+    var credits: IntroDBSegment? { creditsSegments.first }
+    var preview: IntroDBSegment? { previews.first }
 
     static let empty = IntroDBSegments()
 }
@@ -34,8 +39,8 @@ struct IntroDBSegments: Equatable {
 /// aanvragen vallen onder hun standaard rate limit van ~30 verzoeken per
 /// 10 seconden, ruim genoeg voor één opzoeking per afspeelsessie).
 ///
-/// Matcht op TMDB-id (+ seizoen/aflevering voor series). Veyra kent geen
-/// TVDB-id, dus die kant van de API wordt hier niet gebruikt.
+/// Matcht bij voorkeur op TMDB-id (+ seizoen/aflevering voor series), of op
+/// IMDb-id wanneer een titel nog geen TMDB-id heeft.
 actor IntroDBClient {
     static let shared = IntroDBClient()
 
@@ -43,12 +48,17 @@ actor IntroDBClient {
     private let session: URLSession
 
     private struct CacheKey: Hashable {
-        let tmdbID: Int
+        let identifier: String
         let season: Int?
         let episode: Int?
     }
 
-    private var cache: [CacheKey: IntroDBSegments] = [:]
+    private struct CachedSegments {
+        let value: IntroDBSegments
+        let fetchedAt: Date
+    }
+
+    private var cache: [CacheKey: CachedSegments] = [:]
     private var inFlight: [CacheKey: Task<IntroDBSegments, Never>] = [:]
 
     init(session: URLSession = .shared) {
@@ -56,17 +66,33 @@ actor IntroDBClient {
     }
 
     /// Haalt de skip-segmenten op voor een film (season/episode = nil) of
-    /// een serie-aflevering. Geeft `.empty` terug bij elke fout, ontbrekend
-    /// tmdb-id, "niet gevonden" of een rate limit — zodat een aanroeper
+    /// een serie-aflevering. Geeft `.empty` terug bij elke fout, ontbrekende
+    /// ID, "niet gevonden" of een rate limit — zodat een aanroeper
     /// zonder foutafhandeling gewoon geen skip-knoppen toont.
     func segments(
-        tmdbID: Int?, season: Int?, episode: Int?, durationSeconds: Double?
+        tmdbID: Int?, imdbID: String? = nil,
+        season: Int?, episode: Int?, durationSeconds: Double?
     ) async -> IntroDBSegments {
-        guard let tmdbID, tmdbID > 0 else { return .empty }
+        let identifier: String
+        let idQueryItem: URLQueryItem
+        if let tmdbID, tmdbID > 0 {
+            identifier = "tmdb:\(tmdbID)"
+            idQueryItem = URLQueryItem(name: "tmdb_id", value: String(tmdbID))
+        } else if let imdbID = imdbID?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  imdbID.hasPrefix("tt"), imdbID.dropFirst(2).count >= 7,
+                  imdbID.dropFirst(2).allSatisfy(\.isNumber) {
+            identifier = "imdb:\(imdbID)"
+            idQueryItem = URLQueryItem(name: "imdb_id", value: imdbID)
+        } else {
+            return .empty
+        }
 
-        let key = CacheKey(tmdbID: tmdbID, season: season, episode: episode)
+        let key = CacheKey(identifier: identifier, season: season, episode: episode)
 
-        if let cached = cache[key] { return cached }
+        if let cached = cache[key],
+           cached.value != .empty || Date().timeIntervalSince(cached.fetchedAt) < 600 {
+            return cached.value
+        }
 
         if let existing = inFlight[key] {
             return await existing.value
@@ -74,14 +100,15 @@ actor IntroDBClient {
 
         let task = Task<IntroDBSegments, Never> { [baseURL, session] in
             var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)!
-            var items = [URLQueryItem(name: "tmdb_id", value: String(tmdbID))]
+            var items = [idQueryItem]
 
             if let season, let episode {
                 items.append(URLQueryItem(name: "season", value: String(season)))
                 items.append(URLQueryItem(name: "episode", value: String(episode)))
             }
 
-            if let durationSeconds, durationSeconds > 0 {
+            if let durationSeconds, durationSeconds.isFinite,
+               durationSeconds > 0, durationSeconds < Double(Int.max) / 1_000 {
                 items.append(
                     URLQueryItem(name: "duration_ms", value: String(Int(durationSeconds * 1000))))
             }
@@ -111,15 +138,14 @@ actor IntroDBClient {
         inFlight[key] = task
         let result = await task.value
         inFlight[key] = nil
-        cache[key] = result
+        cache[key] = CachedSegments(value: result, fetchedAt: Date())
         return result
     }
 }
 
 /// Ruwe JSON-vorm van `GET /v3/media` — zie `TheIntroDB/Api/MediaResponse.swift`
 /// in de officiële Jellyfin-plugin voor het brontype waarop dit is
-/// gebaseerd. Elke lijst bevat 0 of meer segmenten; Veyra gebruikt alleen
-/// het eerste (langste/meest waarschijnlijke) segment per soort.
+/// gebaseerd. Elke lijst kan meerdere segmenten per soort bevatten.
 private struct IntroDBMediaResponse: Decodable {
     struct RawSegment: Decodable {
         let startMs: Double?
@@ -138,18 +164,21 @@ private struct IntroDBMediaResponse: Decodable {
 
     var segments: IntroDBSegments {
         IntroDBSegments(
-            intro: Self.segment(from: intro),
-            recap: Self.segment(from: recap),
-            credits: Self.segment(from: credits),
-            preview: Self.segment(from: preview)
+            intros: Self.segments(from: intro),
+            recaps: Self.segments(from: recap),
+            creditsSegments: Self.segments(from: credits),
+            previews: Self.segments(from: preview)
         )
     }
 
-    private static func segment(from raw: [RawSegment]?) -> IntroDBSegment? {
-        guard let first = raw?.first, first.startMs != nil || first.endMs != nil else { return nil }
-        return IntroDBSegment(
-            start: first.startMs.map { $0 / 1000 },
-            end: first.endMs.map { $0 / 1000 }
-        )
+    private static func segments(from raw: [RawSegment]?) -> [IntroDBSegment] {
+        (raw ?? []).compactMap { value in
+            guard value.startMs != nil || value.endMs != nil else { return nil }
+            return IntroDBSegment(
+                start: value.startMs.map { $0 / 1_000 },
+                end: value.endMs.map { $0 / 1_000 }
+            )
+        }
+        .sorted { ($0.start ?? 0) < ($1.start ?? 0) }
     }
 }

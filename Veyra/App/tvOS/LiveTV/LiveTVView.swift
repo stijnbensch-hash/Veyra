@@ -25,6 +25,9 @@ struct LiveTVView: View {
     private var showFolders = false
 
     @State
+    private var showMultiview = false
+
+    @State
     private var selection: VeyraEPGSelection?
 
     @State
@@ -129,6 +132,11 @@ struct LiveTVView: View {
                 NavigationStack {
                     LiveTVFoldersListView()
                 }
+            }
+            .sheet(
+                isPresented: $showMultiview
+            ) {
+                MultiviewView(guide: guide)
             }
     }
 
@@ -367,6 +375,8 @@ struct LiveTVView: View {
 
             foldersButton
 
+            multiviewButton
+
             settingsButton
         }
         .font(
@@ -562,6 +572,33 @@ struct LiveTVView: View {
         )
         .accessibilityLabel(
             "Zenders en programmagids nu vernieuwen"
+        )
+    }
+
+    /// Meerdere zenders tegelijk bekijken (2-4 vakken), vertrekkend van je favorieten --
+    /// zie `MultiviewView`.
+    private var multiviewButton: some View {
+        Button {
+            showMultiview = true
+
+        } label: {
+            Image(
+                systemName:
+                    "rectangle.split.2x2"
+            )
+            .frame(
+                width: 48,
+                height: 48
+            )
+        }
+        .buttonStyle(
+            VeyraEPGButtonStyle()
+        )
+        .accessibilityLabel(
+            "Multiview"
+        )
+        .disabled(
+            guide.favoriteRows.isEmpty
         )
     }
 
@@ -1130,6 +1167,21 @@ struct LiveTVView: View {
                             "line.3.horizontal"
                     )
                 }
+            }
+
+            // Rechtstreeks verbergen vanuit de zenderlijst zelf, zonder naar
+            // "Live TV beheren" te moeten gaan -- zie VeyraEPGStore.setChannelVisible.
+            Button(role: .destructive) {
+                guide.setChannelVisible(
+                    row.channel,
+                    visible: false
+                )
+            } label: {
+                Label(
+                    "Zender verbergen",
+                    systemImage:
+                        "eye.slash"
+                )
             }
 
             if ChannelLogoOverrideStore
@@ -2011,7 +2063,7 @@ private struct VeyraEPGDetails: View {
 
 // MARK: - Button style
 
-private struct VeyraEPGButtonStyle:
+struct VeyraEPGButtonStyle:
     ButtonStyle
 {
     var selected = false

@@ -27,8 +27,9 @@ struct MetadataSettingsView: View {
     @AppStorage(MetadataRatingProvider.tomatometer.storageKey) private var tomatometer = true
     @AppStorage(MetadataRatingProvider.metacritic.storageKey) private var metacritic = true
     @AppStorage(MetadataRatingProvider.trakt.storageKey) private var trakt = true
-    @AppStorage(MetadataRatingProvider.popcornmeter.storageKey) private var popcornmeter = true
-    @AppStorage(MetadataRatingProvider.letterboxd.storageKey) private var letterboxd = true
+    // Popcornmeter/Letterboxd hebben geen publiek toegankelijke API en tonen
+    // daarom altijd een uitgeschakelde rij (zie de `.constant(false)`-toggles
+    // hieronder) -- geen eigen @AppStorage nodig.
     @AppStorage(MetadataRatingProvider.mal.storageKey) private var mal = true
 
     var body: some View {
@@ -96,13 +97,15 @@ struct MetadataSettingsView: View {
                     toggleRow(.tomatometer, isOn: $tomatometer)
                     toggleRow(.metacritic, isOn: $metacritic)
                     toggleRow(.trakt, isOn: $trakt)
-                    toggleRow(.popcornmeter, isOn: $popcornmeter)
-                    toggleRow(.letterboxd, isOn: $letterboxd)
+                    toggleRow(.popcornmeter, isOn: .constant(false))
+                        .disabled(true)
+                    toggleRow(.letterboxd, isOn: .constant(false))
+                        .disabled(true)
                     toggleRow(.mal, isOn: $mal)
                 } header: {
                     Text("Ratings")
                 } footer: {
-                    Text("Kies welke ratings zichtbaar zijn op film- en seriepagina's. Een titel toont alleen de scores die de bron er daadwerkelijk voor heeft.")
+                    Text("Kies welke ratings zichtbaar zijn op film- en seriepagina's. Een titel toont alleen de scores die de bron er daadwerkelijk voor heeft. Popcornmeter en Letterboxd staan uitgeschakeld: die bieden geen publiek toegankelijke API, dus die scores kunnen hier niet worden opgehaald.")
                 }
 
                 Section {
@@ -178,8 +181,8 @@ struct MetadataSettingsView: View {
         tomatometer = enabled
         metacritic = enabled
         trakt = enabled
-        popcornmeter = enabled
-        letterboxd = enabled
+        // Popcornmeter/Letterboxd bewust overslaan: die toggles zijn uitgeschakeld
+        // omdat er geen publiek toegankelijke API voor is aangesloten.
         mal = enabled
     }
 }
