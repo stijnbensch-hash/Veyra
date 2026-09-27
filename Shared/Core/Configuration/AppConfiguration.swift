@@ -66,13 +66,18 @@ enum AppConfiguration {
     static var tmdbReadAccessToken:
         String?
     {
-        VeyraAPIKeyStore.value(
-            for:
-                .tmdbReadAccessToken
-        )
-        ?? configuredValue(
-            "TMDBReadAccessToken"
-        )
+        if let stored = VeyraAPIKeyStore.value(for: .tmdbReadAccessToken) {
+            return stored
+        }
+
+        guard let configured = configuredValue("TMDBReadAccessToken") else {
+            return nil
+        }
+        // De Top Shelf-extensie kan de appconfiguratie niet lezen. Bewaar de
+        // bestaande sleutel lokaal in de gedeelde keychain zodra de app hem
+        // gebruikt, zonder hem in de extensiebundel op te nemen.
+        try? VeyraAPIKeyStore.set(configured, for: .tmdbReadAccessToken)
+        return configured
     }
 
     static var openSubtitlesAPIKey:

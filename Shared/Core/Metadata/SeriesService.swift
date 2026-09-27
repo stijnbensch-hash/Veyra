@@ -2,13 +2,15 @@ import Foundation
 
 struct SeriesService {
     private let readAccessToken: String
+    private let language: String
 
-    init?() {
+    init?(language: String = CatalogLocalization.language) {
         guard let token = AppConfiguration.tmdbReadAccessToken else {
             return nil
         }
 
         self.readAccessToken = token
+        self.language = language
     }
 
     func popularSeries() async throws -> [TMDBSeries] {
@@ -77,8 +79,7 @@ struct SeriesService {
         )
     }
 
-    /// De trailers/teasers van TMDB zelf (meestal YouTube-video's), voor de
-    /// "Trailer"-knop op het seriedetailscherm.
+    /// De trailers/teasers van TMDB zelf (meestal YouTube-video's).
     func videos(forSeriesID seriesID: Int) async throws -> [TMDBVideo] {
         let response: TMDBVideosResponse = try await request(
             path: "/3/tv/\(seriesID)/videos"
@@ -116,7 +117,7 @@ struct SeriesService {
         localizedQueryItems.append(
             URLQueryItem(
                 name: "language",
-                value: CatalogLocalization.language
+                value: language
             )
         )
 

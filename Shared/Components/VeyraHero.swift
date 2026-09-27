@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
 
 struct VeyraActionLabel: View {
     let title: String
@@ -47,6 +50,7 @@ struct VeyraHero<Actions: View>: View {
     var overview: String?
     var metadata: [String] = []
     var item: MediaItem? = nil
+    @State private var ratings = MetadataRatings()
     @ViewBuilder let actions: () -> Actions
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -81,6 +85,10 @@ struct VeyraHero<Actions: View>: View {
                     }
                 }
             }
+            if let item {
+                MetadataRatingsView(ratings: heroRatings(for: item),
+                                    maxItems: heroRatingLimit, compact: true)
+            }
             if let overview, !overview.isEmpty {
                 Text(overview).font(VeyraTypography.body).foregroundStyle(.white.opacity(0.78))
                     .lineSpacing(4).lineLimit(3)
@@ -92,6 +100,45 @@ struct VeyraHero<Actions: View>: View {
         .padding(.vertical, 28)
         #if os(tvOS)
         .focusSection()
+        #endif
+        .task(id: item.map { "\($0.type.rawValue)|\($0.tmdbID ?? 0)" }) {
+            ratings = MetadataRatings()
+            guard let item, let tmdbID = item.tmdbID else { return }
+            // tvOS wisselt deze hero ook bij focusbewegingen; wacht tot de
+            // keuze even stilstaat voordat externe ratingbronnen laden.
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
+            let loaded: MetadataRatings
+            switch item.type {
+            case .movie:
+                loaded = await MetadataRatingsService.movieRatings(
+                    tmdbID: tmdbID, imdbID: item.imdbID, knownTMDBRating: item.rating
+                )
+            case .series:
+                loaded = await MetadataRatingsService.seriesRatings(
+                    tmdbID: tmdbID, imdbID: item.imdbID, knownTMDBRating: item.rating
+                )
+            case .liveTV, .iptvSeries:
+                return
+            }
+            guard !Task.isCancelled else { return }
+            ratings = loaded
+        }
+    }
+
+    private func heroRatings(for item: MediaItem) -> MetadataRatings {
+        var result = ratings
+        if result.tmdb == nil, let value = item.rating, value > 0 {
+            result.tmdb = value
+        }
+        return result
+    }
+
+    private var heroRatingLimit: Int {
+        #if os(iOS)
+        return UIDevice.current.userInterfaceIdiom == .phone ? 3 : 5
+        #else
+        return 5
         #endif
     }
 

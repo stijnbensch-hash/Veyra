@@ -44,7 +44,6 @@ struct MovieDetailView: View {
                     // Afspelen op één rij paste dit niet meer naast elkaar
                     // op smallere iPhones (liep buiten het scherm).
                     HStack(spacing: 10) {
-                        TrailerButton(tmdbID: movie.tmdbID, isShow: false, compact: true)
                         WatchedToggleButton(item: movie)
                         FavoriteToggleButton(item: movie, compact: true)
                         WatchlistToggleButton(item: movie, compact: true)
@@ -53,6 +52,8 @@ struct MovieDetailView: View {
                 .padding(.horizontal)
 
                 CastRow(item: movie)
+
+                TrailerSection(item: movie)
 
                 SimilarTitlesRow(item: movie)
             }

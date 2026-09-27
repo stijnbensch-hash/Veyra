@@ -120,7 +120,6 @@ struct SeriesDetailView: View {
                         }
 
                         HStack(spacing: 10) {
-                            TrailerButton(tmdbID: details.id, isShow: true, compact: true)
                             WatchedToggleButton(item: mediaItem(from: details))
                             FavoriteToggleButton(item: mediaItem(from: details), compact: true)
                             WatchlistToggleButton(item: mediaItem(from: details), compact: true)
@@ -217,6 +216,8 @@ struct SeriesDetailView: View {
                 )
 
                 CastRow(item: MediaItem(title: series.name, type: .series, tmdbID: series.id))
+
+                TrailerSection(item: MediaItem(title: series.name, type: .series, tmdbID: series.id))
 
                 SimilarTitlesRow(item: MediaItem(title: series.name, type: .series, tmdbID: series.id))
             }

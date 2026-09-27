@@ -10,6 +10,18 @@ enum TopShelfArtworkRenderer {
     private static let canvas = CGSize(width: 908, height: 512)
     private static let cacheAge: TimeInterval = 6 * 60 * 60
 
+    static func removeOldArtwork() {
+        guard let directory = cacheDirectory(),
+              let files = try? FileManager.default.contentsOfDirectory(
+                at: directory, includingPropertiesForKeys: [.contentModificationDateKey]
+              ) else { return }
+        for file in files {
+            guard let modified = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate,
+                  Date().timeIntervalSince(modified) > 7 * 86_400 else { continue }
+            try? FileManager.default.removeItem(at: file)
+        }
+    }
+
     static func imageURL(for item: TopShelfContinueItem) async -> URL? {
         guard let directory = cacheDirectory() else { return nil }
         let file = directory.appendingPathComponent("\(item.id).jpg")
@@ -110,8 +122,10 @@ enum TopShelfArtworkRenderer {
     }
 
     private static func download(_ url: URL?) async -> Data? {
-        guard let url,
-              let (data, response) = try? await URLSession.shared.data(from: url),
+        guard let url else { return nil }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 8
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
               let http = response as? HTTPURLResponse,
               (200..<300).contains(http.statusCode)
         else { return nil }

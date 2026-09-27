@@ -3,125 +3,40 @@ import SwiftUI
 struct MetadataRatingsView: View {
     let ratings:
         MetadataRatings
+    var maxItems: Int? = nil
+    var compact = false
 
     var body: some View {
-        if ratings.hasVisibleRatings {
+        if !visibleEntries.isEmpty {
             HStack(
-                spacing: 30
+                spacing: compact ? 12 : 30
             ) {
-                if MetadataPreferences.showIMDb,
-                   let value = ratings.imdb
-                {
-                    ratingItem(
-                        provider: .imdb,
-                        value:
-                            String(
-                                format:
-                                    "%.1f",
-                                value
-                            )
-                    )
-                }
-
-                if MetadataPreferences.showTMDB,
-                   let value = ratings.tmdb
-                {
-                    ratingItem(
-                        provider: .tmdb,
-                        value:
-                            String(
-                                format:
-                                    "%.1f",
-                                value
-                            )
-                    )
-                }
-
-                if MetadataPreferences.showTomatometer,
-                   let value =
-                        ratings.tomatometer
-                {
-                    ratingItem(
-                        provider:
-                            .tomatometer,
-                        value:
-                            "\(value)%"
-                    )
-                }
-
-                if MetadataPreferences.showMetacritic,
-                   let value =
-                        ratings.metacritic
-                {
-                    ratingItem(
-                        provider:
-                            .metacritic,
-                        value:
-                            "\(value)"
-                    )
-                }
-
-                if MetadataPreferences.showTrakt,
-                   let value =
-                        ratings.trakt
-                {
-                    ratingItem(
-                        provider:
-                            .trakt,
-                        value:
-                            String(
-                                format:
-                                    "%.1f",
-                                value
-                            )
-                    )
-                }
-
-                if MetadataPreferences.showPopcornmeter,
-                   let value =
-                        ratings.popcornmeter
-                {
-                    ratingItem(
-                        provider:
-                            .popcornmeter,
-                        value:
-                            "\(value)%"
-                    )
-                }
-
-                if MetadataPreferences.showLetterboxd,
-                   let value =
-                        ratings.letterboxd
-                {
-                    ratingItem(
-                        provider:
-                            .letterboxd,
-                        value:
-                            String(
-                                format:
-                                    "%.1f",
-                                value
-                            )
-                    )
-                }
-
-                if MetadataPreferences.showMAL,
-                   let value =
-                        ratings.mal
-                {
-                    ratingItem(
-                        provider:
-                            .mal,
-                        value:
-                            String(
-                                format:
-                                    "%.1f",
-                                value
-                            )
-                    )
+                ForEach(visibleEntries) { entry in
+                    ratingItem(provider: entry.provider, value: entry.value)
                 }
             }
         }
+    }
+
+    private struct RatingEntry: Identifiable {
+        let provider: MetadataRatingProvider
+        let value: String
+        var id: String { provider.rawValue }
+    }
+
+    private var visibleEntries: [RatingEntry] {
+        let candidates: [RatingEntry?] = [
+            ratings.imdb.map { RatingEntry(provider: .imdb, value: String(format: "%.1f", $0)) },
+            ratings.tmdb.map { RatingEntry(provider: .tmdb, value: String(format: "%.1f", $0)) },
+            ratings.tomatometer.map { RatingEntry(provider: .tomatometer, value: "\($0)%") },
+            ratings.metacritic.map { RatingEntry(provider: .metacritic, value: "\($0)") },
+            ratings.trakt.map { RatingEntry(provider: .trakt, value: String(format: "%.1f", $0)) },
+            ratings.popcornmeter.map { RatingEntry(provider: .popcornmeter, value: "\($0)%") },
+            ratings.letterboxd.map { RatingEntry(provider: .letterboxd, value: String(format: "%.1f", $0)) },
+            ratings.mal.map { RatingEntry(provider: .mal, value: String(format: "%.1f", $0)) }
+        ]
+        let enabled = candidates.compactMap { $0 }.filter { MetadataPreferences.isEnabled($0.provider) }
+        return Array(enabled.prefix(maxItems ?? Int.max))
     }
 
     // MARK: - Rating Item
@@ -133,7 +48,7 @@ struct MetadataRatingsView: View {
             String
     ) -> some View {
         HStack(
-            spacing: 10
+            spacing: compact ? 5 : 10
         ) {
             providerIcon(
                 provider
@@ -154,15 +69,24 @@ struct MetadataRatingsView: View {
                 .white
             )
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(provider.title) \(value)")
     }
 
     /// Losstaand van het icoon-formaat, dat op originele grootte staat --
     /// enkel het cijfer zelf is kleiner gemaakt.
     private var valueFontSize: CGFloat {
+        if compact {
+            #if os(tvOS)
+            return 21
+            #else
+            return 14
+            #endif
+        }
         #if os(iOS)
-        18
+        return 18
         #else
-        22
+        return 22
         #endif
     }
 
@@ -188,10 +112,17 @@ struct MetadataRatingsView: View {
     /// Op iOS staan de ratingbadges op een klein telefoonscherm i.p.v. een
     /// tv op afstand, dus mogen de logo's zelf kleiner dan op tvOS.
     private func iconSize(for provider: MetadataRatingProvider) -> CGFloat {
+        if compact {
+            #if os(tvOS)
+            return provider == .imdb ? 36 : 26
+            #else
+            return provider == .imdb ? 27 : 20
+            #endif
+        }
         #if os(iOS)
-        provider == .imdb ? 34 : 24
+        return provider == .imdb ? 34 : 24
         #else
-        provider == .imdb ? 44 : 32
+        return provider == .imdb ? 44 : 32
         #endif
     }
 }

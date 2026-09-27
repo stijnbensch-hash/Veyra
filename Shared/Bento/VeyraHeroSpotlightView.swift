@@ -10,14 +10,17 @@
 // crossfade, zodat het gedrag op alle platformen identiek en voorspelbaar is.
 
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
 
 struct VeyraHeroSpotlightView: View {
     let items: [HeroSpotlightItem]
     let style: HeroSpotlightStyle
     var height: CGFloat = 520
 
-    /// macOS kan de schermvullende achtergrond buiten zijn ScrollView tekenen.
-    /// Op iOS blijft de achtergrond juist binnen de scrollende hero.
+    /// Optie voor schermen die de achtergrond zelf tekenen.
+    /// Home houdt de afbeelding op iOS en macOS binnen de scrollende hero.
     var externalBackdrop = false
     /// Meldt de huidige carrousel-index naar buiten, zodat een aanroeper met
     /// `externalBackdrop = true` weet welke afbeelding hij zelf moet tonen.
@@ -25,6 +28,7 @@ struct VeyraHeroSpotlightView: View {
 
     @State private var index = 0
     @State private var advanceTask: Task<Void, Never>?
+    @State private var ratingsByID: [String: MetadataRatings] = [:]
     #if os(tvOS)
     @State private var selectedMediaItem: MediaItem?
     #endif
@@ -57,22 +61,18 @@ struct VeyraHeroSpotlightView: View {
         Group {
             if let current {
                 ZStack(alignment: .top) {
-                    // iOS tekent de achtergrond in de scrollende hero; macOS
-                    // mag hem apart tekenen. Op tvOS zit hij in de knop zelf.
+                    // iOS en macOS tekenen de achtergrond in de scrollende hero.
+                    // Op tvOS zit hij in de knop zelf.
                     #if !os(tvOS)
                     if style == .fullscreen, !externalBackdrop {
-                        #if os(iOS)
                         scrollingBackdrop(current)
-                        #else
-                        backdrop(current)
-                        #endif
                     }
                     #endif
                     VStack(spacing: 14) {
                         slide(current)
                             .padding(.horizontal, style == .card ? 28 : 0)
                             .frame(height: slideHeight)
-                            #if !os(iOS)
+                            #if os(tvOS)
                             .ignoresSafeArea(edges: style == .fullscreen ? .top : [])
                             #endif
                             #if !os(tvOS)
@@ -98,6 +98,24 @@ struct VeyraHeroSpotlightView: View {
         }
         .onChange(of: index) { _, newValue in
             onIndexChange?(newValue)
+        }
+        .task(id: current?.id) {
+            guard let item = current, let tmdbID = item.mediaItem.tmdbID,
+                  ratingsByID[item.id] == nil else { return }
+            let loaded: MetadataRatings
+            if item.isMovie {
+                loaded = await MetadataRatingsService.movieRatings(
+                    tmdbID: tmdbID, imdbID: item.mediaItem.imdbID,
+                    knownTMDBRating: item.rating
+                )
+            } else {
+                loaded = await MetadataRatingsService.seriesRatings(
+                    tmdbID: tmdbID, imdbID: item.mediaItem.imdbID,
+                    knownTMDBRating: item.rating
+                )
+            }
+            guard !Task.isCancelled else { return }
+            ratingsByID[item.id] = loaded
         }
         #if os(tvOS)
         .navigationDestination(item: $selectedMediaItem) { item in
@@ -155,8 +173,8 @@ struct VeyraHeroSpotlightView: View {
         VeyraHeroAmbientBackdrop(url: item.backdropURL, id: item.id, height: height, bleed: ambientBleed)
     }
 
-    #if os(iOS)
-    /// De iOS-hero is zelf het scrollende beeldvlak. Gebruik ook op iPhone de
+    #if !os(tvOS)
+    /// De hero is zelf het scrollende beeldvlak. Gebruik ook op iPhone de
     /// backdrop: posters hebben vaak de filmtitel al in de afbeelding staan,
     /// terwijl het losse clearlogo onderaan de hero die titel opnieuw toont.
     private func scrollingBackdrop(_ item: HeroSpotlightItem) -> some View {
@@ -282,6 +300,9 @@ struct VeyraHeroSpotlightView: View {
                     .multilineTextAlignment(centeredOnIOS ? .center : .leading)
             }
 
+            MetadataRatingsView(ratings: heroRatings(for: item),
+                                maxItems: heroRatingLimit, compact: true)
+
             Text(metaLine(item))
                 .font(.system(size: metaFontSize, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.85))
@@ -329,11 +350,28 @@ struct VeyraHeroSpotlightView: View {
 
     private func metaLine(_ item: HeroSpotlightItem) -> String {
         var parts: [String] = []
-        if let rating = item.rating, rating > 0 { parts.append(String(format: "★ %.1f", rating)) }
         if let year = item.year { parts.append(year) }
         if let genre = item.genre { parts.append(genre) }
         parts.append(item.isMovie ? "Film" : "Serie")
         return parts.joined(separator: " · ")
+    }
+
+    private func heroRatings(for item: HeroSpotlightItem) -> MetadataRatings {
+        var ratings = ratingsByID[item.id] ?? MetadataRatings()
+        // De catalogusscore is meteen beschikbaar; aanvullende bronnen laden
+        // pas wanneer deze slide zichtbaar wordt.
+        if ratings.tmdb == nil, let value = item.rating, value > 0 {
+            ratings.tmdb = value
+        }
+        return ratings
+    }
+
+    private var heroRatingLimit: Int {
+        #if os(iOS)
+        return UIDevice.current.userInterfaceIdiom == .phone ? 3 : 5
+        #else
+        return 5
+        #endif
     }
 }
 

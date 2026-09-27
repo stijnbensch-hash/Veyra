@@ -5,7 +5,8 @@ struct VeyraMovieHero: View {
     var body: some View {
         VeyraHero(title: movie.title, eyebrow: "Uitgelicht", overview: movie.overview,
                   metadata: movie.releaseDate.map { [String($0.prefix(4))] } ?? [],
-                  item: MediaItem(title: movie.title, type: .movie, tmdbID: movie.id)) {
+                  item: MediaItem(title: movie.title, type: .movie, tmdbID: movie.id,
+                                  rating: movie.voteAverage)) {
             NavigationLink { VeyraMovieDestination(movie: movie, play: true) } label: {
                 VeyraActionLabel(title: "Afspelen", symbol: "play.fill")
             }.buttonStyle(VeyraFocusButtonStyle(primary: true))
@@ -73,7 +74,8 @@ struct VeyraSeriesHero: View {
     var body: some View {
         VeyraHero(title: series.name, eyebrow: "Serie uitgelicht", overview: series.overview,
                   metadata: series.firstAirDate.map { [String($0.prefix(4))] } ?? [],
-                  item: MediaItem(title: series.name, type: .series, tmdbID: series.id)) {
+                  item: MediaItem(title: series.name, type: .series, tmdbID: series.id,
+                                  rating: series.voteAverage)) {
             NavigationLink { SeriesDetailView(series: series) } label: {
                 VeyraActionLabel(title: "Afleveringen bekijken", symbol: "play.rectangle")
             }.buttonStyle(VeyraFocusButtonStyle(primary: true))

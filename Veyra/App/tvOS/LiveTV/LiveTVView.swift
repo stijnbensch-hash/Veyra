@@ -36,6 +36,14 @@ struct LiveTVView: View {
     @State
     private var logoOverrideVersion = 0
 
+    private enum GuideFocus: Hashable {
+        case channel(String)
+        case programme(String, String)
+    }
+
+    @FocusState
+    private var focusedGuideElement: GuideFocus?
+
     @Environment(\.scenePhase)
     private var scenePhase
 
@@ -166,7 +174,7 @@ struct LiveTVView: View {
             }
             .onChange(
                 of: scenePhase
-            ) { phase in
+            ) { _, phase in
                 handleScenePhase(
                     phase
                 )
@@ -614,6 +622,9 @@ struct LiveTVView: View {
             )
         }
         .focusSection()
+        .onChange(of: focusedGuideElement) { previous, current in
+            handleGuideFocusChange(from: previous, to: current)
+        }
         .padding(.horizontal, -40)
     }
 
@@ -746,72 +757,18 @@ struct LiveTVView: View {
     }
 
     private var guideWindowControls: some View {
-        HStack {
-            Text(
-                VeyraEPGFormat.day(
-                    guide.windowStart
-                )
+        Text(
+            VeyraEPGFormat.day(
+                guide.windowStart
             )
-            .font(
-                .system(
-                    size: 18,
-                    weight: .semibold
-                )
-            )
-
-            Spacer()
-
-            Button {
-                guide.moveWindow(
-                    -3
-                )
-
-            } label: {
-                Label(
-                    "3 uur",
-                    systemImage:
-                        "chevron.left"
-                )
-                .padding(
-                    10
-                )
-            }
-            .buttonStyle(
-                VeyraEPGButtonStyle()
-            )
-
-            Button {
-                guide.moveWindow(
-                    3
-                )
-
-            } label: {
-                HStack(
-                    spacing: 8
-                ) {
-                    Text(
-                        "3 uur"
-                    )
-
-                    Image(
-                        systemName:
-                            "chevron.right"
-                    )
-                }
-                .padding(
-                    10
-                )
-            }
-            .buttonStyle(
-                VeyraEPGButtonStyle()
-            )
-        }
+        )
         .font(
             .system(
-                size: 18,
+                size: 26,
                 weight: .semibold
             )
         )
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var emptyGuideView: some View {
@@ -928,7 +885,7 @@ struct LiveTVView: View {
             }
             .onChange(
                 of: guide.selectedCategory
-            ) { _ in
+            ) { _, _ in
                 if let id =
                     guide.visibleChannels
                         .first?
@@ -1100,6 +1057,7 @@ struct LiveTVView: View {
         .buttonStyle(
             VeyraEPGButtonStyle()
         )
+        .focused($focusedGuideElement, equals: .channel(row.id))
         .accessibilityLabel(
             ChannelNameOverrideStore
                 .effectiveName(
@@ -1283,6 +1241,7 @@ struct LiveTVView: View {
             ForEach(
                 slots
             ) { slot in
+                let focusID = GuideFocus.programme(row.id, slot.id)
                 let span =
                     width
                     * slot.end
@@ -1401,6 +1360,10 @@ struct LiveTVView: View {
                             == true
                     )
                 )
+                .focused($focusedGuideElement, equals: focusID)
+                .onMoveCommand { direction in
+                    moveGuideTimeline(direction, row: row, focusedSlot: slot)
+                }
                 .frame(
                     width: span,
                     alignment: .leading
@@ -1424,7 +1387,7 @@ struct LiveTVView: View {
                         )
                 )
                 .accessibilityHint(
-                    "Toon programmadetails; begint niet automatisch met afspelen"
+                    "Toon programmadetails; links en rechts verschuiven de tijdlijn"
                 )
             }
         }
@@ -1460,6 +1423,69 @@ struct LiveTVView: View {
                         false
                     )
             }
+        }
+    }
+
+    private func moveGuideTimeline(
+        _ direction: MoveCommandDirection,
+        row: VeyraGuideChannel,
+        focusedSlot: VeyraEPGSlot
+    ) {
+        guard direction == .left || direction == .right,
+              focusedGuideElement == .programme(row.id, focusedSlot.id)
+        else { return }
+
+        shiftGuideWindow(direction == .left ? -1 : 1, row: row, focusedSlot: focusedSlot)
+    }
+
+    private func handleGuideFocusChange(
+        from previous: GuideFocus?,
+        to current: GuideFocus?
+    ) {
+        guard let previous, let current,
+              case let .programme(rowID, slotID) = previous,
+              case let .channel(channelID) = current,
+              rowID == channelID,
+              let row = guide.visibleChannels.first(where: { $0.id == rowID })
+        else { return }
+
+        let slots = VeyraEPGSlot.make(
+            guide.programmes(for: row),
+            from: guide.windowStart,
+            to: guide.windowEnd
+        )
+        guard let focusedSlot = slots.first(where: { $0.id == slotID }) else { return }
+        shiftGuideWindow(-1, row: row, focusedSlot: focusedSlot)
+    }
+
+    private func shiftGuideWindow(
+        _ hours: Int,
+        row: VeyraGuideChannel,
+        focusedSlot: VeyraEPGSlot
+    ) {
+        let previousStart = guide.windowStart
+        guide.moveWindow(hours)
+        guard guide.windowStart != previousStart else { return }
+
+        let nextRow = guide.visibleChannels.first(where: { $0.id == row.id })
+            ?? guide.visibleChannels.first
+        guard let nextRow else {
+            focusedGuideElement = nil
+            return
+        }
+
+        let nextSlots = VeyraEPGSlot.make(
+            guide.programmes(for: nextRow),
+            from: guide.windowStart,
+            to: guide.windowEnd
+        )
+        let continuingProgramme = focusedSlot.programme.flatMap { programme in
+            nextSlots.first(where: { $0.programme?.id == programme.id })
+        }
+        let nextSlot = continuingProgramme
+            ?? (hours > 0 ? nextSlots.first : nextSlots.last)
+        if let nextSlot {
+            focusedGuideElement = .programme(nextRow.id, nextSlot.id)
         }
     }
 

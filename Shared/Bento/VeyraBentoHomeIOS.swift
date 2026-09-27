@@ -11,16 +11,14 @@
 
 #if !os(tvOS)
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
 
 struct VeyraBentoHomeView: View {
     @State private var model: VeyraBentoViewModel
     private let sportModel: VeyraSportViewModel?
     @State private var heroSpotlight = VeyraHeroSpotlightController()
-
-    #if os(macOS)
-    /// macOS behoudt zijn zachte achtergrond buiten de scrollweergave.
-    @State private var heroScrollProgress: CGFloat = 0
-    #endif
 
     var onPlay: (ContinueItem) -> Void
     var onToggleReminder: (UpcomingItem, Bool) -> Void
@@ -114,7 +112,7 @@ struct VeyraBentoHomeView: View {
                         // in een eigen balk erboven -- de hero zelf loopt door tot onder de
                         // statusbalk, de knoppen blijven wel binnen de safe area staan.
                         ZStack(alignment: .top) {
-                            hero
+                            hero(availableHeight: rootGeo.size.height)
                             if floatingButtons {
                                 HStack {
                                     FloatingIconButton(symbol: "magnifyingglass", accessibilityLabel: "Zoeken", action: onSearch)
@@ -191,18 +189,6 @@ struct VeyraBentoHomeView: View {
             // Het volledige hero-beeld, inclusief de statusbalkzone, schuift nu
             // als onderdeel van de pagina weg in plaats van vast te blijven staan.
             .ignoresSafeArea(edges: showsHero && heroSpotlight.settings.style == .fullscreen ? .top : [])
-            #else
-            // Betrouwbare, systeemeigen scrollpositie i.p.v. de klassieke GeometryReader +
-            // PreferenceKey-truc (die bleek in de praktijk niet altijd door te komen).
-            .onScrollGeometryChange(for: CGFloat.self) { geo in
-                geo.contentOffset.y + geo.contentInsets.top
-            } action: { _, newValue in
-                // Volledig effect na 180pt scrollen; geclampt tussen 0 en 1.
-                let progress = min(max(newValue / 180, 0), 1)
-                if heroScrollProgress != progress {
-                    heroScrollProgress = progress
-                }
-            }
             #endif
             .refreshable {
                 await model.load(force: true)
@@ -240,29 +226,6 @@ struct VeyraBentoHomeView: View {
                 }
             }
         }
-        #if os(macOS)
-        // De macOS-achtergrond blijft buiten de ScrollView.
-        // De schermvullende hero-achtergrond wordt hier, BUITEN de ScrollView om, getekend --
-        // een ScrollView kapt zijn eigen inhoud namelijk af bij de safe area, ook als een kind
-        // daarbinnen `.ignoresSafeArea()` gebruikt. Net als bij de Films-hero
-        // (VeyraArtworkBackground) staat de achtergrond hier als broer van de scrollende inhoud,
-        // niet erin, zodat hij écht tot onder de statusbalk doorloopt.
-        // Volgorde is van belang: eerst de effen basiskleur (helemaal achteraan), dan de
-        // hero-achtergrond daarbovenop (alleen bovenin zichtbaar), en de (grotendeels
-        // doorschijnende) ScrollView-inhoud zelf bovenop dat alles.
-        .background(alignment: .top) {
-            if showsHero, heroSpotlight.settings.style == .fullscreen, let current = heroSpotlight.current {
-                VeyraHeroAmbientBackdrop(url: current.backdropURL, id: current.id,
-                                          height: regular ? 760 : 640)
-                    // Vervaagt en verdonkert licht tijdens het scrollen, wordt weer normaal
-                    // zodra je terug bovenaan bent -- bewust subtiel (tvOS heeft dit effect
-                    // helemaal niet, zie VeyraHeroSpotlightView.swift).
-                    .brightness(-heroScrollProgress * 0.18)
-                    .opacity(1 - heroScrollProgress * 0.12)
-                    .animation(.easeOut(duration: 0.15), value: heroScrollProgress)
-            }
-        }
-        #endif
         .background(VeyraHomeStyle.ink.ignoresSafeArea())
     }
 
@@ -283,7 +246,7 @@ struct VeyraBentoHomeView: View {
     }
 
     @ViewBuilder
-    private var hero: some View {
+    private func hero(availableHeight: CGFloat) -> some View {
         // Nieuwe trending-carrousel (Instellingen → Home → Hero) vervangt de
         // vroegere "verder kijken"-hero; die rij blijft wel bestaan als
         // gewone "Verder kijken"-sectie in `bentoTop`.
@@ -295,10 +258,7 @@ struct VeyraBentoHomeView: View {
             // te krijgen -- enkel "Kaart" krijgt hier nog eigen zijmarge.
             VeyraHeroSpotlightView(items: heroSpotlight.items,
                                    style: heroSpotlight.settings.style,
-                                   height: heroSpotlight.settings.style == .fullscreen
-                                       ? (regular ? 760 : 560)
-                                       : (regular ? 560 : 460),
-                                   externalBackdrop: usesExternalHeroBackdrop,
+                                   height: heroHeight(availableHeight: availableHeight),
                                    onIndexChange: { heroSpotlight.currentIndex = $0 })
                 .padding(.horizontal, heroSpotlight.settings.style == .card ? 16 : 0)
         } else if model.home.phase == .loading || model.home.phase == .idle {
@@ -306,12 +266,20 @@ struct VeyraBentoHomeView: View {
         }
     }
 
-    private var usesExternalHeroBackdrop: Bool {
+    private func heroHeight(availableHeight: CGFloat) -> CGFloat {
+        // iPhone behoudt de huidige maat, ook wanneer een groot toestel
+        // tijdelijk een regular size class krijgt. Op iPad en Mac blijft
+        // onder de hero ruimte over voor de eerste inhoudsrij.
         #if os(iOS)
-        false
-        #else
-        heroSpotlight.settings.style == .fullscreen
+        if UIDevice.current.userInterfaceIdiom != .pad {
+            return heroSpotlight.settings.style == .fullscreen ? 560 : 460
+        }
         #endif
+
+        if heroSpotlight.settings.style == .fullscreen {
+            return min(620, max(390, availableHeight * 0.72))
+        }
+        return min(500, max(340, availableHeight * 0.58))
     }
 
     // MARK: Raster

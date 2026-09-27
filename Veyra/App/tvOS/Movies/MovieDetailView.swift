@@ -36,6 +36,10 @@ struct MovieDetailView: View {
                         .padding(.horizontal, 48)
                         .padding(.top, 12)
 
+                    TrailerSection(item: movie)
+                        .padding(.horizontal, 48)
+                        .padding(.top, 12)
+
                     SimilarTitlesRow(item: movie)
                         .padding(.horizontal, 48)
                         .padding(.top, 12)
@@ -132,8 +136,6 @@ struct MovieDetailView: View {
                             )
                         }
                         .buttonStyle(VeyraFocusButtonStyle(primary: true))
-
-                        TrailerButton(tmdbID: movie.tmdbID, isShow: false)
 
                         WatchedToggleButton(item: movie)
                         FavoriteToggleButton(item: movie)

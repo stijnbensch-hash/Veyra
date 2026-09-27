@@ -157,6 +157,14 @@ struct VeyraBentoContinueMiniContent: View {
 
     @Environment(\.isFocused) private var isFocused
 
+    private var captionMetaText: String {
+#if os(tvOS)
+        item.shortMetaText
+#else
+        compact ? item.shortMetaText : item.metaText
+#endif
+    }
+
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
 
@@ -190,7 +198,7 @@ struct VeyraBentoContinueMiniContent: View {
                                size: compact ? 15 : 30,
                                maxLogoHeight: cardLayout.captionHeight)
 
-                Text(compact ? item.shortMetaText : item.metaText)
+                Text(captionMetaText)
                     .font(.system(size: compact ? 14 : 27, weight: .bold))
                     .foregroundStyle(VeyraHomeStyle.cyan)
                     .lineLimit(1)
@@ -201,7 +209,7 @@ struct VeyraBentoContinueMiniContent: View {
         }
         .foregroundStyle(.white)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(item.title), \(item.metaText)")
+        .accessibilityLabel("\(item.title), \(captionMetaText)")
     }
 }
 

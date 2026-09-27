@@ -5,7 +5,7 @@
 //  Created by Stijn Bensch on 25/09/2026.
 //
 
-@preconcurrency import TVServices
+import TVServices
 
 class ContentProvider: TVTopShelfContentProvider {
 
@@ -23,16 +23,21 @@ class ContentProvider: TVTopShelfContentProvider {
             return sectionedItem
         }
 
-        // Netwerkwerk loopt in kleine batches. De renderer maakt en bewaart
-        // steeds één kaart tegelijk; de Top Shelf-extensie heeft een lagere
-        // geheugenlimiet dan de app.
-        for start in stride(from: 0, to: items.count, by: 4) {
-            let batch = start..<min(start + 4, items.count)
+        // Top Shelf leest de afbeeldingen buiten de extensie. Geef daarom
+        // publieke HTTPS-adressen door in plaats van bestanden uit de
+        // privécache van de extensie. Alleen de kleine TMDB-metadata wordt
+        // hier opgehaald; het systeem haalt de afbeeldingen zelf binnen.
+        for start in stride(from: 0, to: items.count, by: 12) {
+            let batch = start..<min(start + 12, items.count)
             let artwork = await withTaskGroup(of: (Int, URL?).self) { group in
                 for index in batch {
                     let item = items[index]
                     group.addTask {
-                        (index, await TopShelfArtworkRenderer.imageURL(for: item))
+                        guard let tmdbID = item.tmdbID else { return (index, nil) }
+                        let urls = await TopShelfTMDBArtwork.imageURLs(
+                            isShow: item.isShow, tmdbID: tmdbID
+                        )
+                        return (index, urls.backdrop ?? urls.logo)
                     }
                 }
                 var results: [(Int, URL?)] = []

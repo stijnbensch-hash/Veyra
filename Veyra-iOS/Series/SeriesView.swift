@@ -68,7 +68,9 @@ struct SeriesView: View {
                                             )
                                         ]
                                     }
-                                    ?? []
+                                    ?? [],
+                                item: MediaItem(title: featured.name, type: .series,
+                                                tmdbID: featured.id, rating: featured.voteAverage)
                             ) {
                                 Button {
                                     selectedSeries = featured

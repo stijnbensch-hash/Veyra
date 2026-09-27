@@ -31,8 +31,8 @@ struct LiveTVFolderChannelsView: View {
     // `LiveTVFoldersListView`/`LiveTVView`. Een sheet rendert op tvOS als klein
     // zwevend kaartje, dus een `NavigationLink`-push blijft beperkt tot dat
     // kaartje in plaats van het hele scherm te vullen -- het gerapporteerde
-    // "klein mappop-up" i.p.v. fullscreen. Afspelen gaat daarom via
-    // `.fullScreenCover(item:)`, hetzelfde patroon als `TVRecordingsView`.
+    // "klein mappop-up" i.p.v. fullscreen. Afspelen gaat daarom op tvOS/iOS
+    // via `.fullScreenCover(item:)`; macOS gebruikt een speler-sheet.
     @State private var playingSource: PlayableSource?
 
     var body: some View {
@@ -66,9 +66,15 @@ struct LiveTVFolderChannelsView: View {
                 overrideVersion += 1
             }
         }
+        #if os(macOS)
+        .sheet(item: $playingSource) { source in
+            PlayerView(source: source)
+        }
+        #else
         .fullScreenCover(item: $playingSource) { source in
             PlayerView(source: source)
         }
+        #endif
         .onReceive(NotificationCenter.default.publisher(for: .channelOverrideChanged)) { _ in
             overrideVersion += 1
         }
@@ -81,7 +87,7 @@ struct LiveTVFolderChannelsView: View {
 
     /// Enkelvoudige rij: series openen als normale, in-stack detailpagina
     /// (`NavigationLink`, want dat is geen afspelen); een direct afspeelbaar
-    /// kanaal zet `playingSource`, wat de `.fullScreenCover` hierboven opent
+    /// kanaal zet `playingSource`, wat de spelerpresentatie hierboven opent
     /// -- zie de toelichting bij `playingSource` voor waarom dit niet meer
     /// via `NavigationLink` naar een spelerscherm gaat.
     @ViewBuilder

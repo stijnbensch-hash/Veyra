@@ -373,7 +373,7 @@ struct SettingsView: View {
             Image(systemName: "info.circle")
                 .foregroundStyle(VeyraColors.cyan.opacity(0.65))
 
-            Text("Veyra \(appVersionString) · voor iPhone en iPad")
+            Text("Veyra \(appVersionString)")
                 .font(.system(size: 14))
                 .foregroundStyle(.white.opacity(0.50))
 

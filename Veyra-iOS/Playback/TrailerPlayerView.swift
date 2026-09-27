@@ -24,33 +24,41 @@ private struct TrailerWebView: UIViewRepresentable {
         guard let url = URL(
             string: "https://www.youtube.com/embed/\(youtubeKey)?playsinline=1&autoplay=1&rel=0"
         ) else { return }
-        webView.load(URLRequest(url: url))
+        guard webView.url != url else { return }
+        var request = URLRequest(url: url)
+        if let bundleID = Bundle.main.bundleIdentifier {
+            request.setValue("https://\(bundleID.lowercased())", forHTTPHeaderField: "Referer")
+        }
+        webView.load(request)
     }
 }
 
 /// Volledig-scherm trailerweergave, gepresenteerd via `.fullScreenCover`
-/// vanaf `TrailerButton`.
+/// vanaf de trailerssectie op een detailscherm.
 struct TrailerSheet: View {
     let youtubeKey: String
 
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
-            Color.black.ignoresSafeArea()
+        VStack(spacing: 0) {
+            HStack {
+                Spacer()
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 30))
+                        .foregroundStyle(.white, .black.opacity(0.6))
+                }
+                .buttonStyle(.plain)
+                .padding()
+            }
+            .background(.black)
 
             TrailerWebView(youtubeKey: youtubeKey)
-                .ignoresSafeArea()
-
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 30))
-                    .foregroundStyle(.white, .black.opacity(0.6))
-                    .padding()
-            }
-            .buttonStyle(.plain)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.black.ignoresSafeArea())
     }
 }

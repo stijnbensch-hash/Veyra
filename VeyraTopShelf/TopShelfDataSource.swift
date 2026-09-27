@@ -209,6 +209,7 @@ enum TopShelfTraktAPI {
     ) async -> TopShelfTraktToken? {
         guard let url = URL(string: "https://api.trakt.tv/oauth/token") else { return nil }
         var request = URLRequest(url: url)
+        request.timeoutInterval = 10
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let body: [String: String] = [
@@ -241,6 +242,7 @@ enum TopShelfTraktAPI {
     ) async -> T? {
         guard let url = URL(string: "https://api.trakt.tv/\(path)") else { return nil }
         var request = URLRequest(url: url)
+        request.timeoutInterval = 10
         request.setValue("2", forHTTPHeaderField: "trakt-api-version")
         request.setValue(clientID, forHTTPHeaderField: "trakt-api-key")
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
@@ -387,10 +389,13 @@ enum TopShelfTMDBArtwork {
         let kind = isShow ? "tv" : "movie"
         guard let url = URL(string: "https://api.themoviedb.org/3/\(kind)/\(tmdbID)/images?include_image_language=nl,en,null") else { return (nil, nil) }
         var request = URLRequest(url: url)
+        request.timeoutInterval = 8
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
+        // `Image.CodingKeys` bevat de JSON-sleutels al letterlijk. Een extra
+        // snake_case-conversie verandert `file_path` in `filePath`, waardoor
+        // het decoderen van iedere TMDB-afbeelding faalt.
         let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
 
         guard
             let (data, response) = try? await URLSession.shared.data(for: request),

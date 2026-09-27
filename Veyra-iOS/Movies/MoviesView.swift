@@ -69,7 +69,9 @@ struct MoviesView: View {
                                             )
                                         ]
                                     }
-                                    ?? []
+                                    ?? [],
+                                item: MediaItem(title: featured.title, type: .movie,
+                                                tmdbID: featured.id, rating: featured.voteAverage)
                             ) {
                                 Button {
                                     Task {

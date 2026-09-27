@@ -1,10 +1,7 @@
 import SwiftUI
 
 struct MacContentView: View {
-    // Optioneel omdat `List(_:selection:)` in de zijbalk-laag hieronder een
-    // optionele binding verwacht (kan leeg zijn zodra de gebruiker in de
-    // lijst zelf de selectie opheft) -- `content` valt terug op `.home`.
-    @State private var selection: MenuDestination? = .home
+    @State private var selection: MenuDestination = .home
     @ObservedObject private var homeNavigation = HomeNavigationState.shared
 
     // Zijbalk of menubalk boven, net als op iPad (Instellingen → Algemeen →
@@ -16,6 +13,17 @@ struct MacContentView: View {
 
     private var navigationStyle: IPadNavigationStyle {
         IPadNavigationStyle(rawValue: navigationStyleRaw) ?? .sidebar
+    }
+
+    // De lijst verwacht een optionele binding; de getoonde bestemming blijft
+    // altijd geldig, ook wanneer macOS de selectie tijdelijk leegt.
+    private var sidebarSelection: Binding<MenuDestination?> {
+        Binding(
+            get: { selection },
+            set: { newValue in
+                if let newValue { selection = newValue }
+            }
+        )
     }
 
     var body: some View {
@@ -39,10 +47,12 @@ struct MacContentView: View {
 
     private var sidebarLayout: some View {
         NavigationSplitView {
-            List(sidebarSections, selection: $selection) { destination in
-                Label(destination.title, systemImage: destination.symbol)
-                    .tag(destination as MenuDestination?)
-                    .foregroundStyle(selection == destination ? VeyraColors.cyan : .primary)
+            List(selection: sidebarSelection) {
+                ForEach(sidebarSections) { destination in
+                    Label(destination.title, systemImage: destination.symbol)
+                        .tag(destination)
+                        .foregroundStyle(selection == destination ? VeyraColors.cyan : .primary)
+                }
             }
             .navigationTitle("Veyra")
             .listStyle(.sidebar)
@@ -65,7 +75,7 @@ struct MacContentView: View {
 
     private var topBarLayout: some View {
         VStack(spacing: 0) {
-            MacTopNavigation(selected: selection ?? .home) { selection = $0 }
+            MacTopNavigation(selected: selection) { selection = $0 }
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -76,7 +86,7 @@ struct MacContentView: View {
 
     @ViewBuilder
     private var content: some View {
-        switch selection ?? .home {
+        switch selection {
         case .home:
             HomeView(onSearch: { selection = .search }, onSettings: { selection = .settings })
         case .film:

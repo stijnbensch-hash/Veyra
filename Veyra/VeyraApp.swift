@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import TVServices
 
 extension Notification.Name {
     static let iptvHomeRefreshRequested =
@@ -65,6 +66,9 @@ struct VeyraApp: App {
                     .all
                 )
                 .task {
+                    _ = AppConfiguration.tmdbReadAccessToken
+                    TVTopShelfContentProvider.topShelfContentDidChange()
+
                     // Instellingen spiegelen tussen apparaten via de
                     // gekoppelde VeyraHub-server — zie
                     // `Shared/Sync/VeyraHubSyncService.swift`.

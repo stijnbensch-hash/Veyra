@@ -115,8 +115,7 @@ struct TMDBClient {
         )
     }
 
-    /// De trailers/teasers van TMDB zelf (meestal YouTube-video's), voor de
-    /// "Trailer"-knop op het filmdetailscherm.
+    /// De trailers/teasers van TMDB zelf (meestal YouTube-video's).
     func videos(forMovieID movieID: Int) async throws -> [TMDBVideo] {
         let response: TMDBVideosResponse = try await request(
             path: "/3/movie/\(movieID)/videos"

@@ -17,20 +17,16 @@ struct TMDBVideosResponse: Decodable {
 }
 
 extension Array where Element == TMDBVideo {
-    /// Kiest de beste YouTube-trailer uit de videolijst: een officiële
-    /// trailer heeft voorrang, dan een niet-officiële trailer, dan een
-    /// teaser, en anders de eerste beschikbare YouTube-video.
-    var bestTrailerKey: String? {
-        let youtube = filter { $0.site == "YouTube" }
-        if let officialTrailer = youtube.first(where: { $0.type == "Trailer" && $0.official }) {
-            return officialTrailer.key
+    /// Alleen trailers en teasers met een bruikbare YouTube-sleutel komen in
+    /// de trailerssectie. Een willekeurige clip mag daar niet als trailer staan.
+    var bestTrailer: TMDBVideo? {
+        let youtube = filter {
+            $0.site.caseInsensitiveCompare("YouTube") == .orderedSame
+                && !$0.key.isEmpty
+                && $0.key.range(of: "^[A-Za-z0-9_-]+$", options: .regularExpression) != nil
         }
-        if let trailer = youtube.first(where: { $0.type == "Trailer" }) {
-            return trailer.key
-        }
-        if let teaser = youtube.first(where: { $0.type == "Teaser" }) {
-            return teaser.key
-        }
-        return youtube.first?.key
+        return youtube.first(where: { $0.type == "Trailer" && $0.official })
+            ?? youtube.first(where: { $0.type == "Trailer" })
+            ?? youtube.first(where: { $0.type == "Teaser" })
     }
 }

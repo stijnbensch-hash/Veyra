@@ -14,8 +14,13 @@ import Foundation
 enum MetadataRatingsService {
     // MARK: - Public
 
-    static func movieRatings(tmdbID: Int, imdbID: String?) async -> MetadataRatings {
-        let tmdbValue = await fetchTMDBMovieRating(tmdbID: tmdbID)
+    static func movieRatings(tmdbID: Int, imdbID: String?, knownTMDBRating: Double? = nil) async -> MetadataRatings {
+        let tmdbValue: Double?
+        if MetadataPreferences.showTMDB, let knownTMDBRating, knownTMDBRating > 0 {
+            tmdbValue = knownTMDBRating
+        } else {
+            tmdbValue = await fetchTMDBMovieRating(tmdbID: tmdbID)
+        }
         let omdbValue = await fetchOMDb(imdbID: imdbID)
         let traktID = (imdbID?.isEmpty == false) ? imdbID! : String(tmdbID)
         let traktValue = await fetchTraktRating(id: traktID, kind: "movies")
@@ -32,15 +37,24 @@ enum MetadataRatingsService {
         )
     }
 
-    static func seriesRatings(tmdbID: Int, imdbID: String?) async -> MetadataRatings {
+    static func seriesRatings(tmdbID: Int, imdbID: String?, knownTMDBRating: Double? = nil) async -> MetadataRatings {
         let resolvedImdbID: String?
         if let imdbID, !imdbID.isEmpty {
             resolvedImdbID = imdbID
-        } else {
+        } else if AppConfiguration.omdbAPIKey?.isEmpty == false,
+                  MetadataPreferences.showIMDb || MetadataPreferences.showTomatometer
+                    || MetadataPreferences.showMetacritic {
             resolvedImdbID = await resolveSeriesImdbID(tmdbID: tmdbID)
+        } else {
+            resolvedImdbID = nil
         }
 
-        let tmdbValue = await fetchTMDBSeriesRating(tmdbID: tmdbID)
+        let tmdbValue: Double?
+        if MetadataPreferences.showTMDB, let knownTMDBRating, knownTMDBRating > 0 {
+            tmdbValue = knownTMDBRating
+        } else {
+            tmdbValue = await fetchTMDBSeriesRating(tmdbID: tmdbID)
+        }
         let omdbValue = await fetchOMDb(imdbID: resolvedImdbID)
         let traktID = (resolvedImdbID?.isEmpty == false) ? resolvedImdbID! : String(tmdbID)
         let traktValue = await fetchTraktRating(id: traktID, kind: "shows")
