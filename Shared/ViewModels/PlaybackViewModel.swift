@@ -55,6 +55,7 @@ final class PlaybackViewModel: ObservableObject {
             let playSource = source
             let playResumeProgress = await Self.resolveResumeProgress(
                 source: source,
+                item: item,
                 fallback: resumeProgress
             )
 
@@ -178,8 +179,27 @@ final class PlaybackViewModel: ObservableObject {
     /// starting playback.
     private static func resolveResumeProgress(
         source: PlayableSource,
+        item: MediaItem?,
         fallback: Double?
     ) async -> Double? {
+        if let item, TraktStore.shared.wasProgressReset(for: item) {
+            if let sync = source.progressSync {
+                let client = VeyraHubNativeClient(account: sync.account)
+                do {
+                    let previous = try? await client.progress(type: sync.mediaType, id: sync.mediaID)
+                    try await client.setProgress(
+                        type: sync.mediaType,
+                        id: sync.mediaID,
+                        positionSeconds: 0,
+                        durationSeconds: max(1, previous?.durationSeconds ?? 1)
+                    )
+                    TraktStore.shared.clearProgressReset(for: item)
+                } catch {
+                    // Blijf de oude Hub-positie negeren tot de reset daar lukt.
+                }
+            }
+            return nil
+        }
         guard let sync = source.progressSync else { return fallback }
 
         do {

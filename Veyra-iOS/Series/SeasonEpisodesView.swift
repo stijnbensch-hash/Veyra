@@ -52,81 +52,84 @@ struct SeasonEpisodesView: View {
     // MARK: - Episode row
 
     private func episodeRow(_ episode: TMDBEpisode) -> some View {
-        NavigationLink {
-            destination(for: episode)
-        } label: {
-            HStack(alignment: .top, spacing: 14) {
-                ZStack(alignment: .bottom) {
-                    AsyncImage(url: imageURL(path: episode.stillPath)) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image.resizable().scaledToFill()
-                        default:
-                            ZStack {
-                                VeyraColors.surface
-                                Image(systemName: "tv")
-                                    .foregroundStyle(.secondary)
+        HStack(spacing: 8) {
+            NavigationLink {
+                destination(for: episode)
+            } label: {
+                HStack(alignment: .top, spacing: 14) {
+                    ZStack(alignment: .bottom) {
+                        AsyncImage(url: imageURL(path: episode.stillPath)) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image.resizable().scaledToFill()
+                            default:
+                                ZStack {
+                                    VeyraColors.surface
+                                    Image(systemName: "tv")
+                                        .foregroundStyle(.secondary)
+                                }
                             }
                         }
-                    }
 
-                    if let progress = watchProgress(for: episode) {
-                        GeometryReader { geometry in
-                            Rectangle()
-                                .fill(VeyraColors.cyan)
-                                .frame(width: geometry.size.width * progress / 100, height: 3)
+                        if let progress = watchProgress(for: episode) {
+                            GeometryReader { geometry in
+                                Rectangle()
+                                    .fill(VeyraColors.cyan)
+                                    .frame(width: geometry.size.width * progress / 100, height: 3)
+                            }
+                            .frame(height: 3)
+                            .padding(.horizontal, 4)
+                            .padding(.bottom, 4)
                         }
-                        .frame(height: 3)
-                        .padding(.horizontal, 4)
-                        .padding(.bottom, 4)
                     }
-                }
-                .frame(width: 140, height: 79)
-                .clipped()
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                .overlay(alignment: .topTrailing) {
-                    if isEpisodeWatched(episode) {
-                        watchedBadge
-                            .padding(5)
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
-                        Text("Aflevering \(episode.episodeNumber)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-
-                        if watchProgress(for: episode) != nil {
-                            Text("· Verder kijken")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(VeyraColors.cyan)
+                    .frame(width: 140, height: 79)
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .overlay(alignment: .topTrailing) {
+                        if isEpisodeWatched(episode) {
+                            watchedBadge
+                                .padding(5)
                         }
                     }
 
-                    Text(episode.name)
-                        .font(.subheadline.weight(.semibold))
-                        .lineLimit(2)
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 6) {
+                            Text("Aflevering \(episode.episodeNumber)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
 
-                    if let airDate = episode.formattedAirDate {
-                        Text(airDate)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+                            if watchProgress(for: episode) != nil {
+                                Text("· Verder kijken")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(VeyraColors.cyan)
+                            }
+                        }
 
-                    if let overview = episode.overview, !overview.isEmpty {
-                        Text(overview)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        Text(episode.name)
+                            .font(.subheadline.weight(.semibold))
                             .lineLimit(2)
+
+                        if let airDate = episode.formattedAirDate {
+                            Text(airDate)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        if let overview = episode.overview, !overview.isEmpty {
+                            Text(overview)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                        }
                     }
                 }
+                .padding(.vertical, 4)
+                .opacity(episode.isUnreleased ? 0.45 : 1)
             }
-            .padding(.vertical, 4)
-            .opacity(episode.isUnreleased ? 0.45 : 1)
+            // Nog niet uitgebracht: alleen ter info, niet aantikbaar naar afspelen.
+            .disabled(episode.isUnreleased)
+            TraktProgressResetButton(item: mediaItem(for: episode), compact: true)
         }
-        // Nog niet uitgebracht: alleen ter info, niet aantikbaar naar afspelen.
-        .disabled(episode.isUnreleased)
     }
 
     @ViewBuilder
@@ -182,22 +185,7 @@ struct SeasonEpisodesView: View {
     /// gepauzeerd is met minder dan 100% bekeken. `nil` als er niets
     /// bekend is, of als de aflevering al (bijna) helemaal is afgespeeld.
     private func watchProgress(for episode: TMDBEpisode) -> Double? {
-        guard let entry = traktStore.playback.first(where: { entry in
-            guard let entryEpisode = entry.episode,
-                  entryEpisode.season == episode.seasonNumber,
-                  entryEpisode.number == episode.episodeNumber
-            else { return false }
-
-            let showIDs = entry.show?.ids
-            if let tmdb = showIDs?.tmdb, tmdb == series.id { return true }
-            if let imdb = showIDs?.imdb, let imdbID, !imdbID.isEmpty, imdb == imdbID { return true }
-            return false
-        }) else { return nil }
-
-        guard let progress = entry.progress, progress.isFinite, progress > 0, progress < 100 else {
-            return nil
-        }
-        return progress
+        traktStore.progress(for: mediaItem(for: episode))
     }
 
     // MARK: - Media item

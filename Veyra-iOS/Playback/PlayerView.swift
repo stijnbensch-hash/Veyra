@@ -546,19 +546,34 @@ private struct iOSPlayerSurface: View {
 
     private var bottomControls: some View {
         VStack(spacing: 8) {
-            HStack {
-                Text(time(displayedTime))
-                    .font(.system(size: 17, weight: .semibold).monospacedDigit())
-                    .foregroundStyle(.white.opacity(0.9))
+            if source.kind == .liveTV {
+                LivePlayerEPGTimeline(source: source)
+                if canSeek {
+                    HStack {
+                        Text("Streampositie")
+                        Spacer()
+                        Text("\(time(displayedTime)) / \(time(engine.duration))")
+                            .monospacedDigit()
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.7))
+                    IOSPlaybackTimeline(engine: engine, isDragging: $isDragging, dragProgress: $dragProgress)
+                }
+            } else {
+                HStack {
+                    Text(time(displayedTime))
+                        .font(.system(size: 17, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(.white.opacity(0.9))
 
-                Spacer()
+                    Spacer()
 
-                Text(time(engine.duration))
-                    .font(.system(size: 17, weight: .semibold).monospacedDigit())
-                    .foregroundStyle(.white.opacity(0.9))
+                    Text(time(engine.duration))
+                        .font(.system(size: 17, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(.white.opacity(0.9))
+                }
+
+                IOSPlaybackTimeline(engine: engine, isDragging: $isDragging, dragProgress: $dragProgress)
             }
-
-            IOSPlaybackTimeline(engine: engine, isDragging: $isDragging, dragProgress: $dragProgress)
 
             HStack(spacing: 20) {
                 Spacer(minLength: 0)

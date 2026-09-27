@@ -1148,8 +1148,18 @@ final class VeyraEPGStore: ObservableObject {
             forKey: recentKey
         )
 
-        return service.playableSource(
-            for: row.channel
+        return PlayableSource(
+            name: ChannelNameOverrideStore.effectiveName(
+                channelID: row.channel.id, defaultName: row.channel.name
+            ),
+            description: row.channel.group,
+            url: row.channel.streamURL,
+            kind: .liveTV,
+            providerName: providerName,
+            epgChannelID: row.channel.tvgID,
+            epgProgrammes: Array(programmes(for: row)
+                .filter { $0.end > Date() }
+                .prefix(12))
         )
     }
 

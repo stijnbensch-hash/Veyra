@@ -172,79 +172,57 @@ struct SeasonView: View {
                                     < $1.episodeNumber
                             }
                     ) { episode in
+                        HStack(spacing: 12) {
+                            NavigationLink {
+                                SourceSelectionView(
+                                    item:
+                                        mediaItem(
+                                            for:
+                                                episode
+                                        )
+                                )
 
-                        NavigationLink {
-                            SourceSelectionView(
-                                item:
-                                    mediaItem(
-                                        for:
-                                            episode
-                                    )
-                            )
-
-                        } label: {
-                            episodeRow(
-                                episode,
-                                isFocused:
-                                    focusedEpisodeNumber
-                                    == episode
-                                        .episodeNumber
-                            )
-                            .traktWatchedCheckmark(
-                                .episode(
-                                    show:
-                                        TraktIDs(
-                                            tmdb:
-                                                series.id
-                                        ),
-                                    season:
-                                        episode
-                                            .seasonNumber,
-                                    number:
-                                        episode
+                            } label: {
+                                episodeRow(
+                                    episode,
+                                    isFocused:
+                                        focusedEpisodeNumber
+                                        == episode
                                             .episodeNumber
                                 )
+                                .traktWatchedCheckmark(
+                                    .episode(
+                                        show:
+                                            TraktIDs(
+                                                tmdb:
+                                                    series.id
+                                            ),
+                                        season:
+                                            episode
+                                                .seasonNumber,
+                                        number:
+                                            episode
+                                                .episodeNumber
+                                    )
+                                )
+                            }
+                            .buttonStyle(
+                                VeyraEpisodeButtonStyle()
                             )
-                        }
-                        .buttonStyle(
-                            VeyraEpisodeButtonStyle()
-                        )
-                        .focused(
-                            $focusedEpisodeNumber,
-                            equals:
-                                episode
-                                    .episodeNumber
-                        )
-                        .focusEffectDisabled()
-                        // Nog niet uitgebracht: opvallend gedimd, en niet aan te klikken.
-                        .opacity(episode.isUnreleased ? 0.45 : 1)
-                        .disabled(episode.isUnreleased)
-                        .traktMarkWatchedMenu(
-                            MediaItem(
-                                title:
-                                    series.name,
-
-                                type:
-                                    .series,
-
-                                imdbID:
-                                    imdbID,
-
-                                tmdbID:
-                                    series.id,
-
-                                episodeTMDBID:
-                                    episode.id,
-
-                                seasonNumber:
-                                    episode
-                                        .seasonNumber,
-
-                                episodeNumber:
+                            .focused(
+                                $focusedEpisodeNumber,
+                                equals:
                                     episode
                                         .episodeNumber
                             )
-                        )
+                            .focusEffectDisabled()
+                            // Nog niet uitgebracht: opvallend gedimd, en niet aan te klikken.
+                            .opacity(episode.isUnreleased ? 0.45 : 1)
+                            .disabled(episode.isUnreleased)
+                            .traktMarkWatchedMenu(mediaItem(for: episode))
+
+                            TraktProgressResetButton(item: mediaItem(for: episode), compact: true)
+                        }
                     }
                 }
                 .focusSection()
@@ -664,22 +642,7 @@ struct SeasonView: View {
     /// gepauzeerd is met minder dan 100% bekeken. `nil` als er niets
     /// bekend is, of als de aflevering al (bijna) helemaal is afgespeeld.
     private func watchProgress(for episode: TMDBEpisode) -> Double? {
-        guard let entry = traktStore.playback.first(where: { entry in
-            guard let entryEpisode = entry.episode,
-                  entryEpisode.season == episode.seasonNumber,
-                  entryEpisode.number == episode.episodeNumber
-            else { return false }
-
-            let showIDs = entry.show?.ids
-            if let tmdb = showIDs?.tmdb, tmdb == series.id { return true }
-            if let imdb = showIDs?.imdb, let imdbID, !imdbID.isEmpty, imdb == imdbID { return true }
-            return false
-        }) else { return nil }
-
-        guard let progress = entry.progress, progress.isFinite, progress > 0, progress < 100 else {
-            return nil
-        }
-        return progress
+        traktStore.progress(for: mediaItem(for: episode))
     }
 
     private func imageURL(

@@ -152,22 +152,16 @@ struct EpisodeView: View {
                     )
                 }
 
-                NavigationLink {
-                    SourceSelectionView(
-                        item: mediaItem
-                    )
-                } label: {
-                    VeyraActionLabel(
-                        title: "Afspelen",
-                        symbol: "play.fill",
-                        compact: true
-                    )
+                HStack(spacing: 12) {
+                    NavigationLink {
+                        SourceSelectionView(item: mediaItem)
+                    } label: {
+                        VeyraActionLabel(title: "Afspelen", symbol: "play.fill", compact: true)
+                    }
+                    .buttonStyle(VeyraFocusButtonStyle(primary: true))
+
+                    TraktProgressResetButton(item: mediaItem)
                 }
-                .buttonStyle(
-                    VeyraFocusButtonStyle(
-                        primary: true
-                    )
-                )
 
                 Spacer()
             }

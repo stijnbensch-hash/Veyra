@@ -377,17 +377,18 @@ private struct TopShelfTMDBImagesResponse: Decodable {
     }
     let backdrops: [Image]
     let logos: [Image]
+    let posters: [Image]?
 }
 
 enum TopShelfTMDBArtwork {
-    static func imageURLs(isShow: Bool, tmdbID: Int) async -> (backdrop: URL?, logo: URL?) {
+    static func imageURLs(isShow: Bool, tmdbID: Int) async -> (backdrop: URL?, logo: URL?, poster: URL?) {
         guard let token = TopShelfKeychain.apiKey(
             account: "tmdb.read-access-token",
             legacyService: Bundle.main.bundleIdentifier
-        ) else { return (nil, nil) }
+        ) else { return (nil, nil, nil) }
 
         let kind = isShow ? "tv" : "movie"
-        guard let url = URL(string: "https://api.themoviedb.org/3/\(kind)/\(tmdbID)/images?include_image_language=nl,en,null") else { return (nil, nil) }
+        guard let url = URL(string: "https://api.themoviedb.org/3/\(kind)/\(tmdbID)/images?include_image_language=nl,en,null") else { return (nil, nil, nil) }
         var request = URLRequest(url: url)
         request.timeoutInterval = 8
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -402,16 +403,18 @@ enum TopShelfTMDBArtwork {
             let http = response as? HTTPURLResponse,
             (200..<300).contains(http.statusCode),
             let decoded = try? decoder.decode(TopShelfTMDBImagesResponse.self, from: data)
-        else { return (nil, nil) }
+        else { return (nil, nil, nil) }
 
         let logo = decoded.logos.first { $0.iso6391 == "en" }
             ?? decoded.logos.first { $0.iso6391 == "nl" }
             ?? decoded.logos.first { $0.iso6391 == nil }
             ?? decoded.logos.first
         let backdrop = decoded.backdrops.first
+        let poster = decoded.posters?.first
         return (
             backdrop.flatMap { URL(string: "https://image.tmdb.org/t/p/w1280\($0.filePath)") },
-            logo.flatMap { URL(string: "https://image.tmdb.org/t/p/w500\($0.filePath)") }
+            logo.flatMap { URL(string: "https://image.tmdb.org/t/p/w500\($0.filePath)") },
+            poster.flatMap { URL(string: "https://image.tmdb.org/t/p/w780\($0.filePath)") }
         )
     }
 }

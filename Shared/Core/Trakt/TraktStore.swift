@@ -1,6 +1,14 @@
 import Foundation
 import Combine
 
+enum TraktProgressResetError: LocalizedError {
+    case noServerCheckpoint
+
+    var errorDescription: String? {
+        "De afspeelpositie is nog niet bij Trakt opgeslagen. Vernieuw de gegevens en probeer opnieuw."
+    }
+}
+
 @MainActor
 final class TraktStore: ObservableObject {
     static let shared = TraktStore()
@@ -44,6 +52,11 @@ final class TraktStore: ObservableObject {
 
     private let preferences: UserDefaults
 
+    // Een bron van VeyraHub kan een eigen hervatpunt hebben. Bewaar een
+    // geslaagde reset tot die bron opnieuw wordt gestart en gewist.
+    private static let progressResetKey = "veyra.trakt.progress-reset.v1"
+    private var resetMediaKeys: Set<String> = []
+
     private var refreshTask: Task<Void, Never>?
     private var refreshID = UUID()
     private var revision = UUID()
@@ -61,6 +74,7 @@ final class TraktStore: ObservableObject {
         preferences: UserDefaults = .standard
     ) {
         self.preferences = preferences
+        resetMediaKeys = Set(preferences.stringArray(forKey: Self.progressResetKey) ?? [])
 
         let client =
             client ?? TraktClient()
@@ -662,7 +676,7 @@ final class TraktStore: ObservableObject {
             let value =
                 playback.first(
                     where: {
-                        $0.matches(item)
+                        $0.matchesPlayback(item)
                     }
                 )?.progress,
             value.isFinite,
@@ -673,6 +687,55 @@ final class TraktStore: ObservableObject {
         }
 
         return value
+    }
+
+    /// Verwijdert alleen het hervatpunt. `watchedMovies` en `watchedShows`
+    /// worden niet gewijzigd: een bekeken titel blijft bekeken.
+    func resetProgress(for item: MediaItem) async throws {
+        guard isConnected else { throw TraktError.signedOut }
+        await scrobbleTail?.value
+        await refreshTask?.value
+
+        // Een net gepauzeerde sessie heeft lokaal soms nog geen Trakt-ID.
+        // Haal dan eerst de serverversie op voordat we iets verwijderen.
+        if playback.first(where: { $0.matchesPlayback(item) && $0.id != nil }) == nil {
+            await refresh()
+        }
+        guard let id = playback.first(where: { $0.matchesPlayback(item) && $0.id != nil })?.id else {
+            throw TraktProgressResetError.noServerCheckpoint
+        }
+
+        try await client.delete("sync/playback/\(id)")
+        playback.removeAll { $0.matchesPlayback(item) }
+        if let key = progressResetIdentity(for: item) {
+            resetMediaKeys.insert(key)
+            preferences.set(Array(resetMediaKeys), forKey: Self.progressResetKey)
+        }
+        saveHomeCache()
+        TraktHomeThrottle.shared.invalidate()
+        NotificationCenter.default.post(name: .veyraTraktHistoryDidChange, object: nil)
+    }
+
+    func wasProgressReset(for item: MediaItem) -> Bool {
+        guard let key = progressResetIdentity(for: item) else { return false }
+        return resetMediaKeys.contains(key) && progress(for: item) == nil
+    }
+
+    func clearProgressReset(for item: MediaItem) {
+        guard let key = progressResetIdentity(for: item), resetMediaKeys.remove(key) != nil else { return }
+        preferences.set(Array(resetMediaKeys), forKey: Self.progressResetKey)
+    }
+
+    private func progressResetIdentity(for item: MediaItem) -> String? {
+        let id: String
+        if let tmdb = item.tmdbID { id = "tmdb:\(tmdb)" }
+        else if let imdb = item.imdbID, !imdb.isEmpty { id = "imdb:\(imdb)" }
+        else { return nil }
+
+        if let season = item.seasonNumber, let episode = item.episodeNumber {
+            return "episode:\(id):\(season):\(episode)"
+        }
+        return item.type == .movie ? "movie:\(id)" : nil
     }
 
     func isWatched(

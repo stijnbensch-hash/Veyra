@@ -137,6 +137,7 @@ struct MovieDetailView: View {
                         }
                         .buttonStyle(VeyraFocusButtonStyle(primary: true))
 
+                        TraktProgressResetButton(item: movie, compact: true)
                         WatchedToggleButton(item: movie)
                         FavoriteToggleButton(item: movie)
                         WatchlistToggleButton(item: movie)

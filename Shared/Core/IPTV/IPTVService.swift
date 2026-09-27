@@ -171,7 +171,8 @@ struct IPTVService {
             ),
             description: channel.group,
             url: channel.streamURL,
-            kind: .liveTV
+            kind: .liveTV,
+            epgChannelID: channel.tvgID
         )
     }
 

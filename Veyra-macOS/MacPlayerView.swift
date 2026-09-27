@@ -162,7 +162,16 @@ private struct MacPlayerSurface: View {
             .background(.black)
 
             VStack(spacing: 10) {
+                if source.kind == .liveTV {
+                    LivePlayerEPGTimeline(source: source)
+                }
                 if canSeek {
+                    if source.kind == .liveTV {
+                        Text("Streampositie")
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.7))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                     HStack {
                         Text(formatTime(isSeeking ? seekPosition : engine.currentTime))
                         Slider(value: $seekPosition, in: 0...max(engine.duration, 1)) { editing in

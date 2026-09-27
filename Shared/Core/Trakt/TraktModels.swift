@@ -53,6 +53,17 @@ struct TraktEntry: Codable, Identifiable, Hashable {
     func matches(_ item: MediaItem) -> Bool {
         kind == item.traktKind && (media?.ids.matches(item.traktIDs) ?? false)
     }
+
+    /// Trakt laat bij een playback-entry soms de episode-ID weg. Gebruik dan
+    /// de serie-ID plus seizoen- en afleveringsnummer, nooit alleen de serie.
+    func matchesPlayback(_ item: MediaItem) -> Bool {
+        if matches(item) { return true }
+        guard kind == "episode", item.traktKind == "episode",
+              let season = item.seasonNumber, let number = item.episodeNumber,
+              episode?.season == season, episode?.number == number
+        else { return false }
+        return show?.ids.matches(TraktIDs(imdb: item.imdbID, tmdb: item.tmdbID)) ?? false
+    }
 }
 
 struct TraktWatchedSeason: Codable, Hashable {

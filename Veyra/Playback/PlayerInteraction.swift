@@ -167,6 +167,10 @@ enum VeyraPlayerControl: Hashable {
     case play
     case backward
     case forward
+    case previousChannel
+    case nextChannel
+    case guide
+    case favorites
 
     func horizontalNeighbor(forward: Bool, canSeek: Bool) -> Self {
         let row: [Self] =

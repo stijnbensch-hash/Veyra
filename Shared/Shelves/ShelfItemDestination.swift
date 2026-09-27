@@ -22,7 +22,8 @@ struct ShelfItemDestination: View {
                         description: item.overview,
                         url: streamURL,
                         kind: .liveTV,
-                        providerName: item.iptvProviderName ?? "IPTV"
+                        providerName: item.iptvProviderName ?? "IPTV",
+                        epgChannelID: item.iptvEPGChannelID
                     ),
                     item: item
                 )

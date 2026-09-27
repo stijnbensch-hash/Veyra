@@ -6,6 +6,9 @@ struct LiveTVView: View {
     @StateObject
     private var guide = VeyraEPGStore()
 
+    @ObservedObject
+    private var channelHealth = IPTVChannelHealthStore.shared
+
     @State
     private var showProviders = false
 
@@ -1002,26 +1005,27 @@ struct LiveTVView: View {
                     alignment: .trailing,
                     spacing: 5
                 ) {
-                    Text(
-                        ChannelNameOverrideStore
-                            .effectiveName(
-                                channelID:
-                                    row.channel.id,
-                                defaultName:
-                                    row.channel.name
-                            )
-                    )
-                    .font(
-                        .system(
-                            size: 18,
-                            weight: .semibold
+                    HStack(spacing: 8) {
+                        Spacer(minLength: 0)
+                        Text(
+                            ChannelNameOverrideStore
+                                .effectiveName(
+                                    channelID: row.channel.id,
+                                    defaultName: row.channel.name
+                                )
                         )
-                    )
-                    .lineLimit(
-                        2
-                    )
-                    .minimumScaleFactor(0.85)
-                    .multilineTextAlignment(.trailing)
+                        .font(.system(size: 18, weight: .semibold))
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.85)
+                        .multilineTextAlignment(.trailing)
+
+                        if guide.selectedCategory == "favorites" {
+                            IPTVChannelHealthDot(
+                                status: channelHealth.status(for: row.channel),
+                                size: 12
+                            )
+                        }
+                    }
                     .frame(maxWidth: .infinity, alignment: .trailing)
 
                     if guide.favorites
@@ -1070,6 +1074,11 @@ struct LiveTVView: View {
         .accessibilityHint(
             "Opent zenderinformatie en Kijk live"
         )
+        .task(id: guide.selectedCategory == "favorites" ? row.channel.streamURL.absoluteString : "") {
+            if guide.selectedCategory == "favorites" {
+                channelHealth.refreshIfNeeded(row.channel)
+            }
+        }
         .contextMenu {
             Button {
                 editingLogoChannel =

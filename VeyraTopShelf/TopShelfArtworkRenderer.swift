@@ -30,14 +30,14 @@ enum TopShelfArtworkRenderer {
             return file
         }
 
-        let urls: (backdrop: URL?, logo: URL?)
+        let urls: (backdrop: URL?, logo: URL?, poster: URL?)
         if let tmdbID = item.tmdbID {
             urls = await TopShelfTMDBArtwork.imageURLs(isShow: item.isShow, tmdbID: tmdbID)
         } else {
-            urls = (nil, nil)
+            urls = (nil, nil, nil)
         }
 
-        async let backdropData = download(urls.backdrop)
+        async let backdropData = download(urls.backdrop ?? urls.poster)
         async let logoData = download(urls.logo)
         let backdrop = (await backdropData).flatMap(UIImage.init(data:))
         let logo = (await logoData).flatMap(UIImage.init(data:))

@@ -37,7 +37,7 @@ class ContentProvider: TVTopShelfContentProvider {
                         let urls = await TopShelfTMDBArtwork.imageURLs(
                             isShow: item.isShow, tmdbID: tmdbID
                         )
-                        return (index, urls.backdrop ?? urls.logo)
+                        return (index, urls.backdrop ?? urls.logo ?? urls.poster)
                     }
                 }
                 var results: [(Int, URL?)] = []

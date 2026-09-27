@@ -19,6 +19,12 @@ struct PlayableSource: Identifiable, Hashable {
     // "IPTV"
     let providerName: String?
 
+    /// XMLTV-kanaal-ID voor een live IPTV-bron. Alleen programmagegevens,
+    /// nooit een streamadres of providerinloggegevens.
+    let epgChannelID: String?
+    /// Reeds in de gids geladen uitzendingen voor directe weergave in de speler.
+    let epgProgrammes: [VeyraEPGProgramme]
+
     let requiresSoftwareVideo: Bool
 
     /// Present only for a source that came from a VeyraHub server's native
@@ -43,6 +49,8 @@ struct PlayableSource: Identifiable, Hashable {
         url: URL,
         kind: SourceKind,
         providerName: String? = nil,
+        epgChannelID: String? = nil,
+        epgProgrammes: [VeyraEPGProgramme] = [],
         requiresSoftwareVideo: Bool = false,
         progressSync: VeyraHubProgressSync? = nil,
         recorderCleanup: VeyraHubRecorderCleanup? = nil
@@ -54,6 +62,8 @@ struct PlayableSource: Identifiable, Hashable {
         self.url = url
         self.kind = kind
         self.providerName = providerName
+        self.epgChannelID = epgChannelID
+        self.epgProgrammes = epgProgrammes
         self.requiresSoftwareVideo =
             requiresSoftwareVideo
         self.progressSync = progressSync

@@ -132,7 +132,11 @@ struct LiveTVFolderChannelsView: View {
             description: channel.group,
             url: streamURL,
             kind: .liveTV,
-            providerName: channel.providerName
+            providerName: channel.providerName,
+            epgChannelID: channel.tvgID,
+            epgProgrammes: channel.tvgID.flatMap {
+                epgLoader.programmesByTvgID[$0]
+            } ?? []
         )
     }
 

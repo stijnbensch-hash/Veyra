@@ -6,6 +6,20 @@
 
 import SwiftUI
 
+#if os(tvOS)
+private enum VeyraBentoEpisodeLabel {
+    static func expanded(_ code: String?) -> String? {
+        guard let code else { return nil }
+        let value = code.uppercased()
+        guard value.first == "S", let separator = value.firstIndex(of: "E"),
+              let season = Int(value[value.index(after: value.startIndex)..<separator]),
+              let episode = Int(value[value.index(after: separator)...])
+        else { return code }
+        return "Seizoen \(season) Episode \(episode)"
+    }
+}
+#endif
+
 // MARK: - Bouwstenen
 
 /// Kleine hoofdletterkop van een tegel, optioneel met (rode) live-stip en een rechter bijschrift.
@@ -159,9 +173,23 @@ struct VeyraBentoContinueMiniContent: View {
 
     private var captionMetaText: String {
 #if os(tvOS)
-        item.shortMetaText
+        if item.kind == .movie || item.episodeCode == nil { return item.shortMetaText }
+        if let left = item.episodesLeft { return "\(left) te gaan" }
+        if !item.isUpNext, let remaining = item.remainingMinutes {
+            return "nog \(remaining) min"
+        }
+        return item.isUpNext ? "" : "\(Int((item.progress * 100).rounded()))%"
 #else
         compact ? item.shortMetaText : item.metaText
+#endif
+    }
+
+    private var accessibilityDescription: String {
+#if os(tvOS)
+        return [item.title, VeyraBentoEpisodeLabel.expanded(item.episodeCode), captionMetaText]
+            .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", ")
+#else
+        return "\(item.title), \(captionMetaText)"
 #endif
     }
 
@@ -178,6 +206,19 @@ struct VeyraBentoContinueMiniContent: View {
             // De beeldhoogte is op alle apparaten vast, zodat een clearlogo
             // in het onderschrift het kader niet kleiner kan maken.
             .frame(height: cardLayout.artworkHeight)
+            .overlay(alignment: .bottomLeading) {
+#if os(tvOS)
+                if let label = VeyraBentoEpisodeLabel.expanded(item.episodeCode) {
+                    Text(label)
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.9))
+                        .lineLimit(1)
+                        .shadow(color: .black, radius: 4)
+                        .padding(.leading, 14)
+                        .padding(.bottom, 14)
+                }
+#endif
+            }
             .overlay(alignment: .bottom) {
                 if item.progress > 0 { VeyraHairline(progress: item.progress, height: compact ? 3 : 4) }
             }
@@ -198,18 +239,23 @@ struct VeyraBentoContinueMiniContent: View {
                                size: compact ? 15 : 30,
                                maxLogoHeight: cardLayout.captionHeight)
 
-                Text(captionMetaText)
-                    .font(.system(size: compact ? 14 : 27, weight: .bold))
-                    .foregroundStyle(VeyraHomeStyle.cyan)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+#if os(tvOS)
+                Spacer(minLength: 4)
+#endif
+                if !captionMetaText.isEmpty {
+                    Text(captionMetaText)
+                        .font(.system(size: compact ? 14 : 27, weight: .bold))
+                        .foregroundStyle(VeyraHomeStyle.cyan)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
             }
             .frame(height: cardLayout.captionHeight)
             .padding(.horizontal, compact ? 10 : 14)
         }
         .foregroundStyle(.white)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(item.title), \(captionMetaText)")
+        .accessibilityLabel(accessibilityDescription)
     }
 }
 
@@ -397,6 +443,16 @@ struct VeyraBentoUpcomingCardContent: View {
 
     @Environment(\.isFocused) private var isFocused
 
+    private var accessibilityDescription: String {
+        let date = VeyraHomeFormat.when(item.airDate, now: now, dateOnly: true)
+#if os(tvOS)
+        return [item.title, VeyraBentoEpisodeLabel.expanded(item.episodeCode), date]
+            .compactMap { $0 }.joined(separator: ", ")
+#else
+        return "\(item.title), \(date)"
+#endif
+    }
+
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
 
@@ -415,10 +471,23 @@ struct VeyraBentoUpcomingCardContent: View {
                             .background(.black.opacity(0.35), in: Circle())
                     }
                     Spacer(minLength: 0)
+#if os(tvOS)
+                    if let label = VeyraBentoEpisodeLabel.expanded(item.episodeCode) {
+                        Text(label)
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.9))
+                            .lineLimit(1)
+                    } else {
+                        Text(item.kind == .movie ? "Film" : "Nieuw")
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.9))
+                    }
+#else
                     Text(item.episodeCode ?? (item.kind == .movie ? "Film" : "Nieuw"))
                         .font(compact ? .caption2 : .caption)
                         .foregroundStyle(.white.opacity(0.9))
                         .lineLimit(1)
+#endif
                 }
                 .padding(compact ? 10 : 14)
             }
@@ -449,7 +518,7 @@ struct VeyraBentoUpcomingCardContent: View {
         }
         .foregroundStyle(.white)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(item.title), \(VeyraHomeFormat.when(item.airDate, now: now, dateOnly: true))")
+        .accessibilityLabel(accessibilityDescription)
     }
 }
 

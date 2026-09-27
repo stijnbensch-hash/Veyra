@@ -34,6 +34,7 @@ struct MediaItem: Identifiable, Hashable {
     // kunnen halen (zie `ShelfIPTVSeriesEpisodesView`).
     let iptvSeriesID: Int?
     let iptvProviderName: String?
+    let iptvEPGChannelID: String?
 
     // Native catalogus-ID van de bron-addon (zoals een Stremio-achtige
     // catalogus meegeeft), voor items zonder IMDb-ID — bv. losse
@@ -59,6 +60,7 @@ struct MediaItem: Identifiable, Hashable {
         streamURL: URL? = nil,
         iptvSeriesID: Int? = nil,
         iptvProviderName: String? = nil,
+        iptvEPGChannelID: String? = nil,
         catalogItemID: String? = nil
     ) {
         self.id = id
@@ -78,6 +80,7 @@ struct MediaItem: Identifiable, Hashable {
         self.streamURL = streamURL
         self.iptvSeriesID = iptvSeriesID
         self.iptvProviderName = iptvProviderName
+        self.iptvEPGChannelID = iptvEPGChannelID
         self.catalogItemID = catalogItemID
     }
 }

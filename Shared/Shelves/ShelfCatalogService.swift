@@ -52,7 +52,9 @@ enum ShelfCatalogService {
             type: .liveTV,
             overview: channel.group,
             posterURL: channel.logoURL,
-            streamURL: channel.streamURL
+            streamURL: channel.streamURL,
+            iptvProviderName: channel.providerName,
+            iptvEPGChannelID: channel.tvgID
         )
     }
 
@@ -378,6 +380,7 @@ enum ShelfCatalogService {
             streamURL: item.streamURL,
             iptvSeriesID: item.iptvSeriesID,
             iptvProviderName: item.iptvProviderName,
+            iptvEPGChannelID: item.iptvEPGChannelID,
             catalogItemID: item.catalogItemID
         )
     }

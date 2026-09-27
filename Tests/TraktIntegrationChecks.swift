@@ -1,5 +1,16 @@
 import Foundation
 
+// De Trakt-store deelt deze notificatie en cache-invalidator met Bento Home.
+// Deze gerichte controles bouwen de volledige Home-weergave niet mee.
+extension Notification.Name {
+    static let veyraTraktHistoryDidChange = Notification.Name("veyra.trakt.historyDidChange")
+}
+
+final class TraktHomeThrottle {
+    static let shared = TraktHomeThrottle()
+    func invalidate() { }
+}
+
 final class MemoryTokens: TraktTokenStorage {
     var data: Data?
     var writes = 0
@@ -46,7 +57,7 @@ struct TraktIntegrationChecks {
         precondition(watchedStatus(.season(show: watchedIDs, number: 1, episodeCount: 2)) == .partial(count: 1, total: 2))
         precondition(watchedStatus(.season(show: watchedIDs, number: 1, episodeCount: 1)) == .watched)
         precondition(watchedStatus(.season(show: watchedIDs, number: 1, episodeCount: 0)) == .partial(count: 1, total: nil))
-        precondition(watchedStatus(.show(watchedIDs)) == .partial(count: 1, total: nil))
+        precondition(watchedStatus(.show(watchedIDs)) == .watched)
         precondition(watchedStatus(.show(watchedIDs), progress: [TraktUpNext(show: watchedShow, progress: TraktShowProgress(aired: 4, completed: 4))]) == .watched)
         precondition(watchedStatus(.show(watchedIDs), progress: [TraktUpNext(show: watchedShow, progress: TraktShowProgress(aired: 4, completed: 2))]) == .partial(count: 2, total: 4))
         print("PASS watched badges: identity, episode plays, duplicate watches, partial seasons, unknown totals and series completion")
@@ -165,6 +176,10 @@ struct TraktIntegrationChecks {
         nonisolated(unsafe) var missingTitle = false
         nonisolated(unsafe) var failLibrary = true
         nonisolated(unsafe) var failWatched = false
+        nonisolated(unsafe) var moviePlaybackAvailable = false
+        nonisolated(unsafe) var episodePlaybackAvailable = false
+        nonisolated(unsafe) var failPlaybackDelete = false
+        nonisolated(unsafe) var deletedPlayback: [String] = []
         MockTraktProtocol.handler = { request in
             let path = request.url!.path
             if path.hasPrefix("/scrobble/") {
@@ -176,10 +191,29 @@ struct TraktIntegrationChecks {
                 if missingTitle { return (200, [:], Data("{\"not_found\":{\"episodes\":[{\"ids\":{\"tmdb\":456}}]}}".utf8)) }
                 return (200, [:], Data("{\"not_found\":{}}".utf8))
             }
+            if request.httpMethod == "DELETE", path.hasPrefix("/sync/playback/") {
+                deletedPlayback.append(path)
+                if failPlaybackDelete { return (503, [:], Data("{}".utf8)) }
+                if path == "/sync/playback/51" { moviePlaybackAvailable = false }
+                if path == "/sync/playback/52" { episodePlaybackAvailable = false }
+                return (204, [:], Data())
+            }
             if path == "/users/settings" {
                 return (200, [:], Data("{\"user\":{\"username\":\"test\",\"ids\":{\"slug\":\"test\"}}}".utf8))
             }
             let query = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)!.queryItems ?? []
+            if path == "/sync/playback/movies" {
+                let json = moviePlaybackAvailable
+                    ? "[{\"id\":51,\"progress\":42,\"movie\":{\"title\":\"Film\",\"ids\":{\"tmdb\":777}}}]"
+                    : "[]"
+                return (200, [:], Data(json.utf8))
+            }
+            if path == "/sync/playback/episodes" {
+                let json = episodePlaybackAvailable
+                    ? "[{\"id\":52,\"progress\":36,\"show\":{\"title\":\"Show\",\"ids\":{\"tmdb\":123}},\"episode\":{\"season\":1,\"number\":2,\"ids\":{}}}]"
+                    : "[]"
+                return (200, [:], Data(json.utf8))
+            }
             if path == "/users/me/ratings/movies", failLibrary { return (503, [:], Data()) }
             if path == "/sync/watched/movies" {
                 if failWatched { return (503, [:], Data()) }
@@ -218,6 +252,29 @@ struct TraktIntegrationChecks {
         }
         precondition(events == ["/scrobble/start", "/scrobble/pause", "/scrobble/stop"])
         print("PASS store sync, duplicate history guard, sharing opt-in and ordered playback events")
+        let movie = MediaItem(title: "Film", type: .movie, tmdbID: 777)
+        let nextEpisode = MediaItem(title: "Episode", type: .series, tmdbID: 123,
+                                    seasonNumber: 1, episodeNumber: 3)
+        moviePlaybackAvailable = true
+        episodePlaybackAvailable = true
+        await store.refresh()
+        precondition(store.progress(for: movie) == 42 && store.progress(for: episode) == 36)
+        precondition(store.progress(for: nextEpisode) == nil, "Afleveringsreset mag geen ander hervatpunt raken")
+        precondition(store.isWatched(movie) && store.isWatched(episode))
+        try await store.resetProgress(for: episode)
+        try await store.resetProgress(for: movie)
+        precondition(deletedPlayback == ["/sync/playback/52", "/sync/playback/51"])
+        precondition(store.progress(for: movie) == nil && store.progress(for: episode) == nil)
+        precondition(store.isWatched(movie) && store.isWatched(episode), "Reset mag bekeken-status niet wijzigen")
+        precondition(store.wasProgressReset(for: movie) && store.wasProgressReset(for: episode))
+        episodePlaybackAvailable = true
+        await store.refresh()
+        failPlaybackDelete = true
+        do { try await store.resetProgress(for: episode); fatalError("Expected playback deletion failure") }
+        catch TraktError.http(503, _, _) { }
+        precondition(store.progress(for: episode) == 36 && store.isWatched(episode), "Mislukte reset bewaart lokale voortgang")
+        failPlaybackDelete = false
+        print("PASS playback reset deletes Trakt checkpoint, preserves watched status and keeps progress on failure")
         missingTitle = true
         do { try await store.setRating(episode, rating: 7); fatalError("Expected missing title") }
         catch TraktError.missingMedia { }

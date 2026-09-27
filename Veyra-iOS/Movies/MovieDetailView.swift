@@ -40,6 +40,8 @@ struct MovieDetailView: View {
                     .buttonStyle(.borderedProminent)
                     .tint(VeyraColors.cyan)
 
+                    TraktProgressResetButton(item: movie)
+
                     // Eigen rij voor de secundaire knoppen -- samen met
                     // Afspelen op één rij paste dit niet meer naast elkaar
                     // op smallere iPhones (liep buiten het scherm).

@@ -18,6 +18,8 @@ struct PlayerSubtitleControls: View {
     var item: MediaItem? = nil
     var sourceMetadata: SourceMetadata? = nil
     var source: PlayableSource? = nil
+    var liveGuide: VeyraEPGStore? = nil
+    var onSelectLiveChannel: (VeyraGuideChannel) -> Void = { _ in }
 
     var onRequestExit: () -> Void = {}
     var onPlayNextEpisode: (MediaItem) -> Void = { _ in }
@@ -125,6 +127,7 @@ struct PlayerSubtitleControls: View {
     }
 
     @State private var topMenuOpen = false
+    @State private var livePanel: LivePlayerChannelPanel.Filter?
     @State private var ratings = MetadataRatings()
     // Poster van de serie zelf (niet de afleveringsstill) + een korte
     // TMDB-metadatatekst (jaar) onder de titel in de Info-tab.
@@ -133,7 +136,7 @@ struct PlayerSubtitleControls: View {
     @State private var selectedTopMenuTab: TopMenuTab = .metadata
     @FocusState private var topTabFocus: TopMenuFocus?
 
-    private var panelVisible: Bool { topMenuOpen }
+    private var panelVisible: Bool { topMenuOpen || livePanel != nil }
 
     private var isNearEndOfEpisode: Bool {
         guard engine.duration.isFinite, engine.duration > 30 else { return false }
@@ -202,11 +205,22 @@ struct PlayerSubtitleControls: View {
     var body: some View {
         ZStack(alignment: .bottom) {
             Color.clear.contentShape(Rectangle()).focusable(!controlsVisible && !panelVisible)
-                .focused($focused, equals: .surface).focusEffectDisabled().onMoveCommand { _ in
+                .focused($focused, equals: .surface).focusEffectDisabled().onMoveCommand { direction in
                     guard !panelVisible else { return }
-
-                    revealControls(focus: .timeline)
-                }.onTapGesture { revealControls(focus: .timeline) }
+                    if source?.kind == .liveTV, liveGuide != nil {
+                        switch direction {
+                        case .left: changeLiveChannel(by: -1)
+                        case .right: changeLiveChannel(by: 1)
+                        case .up: openLivePanel(.guide)
+                        case .down: revealControls(focus: .play)
+                        default: break
+                        }
+                    } else {
+                        revealControls(focus: .timeline)
+                    }
+                }.onTapGesture {
+                    revealControls(focus: source?.kind == .liveTV ? .play : .timeline)
+                }
 
             Color.black.opacity(controlsVisible || panelVisible ? 0.16 : 0).allowsHitTesting(false)
 
@@ -233,7 +247,7 @@ struct PlayerSubtitleControls: View {
             focused = .nextEpisode
         }.onAppear {
             presentation.revealControls()
-            restoreControlFocus(.timeline)
+            restoreControlFocus(source?.kind == .liveTV ? .play : .timeline)
         }.task { await loadConnectionStatus() }.onChange(of: focused) { _, _ in interaction += 1 }.onChange(of: audioFocused) { _, _ in
             interaction += 1
         }.onDisappear {
@@ -275,13 +289,28 @@ struct PlayerSubtitleControls: View {
             // focus cursor is already resting on.
             if topMenuOpen {
                 topMenu.padding(.top, 40).focusSection()
+            } else if let livePanel, let liveGuide {
+                LivePlayerChannelPanel(
+                    guide: liveGuide,
+                    currentSource: source,
+                    initialFilter: livePanel,
+                    onSelect: { row in
+                        self.livePanel = nil
+                        onSelectLiveChannel(row)
+                    },
+                    onClose: closeLivePanel
+                )
+                .padding(.top, 40)
+                .focusSection()
             }
         }
         // One handler outside the overlay owns Back for both the controls and
         // every submenu. A single command changes exactly one presentation layer.
         .onExitCommand { handleExitCommand() }.onPlayPauseCommand {
             togglePlayback()
-            if !panelVisible { revealControls(focus: .timeline) }
+            if !panelVisible {
+                revealControls(focus: source?.kind == .liveTV ? .play : .timeline)
+            }
         }.task(id: item?.id) {
             countdownTask?.cancel()
             countdownTask = nil
@@ -441,32 +470,50 @@ struct PlayerSubtitleControls: View {
                 }
             }
 
-            VeyraPlaybackTimeline(
-                engine: engine, displayedTime: seekController.previewTime,
-                isFocused: focused == .timeline, isSeeking: seekController.isSeeking
-            ).contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous)).focusable(
-                canSeek
-            ).focused($focused, equals: .timeline).focusEffectDisabled().onMoveCommand {
-                direction in
-                switch direction {
-                case .left: requestSeek(by: -30)
-                case .right: requestSeek(by: 30)
-                case .up: openTopMenu()
-                default: break
+            if let source, source.kind == .liveTV {
+                LivePlayerEPGTimeline(source: source)
+                Text("Op het videobeeld: links/rechts wisselt zender · omhoog opent de gids")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.68))
+                if canSeek {
+                    Text("STREAMPOSITIE")
+                        .font(.system(size: 12, weight: .semibold))
+                        .tracking(2.4)
+                        .foregroundStyle(VeyraColors.ice.opacity(0.76))
+                    seekTimeline
                 }
-            }.accessibilityLabel("Voortgang").accessibilityHint(
-                "Links of rechts: dertig seconden springen. Omhoog: menu met audio, ondertitels en info."
-            ).accessibilityAdjustableAction { direction in
-                switch direction {
-                case .increment: requestSeek(by: 30)
-                case .decrement: requestSeek(by: -30)
-                @unknown default: break
-                }
+            } else {
+                seekTimeline
             }
 
             playbackButtonsRow
         }.padding(.horizontal, 22).padding(.vertical, 15).veyraGlass(backgroundOpacity: 0.4)
             .padding(.horizontal, 72).padding(.bottom, 34)
+    }
+
+    private var seekTimeline: some View {
+        VeyraPlaybackTimeline(
+            engine: engine, displayedTime: seekController.previewTime,
+            isFocused: focused == .timeline, isSeeking: seekController.isSeeking
+        ).contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous)).focusable(
+            canSeek
+        ).focused($focused, equals: .timeline).focusEffectDisabled().onMoveCommand {
+            direction in
+            switch direction {
+            case .left: requestSeek(by: -30)
+            case .right: requestSeek(by: 30)
+            case .up: openTopMenu()
+            default: break
+            }
+        }.accessibilityLabel("Voortgang").accessibilityHint(
+            "Links of rechts: dertig seconden springen. Omhoog: menu met audio, ondertitels en info."
+        ).accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: requestSeek(by: 30)
+            case .decrement: requestSeek(by: -30)
+            @unknown default: break
+            }
+        }
     }
 
     // MARK: - Boven uitklapbaar menu
@@ -516,14 +563,19 @@ struct PlayerSubtitleControls: View {
 
     private var playbackButtonsRow: some View {
         HStack(spacing: 22) {
-            Button {
-                requestSeek(by: -30)
-
-            } label: {
-                Image(systemName: "gobackward.30").font(.system(size: 22)).frame(
-                    width: 58, height: 58
-                ).background(transportButtonFill(.backward), in: Circle())
-            }.focused($focused, equals: .backward).disabled(!canSeek)
+            if source?.kind == .liveTV, liveGuide != nil {
+                Button { changeLiveChannel(by: -1) } label: {
+                    Label("Vorige zender", systemImage: "backward.end.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .padding(.horizontal, 18).frame(height: 58)
+                }.focused($focused, equals: .previousChannel)
+            } else {
+                Button { requestSeek(by: -30) } label: {
+                    Image(systemName: "gobackward.30").font(.system(size: 22)).frame(
+                        width: 58, height: 58
+                    ).background(transportButtonFill(.backward), in: Circle())
+                }.focused($focused, equals: .backward).disabled(!canSeek)
+            }
 
             Button {
                 togglePlayback()
@@ -535,23 +587,57 @@ struct PlayerSubtitleControls: View {
                     VeyraColors.red.opacity(focused == .play ? 0.40 : 0.22), in: Circle())
             }.focused($focused, equals: .play)
 
-            Button {
-                requestSeek(by: 30)
+            if source?.kind == .liveTV, liveGuide != nil {
+                Button { changeLiveChannel(by: 1) } label: {
+                    Label("Volgende zender", systemImage: "forward.end.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .padding(.horizontal, 18).frame(height: 58)
+                }.focused($focused, equals: .nextChannel)
 
-            } label: {
-                Image(systemName: "goforward.30").font(.system(size: 22)).frame(
-                    width: 58, height: 58
-                ).background(transportButtonFill(.forward), in: Circle())
-            }.focused($focused, equals: .forward).disabled(!canSeek)
+                if canSeek {
+                    Button { requestSeek(by: -30) } label: {
+                        Image(systemName: "gobackward.30")
+                            .font(.system(size: 22))
+                            .frame(width: 58, height: 58)
+                    }.focused($focused, equals: .backward)
 
-            Button {
-                cyclePlaybackRate()
+                    Button { requestSeek(by: 30) } label: {
+                        Image(systemName: "goforward.30")
+                            .font(.system(size: 22))
+                            .frame(width: 58, height: 58)
+                    }.focused($focused, equals: .forward)
+                }
 
-            } label: {
-                Text(speedLabel(playbackRate)).font(.system(size: 19, weight: .bold)).frame(
-                    width: 58, height: 58
-                ).background(transportButtonFill(.speed), in: Circle())
-            }.focused($focused, equals: .speed)
+                Button { cyclePlaybackRate() } label: {
+                    Text(speedLabel(playbackRate))
+                        .font(.system(size: 19, weight: .bold))
+                        .frame(width: 58, height: 58)
+                }.focused($focused, equals: .speed)
+
+                Button { openLivePanel(.guide) } label: {
+                    Label("Gids", systemImage: "list.bullet.rectangle")
+                        .font(.system(size: 18, weight: .semibold))
+                        .padding(.horizontal, 18).frame(height: 58)
+                }.focused($focused, equals: .guide)
+
+                Button { openLivePanel(.favorites) } label: {
+                    Label("Favorieten", systemImage: "star.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .padding(.horizontal, 18).frame(height: 58)
+                }.focused($focused, equals: .favorites)
+            } else {
+                Button { requestSeek(by: 30) } label: {
+                    Image(systemName: "goforward.30").font(.system(size: 22)).frame(
+                        width: 58, height: 58
+                    ).background(transportButtonFill(.forward), in: Circle())
+                }.focused($focused, equals: .forward).disabled(!canSeek)
+
+                Button { cyclePlaybackRate() } label: {
+                    Text(speedLabel(playbackRate)).font(.system(size: 19, weight: .bold)).frame(
+                        width: 58, height: 58
+                    ).background(transportButtonFill(.speed), in: Circle())
+                }.focused($focused, equals: .speed)
+            }
         }.buttonStyle(VeyraFocusButtonStyle(radius: VeyraRadius.pill)).padding(.top, 12)
             .focusSection()
     }
@@ -806,7 +892,7 @@ struct PlayerSubtitleControls: View {
         topTabFocus = nil
         audioFocused = nil
         interaction += 1
-        restoreControlFocus(.timeline)
+        restoreControlFocus(source?.kind == .liveTV ? .play : .timeline)
     }
 
     private func audioDescription(_ track: TrackInfo) -> String {
@@ -881,6 +967,11 @@ struct PlayerSubtitleControls: View {
     private func handleExitCommand() {
         interaction += 1
 
+        if livePanel != nil {
+            closeLivePanel()
+            return
+        }
+
         if topMenuOpen {
             closeTopMenu()
             return
@@ -910,6 +1001,42 @@ struct PlayerSubtitleControls: View {
         presentation.revealControls()
         if let target, !panelVisible { focused = target }
         interaction += 1
+    }
+
+    private func openLivePanel(_ filter: LivePlayerChannelPanel.Filter) {
+        guard liveGuide != nil else { return }
+        focused = nil
+        livePanel = filter
+        interaction += 1
+    }
+
+    private func closeLivePanel() {
+        livePanel = nil
+        interaction += 1
+        if controlsVisible {
+            restoreControlFocus(.guide)
+        } else {
+            focused = .surface
+        }
+    }
+
+    private func changeLiveChannel(by offset: Int) {
+        guard let liveGuide, let source else { return }
+        let rows = liveGuide.channels
+        guard !rows.isEmpty else {
+            openLivePanel(.guide)
+            return
+        }
+        let index = rows.firstIndex { $0.channel.streamURL == source.url }
+            ?? rows.firstIndex {
+                $0.channel.tvgID != nil && $0.channel.tvgID == source.epgChannelID
+            }
+        guard let index else {
+            openLivePanel(.guide)
+            return
+        }
+        let next = (index + offset + rows.count) % rows.count
+        onSelectLiveChannel(rows[next])
     }
 }
 

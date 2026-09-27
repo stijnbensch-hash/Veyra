@@ -37,6 +37,10 @@ struct IPTVAccountsView: View {
                             HStack {
                                 VStack(alignment: .leading, spacing: 2) {
                                     HStack(spacing: 6) {
+                                        Circle()
+                                            .fill(providerStatusColor(for: provider.id))
+                                            .frame(width: 10, height: 10)
+                                            .accessibilityLabel(providerStatusLabel(for: provider.id))
                                         Text(provider.displayName)
                                             .foregroundStyle(.primary)
                                         if let status = connectionStatus[provider.id] {
@@ -127,6 +131,9 @@ struct IPTVAccountsView: View {
         }
         .onAppear(perform: reload)
         .onReceive(NotificationCenter.default.publisher(for: .iptvConfigurationDidChange)) { _ in reload() }
+        .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in
+            viewModel.refreshStatus()
+        }
     }
 
     /// Enkel voor Xtream-providers (M3U kent dit begrip niet) -- vraagt
@@ -145,6 +152,22 @@ struct IPTVAccountsView: View {
             return configuration.playlistURL.host ?? configuration.playlistURL.absoluteString
         case .xtream(let configuration):
             return configuration.serverURL.host ?? configuration.serverURL.absoluteString
+        }
+    }
+
+    private func providerStatusColor(for id: UUID) -> Color {
+        switch viewModel.onlineStatus[id] {
+        case .some(true): .green
+        case .some(false): .red
+        case .none: .gray
+        }
+    }
+
+    private func providerStatusLabel(for id: UUID) -> String {
+        switch viewModel.onlineStatus[id] {
+        case .some(true): "Provider bereikbaar"
+        case .some(false): "Provider niet bereikbaar"
+        case .none: "Providerstatus wordt gecontroleerd"
         }
     }
 

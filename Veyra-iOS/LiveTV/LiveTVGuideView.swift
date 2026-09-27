@@ -5,6 +5,7 @@ import SwiftUI
 @MainActor
 struct LiveTVGuideView: View {
     @ObservedObject var guide: VeyraEPGStore
+    @ObservedObject private var channelHealth = IPTVChannelHealthStore.shared
     let logoOverrideVersion: Int
     let onPlay: (VeyraGuideChannel) -> Void
 
@@ -146,6 +147,17 @@ struct LiveTVGuideView: View {
                 .buttonStyle(.plain)
                 .background(VeyraColors.surface)
                 .overlay(alignment: .bottom) { Divider().opacity(0.4) }
+                .overlay(alignment: .topTrailing) {
+                    if guide.selectedCategory == "favorites" {
+                        IPTVChannelHealthDot(status: channelHealth.status(for: row.channel), size: 10)
+                            .padding(7)
+                    }
+                }
+                .task(id: guide.selectedCategory == "favorites" ? row.channel.streamURL.absoluteString : "") {
+                    if guide.selectedCategory == "favorites" {
+                        channelHealth.refreshIfNeeded(row.channel)
+                    }
+                }
             }
         }
     }

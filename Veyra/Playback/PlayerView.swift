@@ -2,6 +2,55 @@ import SwiftUI
 import AetherEngine
 
 struct PlayerView: View {
+    let source: PlayableSource
+    var item: MediaItem? = nil
+    var resumeProgress: Double? = nil
+
+    var body: some View {
+        if source.kind == .liveTV {
+            LiveTVPlayerRoot(source: source, item: item)
+        } else {
+            PlayerSessionView(source: source, item: item, resumeProgress: resumeProgress)
+        }
+    }
+}
+
+/// Keeps the guide and favorite order alive while individual channel playback
+/// sessions are replaced. A channel change never pushes another player onto
+/// the navigation stack.
+@MainActor
+private struct LiveTVPlayerRoot: View {
+    @StateObject private var guide = VeyraEPGStore()
+    @State private var activeSource: PlayableSource
+    let initialItem: MediaItem?
+    let initialSourceID: UUID
+
+    init(source: PlayableSource, item: MediaItem?) {
+        _activeSource = State(initialValue: source)
+        initialItem = item
+        initialSourceID = source.id
+    }
+
+    var body: some View {
+        ZStack {
+            PlayerSessionView(
+                source: activeSource,
+                item: activeSource.id == initialSourceID
+                    ? (initialItem ?? MediaItem(title: activeSource.name, type: .liveTV))
+                    : MediaItem(title: activeSource.name, type: .liveTV),
+                liveGuide: guide,
+                onSelectLiveChannel: { row in
+                    guard row.channel.streamURL != activeSource.url else { return }
+                    activeSource = guide.play(row)
+                }
+            )
+            .id(activeSource.id)
+        }
+        .task { await guide.reload() }
+    }
+}
+
+private struct PlayerSessionView: View {
     @Environment(\.veyraPlayerVisibility)
     private var setPlayerVisible
 
@@ -13,6 +62,9 @@ struct PlayerView: View {
     var item: MediaItem? = nil
 
     var resumeProgress: Double? = nil
+
+    var liveGuide: VeyraEPGStore? = nil
+    var onSelectLiveChannel: (VeyraGuideChannel) -> Void = { _ in }
 
     @Environment(\.scenePhase)
     private var scenePhase
@@ -26,10 +78,21 @@ struct PlayerView: View {
     @State
     private var isResolvingNextEpisode = false
 
-    init(source: PlayableSource, item: MediaItem? = nil, resumeProgress: Double? = nil) {
+    @State
+    private var showErrorGuide = false
+
+    init(
+        source: PlayableSource,
+        item: MediaItem? = nil,
+        resumeProgress: Double? = nil,
+        liveGuide: VeyraEPGStore? = nil,
+        onSelectLiveChannel: @escaping (VeyraGuideChannel) -> Void = { _ in }
+    ) {
         self.source = source
         self.item = item
         self.resumeProgress = resumeProgress
+        self.liveGuide = liveGuide
+        self.onSelectLiveChannel = onSelectLiveChannel
         _viewModel = StateObject(
             wrappedValue: PlaybackViewModel(
                 source: source,
@@ -84,6 +147,13 @@ struct PlayerView: View {
                             Task { await viewModel.retry() }
                         }
                         .buttonStyle(.card)
+
+                        if liveGuide != nil {
+                            Button("Andere zender") {
+                                showErrorGuide = true
+                            }
+                            .buttonStyle(.card)
+                        }
                     }
                     .padding(.top, 12)
                 }
@@ -104,6 +174,8 @@ struct PlayerView: View {
                     item: item,
                     sourceMetadata: source.metadata,
                     source: source,
+                    liveGuide: liveGuide,
+                    onSelectLiveChannel: onSelectLiveChannel,
                     onRequestExit: {
                         dismiss()
                     },
@@ -154,6 +226,22 @@ struct PlayerView: View {
                         )
                     )
                 }
+            }
+
+            if showErrorGuide, let liveGuide {
+                Color.black.opacity(0.6).ignoresSafeArea()
+                LivePlayerChannelPanel(
+                    guide: liveGuide,
+                    currentSource: source,
+                    initialFilter: .guide,
+                    onSelect: { row in
+                        showErrorGuide = false
+                        onSelectLiveChannel(row)
+                    },
+                    onClose: { showErrorGuide = false }
+                )
+                .focusSection()
+                .onExitCommand { showErrorGuide = false }
             }
         }
         .onAppear {
