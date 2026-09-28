@@ -30,6 +30,13 @@ struct VeyraPosterCard: View {
     /// Nu zit het vinkje in de overlay van de posterafbeelding zelf, dus altijd exact op de poster.
     var watchedTarget: TraktWatchedTarget? = nil
     var watchedPartialDisplay: VeyraWatchedPartialDisplay = .hidden
+    /// Instant Peek (lang drukken -> glazen infokaart): enkel aan op schermen die dit meegeven.
+    /// `nil` op beide = huidig gedrag, geen long-press, geen kaart.
+    var onPlay: (() -> Void)? = nil
+    var onOpenDetails: (() -> Void)? = nil
+    /// Op tvOS: laat de aanroeper "Snel bekijken" in zijn eigen `.contextMenu` zetten
+    /// (zie `veyraInstantPeek`'s `externalTrigger`) i.p.v. hier een los, botsend menu te maken.
+    var peekTrigger: Binding<Bool>? = nil
 
     @AppStorage(GeneralSettingsDefaults.showReleaseYearKey)
     private var showReleaseYear = true
@@ -174,11 +181,11 @@ struct VeyraPosterCard: View {
                 }
             }
             .frame(width: width, height: width * 1.5).clipped()
-            .clipShape(RoundedRectangle(cornerRadius: VeyraRadius.poster, style: .continuous))
+            .clipShape(VeyraRadius.posterShape)
             .overlay(alignment: .bottom) {
                 LinearGradient(colors: [.clear, .black.opacity(0.35)], startPoint: .top, endPoint: .bottom)
                     .frame(height: gradientHeight)
-                    .clipShape(RoundedRectangle(cornerRadius: VeyraRadius.poster, style: .continuous))
+                    .clipShape(VeyraRadius.posterShape)
             }
 #if !os(tvOS)
             .shadow(color: .black.opacity(0.28), radius: 6, y: 3)
@@ -207,14 +214,18 @@ struct VeyraPosterCard: View {
 #if os(tvOS)
             // Kader + gloed bij focus, enkel rond de poster -- niet rond de tekstregels
             // errond (zie `VeyraPosterFocusStyle`, die het kader niet meer zelf tekent).
+            // De poster zelf schaalt hier NOG los van de vergroting van de hele kaart
+            // (die doet `VeyraPosterFocusStyle`) -- zo komt de artwork bij focus net iets
+            // verder naar voren dan titel/metadata eromheen, i.p.v. alles gelijk te schalen.
+            .scaleEffect(isFocused ? 1.045 : 1)
             .overlay(
-                RoundedRectangle(cornerRadius: VeyraRadius.poster, style: .continuous)
+                VeyraRadius.posterShape
                     .strokeBorder(VeyraFrame.active, lineWidth: 3)
                     .opacity(isFocused ? 1 : 0)
             )
-            .shadow(color: isFocused ? VeyraColors.cyan.opacity(0.35) : .clear, radius: 16, x: -4)
-            .shadow(color: isFocused ? VeyraColors.red.opacity(0.22) : .clear, radius: 16, x: 6)
-            .animation(.easeOut(duration: 0.16), value: isFocused)
+            .shadow(color: isFocused ? VeyraColors.cyan.opacity(0.4) : .clear, radius: 20, x: -5, y: 4)
+            .shadow(color: isFocused ? VeyraColors.red.opacity(0.26) : .clear, radius: 20, x: 7, y: 4)
+            .animation(VeyraAnimation.focus, value: isFocused)
 #endif
             // Zelfde altijd-dezelfde-tekst-truc: zonder genre/beoordeling mag de titel
             // niet omhoog kruipen -- dan staan titels in dezelfde rij niet meer op één
@@ -243,6 +254,11 @@ struct VeyraPosterCard: View {
             .frame(height: titleHeight, alignment: .topLeading)
         }.frame(width: width).padding(cardPadding)
         .task(id: tmdbID) { await loadCertificationIfNeeded() }
+        .veyraInstantPeek(
+            title: title, posterURL: url, genre: genre, rating: rating, year: year,
+            tmdbID: tmdbID, isMovie: isMovie, onPlay: onPlay, onOpenDetails: onOpenDetails,
+            peekTrigger: peekTrigger
+        )
     }
 }
 

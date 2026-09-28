@@ -17,8 +17,6 @@ enum PlaybackSettingsDefaults {
     static let autoPlayNextEpisodeKey = "playback.autoPlayNextEpisode"
     static let autoSelectFirstSourceKey = "playback.autoSelectFirstSource"
     static let skipContinueWatchingDetailsKey = "playback.skipContinueWatchingDetails"
-    static let preferredResolutionKey = "playback.preferredResolution"
-    static let cellularResolutionKey = "playback.cellularResolution"
 
     // Loading screen
     static let hideProgressBarKey = "playback.hideProgressBar"
@@ -29,71 +27,16 @@ enum PlaybackSettingsDefaults {
     static let subtitleLanguageKey = "playback.subtitleLanguage"
     static let subtitleFallbackLanguageKey = "playback.subtitleFallbackLanguage"
     static let autoSelectSubtitlesKey = "playback.autoSelectSubtitles"
-    static let animeAudioKey = "playback.animeAudio"
 
     // Oversla-segmenten
     static let showSkipIntroButtonKey = "playback.showSkipIntroButton"
     static let autoSkipIntroKey = "playback.autoSkipIntro"
     static let showSkipRecapButtonKey = "playback.showSkipRecapButton"
     static let showSkipCreditsButtonKey = "playback.showSkipCreditsButton"
-    static let postCreditsAlertKey = "playback.postCreditsAlert"
 
     // Hierna
     static let autoPlayNextCountdownEnabledKey = "playback.autoPlayNextCountdownEnabled"
     static let countdownDurationKey = "playback.countdownDuration"
-
-    // Speler
-    static let selectedPlayerKey = "playback.selectedPlayer"
-}
-
-enum PlaybackResolutionOption: String, CaseIterable, Identifiable {
-    case highest
-    case uhd4K
-    case fullHD1080
-    case hd720
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .highest:
-            return "Highest Available"
-
-        case .uhd4K:
-            return "4K"
-
-        case .fullHD1080:
-            return "1080p"
-
-        case .hd720:
-            return "720p"
-        }
-    }
-}
-
-enum PlaybackCellularResolutionOption: String, CaseIterable, Identifiable {
-    case highest
-    case fullHD1080
-    case hd720
-    case sd480
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .highest:
-            return "Highest Available"
-
-        case .fullHD1080:
-            return "1080p Max"
-
-        case .hd720:
-            return "720p Max"
-
-        case .sd480:
-            return "480p Max"
-        }
-    }
 }
 
 /// Centrale taalkeuze voor heel Veyra.
@@ -352,31 +295,6 @@ enum PlaybackAutoSelectSubtitlesOption:
     }
 }
 
-enum PlaybackAnimeAudioOption:
-    String,
-    CaseIterable,
-    Identifiable
-{
-    case noPreference
-    case sub
-    case dub
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .noPreference:
-            return "No Preference"
-
-        case .sub:
-            return "Sub"
-
-        case .dub:
-            return "Dub"
-        }
-    }
-}
-
 enum PlaybackCountdownDuration:
     String,
     CaseIterable,
@@ -410,23 +328,3 @@ enum PlaybackCountdownDuration:
     }
 }
 
-enum PlaybackSelectedPlayer:
-    String,
-    CaseIterable,
-    Identifiable
-{
-    case intern
-    case extern
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .intern:
-            return "Intern"
-
-        case .extern:
-            return "Extern"
-        }
-    }
-}

@@ -4,9 +4,16 @@ import SwiftUI
 /// als de bestaande rijen (Trakt, IPTV, Jellyfin, "Populaire films").
 struct ShelfRowView: View {
     let shelf: Shelf
+    // Instant Peek: navigeert via de centrale `openMediaDetail`-omgevingsactie
+    // (zie MediaNavigation.swift) i.p.v. een eigen `@State` +
+    // `.navigationDestination(item:)`. Met meerdere planken op Home zou elke
+    // rij anders zijn eigen destination voor hetzelfde `MediaItem`-type
+    // registreren, en dat liet "terug naar Home" vastlopen.
+    @Environment(\.openMediaDetail) private var openMediaDetail
 
     @State private var items: [MediaItem] = []
     @State private var isLoading = true
+    @State private var peekingItemID: UUID?
 
     var body: some View {
         // Toont de plank altijd zodra hij is toegevoegd — met een laadstatus
@@ -26,7 +33,7 @@ struct ShelfRowView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(spacing: VeyraSpacing.rail) {
                         ForEach(items) { item in
-                            NavigationLink { ShelfItemDestination(item: item) } label: {
+                            Button { openMediaDetail(item) } label: {
                                 VeyraPosterCard(
                                     title: item.title,
                                     url: item.posterURL,
@@ -34,7 +41,14 @@ struct ShelfRowView: View {
                                     width: 240,
                                     genre: item.genre,
                                     rating: item.rating,
-                                    sourceLabel: item.tmdbID == nil ? shelf.source.subtitle : nil
+                                    sourceLabel: item.tmdbID == nil ? shelf.source.subtitle : nil,
+                                    tmdbID: item.tmdbID,
+                                    isMovie: item.type == .movie,
+                                    // Geen `onPlay`: planken bevatten films, series, IPTV-VOD en
+                                    // live-kanalen door elkaar, en de juiste afspeelbron verschilt
+                                    // per soort — dat lost `ShelfItemDestination` al goed op.
+                                    onOpenDetails: { openMediaDetail(item) },
+                                    peekTrigger: peekBinding(for: item)
                                 )
                             }
                             .buttonStyle(VeyraPosterFocusStyle(cornerRadius: VeyraRadius.poster))
@@ -48,6 +62,13 @@ struct ShelfRowView: View {
         .onReceive(NotificationCenter.default.publisher(for: .veyraShelfConfigurationDidChange)) { _ in
             Task { await load() }
         }
+    }
+
+    private func peekBinding(for item: MediaItem) -> Binding<Bool> {
+        Binding(
+            get: { peekingItemID == item.id },
+            set: { peekingItemID = $0 ? item.id : nil }
+        )
     }
 
     private func load() async {

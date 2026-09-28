@@ -8,7 +8,15 @@ import SwiftUI
 struct SimilarTitlesRow: View {
     let item: MediaItem
 
+    // Navigatie via de centrale `openMediaDetail`-omgevingsactie (MediaNavigation.swift)
+    // i.p.v. `NavigationLink` + eigen destination: deze rij zit onderaan een detailscherm
+    // dat zelf al ergens in een NavigationStack met andere `MediaItem`-navigatie hangt
+    // (Home-planken, Zoeken, ...), en een tweede destination voor hetzelfde type botst
+    // daarmee zodra beide gemonteerd zijn.
+    @Environment(\.openMediaDetail) private var openMediaDetail
+
     @State private var items: [MediaItem] = []
+    @State private var peekingItemID: UUID?
 
     var body: some View {
         // Niets tonen zolang er niets (meer) gevonden is -- in tegenstelling
@@ -25,9 +33,7 @@ struct SimilarTitlesRow: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(alignment: .top, spacing: VeyraSpacing.rail) {
                         ForEach(items) { related in
-                            NavigationLink {
-                                ShelfItemDestination(item: related)
-                            } label: {
+                            Button { openMediaDetail(related) } label: {
                                 VeyraPosterCard(
                                     title: related.title,
                                     url: related.posterURL,
@@ -35,7 +41,11 @@ struct SimilarTitlesRow: View {
                                     width: posterWidth,
                                     genre: related.genre,
                                     rating: related.rating,
-                                    year: String(related.releaseDate?.prefix(4) ?? "")
+                                    year: String(related.releaseDate?.prefix(4) ?? ""),
+                                    tmdbID: related.tmdbID,
+                                    isMovie: related.type == .movie,
+                                    onOpenDetails: { openMediaDetail(related) },
+                                    peekTrigger: peekBinding(for: related)
                                 )
                             }
 #if os(tvOS)
@@ -76,6 +86,13 @@ struct SimilarTitlesRow: View {
 #else
         12
 #endif
+    }
+
+    private func peekBinding(for related: MediaItem) -> Binding<Bool> {
+        Binding(
+            get: { peekingItemID == related.id },
+            set: { peekingItemID = $0 ? related.id : nil }
+        )
     }
 
     private func load() async {

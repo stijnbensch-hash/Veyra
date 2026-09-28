@@ -39,10 +39,17 @@ struct VeyraClearLogo: View {
     }
 
     private var fallbackText: some View {
+        // Zonder eigen `maxWidth` hier (anders dan de AsyncImage-tak hierboven) kon een lange
+        // titel zonder clearlogo (bv. net-aangekondigde titels die TMDB nog geen logo-asset voor
+        // heeft) breder willen zijn dan het scherm. Een ZStack/HStack dwingt zijn kinderen niet
+        // tot een breedte -- dat liet de tekst dan ongeclipt over de randen heen lopen, en duwde
+        // de hele omliggende layout (Instant Peek, hero) mee uit zijn voegen.
         Text(fallbackTitle)
             .font(font)
             .foregroundStyle(.white)
             .lineLimit(2)
+            .minimumScaleFactor(0.6)
+            .frame(maxWidth: maxWidth, alignment: Alignment(horizontal: alignment, vertical: .center))
             .frame(maxWidth: .infinity, alignment: Alignment(horizontal: alignment, vertical: .center))
     }
 }

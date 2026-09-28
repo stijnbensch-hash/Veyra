@@ -883,10 +883,7 @@ struct SourceSelectionView: View {
             alignment: .leading
         )
         .background(
-            RoundedRectangle(
-                cornerRadius: 18,
-                style: .continuous
-            )
+            VeyraRadius.posterShape
             .fill(
                 isFocused
                     ? Color.cyan
@@ -900,10 +897,7 @@ struct SourceSelectionView: View {
             )
         )
         .overlay(
-            RoundedRectangle(
-                cornerRadius: 18,
-                style: .continuous
-            )
+            VeyraRadius.posterShape
             .strokeBorder(
                 isFocused
                     ? Color.cyan

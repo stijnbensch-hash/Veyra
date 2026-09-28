@@ -397,20 +397,16 @@ struct SeriesDetailView: View {
             width: 440,
             height: 248
         )
+        // Zelfde "naar voren"-schaaleffect bij focus als de posterkaarten elders in Veyra.
+        .scaleEffect(isFocused ? 1.03 : 1)
         .background(
             VeyraColors.surface
         )
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: 22,
-                style: .continuous
-            )
-        )
+        // Zelfde eigen vorm als `VeyraPosterCard` (twee diagonaal sterker afgeronde hoeken)
+        // i.p.v. de vroegere uniforme afronding.
+        .clipShape(VeyraRadius.posterShape)
         .overlay {
-            RoundedRectangle(
-                cornerRadius: 22,
-                style: .continuous
-            )
+            VeyraRadius.posterShape
             .stroke(
                 isFocused
                     ? LinearGradient(

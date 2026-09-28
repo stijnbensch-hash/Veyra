@@ -82,6 +82,12 @@ struct TMDBCastMember: Decodable, Identifiable, Hashable {
         case profilePath = "profile_path"
         case order
     }
+
+    /// Gebruikt door `VeyraLensCastRow` (Veyra Lens) voor het portret.
+    var profileURL: URL? {
+        guard let profilePath, !profilePath.isEmpty else { return nil }
+        return URL(string: "https://image.tmdb.org/t/p/w185\(profilePath)")
+    }
 }
 
 struct TMDBCrewMember: Decodable, Identifiable, Hashable {

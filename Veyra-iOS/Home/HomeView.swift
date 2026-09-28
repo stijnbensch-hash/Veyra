@@ -15,6 +15,7 @@ struct HomeView: View {
     @State private var bentoRelease: BentoTMDBTitle?
     @State private var bentoCatalog: BentoCatalog?
     @State private var sportQuery: SportChannelQuery?
+    @State private var activeSportEvent: SportEvent?
 
     var body: some View {
         NavigationStack {
@@ -23,10 +24,12 @@ struct HomeView: View {
                 .sportChannelSheet($sportQuery) { bentoChannel = $0 }
                 .modifier(HomeDestinations(
                     title: $bentoTitle, channel: $bentoChannel, film: $bentoFilm,
-                    series: $bentoSeries, release: $bentoRelease, catalog: $bentoCatalog))
+                    series: $bentoSeries, release: $bentoRelease, catalog: $bentoCatalog,
+                    sportEvent: activeSportEvent))
                 .modifier(HomeActiveTracking(
                     title: bentoTitle, channel: bentoChannel, film: bentoFilm,
                     series: bentoSeries, release: bentoRelease, catalog: bentoCatalog))
+                .mediaNavigationRoot()
         }
     }
 
@@ -45,7 +48,7 @@ struct HomeView: View {
             onOpenIPTVSeries: { bentoSeries = $0 },
             onOpenTMDBTitle: { bentoRelease = $0 },
             onOpenCatalog: { bentoCatalog = $0 },
-            onPlaySport: { event, _ in sportQuery = SportChannelQuery(event: event) },
+            onPlaySport: { event, _ in sportQuery = SportChannelQuery(event: event); activeSportEvent = event },
             onOpenCompetition: { _ in openTab(.sports) },
             floatingButtons: floatingButtons,
             showsSettings: showsSettings,
@@ -59,6 +62,7 @@ struct HomeView: View {
     }
 
     private func playChannel(_ id: String) {
+        activeSportEvent = nil
         if let source = VeyraBentoServices.shared.playableSource(forChannelID: id) {
             bentoChannel = source
         } else {
@@ -75,6 +79,7 @@ private struct HomeDestinations: ViewModifier {
     @Binding var series: IPTVHomeSeries?
     @Binding var release: BentoTMDBTitle?
     @Binding var catalog: BentoCatalog?
+    var sportEvent: SportEvent? = nil
 
     func body(content: Content) -> some View {
         content
@@ -82,7 +87,7 @@ private struct HomeDestinations: ViewModifier {
                 VeyraBentoTitleDestination(item: item)
             }
             .navigationDestination(item: $channel) { source in
-                PlayerView(source: source, item: MediaItem(title: source.name, type: .liveTV))
+                PlayerView(source: source, item: MediaItem(title: source.name, type: .liveTV), sportEvent: sportEvent)
             }
             .navigationDestination(item: $film) { film in
                 PlayerView(source: film.playableSource)

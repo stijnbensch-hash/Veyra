@@ -259,6 +259,10 @@ struct TMDBMovie: Decodable, Identifiable, Hashable {
     /// detail-eindpunt geeft in plaats daarvan volledige `genres`-objecten.
     /// Gebruikt voor de genre-badge op de poster (zie Shared/Theme/PosterEnrichmentSettings.swift).
     let genreIDs: [Int]?
+    /// Alleen aanwezig op TMDB's detail-eindpunt (`movieDetails(id:)`), niet op
+    /// lijst-/ontdek-eindpunten -- gebruikt voor de speelduur in Veyra Pulse
+    /// op `MovieDetailView` (zie `TMDBService.runtimeMinutes(forMovieID:)`).
+    var runtime: Int? = nil
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -270,6 +274,7 @@ struct TMDBMovie: Decodable, Identifiable, Hashable {
         case voteAverage = "vote_average"
         case originalLanguage = "original_language"
         case genreIDs = "genre_ids"
+        case runtime
     }
 }
 

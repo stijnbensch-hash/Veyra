@@ -46,6 +46,7 @@ struct VeyraBentoHomeView: View {
     @AppStorage(TMDBCatalogLanguageFilter.key) private var catalogLanguages = "nl-en"
     @AppStorage(VeyraCollectionNames.key) private var showCollectionNames = true
     @AppStorage(GeneralSettingsDefaults.showUpcomingKey) private var showUpcoming = true
+    @AppStorage(GeneralSettingsDefaults.liveFavoritesOnlyKey) private var liveFavoritesOnly = false
     @State private var layout = VeyraHomeLayoutStore.load()
     @State private var askPreset = false
 
@@ -138,6 +139,13 @@ struct VeyraBentoHomeView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 32) {
+                        // "Context Ribbon": rouleert door Nu/volgende aflevering/live nu/sport --
+                        // onderaan de hero, zodat Home meteen anders aanvoelt (zie ook de kleinere
+                        // Pulse-badge in de hero zelf hierboven, `continueRibbonInfo`).
+                        TimelineView(.periodic(from: .now, by: 5)) { context in
+                            VeyraContextRibbon(items: contextRibbonItems(now: context.date))
+                        }
+
                         if let message = model.home.notice {
                             VeyraStatusMessage(text: message) { Task { await model.load(force: true) } }
                         }
@@ -259,11 +267,78 @@ struct VeyraBentoHomeView: View {
             VeyraHeroSpotlightView(items: heroSpotlight.items,
                                    style: heroSpotlight.settings.style,
                                    height: heroHeight(availableHeight: availableHeight),
-                                   onIndexChange: { heroSpotlight.currentIndex = $0 })
+                                   onIndexChange: { heroSpotlight.currentIndex = $0 },
+                                   contextInfo: continueRibbonInfo)
                 .padding(.horizontal, heroSpotlight.settings.style == .card ? 16 : 0)
         } else if model.home.phase == .loading || model.home.phase == .idle {
             ProgressView().tint(.white).frame(maxWidth: .infinity).frame(height: 240)
         }
+    }
+
+    /// "Context Ribbon": als het gespotlighte item ook in Verder kijken staat,
+    /// toont de hero meteen waar de gebruiker gebleven was (aflevering/
+    /// resterende tijd) i.p.v. enkel de algemene titelinfo. Simpele, veilige
+    /// eerste versie: alleen Verder kijken, geen "vanavond live"/sport nog
+    /// (die databronnen zijn hier niet beschikbaar).
+    private func continueRibbonInfo(_ item: HeroSpotlightItem) -> VeyraPulseInfo? {
+        guard let tmdbID = item.mediaItem.tmdbID,
+              let match = model.home.continueItems.first(where: { $0.tmdbID == tmdbID })
+        else { return nil }
+        return VeyraPulseInfo(kind: item.isMovie ? .movie : .series, text: "Verder kijken · \(match.baseMetaText)")
+    }
+
+    // MARK: Veyra Now (Context Ribbon)
+    // Elke kandidaat krijgt een relevantiescore mee -- de ribbon zelf sorteert
+    // erop, dus wat nú het meest telt (wedstrijd bijna afgelopen > zender die
+    // net begint > gewoon verder kijken > iets dat pas later komt) staat vooraan.
+
+    private func contextRibbonItems(now: Date) -> [VeyraRibbonItem] {
+        var items: [VeyraRibbonItem] = []
+
+        if showContinueWatching, let item = model.home.continueItems.first {
+            items.append(VeyraRibbonItem(
+                id: "ribbon-continue-\(item.id)", icon: "play.fill", label: "VERDER KIJKEN",
+                text: item.title, detail: item.subtitle ?? item.baseMetaText, priority: 50,
+                action: { onPlay(item) }))
+        }
+
+        if showUpcoming, let item = model.today(at: now, limit: 1)?.items.first {
+            let minutesUntilAiring = item.airDate.timeIntervalSince(now) / 60
+            let airingSoon = !item.isDateOnly && minutesUntilAiring > 0 && minutesUntilAiring <= 180
+            let startText = item.isDateOnly
+                ? item.airDate.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).locale(VeyraHomeFormat.locale))
+                : item.airDate.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).hour().minute().locale(VeyraHomeFormat.locale))
+            let detail = [item.subtitle, startText].compactMap { $0 }.joined(separator: " · ")
+            items.append(VeyraRibbonItem(
+                id: "ribbon-upcoming-\(item.id)", icon: "calendar",
+                label: item.kind == .movie ? "FILM BINNENKORT" : "VOLGENDE AFLEVERING",
+                text: item.title, detail: detail, priority: airingSoon ? 75 : 40,
+                action: { onToggleReminder(item, !model.home.reminderIDs.contains(item.id)) }))
+        }
+
+        if let row = model.liveRows(at: now, limit: 1, favoritesOnly: liveFavoritesOnly).first {
+            let justStarted = row.progress < 0.1
+            items.append(VeyraRibbonItem(
+                id: "ribbon-live-\(row.id)", icon: "dot.radiowaves.left.and.right", label: "LIVE NU",
+                text: row.title, detail: "\(row.channelName) · nog \(row.remainingMinutes) min", isLive: true,
+                priority: justStarted ? 85 : (row.isSports ? 65 : 55),
+                action: { onPlayChannel(row.channelID) }))
+        }
+
+        if layout.showSport, let sportModel, let event = sportModel.featured(at: now) {
+            let live = event.isLive(at: now)
+            let remaining = event.remainingMinutes(at: now) ?? .max
+            let nearEnd = live && remaining <= 20
+            items.append(VeyraRibbonItem(
+                id: "ribbon-sport-\(event.id)", icon: "sportscourt", label: live ? "SPORT · LIVE" : "SPORT · STRAKS",
+                text: event.title,
+                detail: live ? "Live op \(event.channelName)" : "Start \(event.start.formatted(.dateTime.hour().minute().locale(VeyraHomeFormat.locale))) · \(event.channelName)",
+                isLive: live,
+                priority: nearEnd ? 100 : (live ? 90 : 60),
+                action: { onPlaySport(event, .live) }))
+        }
+
+        return items
     }
 
     private func heroHeight(availableHeight: CGFloat) -> CGFloat {
@@ -289,8 +364,11 @@ struct VeyraBentoHomeView: View {
         // "Binnenkort" toont alles wat Trakt teruggeeft, net als op tvOS.
         let today = showUpcoming ? model.today(at: now, limit: Int.max) : nil
         let items = showContinueWatching ? model.home.continueItems : []
-        let showVolgende = layout.isVisible(.volgende) && !items.isEmpty
-        let showVandaag = layout.isVisible(.vandaag) && today != nil
+        // "Universal Timeline": vervangt de twee losse rijen hieronder door één chronologisch
+        // gesorteerde rij, zolang de gebruiker dit blok expliciet aanzette.
+        let showTimeline = layout.isVisible(.tijdlijn) && (!items.isEmpty || !(today?.items.isEmpty ?? true))
+        let showVolgende = !showTimeline && layout.isVisible(.volgende) && !items.isEmpty
+        let showVandaag = !showTimeline && layout.isVisible(.vandaag) && today != nil
         #if os(iOS)
         let cardLayout = VeyraCaptionedCardLayout.landscape(
             width: min(regular ? 380 : 300, contentWidth))
@@ -298,7 +376,59 @@ struct VeyraBentoHomeView: View {
         let cardLayout: VeyraCaptionedCardLayout = .regular
         #endif
 
-        if showVolgende || showVandaag {
+        if showTimeline {
+            let order: [BentoTile] = [.tijdlijn]
+            let baseProfile = BentoProfile.make(regular ? .tablet : .phone, order: order)
+            // Twee rijen naast elkaar i.p.v. één -- de tegel moet dus bijna dubbel zo hoog zijn.
+            let rowHeight = max(baseProfile.rowHeights.first ?? 0, (cardLayout.height + 22) * 2 + 34)
+            let profile = BentoProfile(columns: baseProfile.columns,
+                                       rowHeights: Array(repeating: rowHeight, count: baseProfile.rowHeights.count),
+                                       spacing: baseProfile.spacing, cells: baseProfile.cells)
+            let entries = veyraTimelineEntries(continueItems: items, upcoming: today?.items ?? [])
+
+            VeyraBentoGrid(profile: profile) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Tijdlijn")
+                        .font(.system(size: 12, weight: .bold))
+                        .tracking(1.5)
+                        .textCase(.uppercase)
+                        .foregroundStyle(VeyraHomeStyle.cyan.opacity(0.85))
+
+                    ScrollView(.horizontal) {
+                        LazyHGrid(rows: [
+                            GridItem(.fixed(cardLayout.height + 22), spacing: 10),
+                            GridItem(.fixed(cardLayout.height + 22), spacing: 10)
+                        ], alignment: .top, spacing: 10) {
+                            ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                                // Vaste label-hoogte reserveren i.p.v. `height: 1` -- anders verschilt de
+                                // totale kaarthoogte per item en zakt de kaart t.o.v. buren zonder label.
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Group {
+                                        if index == 0 || entry.bucketLabel(now: now) != entries[index - 1].bucketLabel(now: now) {
+                                            Text(entry.bucketLabel(now: now))
+                                                .font(.system(size: 10, weight: .bold, design: .rounded))
+                                                .tracking(0.5)
+                                                .foregroundStyle(entry.isNow ? VeyraColors.red : VeyraHomeStyle.dim)
+                                        } else {
+                                            Color.clear
+                                        }
+                                    }
+                                    .frame(height: 14, alignment: .leading)
+                                    timelineCard(entry, now: now, cardLayout: cardLayout,
+                                                featuredContinueID: items.first?.id)
+                                        .frame(width: cardLayout.width, height: cardLayout.height)
+                                }
+                                .frame(height: cardLayout.height + 22, alignment: .top)
+                            }
+                        }
+                    }
+                    .scrollIndicators(.hidden)
+                    .sensoryFeedback(.selection, trigger: model.home.reminderIDs)
+                }
+                .veyraHomeTileMenu(.tijdlijn)
+                .bentoCell(profile.cell(.tijdlijn))
+            }
+        } else if showVolgende || showVandaag {
             let order: [BentoTile] = [showVolgende ? .volgende : nil, showVandaag ? .vandaag : nil].compactMap { $0 }
             let baseProfile = BentoProfile.make(regular ? .tablet : .phone, order: order)
             // De 16:9-kaarten hebben meer hoogte nodig dan de vroegere brede banners.
@@ -326,7 +456,8 @@ struct VeyraBentoHomeView: View {
                                 ForEach(items) { item in
                                     continueButton(item, radius: 16) {
                                         VeyraBentoContinueMiniContent(item: item, compact: true,
-                                                                      cornerRadius: 16, cardLayout: cardLayout)
+                                                                      cornerRadius: 16, cardLayout: cardLayout,
+                                                                      isFeatured: item.id == items.first?.id)
                                     }
                                     .frame(width: cardLayout.width, height: cardLayout.height)
                                 }
@@ -390,7 +521,7 @@ struct VeyraBentoHomeView: View {
 
     @ViewBuilder
     private func bentoMiddle(now: Date, contentWidth: CGFloat) -> some View {
-        let live = model.liveRows(at: now, limit: 4, recentFirst: true)
+        let live = model.liveRows(at: now, limit: 4, recentFirst: true, favoritesOnly: liveFavoritesOnly)
         let present = middlePresentTiles(live: live)
         let order = layout.orderedTiles.filter { present.contains($0) }
         let baseProfile = BentoProfile.make(regular ? .tablet : .phone, order: order)
@@ -560,6 +691,33 @@ struct VeyraBentoHomeView: View {
     private func toggle(_ item: UpcomingItem) {
         let on = model.home.toggleReminder(item)
         onToggleReminder(item, on)
+    }
+
+    /// Kaart voor één item van de Universal Timeline -- hergebruikt dezelfde knop/contextmenu-
+    /// logica als de losse "Verder kijken"/"Binnenkort"-rijen (`continueButton`/`toggle` hierboven).
+    @ViewBuilder
+    private func timelineCard(_ entry: VeyraTimelineEntry, now: Date, cardLayout: VeyraCaptionedCardLayout,
+                              featuredContinueID: String?) -> some View {
+        switch entry {
+        case .now(let item):
+            continueButton(item, radius: 16) {
+                VeyraBentoContinueMiniContent(item: item, compact: true, cornerRadius: 16, cardLayout: cardLayout,
+                                              isFeatured: item.id == featuredContinueID)
+            }
+        case .later(let item):
+            let on = model.home.reminderIDs.contains(item.id)
+            Button { toggle(item) } label: {
+                VeyraBentoUpcomingCardContent(item: item, now: now, isReminded: on,
+                                              compact: true, cornerRadius: 16, cardLayout: cardLayout)
+            }
+            .buttonStyle(.plain)
+            .contextMenu {
+                Button { toggle(item) } label: {
+                    Label(on ? "Herinnering uit · \(item.title)" : "Herinner mij · \(item.title)",
+                          systemImage: on ? "bell.slash" : "bell")
+                }
+            }
+        }
     }
 
     private func play(_ suggestion: BentoTimeSuggestion) {

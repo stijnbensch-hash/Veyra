@@ -11,6 +11,7 @@ struct ContentView: View {
     @State private var bentoRelease: BentoTMDBTitle?
     @State private var bentoCatalog: BentoCatalog?
     @State private var sportQuery: SportChannelQuery?
+    @State private var activeSportEvent: SportEvent?
 
     var body: some View {
         NavigationStack {
@@ -24,6 +25,7 @@ struct ContentView: View {
                         onPlay: { bentoTitle = $0 },
                         onOpenLiveTV: { _ in destination = .liveTV },
                         onPlayChannel: { id in
+                            activeSportEvent = nil
                             if let source = VeyraBentoServices.shared.playableSource(forChannelID: id) {
                                 bentoChannel = source
                             } else {
@@ -34,7 +36,7 @@ struct ContentView: View {
                         onOpenIPTVSeries: { bentoSeries = $0 },
                         onOpenTMDBTitle: { bentoRelease = $0 },
                         onOpenCatalog: { bentoCatalog = $0 },
-                        onPlaySport: { event, _ in sportQuery = SportChannelQuery(event: event) },
+                        onPlaySport: { event, _ in sportQuery = SportChannelQuery(event: event); activeSportEvent = event },
                         onOpenCompetition: { _ in destination = .sport }
                     )
                 }
@@ -51,12 +53,13 @@ struct ContentView: View {
                 .container,
                 edges: .horizontal
             )
+            .mediaNavigationRoot()
             .navigationDestination(item: $bentoTitle) { item in
                 VeyraBentoTitleDestination(item: item)
             }
             .sportChannelSheet($sportQuery) { bentoChannel = $0 }
             .navigationDestination(item: $bentoChannel) { source in
-                PlayerView(source: source, item: MediaItem(title: source.name, type: .liveTV))
+                PlayerView(source: source, item: MediaItem(title: source.name, type: .liveTV), sportEvent: activeSportEvent)
             }
             .navigationDestination(item: $bentoFilm) { film in
                 PlayerView(source: film.playableSource)

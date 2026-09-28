@@ -1,10 +1,14 @@
 import SwiftUI
 
 struct SearchView: View {
+    // Zie MediaNavigation.swift: centrale actie i.p.v. eigen `.navigationDestination(item:)`
+    // voor `MediaItem`, anders botst dit met de Home-planken in dezelfde (enige, tvOS-brede)
+    // NavigationStack.
+    @Environment(\.openMediaDetail) private var openMediaDetail
+
     @State private var movies: [TMDBMovie] = []
     @State private var series: [TMDBSeries] = []
 
-    @State private var selectedMediaItem: MediaItem?
     @State private var selectedSeries: TMDBSeries?
 
     @State private var searchText = ""
@@ -47,13 +51,6 @@ struct SearchView: View {
         )
         .task(id: searchText) {
             await updateSearch()
-        }
-        .navigationDestination(
-            item: $selectedMediaItem
-        ) { movie in
-            MovieDetailView(
-                movie: movie
-            )
         }
         .navigationDestination(
             item: $selectedSeries
@@ -493,10 +490,10 @@ struct SearchView: View {
         }
 
         do {
-            selectedMediaItem =
-                try await service.mediaItem(
-                    for: movie
-                )
+            let item = try await service.mediaItem(
+                for: movie
+            )
+            openMediaDetail(item)
         } catch {
             errorMessage =
                 error.localizedDescription

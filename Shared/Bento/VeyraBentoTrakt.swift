@@ -1,6 +1,6 @@
 // VeyraBentoTrakt.swift — gedeeld (tvOS 17+ / iOS 17+ / macOS 14+)
 // Gegevenslaag voor de home-secties "Verder kijken" en "Binnenkort", gevoed door Trakt.
-// Vereist VeyraBentoHeroModel.swift (HeroMoment / HeroContent).
+// (Vereiste HeroMoment/HeroContent-koppeling met VeyraBentoHeroModel.swift is opgeruimd, was ongebruikt.)
 //
 // Trakt-endpoints (allemaal OAuth):
 //   Verder kijken
@@ -23,7 +23,7 @@ import Observation
 
 // MARK: - Domeinmodellen
 
-nonisolated enum MediaKind: Sendable { case movie, episode }
+nonisolated enum MediaKind: String, Sendable, Codable { case movie, episode }
 
 nonisolated struct Artwork: Sendable, Equatable {
     var backdrop: URL?
@@ -31,7 +31,7 @@ nonisolated struct Artwork: Sendable, Equatable {
     var banner: URL? = nil
 }
 
-nonisolated struct ContinueItem: Identifiable, Hashable, Sendable {
+nonisolated struct ContinueItem: Identifiable, Hashable, Sendable, Codable {
     let id: String                 // "pb-123" of "next-<showTraktID>-S2E5"
     let playbackID: Int?           // nodig voor DELETE /sync/playback/{id}
     let kind: MediaKind
@@ -101,7 +101,7 @@ nonisolated struct ContinueItem: Identifiable, Hashable, Sendable {
     }
 }
 
-nonisolated struct UpcomingItem: Identifiable, Equatable, Sendable {
+nonisolated struct UpcomingItem: Identifiable, Equatable, Sendable, Codable {
     let id: String
     let kind: MediaKind
     let title: String
@@ -475,12 +475,18 @@ nonisolated final class TraktHomeAPI: TraktHomeProviding {
         return try Self.decoder().decode(T.self, from: data)
     }
 
-    /// Trakt geeft af en toe een transiënte 500/502/503 terug (bekend bij vooral
-    /// `calendars/*` en `progress/watched`) zonder dat er iets mis is met het
-    /// verzoek zelf -- vandaar een korte retry met backoff vóór we de fout
-    /// laten zien. Geen retry op 4xx: dat is een verzoek-/auth-probleem dat
-    /// opnieuw proberen toch niet oplost.
-    private static let serverErrorRetryDelays: [UInt64] = [500_000_000, 1_500_000_000, 3_000_000_000] // ns: 0.5s, 1.5s, 3.0s
+    /// Trakt geeft af en toe een transiënte 500/502/503 terug zonder dat er
+    /// iets mis is met het verzoek zelf -- vandaar één korte retry vóór we de
+    /// fout laten zien. Geen retry op 4xx: dat is een verzoek-/auth-probleem
+    /// dat opnieuw proberen toch niet oplost.
+    ///
+    /// Bewust maar één korte retry, niet drie oplopend tot 5s: `send()` wordt
+    /// ook gebruikt door de per-serie `progress/watched`-aanroepen die
+    /// "Verder kijken" doet (tot ~40, in groepjes van 6). Bij een bredere
+    /// Trakt-storing telden 3 retries per mislukte aanroep op tot tientallen
+    /// seconden extra wachttijd — "Verder kijken"/"Binnenkort" moeten meteen
+    /// bij het openen van de app laden, ook als Trakt net hapert.
+    private static let serverErrorRetryDelays: [UInt64] = [300_000_000] // ns: 0.3s
 
     private func send(_ path: String, method: String, query: [URLQueryItem]) async throws -> Data {
         var comps = URLComponents(url: base.appendingPathComponent(path), resolvingAgainstBaseURL: false)!
@@ -566,6 +572,48 @@ final class VeyraHomeViewModel {
         self.provider = provider
         self.artwork = artwork
         self.reminderIDs = reminders
+        // Vorige sessie's resultaat meteen tonen (incl. eerder opgehaalde beeld-URL's) zodat
+        // "Verder kijken"/"Binnenkort" al op het scherm staan voordat `load()` klaar is --
+        // wordt zo dadelijk gewoon overschreven door de verse Trakt-data.
+        if let cached = Self.loadCache() {
+            continueItems = cached.continueItems
+            upcoming = cached.upcoming
+        }
+        // Opruimen: eerdere (inmiddels verwijderde) versie schreef deze cache nog naar
+        // UserDefaults, waar een te grote waarde de app kon laten crashen ("byte count limit
+        // reached"). Eenmalig verwijderen zodat een reeds opgeslagen te-grote waarde niet blijft
+        // hangen.
+        UserDefaults.standard.removeObject(forKey: "VeyraHomeViewModel.cache.v1")
+    }
+
+    private struct HomeCache: Codable {
+        let continueItems: [ContinueItem]
+        let upcoming: [UpcomingItem]
+    }
+
+    /// Bewust een los bestand in Caches, geen UserDefaults: NSUserDefaults/CFPreferences
+    /// weigert waarden vanaf ~1MB ("byte count limit reached") en crasht de app daarop --
+    /// gezien "Binnenkort" een ongelimiteerd aantal Trakt-items kan bevatten (elk met eigen
+    /// backdrop-/logo-URL's) is die grens met wat pech gewoon haalbaar. Een los bestand kent
+    /// die limiet niet.
+    private static var cacheFileURL: URL? {
+        guard let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else { return nil }
+        return dir.appendingPathComponent("veyra-home-cache.json")
+    }
+
+    private static func loadCache() -> HomeCache? {
+        guard let url = cacheFileURL, let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode(HomeCache.self, from: data)
+    }
+
+    private func saveCache() {
+        guard let url = Self.cacheFileURL else { return }
+        // Extra begrenzing (naast de eigen `continueWatchingLimit`-knip hierboven): "Binnenkort"
+        // kan in theorie fors uitlopen; hier hard afgekapt zodat het cachebestand sowieso klein
+        // en snel te lezen/schrijven blijft, ongeacht hoeveel Trakt teruggeeft.
+        let payload = HomeCache(continueItems: continueItems, upcoming: Array(upcoming.prefix(60)))
+        guard let data = try? JSONEncoder().encode(payload) else { return }
+        try? data.write(to: url, options: .atomic)
     }
 
     nonisolated private static func capture<T: Sendable>(_ work: @Sendable () async throws -> T) async -> Result<T, Error> {
@@ -587,8 +635,12 @@ final class VeyraHomeViewModel {
         // Ruimer ophalen dan uiteindelijk getoond wordt (zie `continueWatchingLimit` hieronder):
         // Trakt-checkpoints die geen "te gaan" meer hebben, worden client-side weggefilterd
         // (zie `continueWatching(limit:)`), dus een kleine instelling mag niet ook al de
-        // ruwe ophaling beperken -- anders houd je soms minder dan gevraagd over.
-        async let cont = Self.capture { try await provider.continueWatching(limit: 80) }
+        // ruwe ophaling beperken -- anders houd je soms minder dan gevraagd over. Wél begrensd
+        // i.p.v. een vaste 80: elk extra item kost een eigen "progress/watched"-aanroep per
+        // serie, dus bij de standaardinstelling (10) onnodig 80 ophalen kostte extra tijd
+        // bovenop de eigenlijke boosdoener (zie `serverErrorRetryDelays` hierboven).
+        let fetchLimit = min(Self.continueWatchingLimit * 2, 40)
+        async let cont = Self.capture { try await provider.continueWatching(limit: fetchLimit) }
         async let soon = Self.capture { try await provider.upcoming(days: 14) }
         let (c, u) = await (cont, soon)
 
@@ -607,14 +659,16 @@ final class VeyraHomeViewModel {
         if case .failure(let e) = c, continueItems.isEmpty { notice = e.localizedDescription }
         else if case .failure(let e) = u, upcoming.isEmpty { notice = e.localizedDescription }
         else { notice = nil }
+        saveCache()
         await enrichArtwork()
+        saveCache()
     }
 
     func remove(_ item: ContinueItem) async {
         guard let id = item.playbackID else { return }
         let before = continueItems
         continueItems.removeAll { $0.id == item.id }
-        do { try await provider.removePlayback(id: id) } catch { continueItems = before }
+        do { try await provider.removePlayback(id: id); saveCache() } catch { continueItems = before }
     }
 
     /// Geeft terug of de herinnering nu aan staat. Plan de echte notificatie in de app (UNUserNotificationCenter).
@@ -671,39 +725,6 @@ final class VeyraHomeViewModel {
         }
     }
 
-    // MARK: Hero-mapping (zelfde HeroContent als VeyraHeroView)
-
-    func heroContent(forContinue item: ContinueItem, now: Date = .now) -> HeroContent {
-        var moments = [HeroMoment(
-            id: item.id,
-            label: item.isUpNext ? "VOLGENDE" : "HERVAT",
-            title: item.episodeCode != nil ? (item.subtitle ?? item.title) : item.title,
-            metaLine: item.metaText,
-            backdropURL: item.backdropURL,
-            progress: item.progress > 0 ? item.progress : nil,
-            isLive: false,
-            runtimeText: item.remainingMinutes.map { "\($0) min" },
-            badges: [])]
-
-        // "Straks": staat er een nieuwe aflevering van dezelfde serie in de Trakt-kalender?
-        if let sid = item.showTraktID, let next = upcoming.first(where: { $0.showTraktID == sid }) {
-            moments.append(HeroMoment(
-                id: next.id, label: "STRAKS", title: next.subtitle ?? next.title,
-                metaLine: VeyraHomeFormat.when(next.airDate, now: now, dateOnly: next.isDateOnly),
-                backdropURL: next.backdropURL ?? item.backdropURL, progress: nil, isLive: false,
-                runtimeText: next.runtimeMinutes.map { "\($0) min" }, badges: []))
-        }
-        return HeroContent(logoURL: item.logoURL, fallbackTitle: item.title, moments: moments)
-    }
-
-    func heroContent(forUpcoming item: UpcomingItem, now: Date = .now) -> HeroContent {
-        let moment = HeroMoment(
-            id: item.id, label: "BINNENKORT", title: item.subtitle ?? item.title,
-            metaLine: "\(VeyraHomeFormat.when(item.airDate, now: now, dateOnly: item.isDateOnly)) · over \(VeyraHomeFormat.countdown(to: item.airDate, now: now))",
-            backdropURL: item.backdropURL, progress: nil, isLive: false,
-            runtimeText: item.runtimeMinutes.map { "\($0) min" }, badges: [])
-        return HeroContent(logoURL: item.logoURL, fallbackTitle: item.title, moments: [moment])
-    }
 }
 
 // MARK: - Voorbeelddata (previews)

@@ -10,12 +10,10 @@ struct VeyraHomeContinueWatchingSettingsView: View {
     private var showContinueWatching = true
     @AppStorage(GeneralSettingsDefaults.continueWatchingLimitKey)
     private var continueWatchingLimit = 10
-    @AppStorage(GeneralSettingsDefaults.hideContinueWatchingReleaseDateKey)
-    private var hideContinueWatchingReleaseDate = false
     @AppStorage(GeneralSettingsDefaults.showUpcomingKey)
     private var showUpcoming = true
-    @AppStorage(GeneralSettingsDefaults.includeWatchlistPremieresKey)
-    private var includeWatchlistPremieres = true
+    @AppStorage(GeneralSettingsDefaults.pulseBadgesKey)
+    private var showPulseBadges = true
 
     var body: some View {
 #if os(tvOS)
@@ -43,13 +41,10 @@ struct VeyraHomeContinueWatchingSettingsView: View {
                     }
                     .disabled(!showContinueWatching)
                     .veyraCardRow()
-                    Toggle("Releasedatum verbergen op verder-kijken-kaarten", isOn: $hideContinueWatchingReleaseDate)
-                        .disabled(!showContinueWatching)
                     Toggle("Binnenkort tonen", isOn: $showUpcoming)
-                    Toggle("Premières uit kijklijst meenemen", isOn: $includeWatchlistPremieres)
-                        .disabled(!showUpcoming)
+                    Toggle("Veyra Pulse-badges tonen", isOn: $showPulseBadges)
                 } footer: {
-                    Text("Verder kijken toont titels die je begonnen bent; Aantal tegels begrenst hoeveel er verschijnen (meest recente behouden). Binnenkort toont de volgende aflevering — en de uitzenddatum — voor series waar je bij bent. \"Releasedatum verbergen\" heeft nog geen effect: verder-kijken-kaarten tonen momenteel geen datum om te verbergen. \"Premières uit kijklijst\" is nog niet aangesloten — dat vraagt releasedata per kijklijst-item die Veyra nu nog niet opzoekt.")
+                    Text("Verder kijken toont titels die je begonnen bent; Aantal tegels begrenst hoeveel er verschijnen (meest recente behouden). Binnenkort toont de volgende aflevering — en de uitzenddatum — voor series waar je bij bent. \"Veyra Pulse\" toont de meta-informatie (nog te gaan, resterende tijd) als icoon + pil i.p.v. losse tekst — geldt voor alle platformen tegelijk.")
                 }
             }
             .frame(maxWidth: 1000)
@@ -65,13 +60,10 @@ struct VeyraHomeContinueWatchingSettingsView: View {
                     in: 1...30
                 )
                 .disabled(!showContinueWatching)
-                Toggle("Releasedatum verbergen op verder-kijken-kaarten", isOn: $hideContinueWatchingReleaseDate)
-                    .disabled(!showContinueWatching)
                 Toggle("Binnenkort tonen", isOn: $showUpcoming)
-                Toggle("Premières uit kijklijst meenemen", isOn: $includeWatchlistPremieres)
-                    .disabled(!showUpcoming)
+                Toggle("Veyra Pulse-badges tonen", isOn: $showPulseBadges)
             } footer: {
-                Text("Verder kijken toont titels die je begonnen bent; Aantal tegels begrenst hoeveel er verschijnen (meest recente behouden). Binnenkort toont de volgende aflevering — en de uitzenddatum — voor series waar je bij bent. \"Releasedatum verbergen\" heeft nog geen effect: verder-kijken-kaarten tonen momenteel geen datum om te verbergen. \"Premières uit kijklijst\" is nog niet aangesloten — dat vraagt releasedata per kijklijst-item die Veyra nu nog niet opzoekt.")
+                Text("Verder kijken toont titels die je begonnen bent; Aantal tegels begrenst hoeveel er verschijnen (meest recente behouden). Binnenkort toont de volgende aflevering — en de uitzenddatum — voor series waar je bij bent. \"Veyra Pulse\" toont de meta-informatie (nog te gaan, resterende tijd) als icoon + pil i.p.v. losse tekst — geldt voor alle platformen tegelijk.")
             }
         }
         .navigationTitle("Verder kijken & Binnenkort")

@@ -4,6 +4,7 @@ struct MovieDetailView: View {
     let movie: MediaItem
 
     @State private var ratings = MetadataRatings()
+    @State private var runtimeMinutes: Int?
     @ObservedObject private var traktStore = TraktStore.shared
 
     var body: some View {
@@ -55,6 +56,7 @@ struct MovieDetailView: View {
         .task(id: movie.id) {
             guard let tmdbID = movie.tmdbID else { return }
             ratings = await MetadataRatingsService.movieRatings(tmdbID: tmdbID, imdbID: movie.imdbID, title: movie.title)
+            runtimeMinutes = try? await TMDBService()?.runtimeMinutes(forMovieID: tmdbID)
         }
     }
 
@@ -72,17 +74,26 @@ struct MovieDetailView: View {
                         font: .system(size: 54, weight: .bold, design: .rounded)
                     )
 
-                    if let year = releaseYear {
-                        Text(year)
-                            .font(
-                                .system(
-                                    size: 32,
-                                    weight: .medium
+                    HStack(spacing: 16) {
+                        if let year = releaseYear {
+                            Text(year)
+                                .font(
+                                    .system(
+                                        size: 32,
+                                        weight: .medium
+                                    )
                                 )
-                            )
-                            .foregroundStyle(
-                                .cyan.opacity(0.85)
-                            )
+                                .foregroundStyle(
+                                    .cyan.opacity(0.85)
+                                )
+                        }
+
+                        // Veyra Pulse: speelduur -- zelfde icoon+pil-taal als elders (Live TV,
+                        // Verder kijken). Kwaliteit/bronnen zijn hier bewust nog niet
+                        // toegevoegd: die zijn pas bekend na broncontrole, niet vooraf.
+                        if let runtimeMinutes, let pulse = VeyraPulseInfo(kind: .movie, text: formattedRuntime(runtimeMinutes)) {
+                            VeyraPulseBadge(info: pulse)
+                        }
                     }
 
                     MetadataRatingsView(ratings: ratings)
@@ -200,6 +211,12 @@ struct MovieDetailView: View {
 
     private var baseBackground: some View {
         VeyraBackground()
+    }
+
+    // MARK: - Speelduur
+
+    private func formattedRuntime(_ minutes: Int) -> String {
+        minutes >= 60 ? "\(minutes / 60)u \(minutes % 60)m" : "\(minutes) min"
     }
 
     // MARK: - Release year

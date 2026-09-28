@@ -31,6 +31,21 @@ struct LiveTVView: View {
     @State
     private var displayMode: LiveTVDisplayMode = .channels
 
+    @AppStorage("liveTV.epgViewMode") private var epgViewModeRaw = VeyraEPGViewMode.grid.rawValue
+    private var epgViewMode: VeyraEPGViewMode { VeyraEPGViewMode(rawValue: epgViewModeRaw) ?? .grid }
+
+    @StateObject private var flowPreview = VeyraFlowPreviewController()
+    @State private var flowSelectedChannelID: String?
+    @State private var showFlowPreview = false
+    @State private var pendingFlowSource: PlayableSource?
+
+    private var flowSelectedRow: VeyraGuideChannel? {
+        guide.visibleChannels.first { $0.id == flowSelectedChannelID }
+            ?? guide.visibleChannels.first
+    }
+
+    @Environment(\.scenePhase) private var scenePhase
+
     @Environment(\.horizontalSizeClass)
     private var sizeClass
 
@@ -65,6 +80,16 @@ struct LiveTVView: View {
                     .padding(.top, 8)
 
                     categorySelector
+
+                    if displayMode == .guide {
+                        Picker("Gidsweergave", selection: $epgViewModeRaw) {
+                            Text("Raster").tag(VeyraEPGViewMode.grid.rawValue)
+                            Text("Flow").tag(VeyraEPGViewMode.flow.rawValue)
+                        }
+                        .pickerStyle(.segmented)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 8)
+                    }
 
                     content
                 }
@@ -108,6 +133,22 @@ struct LiveTVView: View {
             ) { _ in
                 logoOverrideVersion += 1
             }
+            .onChange(of: scenePhase) { _, phase in
+                if phase != .active { flowPreview.stop() }
+            }
+            .onChange(of: displayMode) { _, _ in flowPreview.stop() }
+            .onChange(of: epgViewModeRaw) { _, _ in flowPreview.stop() }
+            .onChange(of: guide.activeProviderID) { _, _ in
+                flowPreview.stop()
+                flowSelectedChannelID = nil
+            }
+            .onChange(of: showFolders) { _, showing in
+                if showing { flowPreview.stop() }
+            }
+            .onChange(of: showRecordings) { _, showing in
+                if showing { flowPreview.stop() }
+            }
+            .onDisappear { flowPreview.stop() }
             .navigationDestination(
                 item:
                     $selectedSource
@@ -231,6 +272,30 @@ struct LiveTVView: View {
                         guide
                 )
             }
+            .sheet(isPresented: $showFlowPreview, onDismiss: {
+                if let source = pendingFlowSource {
+                    pendingFlowSource = nil
+                    selectedSource = source
+                }
+            }) {
+                NavigationStack {
+                    TimelineView(.periodic(from: .now, by: 60)) { context in
+                        VeyraPortableFlowPreview(
+                            guide: guide,
+                            row: flowSelectedRow,
+                            now: context.date,
+                            controller: flowPreview,
+                            onPlay: playFlowChannel
+                        )
+                    }
+                    .navigationTitle("Live voorbeeld")
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Sluiten") { showFlowPreview = false }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -337,12 +402,65 @@ struct LiveTVView: View {
 
         } else {
             if displayMode == .guide {
-                LiveTVGuideView(guide: guide, logoOverrideVersion: logoOverrideVersion) { row in
-                    selectedSource = guide.play(row)
+                if epgViewMode == .flow {
+                    flowGuide
+                } else {
+                    LiveTVGuideView(guide: guide, logoOverrideVersion: logoOverrideVersion) { row in
+                        selectedSource = guide.play(row)
+                    }
                 }
             } else {
                 channelList
             }
+        }
+    }
+
+    private var flowGuide: some View {
+        TimelineView(.periodic(from: .now, by: 60)) { context in
+            HStack(alignment: .top, spacing: 12) {
+                VeyraFlowEPGView(
+                    guide: guide,
+                    channels: guide.visibleChannels,
+                    now: context.date,
+                    selectedChannelID: flowSelectedRow?.id,
+                    logoOverrideVersion: logoOverrideVersion,
+                    onPlay: playFlowChannel,
+                    onFocus: selectFlowChannel
+                )
+
+                if isPad {
+                    VeyraPortableFlowPreview(
+                        guide: guide,
+                        row: flowSelectedRow,
+                        now: context.date,
+                        controller: flowPreview,
+                        onPlay: playFlowChannel
+                    )
+                    .frame(width: 340)
+                }
+            }
+            .onChange(of: flowSelectedRow?.id) { _, _ in flowPreview.stop() }
+        }
+    }
+
+    private func selectFlowChannel(_ row: VeyraGuideChannel) {
+        if flowSelectedChannelID != row.id {
+            flowPreview.stop()
+            flowSelectedChannelID = row.id
+        }
+        // Voorvertoning meteen tonen i.p.v. een aparte "Voorvertoning"-druk te vereisen.
+        flowPreview.start(row)
+        if !isPad { showFlowPreview = true }
+    }
+
+    private func playFlowChannel(_ row: VeyraGuideChannel) {
+        flowPreview.stop()
+        let source = guide.play(row)
+        if showFlowPreview {
+            pendingFlowSource = source
+            showFlowPreview = false
+        } else {
+            selectedSource = source
         }
     }
 

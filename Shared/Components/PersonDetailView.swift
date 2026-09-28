@@ -13,6 +13,10 @@ struct PersonDetailView: View {
     @State private var filter: Filter = .all
     @State private var isLoading = true
     @State private var biographyExpanded = false
+    @State private var peekingKnownForID: UUID?
+
+    // Zie MediaNavigation.swift: centrale actie i.p.v. eigen `.navigationDestination(item:)`.
+    @Environment(\.openMediaDetail) private var openMediaDetail
 
 #if os(tvOS)
     @Environment(\.dismiss) private var dismiss
@@ -218,16 +222,18 @@ struct PersonDetailView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: rowSpacing) {
                     ForEach(knownFor, id: \.self) { credit in
-                        NavigationLink {
-                            ShelfItemDestination(item: credit.mediaItem())
-                        } label: {
+                        Button { openMediaDetail(credit.mediaItem()) } label: {
                             VeyraPosterCard(
                                 title: credit.displayTitle,
                                 url: credit.mediaItem().posterURL,
                                 symbol: credit.isMovie ? "film" : "tv",
                                 width: posterWidth,
                                 genre: credit.mediaItem().genre,
-                                rating: credit.voteAverage
+                                rating: credit.voteAverage,
+                                tmdbID: credit.mediaItem().tmdbID,
+                                isMovie: credit.isMovie,
+                                onOpenDetails: { openMediaDetail(credit.mediaItem()) },
+                                peekTrigger: peekBinding(for: credit)
                             )
                         }
 #if os(tvOS)
@@ -292,6 +298,13 @@ struct PersonDetailView: View {
                 }
             }
         }
+    }
+
+    private func peekBinding(for credit: TMDBPersonCredit) -> Binding<Bool> {
+        Binding(
+            get: { peekingKnownForID == credit.mediaItem().id },
+            set: { peekingKnownForID = $0 ? credit.mediaItem().id : nil }
+        )
     }
 
     private func filmographyLink(_ credit: TMDBPersonCredit) -> some View {

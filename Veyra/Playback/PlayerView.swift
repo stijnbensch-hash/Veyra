@@ -5,10 +5,13 @@ struct PlayerView: View {
     let source: PlayableSource
     var item: MediaItem? = nil
     var resumeProgress: Double? = nil
+    /// Gezet wanneer deze bron een wedstrijd is (zie `SportChannelQuery`) --
+    /// toont Match Center bovenop de speler i.p.v. gewone live-TV-chrome.
+    var sportEvent: SportEvent? = nil
 
     var body: some View {
         if source.kind == .liveTV {
-            LiveTVPlayerRoot(source: source, item: item)
+            LiveTVPlayerRoot(source: source, item: item, sportEvent: sportEvent)
         } else {
             PlayerSessionView(source: source, item: item, resumeProgress: resumeProgress)
         }
@@ -24,11 +27,13 @@ private struct LiveTVPlayerRoot: View {
     @State private var activeSource: PlayableSource
     let initialItem: MediaItem?
     let initialSourceID: UUID
+    let sportEvent: SportEvent?
 
-    init(source: PlayableSource, item: MediaItem?) {
+    init(source: PlayableSource, item: MediaItem?, sportEvent: SportEvent? = nil) {
         _activeSource = State(initialValue: source)
         initialItem = item
         initialSourceID = source.id
+        self.sportEvent = sportEvent
     }
 
     var body: some View {
@@ -39,6 +44,9 @@ private struct LiveTVPlayerRoot: View {
                     ? (initialItem ?? MediaItem(title: activeSource.name, type: .liveTV))
                     : MediaItem(title: activeSource.name, type: .liveTV),
                 liveGuide: guide,
+                // Zenderwissel binnen dezelfde sessie verlaat de wedstrijd --
+                // Match Center hoort alleen bij het oorspronkelijk gekozen kanaal.
+                sportEvent: activeSource.id == initialSourceID ? sportEvent : nil,
                 onSelectLiveChannel: { row in
                     guard row.channel.streamURL != activeSource.url else { return }
                     activeSource = guide.play(row)
@@ -64,6 +72,7 @@ private struct PlayerSessionView: View {
     var resumeProgress: Double? = nil
 
     var liveGuide: VeyraEPGStore? = nil
+    var sportEvent: SportEvent? = nil
     var onSelectLiveChannel: (VeyraGuideChannel) -> Void = { _ in }
 
     @Environment(\.scenePhase)
@@ -86,12 +95,14 @@ private struct PlayerSessionView: View {
         item: MediaItem? = nil,
         resumeProgress: Double? = nil,
         liveGuide: VeyraEPGStore? = nil,
+        sportEvent: SportEvent? = nil,
         onSelectLiveChannel: @escaping (VeyraGuideChannel) -> Void = { _ in }
     ) {
         self.source = source
         self.item = item
         self.resumeProgress = resumeProgress
         self.liveGuide = liveGuide
+        self.sportEvent = sportEvent
         self.onSelectLiveChannel = onSelectLiveChannel
         _viewModel = StateObject(
             wrappedValue: PlaybackViewModel(
@@ -175,6 +186,7 @@ private struct PlayerSessionView: View {
                     sourceMetadata: source.metadata,
                     source: source,
                     liveGuide: liveGuide,
+                    sportEvent: sportEvent,
                     onSelectLiveChannel: onSelectLiveChannel,
                     onRequestExit: {
                         dismiss()
@@ -245,6 +257,15 @@ private struct PlayerSessionView: View {
                 )
                 .focusSection()
                 .onExitCommand { showErrorGuide = false }
+            }
+
+        }
+        .overlay(alignment: .topLeading) {
+            if let sportEvent, viewModel.playbackEngine != nil, !showErrorGuide {
+                TimelineView(.periodic(from: .now, by: 15)) { context in
+                    VeyraMatchCenterOverlay(event: sportEvent, now: context.date)
+                }
+                .padding(60)
             }
         }
         .onAppear {

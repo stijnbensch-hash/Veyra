@@ -6,6 +6,19 @@ struct LiveTVView: View {
     @StateObject
     private var guide = VeyraEPGStore()
 
+    // "Flow EPG": alternatieve gidsweergave, zie VeyraFlowEPGView.swift. Eén instelling, gedeeld
+    // met een eventuele latere iOS-gids (zelfde sleutel = zelfde voorkeur op elk apparaat).
+    @AppStorage("liveTV.epgViewMode") private var epgViewModeRaw = VeyraEPGViewMode.grid.rawValue
+    private var epgViewMode: VeyraEPGViewMode { VeyraEPGViewMode(rawValue: epgViewModeRaw) ?? .grid }
+
+    @StateObject private var flowPreview = VeyraFlowPreviewController()
+    @State private var flowSelectedChannelID: String?
+
+    private var flowSelectedRow: VeyraGuideChannel? {
+        guide.visibleChannels.first { $0.id == flowSelectedChannelID }
+            ?? guide.visibleChannels.first
+    }
+
     @ObservedObject
     private var channelHealth = IPTVChannelHealthStore.shared
 
@@ -186,10 +199,19 @@ struct LiveTVView: View {
             .onChange(
                 of: scenePhase
             ) { _, phase in
+                if phase != .active { flowPreview.stop() }
                 handleScenePhase(
                     phase
                 )
             }
+            .onChange(of: guide.activeProviderID) { _, _ in
+                flowPreview.stop()
+                flowSelectedChannelID = nil
+            }
+            .onChange(of: showMultiview) { _, showing in
+                if showing { flowPreview.stop() }
+            }
+            .onDisappear { flowPreview.stop() }
     }
 
     // MARK: - Main layout
@@ -270,6 +292,7 @@ struct LiveTVView: View {
     private func startLivePlayback(
         _ selected: VeyraEPGSelection
     ) {
+        flowPreview.stop()
         // BELANGRIJK: geen `VeyraLocalLiveFallback` meer proactief vóór het
         // afspelen aanroepen. Die wisselde hier tot voor kort *altijd* stil
         // naar een andere geconfigureerde provider zodra er een kanaal met
@@ -281,8 +304,14 @@ struct LiveTVView: View {
         // afspeelgedrag dat hiermee werd waargenomen. Nu wordt gewoon de
         // bron van de daadwerkelijk geselecteerde/actieve provider gebruikt.
         let directSource = guide.play(selected.row)
-        pendingSource = directSource
-        selection = nil
+        if selection != nil {
+            // De rastersheet moet eerst sluiten voordat de speler opent.
+            pendingSource = directSource
+            selection = nil
+        } else {
+            // Flow heeft geen sheet: open de speler meteen.
+            selectedSource = directSource
+        }
     }
 
     // MARK: - Provider dialog
@@ -366,6 +395,8 @@ struct LiveTVView: View {
             providerButton
 
             categoryButton
+
+            flowToggleButton
 
             nowButton
 
@@ -626,6 +657,20 @@ struct LiveTVView: View {
         )
     }
 
+    /// "Flow EPG": wisselt tussen de klassieke grid en de nieuwe rij-per-zender-weergave
+    /// (VeyraFlowEPGView), zonder de databron/logica te veranderen.
+    private var flowToggleButton: some View {
+        Button {
+            flowPreview.stop()
+            epgViewModeRaw = (epgViewMode == .grid ? VeyraEPGViewMode.flow : .grid).rawValue
+        } label: {
+            Image(systemName: epgViewMode == .grid ? "rectangle.grid.2x2" : "list.bullet.rectangle")
+                .frame(width: 48, height: 48)
+        }
+        .buttonStyle(VeyraEPGButtonStyle())
+        .accessibilityLabel(epgViewMode == .grid ? "Wissel naar Flow-weergave" : "Wissel naar rasterweergave")
+    }
+
     private var settingsButton: some View {
         NavigationLink {
             IPTVAccountsView()
@@ -657,15 +702,75 @@ struct LiveTVView: View {
                 by: 60
             )
         ) { context in
-            programmeGrid(
-                now: context.date
-            )
+            if epgViewMode == .flow {
+                flowGuide(now: context.date)
+            } else {
+                programmeGrid(
+                    now: context.date
+                )
+            }
         }
         .focusSection()
         .onChange(of: focusedGuideElement) { previous, current in
             handleGuideFocusChange(from: previous, to: current)
         }
         .padding(.horizontal, -40)
+    }
+
+    private func flowGuide(now: Date) -> some View {
+        VStack(alignment: .leading, spacing: 18) {
+            VeyraFlowLivePreview(
+                guide: guide,
+                row: flowSelectedRow,
+                now: now,
+                logoOverrideVersion: logoOverrideVersion,
+                controller: flowPreview,
+                onPlay: { row in playFlowChannel(row, at: now) }
+            )
+            .frame(height: 360)
+
+            VeyraFlowEPGView(
+                guide: guide,
+                channels: guide.visibleChannels,
+                now: now,
+                selectedChannelID: flowSelectedRow?.id,
+                logoOverrideVersion: logoOverrideVersion,
+                onPlay: { row in playFlowChannel(row, at: now) },
+                onFocus: { row in
+                    if flowSelectedChannelID != row.id {
+                        flowSelectedChannelID = row.id
+                    }
+                    if flowPreview.channelID != row.id {
+                        flowPreview.start(row)
+                    }
+                }
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .frame(maxHeight: .infinity)
+        .onChange(of: flowSelectedRow?.id) { _, _ in
+            // Filter- of providerwissels kunnen de selectie wijzigen zonder
+            // focusgebeurtenis. Een focuswissel start zelf al direct af.
+            if let row = flowSelectedRow {
+                if flowPreview.channelID != row.id { flowPreview.start(row) }
+            } else {
+                flowPreview.stop()
+            }
+        }
+        .onAppear {
+            if let row = flowSelectedRow, flowPreview.channelID != row.id {
+                flowPreview.start(row)
+            }
+        }
+    }
+
+    private func playFlowChannel(_ row: VeyraGuideChannel, at now: Date) {
+        startLivePlayback(
+            VeyraEPGSelection(
+                row: row,
+                programme: guide.programmes(for: row).first { $0.isOnAir(at: now) }
+            )
+        )
     }
 
     // MARK: - Categories

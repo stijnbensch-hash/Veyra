@@ -29,13 +29,14 @@ nonisolated enum BentoTile: String, CaseIterable, Hashable, Sendable {
     case releasesSeries  // Nieuw uitgebrachte series (TMDB)
     case streaming   // Streamingdiensten (logo's)
     case collecties  // Filmcollecties (franchises)
+    case tijdlijn    // Universal Timeline: Verder kijken + Binnenkort chronologisch samengevoegd
 }
 
 extension BentoTile {
     /// De blokken die de gebruiker kan aan- of uitzetten en herschikken.
     static let configurable: [BentoTile] = [
         .volgende, .releasesFilms, .releasesSeries, .live, .vandaag,
-        .iptvFilms, .iptvSeries, .streaming, .collecties
+        .iptvFilms, .iptvSeries, .streaming, .collecties, .tijdlijn
     ]
 
     var title: String {
@@ -50,6 +51,7 @@ extension BentoTile {
         case .iptvSeries: return "IPTV series"
         case .streaming: return "Streamingdiensten"
         case .collecties: return "Filmcollecties"
+        case .tijdlijn: return "Tijdlijn"
         case .tijd, .nieuw, .bronnen: return rawValue
         }
     }
@@ -66,6 +68,7 @@ extension BentoTile {
         case .iptvSeries: return "Nieuw toegevoegde series van je IPTV-providers"
         case .streaming: return "Netflix, Disney+ en andere diensten"
         case .collecties: return "Franchises en eigen lijsten"
+        case .tijdlijn: return "Verder kijken en Binnenkort samen op één chronologische rij (Nu · 13:00 · Vanavond · Morgen) i.p.v. twee losse rijen. Vervangt die twee rijen zolang dit aan staat."
         case .tijd, .nieuw, .bronnen: return ""
         }
     }
@@ -81,6 +84,7 @@ extension BentoTile {
         case .iptvSeries: return "rectangle.stack"
         case .streaming: return "play.rectangle.on.rectangle"
         case .collecties: return "square.stack"
+        case .tijdlijn: return "clock.arrow.circlepath"
         case .tijd, .nieuw, .bronnen: return "square"
         }
     }
@@ -201,6 +205,8 @@ extension BentoTile {
             // sectie heen lopen -- vandaar dat dit hier ook echt moet kloppen.
             case .volgende: return 352
             case .vandaag: return 352
+            // Tijdlijn toont twee rijen naast elkaar (i.p.v. één), dus bijna dubbel zo hoog.
+            case .tijdlijn: return 720
             case .live: return 520
             case .iptvFilms, .iptvSeries: return 450
             case .streaming: return 220
@@ -220,6 +226,7 @@ extension BentoTile {
             case .volgende: return 205
             case .live: return 300
             case .vandaag: return 205
+            case .tijdlijn: return 205
             case .iptvFilms, .iptvSeries: return 280
             case .streaming: return 76
             // Zie toelichting bij `.tv` hierboven -- zelfde tekort, andere maten.
@@ -236,6 +243,7 @@ extension BentoTile {
             // Zie toelichting bij `.tv` hierboven -- zelfde tekort, andere maten.
             case .collecties: return names ? 205 : 183
             case .vandaag: return 165
+            case .tijdlijn: return 165
             default: return 200
             }
         }

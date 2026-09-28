@@ -285,10 +285,13 @@ final class VeyraBentoViewModel {
     }
 
     /// Maximaal `limit` zenders die nu iets uitzenden: één live sportwedstrijd, dan favorieten, dan de rest.
-    func liveRows(at now: Date, limit: Int = 3, recentFirst: Bool = false) -> [BentoLiveRow] {
-        let live = channels.compactMap { channel -> (EPGChannel, EPGProgram)? in
+    func liveRows(at now: Date, limit: Int = 3, recentFirst: Bool = false, favoritesOnly: Bool = false) -> [BentoLiveRow] {
+        var live = channels.compactMap { channel -> (EPGChannel, EPGProgram)? in
             guard channel.health != .down, let program = channel.currentProgram(at: now) else { return nil }
             return (channel, program)
+        }
+        if favoritesOnly {
+            live = live.filter { $0.0.isFavorite }
         }
 
         var picked: [(EPGChannel, EPGProgram)] = []
@@ -403,17 +406,6 @@ final class VeyraBentoViewModel {
          sources.filter { $0.health == .degraded }.count, sources.filter { $0.health == .down }.count)
     }
 
-    // MARK: Hero-mapping
-
-    func heroContent(forLive row: BentoLiveRow, now: Date = .now) -> HeroContent? {
-        guard let channel = channels.first(where: { $0.id == row.channelID }),
-              let program = channel.currentProgram(at: now) else { return nil }
-        var moments = [program.heroMoment(at: now, health: channel.health)]
-        if let next = channel.nextProgram(after: program.end) {
-            moments.append(next.heroMoment(at: now, health: channel.health))
-        }
-        return HeroContent(logoURL: nil, fallbackTitle: program.title, moments: moments)
-    }
 }
 
 // MARK: - Voorbeelddata (previews)

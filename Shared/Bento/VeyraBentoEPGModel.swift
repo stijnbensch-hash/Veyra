@@ -1,5 +1,5 @@
 // VeyraBentoEPGModel.swift — gedeeld door de tvOS- en (latere) iOS-EPG
-// Voeg toe aan alle targets. Vereist VeyraBentoHeroModel.swift (HeroMoment).
+// Voeg toe aan alle targets.
 //
 // Mapping naar Veyra:
 //   EPGChannel  <- jullie zender/IPTV-bron (+ bronstatus uit Veyra Hub / AIOStreams-check)
@@ -78,33 +78,6 @@ nonisolated struct EPGChannel: Identifiable, Equatable, Codable, Sendable {
 
     func program(containing date: Date) -> EPGProgram? {
         programs.first { $0.start <= date && date < $0.end }
-    }
-}
-
-// MARK: - Mapping naar de hero (zelfde taal als VeyraHeroView)
-
-nonisolated extension EPGProgram {
-    func heroMoment(at now: Date, health: SourceHealth) -> HeroMoment {
-        let live = isLive(at: now)
-        let label: String
-        if live { label = isSports ? "NU LIVE" : "NU" }
-        else if isPast(at: now) { label = "AFGELOPEN" }
-        else { label = "STRAKS" }
-
-        var badges = [health.label]
-        if canCatchUp { badges.append("Vanaf begin mogelijk") }
-
-        return HeroMoment(
-            id: id,
-            label: label,
-            title: subtitle.map { "\(title) · \($0)" } ?? title,
-            metaLine: metaLine(at: now),
-            backdropURL: backdropURL,
-            progress: progress(at: now),
-            isLive: live && isSports,
-            runtimeText: "\(durationMinutes) min",
-            badges: badges
-        )
     }
 }
 

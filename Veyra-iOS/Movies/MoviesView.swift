@@ -2,9 +2,15 @@ import SwiftUI
 
 struct MoviesView: View {
     @ObservedObject private var trakt = TraktStore.shared
+    // Navigatie via de centrale `openMediaDetail`/`playMediaItem`-omgevingsacties
+    // (MediaNavigation.swift) i.p.v. eigen `@State` + `.navigationDestination(item:)`.
+    @Environment(\.openMediaDetail) private var openMediaDetail
+    @Environment(\.playMediaItem) private var playMediaItem
 
     @State private var movies: [TMDBMovie] = []
-    @State private var selectedMovieItem: MediaItem?
+    // Instant Peek: welke film zijn infokaart open staat (per id, `movieCard`-lus is geen
+    // eigen View, dus geen lokale @State per kaart mogelijk).
+    @State private var peekingMovieID: Int?
     @State private var isLoading = true
     @State private var isOpeningMovie = false
     @State private var errorMessage: String?
@@ -158,14 +164,15 @@ struct MoviesView: View {
             .task(id: heroPool.map(\.id)) {
                 await rotateHeroAutomatically()
             }
-            .navigationDestination(
-                item: $selectedMovieItem
-            ) { movie in
-                MovieDetailView(
-                    movie: movie
-                )
-            }
         }
+        .mediaNavigationRoot()
+    }
+
+    private func peekBinding(for movie: TMDBMovie) -> Binding<Bool> {
+        Binding(
+            get: { peekingMovieID == movie.id },
+            set: { peekingMovieID = $0 ? movie.id : nil }
+        )
     }
 
     // MARK: - Hero rotatie
@@ -325,13 +332,29 @@ struct MoviesView: View {
                             tmdbID: movie.id,
                             isMovie: true,
                             releaseDateRaw: movie.releaseDate,
-                            watchedTarget: .movie(TraktIDs(tmdb: movie.id))
+                            watchedTarget: .movie(TraktIDs(tmdb: movie.id)),
+                            onPlay: { Task { await openMovieForPlay(movie) } },
+                            onOpenDetails: { Task { await openMovie(movie) } },
+                            peekTrigger: peekBinding(for: movie)
                         )
                     }
                     .buttonStyle(.plain)
                     .disabled(
                         isOpeningMovie
                     )
+                    .traktMarkWatchedMenu(
+                        MediaItem(
+                            title: movie.title,
+                            type: .movie,
+                            tmdbID: movie.id
+                        )
+                    ) {
+                        Button {
+                            peekingMovieID = movie.id
+                        } label: {
+                            Label("Snel bekijken", systemImage: "eye")
+                        }
+                    }
                 }
             }
         }
@@ -600,17 +623,29 @@ struct MoviesView: View {
         }
 
         do {
-            selectedMovieItem =
-                try await service
+            let item = try await service
                 .mediaItem(
                     for: movie
                 )
+            openMediaDetail(item)
 
         } catch {
             errorMessage =
                 error
                 .localizedDescription
         }
+    }
+
+    // MARK: - Open movie (Instant Peek "Afspelen")
+
+    @MainActor
+    private func openMovieForPlay(_ movie: TMDBMovie) async {
+        guard let service = TMDBService() else {
+            errorMessage = "De metadataservice is niet geconfigureerd."
+            return
+        }
+        guard let item = try? await service.mediaItem(for: movie) else { return }
+        playMediaItem(item)
     }
 }
 

@@ -2,12 +2,11 @@ import SwiftUI
 
 /// tvOS-versie van de "Afspelen"-instellingen, zoals Strand die aanbiedt.
 /// Zie `PlaybackSettings.swift` (Shared) voor de opgeslagen sleutels en
-/// keuzelijsten. De meeste schakelaars sturen de speler nu ook echt aan
-/// (eerste bron/details overslaan, taalvoorkeuren, oversla-segmenten,
-/// "hierna"). Nog niet aangesloten: voorkeursresolutie/mobiele resolutie
-/// (AetherEngine's laadopties bieden hier vooralsnog geen haakje voor),
-/// anime-audio, melding na de aftiteling, externe speler en "automatisch
-/// draaien naar liggend" (niet van toepassing op tvOS).
+/// keuzelijsten. De schakelaars sturen de speler nu ook echt aan (eerste
+/// bron/details overslaan, taalvoorkeuren, oversla-segmenten, "hierna").
+/// Instellingen die nog geen haakje in de speler hadden (voorkeursresolutie,
+/// anime-audio, melding na de aftiteling, externe speler) zijn verwijderd
+/// i.p.v. als dode schakelaar te blijven staan.
 ///
 /// Dit scherm was voorheen één lange lijst met ruim twintig schakelaars.
 /// Voor meer overzicht (zie ook het hoofdmenu "Instellingen") is dat nu
@@ -38,10 +37,6 @@ struct PlaybackSettingsView: View {
                         .upNext, icon: "play.square.stack", title: "Hierna",
                         subtitle: "Automatisch doorspelen en aftelling"
                     )
-                    categoryCard(
-                        .player, icon: "tv", title: "Speler",
-                        subtitle: "Interne of externe speler"
-                    )
                 }
                 .frame(maxWidth: 1300, alignment: .leading)
                 .padding(.horizontal, VeyraSpacing.page)
@@ -57,7 +52,6 @@ struct PlaybackSettingsView: View {
             case .language: PlaybackLanguageSettingsView()
             case .skipSegments: PlaybackSkipSegmentsSettingsView()
             case .upNext: PlaybackUpNextSettingsView()
-            case .player: PlaybackPlayerSettingsView()
             }
         }
     }
@@ -107,7 +101,7 @@ struct PlaybackSettingsView: View {
 }
 
 private enum PlaybackSettingsDestination: String, Identifiable, Hashable {
-    case general, language, skipSegments, upNext, player
+    case general, language, skipSegments, upNext
 
     var id: String { rawValue }
 }
@@ -123,10 +117,6 @@ private struct PlaybackGeneralSettingsView: View {
     private var autoSelectFirstSource = false
     @AppStorage(PlaybackSettingsDefaults.skipContinueWatchingDetailsKey)
     private var skipContinueWatchingDetails = false
-    @AppStorage(PlaybackSettingsDefaults.preferredResolutionKey)
-    private var preferredResolutionRaw = PlaybackResolutionOption.highest.rawValue
-    @AppStorage(PlaybackSettingsDefaults.cellularResolutionKey)
-    private var cellularResolutionRaw = PlaybackCellularResolutionOption.fullHD1080.rawValue
 
     var body: some View {
         ZStack {
@@ -138,12 +128,8 @@ private struct PlaybackGeneralSettingsView: View {
                     VeyraSettingsToggleRow(icon: "play.fill", title: "Volgende aflevering automatisch afspelen", isOn: $autoPlayNextEpisode)
                     VeyraSettingsToggleRow(icon: "checkmark.circle", title: "Eerste bron automatisch selecteren", isOn: $autoSelectFirstSource)
                     VeyraSettingsToggleRow(icon: "forward.end", title: "Details overslaan bij verdergaan", isOn: $skipContinueWatchingDetails)
-
-                    VeyraSettingsChoiceRow<PlaybackResolutionOption>(icon: "rectangle.expand.vertical", "Voorkeursresolutie", selection: $preferredResolutionRaw)
-
-                    VeyraSettingsChoiceRow<PlaybackCellularResolutionOption>(icon: "antenna.radiowaves.left.and.right", "Resolutie via mobiele data", selection: $cellularResolutionRaw)
                 } footer: {
-                    Text("HDR en Dolby Vision worden automatisch herkend en afgespeeld door de speler — daar is geen instelling voor nodig. Voorkeursresolutie en resolutie via mobiele data zijn nog niet aangesloten op de speler.")
+                    Text("HDR en Dolby Vision worden automatisch herkend en afgespeeld door de speler — daar is geen instelling voor nodig.")
                 }
             }
             .frame(maxWidth: 1000)
@@ -165,8 +151,6 @@ private struct PlaybackLanguageSettingsView: View {
     private var subtitleFallbackLanguageRaw = PlaybackLanguageOption.english.rawValue
     @AppStorage(PlaybackSettingsDefaults.autoSelectSubtitlesKey)
     private var autoSelectSubtitlesRaw = PlaybackAutoSelectSubtitlesOption.forcedOnly.rawValue
-    @AppStorage(PlaybackSettingsDefaults.animeAudioKey)
-    private var animeAudioRaw = PlaybackAnimeAudioOption.noPreference.rawValue
 
     var body: some View {
         ZStack {
@@ -187,12 +171,6 @@ private struct PlaybackLanguageSettingsView: View {
                 } header: {
                     Text("Ondertitels")
                 }
-
-                Section {
-                    VeyraSettingsChoiceRow<PlaybackAnimeAudioOption>(icon: "sparkles", "Anime-audio", selection: $animeAudioRaw)
-                } footer: {
-                    Text("Anime-audio is nog niet aangesloten op de speler.")
-                }
             }
             .frame(maxWidth: 1000)
         }
@@ -211,8 +189,6 @@ private struct PlaybackSkipSegmentsSettingsView: View {
     private var showSkipRecapButton = true
     @AppStorage(PlaybackSettingsDefaults.showSkipCreditsButtonKey)
     private var showSkipCreditsButton = true
-    @AppStorage(PlaybackSettingsDefaults.postCreditsAlertKey)
-    private var postCreditsAlert = false
 
     var body: some View {
         ZStack {
@@ -224,9 +200,8 @@ private struct PlaybackSkipSegmentsSettingsView: View {
                     VeyraSettingsToggleRow(icon: "bolt.fill", title: "Intro automatisch overslaan", isOn: $autoSkipIntro)
                     VeyraSettingsToggleRow(icon: "arrow.uturn.forward", title: "Knop 'Samenvatting overslaan' tonen", isOn: $showSkipRecapButton)
                     VeyraSettingsToggleRow(icon: "text.below.photo", title: "Knop 'Aftiteling overslaan' tonen", isOn: $showSkipCreditsButton)
-                    VeyraSettingsToggleRow(icon: "bell", title: "Melding na de aftiteling", isOn: $postCreditsAlert)
                 } footer: {
-                    Text("Tijden komen van TheIntroDB en zijn niet voor elke film of aflevering beschikbaar. Melding na de aftiteling is nog niet aangesloten op de speler.")
+                    Text("Tijden komen van TheIntroDB en zijn niet voor elke film of aflevering beschikbaar.")
                 }
             }
             .frame(maxWidth: 1000)
@@ -258,29 +233,6 @@ private struct PlaybackUpNextSettingsView: View {
             .frame(maxWidth: 1000)
         }
         .navigationTitle("Hierna")
-    }
-}
-
-// MARK: - Speler
-
-private struct PlaybackPlayerSettingsView: View {
-    @AppStorage(PlaybackSettingsDefaults.selectedPlayerKey)
-    private var selectedPlayerRaw = PlaybackSelectedPlayer.intern.rawValue
-
-    var body: some View {
-        ZStack {
-            VeyraBackground().ignoresSafeArea()
-
-            List {
-                Section {
-                    VeyraSettingsChoiceRow<PlaybackSelectedPlayer>(icon: "play.rectangle", "Speler geselecteerd", selection: $selectedPlayerRaw)
-                } footer: {
-                    Text("Externe spelerondersteuning hangt af van wat AetherEngine toestaat en is hier nog niet aangesloten.")
-                }
-            }
-            .frame(maxWidth: 1000)
-        }
-        .navigationTitle("Speler")
     }
 }
 

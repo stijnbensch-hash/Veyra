@@ -434,33 +434,6 @@ final class VeyraSportViewModel {
         return String(competition[..<range.lowerBound]).trimmingCharacters(in: .whitespaces)
     }
 
-    // MARK: Hero-mapping
-
-    func heroContent(for event: SportEvent, now: Date = .now) -> HeroContent {
-        let live = event.isLive(at: now)
-        var badges: [String] = event.channelName.isEmpty ? [] : [event.health.label]
-        if event.alternativeSources > 0 { badges.append("\(event.alternativeSources)× alternatief") }
-
-        var moments = [HeroMoment(
-            id: event.id,
-            label: live ? "NU LIVE" : "STRAKS",
-            title: [event.competition, event.channelName.isEmpty ? nil : event.channelName].compactMap { $0 }.joined(separator: " · "),
-            metaLine: event.metaLine(at: now),
-            backdropURL: event.backdropURL,
-            progress: event.progress(at: now),
-            isLive: live,
-            runtimeText: "\(event.durationMinutes) min",
-            badges: badges)]
-
-        if let next = events.first(where: { $0.channelID == event.channelID && $0.start >= event.end }) {
-            moments.append(HeroMoment(
-                id: next.id, label: "STRAKS", title: next.title,
-                metaLine: VeyraHomeFormat.when(next.start, now: now), backdropURL: next.backdropURL,
-                progress: nil, isLive: false, runtimeText: "\(next.durationMinutes) min",
-                badges: [next.health.label]))
-        }
-        return HeroContent(logoURL: nil, fallbackTitle: event.title, moments: moments)
-    }
 }
 
 // MARK: - Voorbeelddata (previews)

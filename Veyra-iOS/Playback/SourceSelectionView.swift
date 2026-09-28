@@ -415,15 +415,15 @@ struct SourceSelectionView: View {
             .padding(.vertical, isWide ? 21 : 14)
             .frame(maxWidth: .infinity, minHeight: isWide ? 110 : 94, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                VeyraRadius.posterShape
                     .fill(isHovered ? Color.cyan.opacity(0.14) : Color.white.opacity(0.035))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                VeyraRadius.posterShape
                     .strokeBorder(isHovered ? Color.cyan : Color.cyan.opacity(0.10),
                                   lineWidth: isHovered ? 2 : 1)
             )
-            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .contentShape(VeyraRadius.posterShape)
         }
         .buttonStyle(.plain)
         .onHover { hovering in

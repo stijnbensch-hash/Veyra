@@ -3,11 +3,17 @@ import SwiftUI
 struct SearchView: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
 
+    // Navigatie via de centrale `openMediaDetail`/`playMediaItem`-omgevingsacties
+    // (MediaNavigation.swift) i.p.v. een eigen `@State` + `.navigationDestination(item:)`
+    // voor `MediaItem`.
+    @Environment(\.openMediaDetail) private var openMediaDetail
+    @Environment(\.playMediaItem) private var playMediaItem
+
     @State private var query = ""
     @State private var movies: [TMDBMovie] = []
     @State private var series: [TMDBSeries] = []
-    @State private var selectedMovie: MediaItem?
     @State private var selectedSeries: TMDBSeries?
+    @State private var peekingMovieID: Int?
     @State private var isSearching = false
     @State private var isOpeningMovie = false
     @State private var errorMessage: String?
@@ -44,7 +50,10 @@ struct SearchView: View {
                                             width: metrics.posterWidth,
                                             tmdbID: movie.id,
                                             isMovie: true,
-                                            watchedTarget: .movie(TraktIDs(tmdb: movie.id))
+                                            watchedTarget: .movie(TraktIDs(tmdb: movie.id)),
+                                            onPlay: { Task { await openMovieForPlay(movie) } },
+                                            onOpenDetails: { Task { await openMovie(movie) } },
+                                            peekTrigger: peekBinding(for: movie)
                                         )
                                     }
                                     .buttonStyle(.plain)
@@ -82,7 +91,6 @@ struct SearchView: View {
             .navigationTitle("Zoeken")
             .searchable(text: $query, prompt: "Zoek films en series")
             .task(id: query) { await search() }
-            .navigationDestination(item: $selectedMovie) { MovieDetailView(movie: $0) }
             .navigationDestination(item: $selectedSeries) { SeriesDetailView(series: $0) }
             .overlay {
                 if isOpeningMovie {
@@ -92,6 +100,14 @@ struct SearchView: View {
                 }
             }
         }
+        .mediaNavigationRoot()
+    }
+
+    private func peekBinding(for movie: TMDBMovie) -> Binding<Bool> {
+        Binding(
+            get: { peekingMovieID == movie.id },
+            set: { peekingMovieID = $0 ? movie.id : nil }
+        )
     }
 
     private func sectionTitle(_ title: String) -> some View {
@@ -153,9 +169,20 @@ struct SearchView: View {
             return
         }
         do {
-            selectedMovie = try await service.mediaItem(for: movie)
+            let item = try await service.mediaItem(for: movie)
+            openMediaDetail(item)
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    @MainActor
+    private func openMovieForPlay(_ movie: TMDBMovie) async {
+        guard let service = TMDBService() else {
+            errorMessage = "De metadataservice is niet ingesteld."
+            return
+        }
+        guard let item = try? await service.mediaItem(for: movie) else { return }
+        playMediaItem(item)
     }
 }

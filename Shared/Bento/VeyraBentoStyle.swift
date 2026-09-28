@@ -57,6 +57,9 @@ enum VeyraFrame {
     static let active = LinearGradient(
         colors: [VeyraColors.ice, VeyraColors.cyan, VeyraColors.red.opacity(0.75)],
         startPoint: .leading, endPoint: .trailing)
+    /// Effen rood kader (als gradient, zodat het type overeenkomt met `resting`/`active` in een
+    /// `? :`-expressie) voor "dit is nu urgent" -- bv. een "Binnenkort"-kaart die binnen 30 min begint.
+    static let urgent = LinearGradient(colors: [VeyraColors.red.opacity(0.85)], startPoint: .leading, endPoint: .trailing)
 }
 
 extension Array {
@@ -69,7 +72,9 @@ struct VeyraGlassSurface: ViewModifier {
     var cornerRadius: CGFloat = 30
 
     func body(content: Content) -> some View {
-        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        // Zelfde eigen Veyra-vorm als de posterkaarten -- `cornerRadius` blijft als
+        // parameter bestaan voor bron-compatibiliteit maar wordt hier niet meer gebruikt.
+        let shape = VeyraRadius.posterShape
         content
             .background(.ultraThinMaterial, in: shape)
             .background(Color.white.opacity(0.05), in: shape)

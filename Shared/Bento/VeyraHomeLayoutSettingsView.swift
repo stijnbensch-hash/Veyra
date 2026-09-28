@@ -47,6 +47,7 @@ struct VeyraHomePresetPickerView: View {
 /// Instellingen > Home > Indeling.
 struct VeyraHomeLayoutSettingsView: View {
     @State private var layout = VeyraHomeLayoutStore.load()
+    @AppStorage(GeneralSettingsDefaults.liveFavoritesOnlyKey) private var liveFavoritesOnly = false
 
     var body: some View {
         Form {
@@ -56,6 +57,17 @@ struct VeyraHomeLayoutSettingsView: View {
                         layout = preset.layout
                         VeyraHomeLayoutStore.save(layout)
                     } label: {
+                        #if os(tvOS)
+                        // Een kale `Button` in een tvOS-`List` krijgt bij focus altijd de
+                        // felwitte systeemkaart -- i.p.v. daarvan hier dezelfde donkere
+                        // kaart + cyaan gloed als de rest van de instellingenschermen
+                        // (zie `VeyraSettingsCardRow.swift`).
+                        VeyraSettingsCardRowLabel(icon: preset.symbol, title: preset.title, subtitle: preset.detail) {
+                            if layout.preset == preset.id {
+                                Image(systemName: "checkmark").foregroundStyle(VeyraColors.cyan)
+                            }
+                        }
+                        #else
                         HStack {
                             Label {
                                 VStack(alignment: .leading, spacing: 2) {
@@ -68,7 +80,11 @@ struct VeyraHomeLayoutSettingsView: View {
                             Spacer()
                             if layout.preset == preset.id { Image(systemName: "checkmark").foregroundStyle(VeyraColors.cyan) }
                         }
+                        #endif
                     }
+                    #if os(tvOS)
+                    .veyraCardRow()
+                    #endif
                 }
             } header: {
                 Text("Start met")
@@ -129,10 +145,27 @@ struct VeyraHomeLayoutSettingsView: View {
             }
 
             Section {
-                Button("Standaardindeling herstellen") {
+                Toggle("Enkel favoriete zenders tonen", isOn: $liveFavoritesOnly)
+            } header: {
+                Text("Live TV")
+            } footer: {
+                Text("Geldt voor \"Live nu\" op Home en Veyra Now. Zonder favoriete zenders blijft dit blok leeg.")
+            }
+
+            Section {
+                Button {
                     layout = .standard
                     persist()
+                } label: {
+                    #if os(tvOS)
+                    VeyraSettingsCardRowLabel(icon: "arrow.counterclockwise", title: "Standaardindeling herstellen")
+                    #else
+                    Text("Standaardindeling herstellen")
+                    #endif
                 }
+                #if os(tvOS)
+                .veyraCardRow()
+                #endif
             }
         }
         .navigationTitle("Indeling")

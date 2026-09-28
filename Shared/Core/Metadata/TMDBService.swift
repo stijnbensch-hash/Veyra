@@ -22,6 +22,12 @@ struct TMDBService {
         return try await mediaItem(for: movie)
     }
 
+    /// Speelduur in minuten, voor Veyra Pulse op `MovieDetailView` -- `TMDBMovie` uit een
+    /// lijst-/ontdek-eindpunt kent dit niet, dus dit haalt altijd het detail-eindpunt op.
+    func runtimeMinutes(forMovieID id: Int) async throws -> Int? {
+        try await client.movieDetails(id: id).runtime
+    }
+
     func popularMovies() async throws -> [TMDBMovie] {
         try await client.popularMovies()
     }

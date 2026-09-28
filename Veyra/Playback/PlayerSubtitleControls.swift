@@ -19,6 +19,10 @@ struct PlayerSubtitleControls: View {
     var sourceMetadata: SourceMetadata? = nil
     var source: PlayableSource? = nil
     var liveGuide: VeyraEPGStore? = nil
+    /// Zie de tvOS `PlayerView` -- gezet wanneer deze speelsessie een
+    /// wedstrijd is. Maakt de Info-tab ("Veyra Lens") wedstrijdinformatie
+    /// tonen i.p.v. de gewone titel/overzicht-lay-out.
+    var sportEvent: SportEvent? = nil
     var onSelectLiveChannel: (VeyraGuideChannel) -> Void = { _ in }
 
     var onRequestExit: () -> Void = {}
@@ -134,6 +138,8 @@ struct PlayerSubtitleControls: View {
     // TMDB-metadatatekst (jaar) onder de titel in de Info-tab.
     @State private var metadataPosterURL: URL?
     @State private var metadataInfoLine: String?
+    // Veyra Lens: hoofdcast van de film/serie, zie `loadTMDBMetadata()`.
+    @State private var lensCast: [TMDBCastMember] = []
     @State private var selectedTopMenuTab: TopMenuTab = .metadata
     @FocusState private var topTabFocus: TopMenuFocus?
 
@@ -729,7 +735,29 @@ struct PlayerSubtitleControls: View {
         }
     }
 
+    // MARK: - Veyra Lens (Info-tab)
+    // Dezelfde contextknop, andere inhoud naargelang wat er speelt: wedstrijd
+    // -> stand/klok/competitie, Live TV -> huidig/volgend programma, film/serie
+    // -> titel, overzicht, cast en ratings/streaminfo zoals voorheen.
+
+    @ViewBuilder
     private var metadataTabContent: some View {
+        if let sportEvent {
+            ScrollView {
+                VeyraMatchCenterOverlay(event: sportEvent, now: .now)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        } else if let source, source.kind == .liveTV {
+            ScrollView {
+                LivePlayerEPGTimeline(source: source)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        } else {
+            titleTabContent
+        }
+    }
+
+    private var titleTabContent: some View {
         HStack(alignment: .top, spacing: 28) {
             AsyncImage(url: metadataPosterURL ?? item?.posterURL) { phase in
                 switch phase {
@@ -769,6 +797,17 @@ struct PlayerSubtitleControls: View {
                             Text(overview).font(.system(size: 19)).foregroundStyle(
                                 .white.opacity(0.75)
                             ).lineSpacing(3)
+                        }
+                    }
+
+                    if !lensCast.isEmpty {
+                        Divider().overlay(Color.white.opacity(0.12))
+
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("CAST").font(.system(size: 15, weight: .semibold)).tracking(2)
+                                .foregroundStyle(.secondary)
+
+                            VeyraLensCastRow(cast: lensCast)
                         }
                     }
 
@@ -828,10 +867,17 @@ struct PlayerSubtitleControls: View {
     private func loadTMDBMetadata() async {
         metadataPosterURL = nil
         metadataInfoLine = nil
+        lensCast = []
+
+        if let item, let credits = await CreditsService.credits(for: item) {
+            lensCast = credits.cast
+        }
 
         guard let tmdbID = item?.tmdbID, let token = AppConfiguration.tmdbReadAccessToken else {
             return
         }
+
+        let client = TMDBClient(readAccessToken: token)
 
         if item?.type == .series {
             guard let service = SeriesService() else { return }
@@ -850,8 +896,6 @@ struct PlayerSubtitleControls: View {
             }
 
         } else {
-            let client = TMDBClient(readAccessToken: token)
-
             if let movie = try? await client.movieDetails(id: tmdbID) {
                 metadataPosterURL = tmdbImageURL(path: movie.posterPath)
                 metadataInfoLine = tmdbYear(movie.releaseDate)

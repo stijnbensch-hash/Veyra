@@ -58,19 +58,19 @@ final class VeyraEPGStore: ObservableObject {
     private let epgService = VeyraEPGService()
 
     /// `UserDefaults`/`CFPreferences` crasht hard op tvOS zodra één sleutel
-    /// >= 1 MB wordt weggeschreven ("byte count limit reached"). De
-    /// catalogus- en gidssnapshots hieronder kunnen met veel zenders/dagen
-    /// aan programmadata makkelijk over die grens gaan. Ruim onder de
-    /// grens blijven (i.p.v. precies op 1 MB toetsen) voorkomt dat een
-    /// snapshot net op het randje alsnog crasht. `IPTVDiskCache` (los
-    /// bestand, geen CFPreferences-limiet) blijft in dat geval de
-    /// betrouwbare cache — deze snapshot in UserDefaults is alleen een
-    /// extra kopie voor snelle herstart en voor VeyraHubSyncService.
-    private static let maxUserDefaultsSnapshotBytes = 900_000
-
-    private func isSafeForUserDefaults(_ data: Data) -> Bool {
-        data.count < Self.maxUserDefaultsSnapshotBytes
-    }
+    /// >= 1 MB wordt weggeschreven ("byte count limit reached"), en zelfs
+    /// een controle die daaronder blijft loste dit niet betrouwbaar op: met
+    /// meerdere providers/veel programmadata liep het *totaal* van alle
+    /// sleutels samen alsnog op, en het opruimen daarvan met
+    /// `dictionaryRepresentation()` leest de hele voorkeurendatabase
+    /// synchroon in het geheugen op de main thread — met deze blobs erin
+    /// kon dát de app juist laten hangen bij het opstarten. Daarom
+    /// schrijven we deze snapshot niet meer naar UserDefaults; `IPTVDiskCache`
+    /// (los bestand, geen CFPreferences-limiet en geen main-thread-risico)
+    /// is en blijft de betrouwbare cache. VeyraHubSyncService synct deze
+    /// twee sleutels dus niet meer mee tussen apparaten — elk apparaat
+    /// haalt de gids/catalogus zelf op, wat trager kan zijn bij een koude
+    /// start op een nieuw apparaat, maar niet meer kan crashen/hangen.
 
     private static func cacheInterval(
         key: String,
@@ -440,18 +440,6 @@ final class VeyraEPGStore: ObservableObject {
                 preferences: preferences
             )
             IPTVDiskCache.write(catalog, key: cacheKey)
-            let visibleCatalog = VeyraLiveCatalog(
-                channels: channels.map(\.channel),
-                categories: categories
-            )
-            if let snapshot = VeyraIPTVSnapshot.encode(
-                VeyraCatalogSnapshot(savedAt: Date(), catalog: visibleCatalog)
-            ), isSafeForUserDefaults(snapshot) {
-                UserDefaults.standard.set(
-                    snapshot,
-                    forKey: VeyraIPTVSnapshot.catalogPrefix + configuration.providerIdentifier
-                )
-            }
 
             loadingChannels = false
 
@@ -1108,14 +1096,6 @@ final class VeyraEPGStore: ObservableObject {
                 result.programmes,
                 key: "live-guide-v1-\(configuration.providerIdentifier)"
             )
-            if let snapshot = VeyraIPTVSnapshot.encode(
-                VeyraGuideSnapshot(savedAt: Date(), programmes: result.programmes)
-            ), isSafeForUserDefaults(snapshot) {
-                UserDefaults.standard.set(
-                    snapshot,
-                    forKey: VeyraIPTVSnapshot.guidePrefix + configuration.providerIdentifier
-                )
-            }
 
             let linked =
                 channels.filter {

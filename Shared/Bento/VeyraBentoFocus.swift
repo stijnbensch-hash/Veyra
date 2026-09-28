@@ -40,6 +40,16 @@ struct VeyraCaptionedTileStyle: ButtonStyle {
     }
 }
 
+/// Streamingkaarten tekenen zelf hun merkkleur en focusrand. De standaard
+/// tvOS-knopfocuseffecten zouden daar een witte laag overheen leggen.
+struct VeyraStreamingTileStyle: ButtonStyle {
+    func makeBody(configuration: ButtonStyleConfiguration) -> some View {
+        configuration.label
+            .opacity(configuration.isPressed ? 0.85 : 1)
+            .focusEffectDisabled()
+    }
+}
+
 struct VeyraTileStyle: ButtonStyle {
     var cornerRadius: CGFloat = 30
 
@@ -54,7 +64,10 @@ struct VeyraTileStyle: ButtonStyle {
         @Environment(\.isFocused) private var isFocused
 
         var body: some View {
-            let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            // Zelfde eigen Veyra-vorm als de posterkaarten, overal waar deze algemene
+            // tegelstijl gebruikt wordt (i.p.v. de vroegere uniforme `cornerRadius`,
+            // die als parameter blijft bestaan voor bron-compatibiliteit).
+            let shape = VeyraRadius.posterShape
             configuration.label
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .background(.ultraThinMaterial, in: shape)

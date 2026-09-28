@@ -154,16 +154,27 @@ extension View {
 
 // MARK: - Long-press "mark as watched" menu
 
-private struct TraktMarkWatchedMenuModifier: ViewModifier {
+private struct TraktMarkWatchedMenuModifier<Extra: View>: ViewModifier {
     let item: MediaItem
+    /// Bewust ook aan te roepen wanneer er geen watched-toggle is (Trakt niet gekoppeld) --
+    /// anders verdwijnt bv. de Instant Peek-knop mee zodra Trakt niet gekoppeld is, terwijl die
+    /// daar niets mee te maken heeft. Zonder watched-toggle én zonder extra inhoud blijft het
+    /// gedrag exact zoals voorheen (geen menu).
+    let hasExtra: Bool
+    @ViewBuilder let extra: () -> Extra
     @ObservedObject private var store = TraktStore.shared
 
+    private var showWatchedToggle: Bool { store.isConnected && item.canSyncTrakt }
+
     func body(content: Content) -> some View {
-        if store.isConnected && item.canSyncTrakt {
+        if showWatchedToggle || hasExtra {
             content.contextMenu {
-                let watched = store.isWatched(item)
-                Button(watched ? "Markeer als niet bekeken" : "Markeer als bekeken") {
-                    Task { try? await store.setWatched(item, watched: !watched) }
+                extra()
+                if showWatchedToggle {
+                    let watched = store.isWatched(item)
+                    Button(watched ? "Markeer als niet bekeken" : "Markeer als bekeken") {
+                        Task { try? await store.setWatched(item, watched: !watched) }
+                    }
                 }
             }
         } else {
@@ -173,9 +184,11 @@ private struct TraktMarkWatchedMenuModifier: ViewModifier {
 }
 
 extension View {
-    /// Voegt een lang-indruk-menu toe waarmee een film of aflevering
-    /// direct als bekeken/niet bekeken bij Trakt gemarkeerd kan worden.
-    func traktMarkWatchedMenu(_ item: MediaItem) -> some View {
-        modifier(TraktMarkWatchedMenuModifier(item: item))
+    /// Voegt een lang-indruk-menu toe waarmee een film of aflevering direct als bekeken/niet
+    /// bekeken bij Trakt gemarkeerd kan worden. `extra` voegt eigen menu-items toe (bv. Instant
+    /// Peek se "Snel bekijken") -- op tvOS is lang drukken het systeem-contextmenu, dus een los
+    /// gebaar ernaast verliest altijd van dit menu; alles moet daarom in dezelfde `.contextMenu`.
+    func traktMarkWatchedMenu<Extra: View>(_ item: MediaItem, @ViewBuilder extra: @escaping () -> Extra = { EmptyView() }) -> some View {
+        modifier(TraktMarkWatchedMenuModifier(item: item, hasExtra: Extra.self != EmptyView.self, extra: extra))
     }
 }

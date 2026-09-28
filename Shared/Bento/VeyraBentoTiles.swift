@@ -20,6 +20,53 @@ private enum VeyraBentoEpisodeLabel {
 }
 #endif
 
+// MARK: - Universal Timeline
+
+/// Eén samengevoegd item voor de Universal Timeline: ofwel iets dat je NU verder kunt kijken
+/// (`ContinueItem`), ofwel iets dat later vandaag/morgen begint (`UpcomingItem`). Beide hergebruiken
+/// hun eigen bestaande kaart (`VeyraBentoContinueMiniContent`/`VeyraBentoUpcomingCardContent`)
+/// ongewijzigd -- enkel de volgorde en het tijdlabel erboven zijn nieuw (zie brainstorm
+/// "Universal Timeline": Nu · 13:00 · Vanavond · Morgen i.p.v. losse rijen).
+nonisolated enum VeyraTimelineEntry: Identifiable {
+    case now(ContinueItem)
+    case later(UpcomingItem)
+
+    var id: String {
+        switch self {
+        case .now(let item): return "now-\(item.id)"
+        case .later(let item): return "later-\(item.id)"
+        }
+    }
+
+    /// "Verder kijken" staat altijd vooraan (per definitie NU), daarna chronologisch.
+    var sortKey: Date {
+        switch self {
+        case .now: return .distantPast
+        case .later(let item): return item.airDate
+        }
+    }
+
+    /// Label boven de kaart: "NU" voor Verder kijken, anders het tijdstip.
+    func bucketLabel(now: Date) -> String {
+        switch self {
+        case .now: return "NU"
+        case .later(let item): return VeyraHomeFormat.when(item.airDate, now: now, dateOnly: item.isDateOnly).uppercased()
+        }
+    }
+
+    var isNow: Bool {
+        if case .now = self { return true }
+        return false
+    }
+}
+
+/// Verder kijken + Binnenkort samengevoegd tot invoer voor `VeyraTimelineEntry`, chronologisch
+/// gesorteerd (Verder kijken altijd eerst).
+func veyraTimelineEntries(continueItems: [ContinueItem], upcoming: [UpcomingItem]) -> [VeyraTimelineEntry] {
+    (continueItems.map(VeyraTimelineEntry.now) + upcoming.map(VeyraTimelineEntry.later))
+        .sorted { $0.sortKey < $1.sortKey }
+}
+
 // MARK: - Bouwstenen
 
 /// Kleine hoofdletterkop van een tegel, optioneel met (rode) live-stip en een rechter bijschrift.
@@ -168,8 +215,13 @@ struct VeyraBentoContinueMiniContent: View {
     var thumbnailWidth: CGFloat? = nil
     var cornerRadius: CGFloat = 22
     var cardLayout: VeyraCaptionedCardLayout = .tv
+    /// "Slimme Bento": zonder de vaste kaartmaat aan te raken (risico op een kapotte rij/cel) enkel
+    /// de rand/gloed en een badge anders voor de meest relevante kaart in de rij -- zie
+    /// `VeyraBentoHome.featuredContinueItemID`.
+    var isFeatured = false
 
     @Environment(\.isFocused) private var isFocused
+    @AppStorage(GeneralSettingsDefaults.pulseBadgesKey) private var showPulseBadges = true
 
     private var captionMetaText: String {
 #if os(tvOS)
@@ -194,7 +246,9 @@ struct VeyraBentoContinueMiniContent: View {
     }
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        // Zelfde eigen vorm als `VeyraPosterCard` (twee diagonaal sterker afgeronde hoeken)
+        // i.p.v. de vroegere uniforme `cornerRadius` -- consistente Veyra-kaartvorm overal.
+        let shape = VeyraRadius.posterShape
 
         VStack(alignment: .leading, spacing: cardLayout.spacing) {
             ZStack {
@@ -206,6 +260,11 @@ struct VeyraBentoContinueMiniContent: View {
             // De beeldhoogte is op alle apparaten vast, zodat een clearlogo
             // in het onderschrift het kader niet kleiner kan maken.
             .frame(height: cardLayout.artworkHeight)
+#if os(tvOS)
+            // Zelfde "artwork komt naar voren"-effect als `VeyraPosterCard`: schaalt bij
+            // focus net iets meer dan de titel/metadata eronder.
+            .scaleEffect(isFocused ? 1.045 : 1)
+#endif
             .overlay(alignment: .bottomLeading) {
 #if os(tvOS)
                 if let label = VeyraBentoEpisodeLabel.expanded(item.episodeCode) {
@@ -222,12 +281,28 @@ struct VeyraBentoContinueMiniContent: View {
             .overlay(alignment: .bottom) {
                 if item.progress > 0 { VeyraHairline(progress: item.progress, height: compact ? 3 : 4) }
             }
-            // Het cyaan/rode kader zit alleen rond de banner, niet rond de tekst eronder.
+            .overlay(alignment: .topLeading) {
+                if isFeatured {
+                    // Zelfde maatorde als de andere badges op tvOS (Pulse/trendlabel: ~19-23pt) --
+                    // de eerdere 14pt was op 10-voet-afstand niet leesbaar.
+                    Text("AANBEVOLEN")
+                        .font(.system(size: compact ? 11 : 19, weight: .bold, design: .rounded))
+                        .tracking(1.2)
+                        .foregroundStyle(VeyraColors.background)
+                        .padding(.horizontal, compact ? 8 : 14)
+                        .padding(.vertical, compact ? 4 : 7)
+                        .background(VeyraHomeStyle.cyan, in: Capsule())
+                        .padding(compact ? 8 : 14)
+                }
+            }
+            // Het cyaan/rode kader zit alleen rond de banner, niet rond de tekst eronder. De
+            // uitgelichte kaart krijgt een permanent zichtbare (i.p.v. enkel focus-)gloed, zodat
+            // ze opvalt zonder ooit groter/kleiner te worden dan haar buren in de rij.
             .clipShape(shape)
-            .overlay(shape.strokeBorder(isFocused ? VeyraFrame.active : VeyraFrame.resting,
-                                        lineWidth: isFocused ? 3 : 1.5))
-            .shadow(color: isFocused ? VeyraColors.cyan.opacity(0.32) : Color.black.opacity(0.3),
-                    radius: isFocused ? 22 : 14, x: isFocused ? -5 : 0, y: isFocused ? 3 : 10)
+            .overlay(shape.strokeBorder(isFocused || isFeatured ? VeyraFrame.active : VeyraFrame.resting,
+                                        lineWidth: isFocused ? 3 : (isFeatured ? 2 : 1.5)))
+            .shadow(color: isFocused || isFeatured ? VeyraColors.cyan.opacity(0.32) : Color.black.opacity(0.3),
+                    radius: isFocused ? 22 : (isFeatured ? 18 : 14), x: isFocused ? -5 : 0, y: isFocused ? 3 : 10)
             .shadow(color: isFocused ? VeyraColors.red.opacity(0.20) : .clear, radius: 22, x: 8, y: 3)
 
             // Clearlogo/titel links, cyaan meta-tekst rechts -- buiten het kader, eronder.
@@ -242,7 +317,13 @@ struct VeyraBentoContinueMiniContent: View {
 #if os(tvOS)
                 Spacer(minLength: 4)
 #endif
-                if !captionMetaText.isEmpty {
+                // Bewust de al-getrimde `captionMetaText` gebruiken i.p.v. het volledige
+                // `item.metaText` -- dat laatste propt aflevering + gezien + te gaan samen
+                // ("S4E8 · 34 gezien · 8 te gaan"), wat in de smalle Pulse-pil onleesbaar werd.
+                // Hier blijft het bij één kernfeit, precies zoals de kaart al deed vóór Pulse.
+                if showPulseBadges, let pulse = VeyraPulseInfo(kind: item.kind == .movie ? .movie : .series, text: captionMetaText) {
+                    VeyraPulseBadge(info: pulse, compact: compact)
+                } else if !captionMetaText.isEmpty {
                     Text(captionMetaText)
                         .font(.system(size: compact ? 14 : 27, weight: .bold))
                         .foregroundStyle(VeyraHomeStyle.cyan)
@@ -274,8 +355,8 @@ struct VeyraBentoLiveList<Rows: View>: View {
                 Spacer(minLength: 0)
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: compact ? 22 : 30, style: .continuous))
-        .veyraGlassSurface(cornerRadius: compact ? 22 : 30)
+        .clipShape(VeyraRadius.posterShape)
+        .veyraGlassSurface()
     }
 }
 
@@ -283,6 +364,8 @@ struct VeyraBentoLiveList<Rows: View>: View {
 struct VeyraBentoLiveRowContent: View {
     let row: BentoLiveRow
     var compact = false
+
+    @AppStorage(GeneralSettingsDefaults.pulseBadgesKey) private var showPulseBadges = true
 
     var body: some View {
         HStack(alignment: .center, spacing: compact ? 10 : 16) {
@@ -293,20 +376,25 @@ struct VeyraBentoLiveRowContent: View {
                     if row.isSports {
                         Circle().fill(VeyraHomeStyle.live).frame(width: compact ? 6 : 10, height: compact ? 6 : 10)
                     }
-                    (
-                        Text("\(row.title) · ")
-                            .font(compact ? .caption : .callout)
-                        + Text("nog \(row.remainingMinutes) min")
-                            .font(compact ? .caption2 : .footnote)
-                    )
-                        .foregroundStyle(VeyraHomeStyle.dim)
-                        .lineLimit(1)
+                    // Veyra Pulse: huidig programma + resterende tijd, zelfde icoon+pil-taal als
+                    // de film/serie-Pulse elders -- i.p.v. de vroegere kale tekst hier.
+                    if showPulseBadges, let pulse = VeyraPulseInfo(kind: .live, text: "\(row.title) · nog \(row.remainingMinutes) min") {
+                        VeyraPulseBadge(info: pulse, compact: compact)
+                    } else {
+                        (
+                            Text("\(row.title) · ")
+                                .font(compact ? .caption : .system(size: 23, weight: .semibold))
+                            + Text("nog \(row.remainingMinutes) min")
+                                .font(compact ? .caption2 : .system(size: 18))
+                        )
+                            .foregroundStyle(VeyraHomeStyle.dim)
+                            .lineLimit(1)
+                    }
                 }
-                // I.p.v. de zendernaam: het eerstvolgende programma, in
-                // dezelfde tekstgrootte als het huidige programma erboven.
+                // Het volgende programma blijft visueel ondergeschikt aan wat nu speelt.
                 if let nextTitle = row.nextTitle {
                     Text("Straks: \(nextTitle)")
-                        .font(compact ? .caption : .callout)
+                        .font(compact ? .caption : .system(size: 18, weight: .medium))
                         .foregroundStyle(VeyraHomeStyle.dim)
                         .lineLimit(1)
                 }
@@ -443,6 +531,14 @@ struct VeyraBentoUpcomingCardContent: View {
 
     @Environment(\.isFocused) private var isFocused
 
+    /// "Slimme Bento": net als de uitgelichte kaart in "Verder kijken" krijgt het item dat
+    /// binnen 30 minuten begint een permanente (niet enkel focus-)gloed en badge -- in rood,
+    /// zelfde taal als "Live nu" -- zodat iets dat NU relevant wordt meteen opvalt zonder dat
+    /// de kaart zelf groter wordt dan haar buren.
+    private var startsSoon: Bool {
+        !item.isDateOnly && item.airDate > now && item.airDate.timeIntervalSince(now) <= 1800
+    }
+
     private var accessibilityDescription: String {
         let date = VeyraHomeFormat.when(item.airDate, now: now, dateOnly: true)
 #if os(tvOS)
@@ -454,7 +550,8 @@ struct VeyraBentoUpcomingCardContent: View {
     }
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        // Zelfde eigen vorm als `VeyraPosterCard` (twee diagonaal sterker afgeronde hoeken).
+        let shape = VeyraRadius.posterShape
 
         VStack(alignment: .leading, spacing: cardLayout.spacing) {
             ZStack {
@@ -463,6 +560,15 @@ struct VeyraBentoUpcomingCardContent: View {
                                startPoint: .bottom, endPoint: .top)
                 VStack(alignment: .leading, spacing: 0) {
                     HStack {
+                        if startsSoon {
+                            Text("BEGINT ZO")
+                                .font(.system(size: compact ? 9 : 15, weight: .bold, design: .rounded))
+                                .tracking(1)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, compact ? 7 : 12)
+                                .padding(.vertical, compact ? 3 : 5)
+                                .background(VeyraColors.red, in: Capsule())
+                        }
                         Spacer(minLength: 0)
                         Image(systemName: isReminded ? "bell.fill" : "bell")
                             .font(compact ? .caption : .callout)
@@ -492,12 +598,15 @@ struct VeyraBentoUpcomingCardContent: View {
                 .padding(compact ? 10 : 14)
             }
             .frame(height: cardLayout.artworkHeight)
+#if os(tvOS)
+            .scaleEffect(isFocused ? 1.045 : 1)
+#endif
             // Het cyaan/rode kader zit alleen rond de banner, niet rond de tekst eronder.
             .clipShape(shape)
-            .overlay(shape.strokeBorder(isFocused ? VeyraFrame.active : VeyraFrame.resting,
-                                        lineWidth: isFocused ? 3 : 1.5))
-            .shadow(color: isFocused ? VeyraColors.cyan.opacity(0.32) : Color.black.opacity(0.3),
-                    radius: isFocused ? 22 : 14, x: isFocused ? -5 : 0, y: isFocused ? 3 : 10)
+            .overlay(shape.strokeBorder(isFocused ? VeyraFrame.active : (startsSoon ? VeyraFrame.urgent : VeyraFrame.resting),
+                                        lineWidth: isFocused ? 3 : (startsSoon ? 2 : 1.5)))
+            .shadow(color: isFocused ? VeyraColors.cyan.opacity(0.32) : (startsSoon ? VeyraColors.red.opacity(0.4) : Color.black.opacity(0.3)),
+                    radius: isFocused ? 22 : (startsSoon ? 18 : 14), x: isFocused ? -5 : 0, y: isFocused ? 3 : 10)
             .shadow(color: isFocused ? VeyraColors.red.opacity(0.20) : .clear, radius: 22, x: 8, y: 3)
 
             // Titel-clearlogo en datum staan samen onder het beeldkader. Zelfde
@@ -602,7 +711,7 @@ struct VeyraBentoNewContent: View {
                 .lineLimit(2)
                 .padding(compact ? 8 : 12)
         }
-        .clipShape(RoundedRectangle(cornerRadius: compact ? 10 : 14, style: .continuous))
+        .clipShape(VeyraRadius.posterShape)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(item.title)
     }
@@ -675,7 +784,7 @@ struct VeyraBentoPosterContent: View {
                         .scaleEffect(compact ? 0.75 : 1, anchor: .topTrailing)
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: compact ? 10 : 14, style: .continuous))
+            .clipShape(VeyraRadius.posterShape)
 
             Text(title)
                 .font(.system(size: titleFontSize, weight: .semibold))
@@ -755,8 +864,8 @@ struct VeyraBentoShelf<Cards: View>: View {
                 Spacer(minLength: 0)
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: compact ? 22 : 30, style: .continuous))
-        .veyraGlassSurface(cornerRadius: compact ? 22 : 30)
+        .clipShape(VeyraRadius.posterShape)
+        .veyraGlassSurface()
     }
 }
 
@@ -825,6 +934,13 @@ struct VeyraBentoStreamingContent: View {
     /// Eigen logo van de gebruiker: getoond zoals het is.
     var customURL: URL? = nil
 
+    // Eigen focusrand i.p.v. `VeyraTileStyle` (Veyra's asymmetrische
+    // postervorm) -- die vorm is voor portret-posters gemaakt en paste niet
+    // bij dit brede logokader: de rand sneed door het logo heen op tvOS.
+    // Hier volgt de rand exact dezelfde uniforme afgeronde rechthoek als de
+    // achtergrond, dus het logo past altijd binnen het kader.
+    @Environment(\.isFocused) private var isFocused
+
     private var tint: Color {
         guard let brand else { return VeyraColors.cyan.opacity(0.35) }
         return Color(red: Double((brand >> 16) & 0xFF) / 255,
@@ -834,17 +950,20 @@ struct VeyraBentoStreamingContent: View {
 
     var body: some View {
         let radius: CGFloat = compact ? 16 : 26
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
         ZStack {
             LinearGradient(colors: [tint.opacity(0.95), tint.opacity(0.45)], startPoint: .topLeading, endPoint: .bottomTrailing)
             content
                 .padding(compact ? 12 : 26)
         }
-        .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+        .clipShape(shape)
         .overlay {
-            if compact {
-                RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(VeyraFrame.resting, lineWidth: 1)
-            }
+            shape.strokeBorder(isFocused ? VeyraFrame.active : VeyraFrame.resting,
+                                lineWidth: isFocused ? 3 : 1)
         }
+        .scaleEffect(isFocused ? 1.03 : 1)
+        .shadow(color: isFocused ? VeyraColors.cyan.opacity(0.30) : .clear, radius: 20)
+        .animation(.easeOut(duration: 0.16), value: isFocused)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(name)
     }
@@ -969,12 +1088,16 @@ struct VeyraBentoCollectionMiniContent: View {
                         .padding(compact ? 3 : 5)
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: compact ? 16 : 22, style: .continuous))
+#if os(tvOS)
+            .scaleEffect(isFocused ? 1.045 : 1)
+#endif
+            // Zelfde eigen vorm als `VeyraPosterCard` i.p.v. de vroegere uniforme afronding.
+            .clipShape(VeyraRadius.posterShape)
             // Cyaan-rode rand enkel om de banner (net als bij "Verder kijken"); de naam eronder blijft erbuiten.
             // Altijd een zichtbare rand -- niet enkel bij focus/hover, want op iOS/iPadOS/macOS is er geen
             // afstandsbediening-focus, dus dan viel de rand hier (en de gloed eronder) helemaal weg.
             .overlay {
-                RoundedRectangle(cornerRadius: compact ? 16 : 22, style: .continuous)
+                VeyraRadius.posterShape
                     .strokeBorder(isFocused ? VeyraFrame.active : VeyraFrame.resting, lineWidth: isFocused ? 3 : (compact ? 2 : 1.5))
             }
             .shadow(color: VeyraColors.cyan.opacity(isFocused ? 0.35 : 0.16), radius: isFocused ? 16 : 8, x: -4)

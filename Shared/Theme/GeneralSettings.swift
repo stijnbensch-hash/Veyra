@@ -11,18 +11,22 @@ enum GeneralSettingsDefaults {
     // Beginschermplanken
     static let showContinueWatchingKey = "general.showContinueWatching"
     static let continueWatchingLimitKey = "general.continueWatchingLimit"
-    static let hideContinueWatchingReleaseDateKey = "general.hideContinueWatchingReleaseDate"
     static let showUpcomingKey = "general.showUpcoming"
-    static let includeWatchlistPremieresKey = "general.includeWatchlistPremieresInUpcoming"
 
     // Posters
     static let showReleaseYearKey = "general.showReleaseYear"
     static let hideTitlesUnderPostersKey = "general.hideTitlesUnderPosters"
     static let hideEpisodesRemainingKey = "general.hideEpisodesRemaining"
 
+    // Veyra Pulse — zie VeyraPulse.swift
+    static let pulseBadgesKey = VeyraPulseDefaults.enabledKey
+
     // Sport
     static let hideScoreSpoilersKey = "general.hideScoreSpoilers"
     static let chooseChannelOnTapKey = "general.chooseChannelOnTap"
+
+    // Live TV
+    static let liveFavoritesOnlyKey = "general.liveFavoritesOnly"
 
     // Weergave
     static let textSizeKey = "general.textSize"

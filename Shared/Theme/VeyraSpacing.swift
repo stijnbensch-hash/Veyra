@@ -11,6 +11,18 @@ enum VeyraRadius {
     static let card: CGFloat = 20
     static let panel: CGFloat = 26
     static let pill: CGFloat = 44
+
+    /// Veyra's eigen postervorm i.p.v. een uniform afgeronde rechthoek (de generieke
+    /// "streaming-app"-look): twee sterker afgeronde hoeken diagonaal tegenover elkaar.
+    /// Herkenbaar silhouet, ook los van kleur/gloei -- en werkt net zo goed in rust als
+    /// bij focus (zie `VeyraPosterCard`).
+    static var posterShape: UnevenRoundedRectangle {
+        UnevenRoundedRectangle(
+            topLeadingRadius: 26, bottomLeadingRadius: 8,
+            bottomTrailingRadius: 26, topTrailingRadius: 8,
+            style: .continuous
+        )
+    }
 }
 
 enum VeyraAnimation {

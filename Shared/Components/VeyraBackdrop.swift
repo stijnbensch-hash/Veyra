@@ -60,8 +60,15 @@ private struct VeyraLightRibbon: View {
 }
 
 /// One bounded image for the hero and the artwork behind the navigation.
+///
+/// "Living Backdrop": in plaats van een volledig statisch beeld drijft de artwork heel
+/// traag en subtiel in en uit (Ken Burns-effect) zodat het scherm nooit helemaal stilstaat
+/// -- en wanneer de URL verandert (bv. een andere hero roteert in beeld) glijdt/zoomt het
+/// nieuwe beeld zacht in i.p.v. hard te wisselen.
 struct VeyraArtworkBackground: View {
     let url: URL?
+    @State private var isBreathing = false
+
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .top) {
@@ -70,6 +77,7 @@ struct VeyraArtworkBackground: View {
                     image.resizable().scaledToFill()
                 } placeholder: { Color.clear }
                 .frame(width: geometry.size.width, height: min(geometry.size.height, 900))
+                .scaleEffect(isBreathing ? 1.05 : 1.0)
                 .clipped()
                 .saturation(0.90)
                 .contrast(1.06)
@@ -80,6 +88,18 @@ struct VeyraArtworkBackground: View {
                                        .init(color: VeyraColors.background.opacity(0.7), location: 0.66),
                                        .init(color: VeyraColors.background, location: 0.94)], startPoint: .top, endPoint: .bottom)
             }
-        }.ignoresSafeArea()
+            .id(url)
+            .transition(.asymmetric(
+                insertion: .opacity.combined(with: .scale(scale: 1.045)),
+                removal: .opacity
+            ))
+        }
+        .ignoresSafeArea()
+        .onAppear {
+            withAnimation(.easeInOut(duration: 16).repeatForever(autoreverses: true)) {
+                isBreathing = true
+            }
+        }
+        .animation(.easeInOut(duration: 0.5), value: url)
     }
 }

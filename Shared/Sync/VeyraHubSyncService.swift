@@ -22,14 +22,12 @@ final class VeyraHubSyncService {
         // Afspelen — zie Shared/Theme/PlaybackSettings.swift
         "playback.autoRotateLandscape", "playback.autoPlayNextEpisode",
         "playback.autoSelectFirstSource", "playback.skipContinueWatchingDetails",
-        "playback.preferredResolution", "playback.cellularResolution",
         "playback.hideProgressBar", "playback.audioLanguage",
         "playback.audioFallbackLanguage", "playback.subtitleLanguage",
         "playback.subtitleFallbackLanguage", "playback.autoSelectSubtitles",
-        "playback.animeAudio", "playback.showSkipIntroButton", "playback.autoSkipIntro",
+        "playback.showSkipIntroButton", "playback.autoSkipIntro",
         "playback.showSkipRecapButton", "playback.showSkipCreditsButton",
-        "playback.postCreditsAlert", "playback.autoPlayNextCountdownEnabled",
-        "playback.countdownDuration", "playback.selectedPlayer",
+        "playback.autoPlayNextCountdownEnabled", "playback.countdownDuration",
     ]
 
     private static let iptvDisplayKeys: [String] = [
@@ -48,8 +46,7 @@ final class VeyraHubSyncService {
     private static let generalKeys: [String] = [
         // Algemeen — zie Shared/Theme/GeneralSettings.swift
         "general.showContinueWatching", "general.continueWatchingLimit",
-        "general.hideContinueWatchingReleaseDate", "general.showUpcoming",
-        "general.includeWatchlistPremieresInUpcoming", "general.showReleaseYear",
+        "general.showUpcoming", "general.showReleaseYear",
         "general.hideTitlesUnderPosters", "general.hideEpisodesRemaining",
         "general.hideScoreSpoilers", "general.chooseChannelOnTap", "general.textSize",
         // Posterverrijking — zie Shared/Theme/PosterEnrichmentSettings.swift
@@ -304,11 +301,14 @@ final class VeyraHubSyncService {
             return Array(Set(fixed + dynamic))
         }
         return defaults.dictionaryRepresentation().keys.filter {
+            // Catalogus-/gidssnapshots worden bewust niet meer gesynct: die
+            // konden groot genoeg worden om de CFPreferences 1 MB-limiet te
+            // raken en de app te laten hangen/crashen bij het toepassen van
+            // binnenkomende sync-data (zie VeyraEPGStore.swift). Elk
+            // apparaat haalt de gids/catalogus voortaan zelf op.
             $0.hasPrefix("veyra.epg.favorites.") ||
             $0.hasPrefix("veyra.epg.favoriteOrder.") ||
             $0.hasPrefix("veyra.epg.recent.") ||
-            $0.hasPrefix(VeyraIPTVSnapshot.catalogPrefix) ||
-            $0.hasPrefix(VeyraIPTVSnapshot.guidePrefix) ||
             $0 == "veyra.channelNameOverrides" ||
             $0 == ChannelLogoOverrideStore.key
         }
@@ -409,8 +409,6 @@ final class VeyraHubSyncService {
                     key.hasPrefix("veyra.epg.favorites.") ||
                     key.hasPrefix("veyra.epg.favoriteOrder.") ||
                     key.hasPrefix("veyra.epg.recent.") ||
-                    key.hasPrefix(VeyraIPTVSnapshot.catalogPrefix) ||
-                    key.hasPrefix(VeyraIPTVSnapshot.guidePrefix) ||
                     key == "veyra.channelNameOverrides"),
                   let data = Data(base64Encoded: encoded), isSafeForLocalWrite(data),
                   let value = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil)

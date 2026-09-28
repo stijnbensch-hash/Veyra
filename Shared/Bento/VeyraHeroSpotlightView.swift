@@ -25,13 +25,19 @@ struct VeyraHeroSpotlightView: View {
     /// Meldt de huidige carrousel-index naar buiten, zodat een aanroeper met
     /// `externalBackdrop = true` weet welke afbeelding hij zelf moet tonen.
     var onIndexChange: ((Int) -> Void)?
+    /// "Context Ribbon": optionele, per-item contextuele badge boven de titel
+    /// (bv. "Verder kijken · S2E4 · nog 23 min" wanneer dit item ook in
+    /// Verder kijken staat). Een closure i.p.v. een losse waarde, zodat de
+    /// juiste info altijd meeschuift met de automatisch wisselende carrousel
+    /// zonder dat de aanroeper de interne `index` hoeft te kennen. `nil`
+    /// (default) laat de ribbon gewoon weg.
+    var contextInfo: ((HeroSpotlightItem) -> VeyraPulseInfo?)? = nil
+
+    @Environment(\.openMediaDetail) private var openMediaDetail
 
     @State private var index = 0
     @State private var advanceTask: Task<Void, Never>?
     @State private var ratingsByID: [String: MetadataRatings] = [:]
-    #if os(tvOS)
-    @State private var selectedMediaItem: MediaItem?
-    #endif
     #if !os(tvOS)
     @State private var dragOffset: CGFloat = 0
     #endif
@@ -117,11 +123,6 @@ struct VeyraHeroSpotlightView: View {
             guard !Task.isCancelled else { return }
             ratingsByID[item.id] = loaded
         }
-        #if os(tvOS)
-        .navigationDestination(item: $selectedMediaItem) { item in
-            ShelfItemDestination(item: item)
-        }
-        #endif
     }
 
     #if !os(tvOS)
@@ -224,7 +225,7 @@ struct VeyraHeroSpotlightView: View {
     private func slide(_ item: HeroSpotlightItem) -> some View {
         #if os(tvOS)
         Button {
-            selectedMediaItem = item.mediaItem
+            openMediaDetail(item.mediaItem)
         } label: {
             slideContent(item)
         }
@@ -284,6 +285,9 @@ struct VeyraHeroSpotlightView: View {
 
     private func content(_ item: HeroSpotlightItem) -> some View {
         VStack(alignment: centeredOnIOS ? .center : .leading, spacing: contentSpacing) {
+            if let contextInfo, let info = contextInfo(item) {
+                VeyraPulseBadge(info: info, compact: pulseBadgeCompact)
+            }
             if let logoURL = item.logoURL {
                 AsyncImage(url: logoURL) { phase in
                     if case .success(let image) = phase {
@@ -347,6 +351,17 @@ struct VeyraHeroSpotlightView: View {
     private let overviewFontSize: CGFloat = 14
     private let overviewLineLimit = 2
     #endif
+
+    // Zelfde 10-voet- vs. van-dichtbij-onderscheid als `contentSpacing`/
+    // `titleFontSize` hierboven: groot en leesbaar op tvOS, compacter op
+    // iOS/iPadOS/macOS.
+    private var pulseBadgeCompact: Bool {
+        #if os(tvOS)
+        false
+        #else
+        true
+        #endif
+    }
 
     private func metaLine(_ item: HeroSpotlightItem) -> String {
         var parts: [String] = []

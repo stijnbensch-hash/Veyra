@@ -4,6 +4,7 @@ struct MovieDetailView: View {
     let movie: MediaItem
 
     @State private var ratings = MetadataRatings()
+    @State private var runtimeMinutes: Int?
     @Environment(\.horizontalSizeClass) private var sizeClass
     @ObservedObject private var traktStore = TraktStore.shared
 
@@ -15,10 +16,18 @@ struct MovieDetailView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     VeyraClearLogo(item: movie, fallbackTitle: movie.title, maxWidth: 320, maxHeight: 80, font: .title.weight(.bold))
 
-                    if let year = releaseYear {
-                        Text(year)
-                            .font(.subheadline)
-                            .foregroundStyle(VeyraColors.cyan)
+                    HStack(spacing: 12) {
+                        if let year = releaseYear {
+                            Text(year)
+                                .font(.subheadline)
+                                .foregroundStyle(VeyraColors.cyan)
+                        }
+
+                        // Veyra Pulse: speelduur -- zie tvOS-versie voor de toelichting
+                        // waarom kwaliteit/bronnen hier bewust nog ontbreken.
+                        if let runtimeMinutes, let pulse = VeyraPulseInfo(kind: .movie, text: formattedRuntime(runtimeMinutes)) {
+                            VeyraPulseBadge(info: pulse, compact: true)
+                        }
                     }
 
                     MetadataRatingsView(ratings: ratings)
@@ -69,6 +78,7 @@ struct MovieDetailView: View {
         .task(id: movie.id) {
             guard let tmdbID = movie.tmdbID else { return }
             ratings = await MetadataRatingsService.movieRatings(tmdbID: tmdbID, imdbID: movie.imdbID, title: movie.title)
+            runtimeMinutes = try? await TMDBService()?.runtimeMinutes(forMovieID: tmdbID)
         }
     }
 
@@ -102,5 +112,9 @@ struct MovieDetailView: View {
     private var releaseYear: String? {
         guard let date = movie.releaseDate, date.count >= 4 else { return nil }
         return String(date.prefix(4))
+    }
+
+    private func formattedRuntime(_ minutes: Int) -> String {
+        minutes >= 60 ? "\(minutes / 60)u \(minutes % 60)m" : "\(minutes) min"
     }
 }

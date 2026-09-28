@@ -84,13 +84,9 @@ private struct VeyraSettingsChoiceListView<Option: VeyraSettingsOption>: View {
 
 // MARK: - Conformances
 
-extension PlaybackResolutionOption: VeyraSettingsOption {}
-extension PlaybackCellularResolutionOption: VeyraSettingsOption {}
 extension PlaybackLanguageOption: VeyraSettingsOption {}
 extension PlaybackAutoSelectSubtitlesOption: VeyraSettingsOption {}
-extension PlaybackAnimeAudioOption: VeyraSettingsOption {}
 extension PlaybackCountdownDuration: VeyraSettingsOption {}
-extension PlaybackSelectedPlayer: VeyraSettingsOption {}
 extension VeyraSubtitleSize: VeyraSettingsOption {}
 extension VeyraSubtitlePosition: VeyraSettingsOption {}
 extension VeyraSubtitleBackground: VeyraSettingsOption {}

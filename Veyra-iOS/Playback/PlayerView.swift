@@ -10,6 +10,9 @@ struct PlayerView: View {
     let source: PlayableSource
     var item: MediaItem? = nil
     var resumeProgress: Double? = nil
+    /// Gezet wanneer deze bron een wedstrijd is (zie `SportChannelQuery`) --
+    /// toont Match Center bovenop de speler i.p.v. gewone live-TV-chrome.
+    var sportEvent: SportEvent? = nil
 
     @Environment(\.scenePhase)
     private var scenePhase
@@ -37,10 +40,11 @@ struct PlayerView: View {
     @AppStorage(PlaybackSettingsDefaults.hideProgressBarKey)
     private var hideProgressBar = false
 
-    init(source: PlayableSource, item: MediaItem? = nil, resumeProgress: Double? = nil) {
+    init(source: PlayableSource, item: MediaItem? = nil, resumeProgress: Double? = nil, sportEvent: SportEvent? = nil) {
         self.source = source
         self.item = item
         self.resumeProgress = resumeProgress
+        self.sportEvent = sportEvent
         _viewModel = StateObject(
             wrappedValue: PlaybackViewModel(
                 source: source,
@@ -108,7 +112,8 @@ struct PlayerView: View {
                             nextEpisodeRequest = NextPlaybackRequest(item: next, source: matchedSource)
                         }
                     },
-                    onUserActivity: { viewModel.registerActivity() }
+                    onUserActivity: { viewModel.registerActivity() },
+                    sportEvent: sportEvent
                 )
 
             } else {
@@ -124,6 +129,15 @@ struct PlayerView: View {
                     )
                     .foregroundStyle(.white.opacity(0.8))
                 }
+            }
+        }
+        .overlay(alignment: .topLeading) {
+            if let sportEvent, viewModel.playbackEngine != nil {
+                TimelineView(.periodic(from: .now, by: 15)) { context in
+                    VeyraMatchCenterOverlay(event: sportEvent, now: context.date)
+                }
+                .padding(.top, 54)
+                .padding(.leading, 16)
             }
         }
         .navigationBarHidden(true)
@@ -191,6 +205,7 @@ private struct NextPlaybackRequest: Identifiable, Hashable {
 private enum IOSPlayerPanel: String, Identifiable {
     case subtitles
     case audio
+    case lens
 
     var id: String { rawValue }
 }
@@ -204,6 +219,9 @@ private struct iOSPlayerSurface: View {
     let onClose: () -> Void
     var onPlayNextEpisode: (MediaItem) -> Void = { _ in }
     var onUserActivity: () -> Void = {}
+    /// Zie de tvOS `PlayerView` -- gezet wanneer deze speelsessie een
+    /// wedstrijd is, voor Veyra Lens (de contextknop hieronder).
+    var sportEvent: SportEvent? = nil
 
     // Actieve/maximale gelijktijdige verbindingen van de Xtream-provider
     // waarmee deze IPTV-stream loopt (bv. "1/2") -- enkel voor IPTV, en
@@ -460,6 +478,8 @@ private struct iOSPlayerSurface: View {
                     IOSSubtitleTrackSheet(engine: engine, item: item)
                 case .audio:
                     IOSAudioTrackSheet(engine: engine)
+                case .lens:
+                    VeyraLensSheet(item: item, source: source, sportEvent: sportEvent)
                 }
             }
             .presentationDetents([.medium, .large])
@@ -590,6 +610,15 @@ private struct iOSPlayerSurface: View {
 
             HStack(spacing: 20) {
                 Spacer(minLength: 0)
+
+                Button {
+                    activePanel = .lens
+                } label: {
+                    Image(systemName: "sparkle.magnifyingglass")
+                        .font(.system(size: 18))
+                        .foregroundStyle(.white)
+                        .frame(width: 40, height: 40)
+                }
 
                 Button {
                     activePanel = .subtitles

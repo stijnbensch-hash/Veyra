@@ -30,9 +30,25 @@ nonisolated struct VeyraHomeLayout: Codable, Equatable, Sendable {
         return tiles
     }
 
-    func isVisible(_ tile: BentoTile) -> Bool { !hidden.contains(tile.rawValue) }
+    /// `.tijdlijn` is nieuw en vervangt visueel "Verder kijken" + "Binnenkort" zodra hij aan
+    /// staat -- daarom (in tegenstelling tot de andere blokken, die standaard AAN staan)
+    /// standaard UIT, ook voor bestaande gebruikers, tot ze hem zelf aanzetten. Geen nieuw
+    /// veld nodig: hergebruikt `hidden` met een sentinelwaarde, zodat oude opgeslagen indelingen
+    /// gewoon blijven decoderen.
+    private static let timelineOptInFlag = "tijdlijn:aan"
+
+    func isVisible(_ tile: BentoTile) -> Bool {
+        if tile == .tijdlijn { return hidden.contains(Self.timelineOptInFlag) }
+        return !hidden.contains(tile.rawValue)
+    }
 
     mutating func setVisible(_ visible: Bool, _ tile: BentoTile) {
+        if tile == .tijdlijn {
+            hidden.removeAll { $0 == Self.timelineOptInFlag }
+            if visible { hidden.append(Self.timelineOptInFlag) }
+            preset = nil
+            return
+        }
         hidden.removeAll { $0 == tile.rawValue }
         if !visible { hidden.append(tile.rawValue) }
         preset = nil

@@ -21,15 +21,23 @@ struct SportChannelQuery: Identifiable, Equatable {
     let title: String
     let teams: [String]
     let start: Date
+    /// Het volledige wedstrijdobject, indien de query uit een `SportEvent` komt (Bento-home/Veyra
+    /// Now) -- geeft Match Center (stand/klok/competitie) in de speler door. `nil` bij een query
+    /// die enkel titel/teams/start meekrijgt (bv. het Sport-menu, dat een ander model gebruikt).
+    let event: SportEvent?
 
     init(title: String, teams: [String], start: Date) {
         self.title = title
         self.teams = teams
         self.start = start
+        self.event = nil
     }
 
     init(event: SportEvent) {
-        self.init(title: event.title, teams: event.searchTeams, start: event.start)
+        self.title = event.title
+        self.teams = event.searchTeams
+        self.start = event.start
+        self.event = event
     }
 }
 
