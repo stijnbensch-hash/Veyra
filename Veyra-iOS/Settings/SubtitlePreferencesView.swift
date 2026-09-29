@@ -3,24 +3,24 @@ import SwiftUI
 struct SubtitlePreferencesView: View {
     @AppStorage(SubtitlePreferences.languageKey) private var language = "nl"
 
+    private var currentLanguageTitle: String {
+        SubtitleLanguage(rawValue: language)?.title ?? "Nederlands"
+    }
+
     var body: some View {
         ZStack {
             VeyraColors.background.ignoresSafeArea()
 
             List {
             Section {
-                ForEach(SubtitleLanguage.allCases) { option in
-                    Button {
-                        language = option.rawValue
-                    } label: {
-                        HStack {
-                            Text(option.title).foregroundStyle(.primary)
-                            Spacer()
-                            if language == option.rawValue {
-                                Image(systemName: "checkmark")
-                                    .foregroundStyle(VeyraColors.cyan)
-                            }
-                        }
+                NavigationLink {
+                    SubtitleLanguagePickerView(language: $language)
+                } label: {
+                    HStack {
+                        Text("Standaardtaal")
+                        Spacer()
+                        Text(currentLanguageTitle)
+                            .foregroundStyle(.secondary)
                     }
                 }
             } header: {
@@ -124,6 +124,40 @@ struct OpenSubtitlesConfigurationCard: View {
             configured = AppConfiguration.openSubtitlesAPIKey != nil
             message = "Opslaan van de API-sleutel is niet gelukt."
         }
+    }
+}
+
+/// Sub-scherm met alle taalopties — apart van `SubtitlePreferencesView` zodat "Standaardtaal"
+/// daar één uitklapbare rij is i.p.v. alle 15 talen meteen te tonen (zelfde patroon als tvOS).
+struct SubtitleLanguagePickerView: View {
+    @Binding var language: String
+
+    var body: some View {
+        ZStack {
+            VeyraColors.background.ignoresSafeArea()
+
+            List {
+                Section {
+                    ForEach(SubtitleLanguage.allCases) { option in
+                        Button {
+                            language = option.rawValue
+                        } label: {
+                            HStack {
+                                Text(option.title).foregroundStyle(.primary)
+                                Spacer()
+                                if language == option.rawValue {
+                                    Image(systemName: "checkmark")
+                                        .foregroundStyle(VeyraColors.cyan)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .scrollContentBackground(.hidden)
+        }
+        .navigationTitle("Standaardtaal")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

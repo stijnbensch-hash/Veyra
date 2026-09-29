@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Algemene Veyra-voorkeuren: startscherm, sportweergave, kaartweergave en
 /// toegankelijkheid. Zie `GeneralSettings.swift` (Shared) voor per
@@ -97,16 +98,21 @@ struct GeneralSettingsView: View {
                     Text("Past tekst aan die Dynamic Type volgt. De meeste titels en koppen in Veyra gebruiken een vaste grootte en reageren hier nog niet op.")
                 }
 
-                Section {
-                    Picker("Navigatie", selection: $ipadNavigationStyleRaw) {
-                        ForEach(IPadNavigationStyle.allCases) { style in
-                            Text(style.title).tag(style.rawValue)
+                // Enkel op iPad tonen -- op iPhone is er sowieso altijd een
+                // tabbalk onderaan, dus deze instelling heeft daar geen
+                // effect en stond enkel nutteloos in de weg.
+                if UIDevice.current.userInterfaceIdiom == .pad {
+                    Section {
+                        Picker("Navigatie", selection: $ipadNavigationStyleRaw) {
+                            ForEach(IPadNavigationStyle.allCases) { style in
+                                Text(style.title).tag(style.rawValue)
+                            }
                         }
+                    } header: {
+                        sectionHeader("Navigatie (iPad & Mac)", symbol: "sidebar.left", tint: VeyraColors.cyan)
+                    } footer: {
+                        Text("Kies of Veyra op de iPad en op de Mac een zijbalk of een menubalk bovenaan gebruikt — nooit allebei tegelijk.")
                     }
-                } header: {
-                    sectionHeader("Navigatie (iPad & Mac)", symbol: "sidebar.left", tint: VeyraColors.cyan)
-                } footer: {
-                    Text("Kies of Veyra op de iPad en op de Mac een zijbalk of een menubalk bovenaan gebruikt — nooit allebei tegelijk. Op iPhone heeft dit geen effect (altijd een tabbalk onderaan).")
                 }
             }
             .scrollContentBackground(.hidden)
