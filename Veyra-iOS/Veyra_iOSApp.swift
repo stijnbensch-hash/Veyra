@@ -7,6 +7,14 @@
 
 import SwiftUI
 
+// Zelfde patroon als `.iptvConfigurationDidChange` (zie `IPTVAccountsView.swift`):
+// per platform een eigen extensie i.p.v. gedeeld, want de tvOS-versie zit in
+// `Veyra/VeyraApp.swift`, dat niet in dit target zit.
+extension Notification.Name {
+    static let iptvHomeRefreshRequested =
+        Notification.Name("veyra.iptv.home.refreshRequested")
+}
+
 @main
 struct Veyra_iOSApp: App {
     // Nodig zodat `OrientationLock` (Playback/OrientationLock.swift) de
@@ -17,6 +25,11 @@ struct Veyra_iOSApp: App {
 
     @AppStorage(GeneralSettingsDefaults.textSizeKey)
     private var textSizeRaw = GeneralTextSize.defaultSize.rawValue
+
+    @AppStorage(DataSettingsDefaults.autoRefreshOnForegroundKey)
+    private var autoRefreshOnForeground = true
+
+    @Environment(\.scenePhase) private var scenePhase
 
     // Toont de openingsanimatie (beeldmerk verschijnt, vliegt dan weg) één
     // keer bij een koude start. `showLaunchAnimation` blijft in dit
@@ -59,6 +72,13 @@ struct Veyra_iOSApp: App {
                 IPTVStartupRefreshBadge(coordinator: iptvStartupRefresh)
                     .padding(.top, 8)
                     .padding(.trailing, 16)
+                    .onChange(of: scenePhase) { _, phase in
+                        guard phase == .active, autoRefreshOnForeground else { return }
+                        Task {
+                            await TraktStore.shared.refreshIfNeeded()
+                            NotificationCenter.default.post(name: .iptvHomeRefreshRequested, object: nil)
+                        }
+                    }
 
                 if showLaunchAnimation {
                     LaunchAnimationView {

@@ -14,6 +14,12 @@ struct SeriesDetailView: View {
     @State private var ratings =
         MetadataRatings()
 
+    // MARK: - Hero-trailer
+    // Zelfde geluidloze voorvertoning als bij films -- zie
+    // `Veyra-iOS/Movies/MovieDetailView.swift` voor de toelichting.
+    @State private var heroTrailerKey: String?
+    @State private var showHeroTrailer = false
+
     init(
         series: TMDBSeries
     ) {
@@ -66,22 +72,13 @@ struct SeriesDetailView: View {
                         let details =
                             viewModel.details
                     {
-                        HStack(
-                            alignment: .center,
-                            spacing: 10
-                        ) {
-                            VeyraClearLogo(
-                                item: mediaItem(from: details),
-                                fallbackTitle: details.name,
-                                maxWidth: 320,
-                                maxHeight: 80,
-                                font: .title.weight(.bold)
-                            )
-
-                            if hasAnyWatchedEpisode {
-                                watchedBadge
-                            }
-                        }
+                        VeyraClearLogo(
+                            item: mediaItem(from: details),
+                            fallbackTitle: details.name,
+                            maxWidth: 320,
+                            maxHeight: 80,
+                            font: .title.weight(.bold)
+                        )
 
                         if let year =
                             releaseYear(
@@ -219,6 +216,8 @@ struct SeriesDetailView: View {
 
                 TrailerSection(item: MediaItem(title: series.name, type: .series, tmdbID: series.id))
 
+                ReviewsSection(item: MediaItem(title: series.name, type: .series, tmdbID: series.id))
+
                 SimilarTitlesRow(item: MediaItem(title: series.name, type: .series, tmdbID: series.id))
             }
             .padding(
@@ -280,23 +279,40 @@ struct SeriesDetailView: View {
         // naar de VStack erboven (breder dan het scherm, gecentreerd
         // overlopend aan beide kanten).
         GeometryReader { geo in
-            AsyncImage(
-                url: imageURL(
-                    path: viewModel.details?.backdropPath ?? series.backdropPath,
-                    size: "w1280"
-                )
-            ) { phase in
-                switch phase {
-                case .success(let image):
-                    image.resizable().scaledToFill()
-                default:
-                    VeyraColors.surface
+            ZStack {
+                AsyncImage(
+                    url: imageURL(
+                        path: viewModel.details?.backdropPath ?? series.backdropPath,
+                        size: "w1280"
+                    )
+                ) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image.resizable().scaledToFill()
+                    default:
+                        VeyraColors.surface
+                    }
+                }
+                if showHeroTrailer, let heroTrailerKey {
+                    VeyraTrailerAutoplayView(youtubeKey: heroTrailerKey)
+                        .transition(.opacity)
                 }
             }
             .frame(width: geo.size.width, height: geo.size.height)
             .clipped()
         }
         .frame(height: VeyraPosterMetrics(regular: sizeClass == .regular).backdropHeight)
+        .task(id: series.id) {
+            heroTrailerKey = nil
+            showHeroTrailer = false
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            guard !Task.isCancelled else { return }
+            heroTrailerKey = await MetadataTrailerService.trailer(
+                for: MediaItem(title: series.name, type: .series, tmdbID: series.id)
+            )?.key
+            guard heroTrailerKey != nil else { return }
+            withAnimation(.easeInOut(duration: 0.6)) { showHeroTrailer = true }
+        }
     }
 
     // MARK: - Watched

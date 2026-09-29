@@ -123,6 +123,15 @@ struct TMDBClient {
         return response.results
     }
 
+    /// Door kijkers geschreven recensies (Engelstalig -- TMDB vertaalt deze
+    /// niet), voor de recensiesectie op het filmdetailscherm.
+    func reviews(forMovieID movieID: Int) async throws -> [TMDBReview] {
+        let response: TMDBReviewsResponse = try await request(
+            path: "/3/movie/\(movieID)/reviews"
+        )
+        return response.results
+    }
+
     /// Films "van hetzelfde type/genre" als de opgegeven film, voor de
     /// "Vergelijkbaar"-rij onderaan het filmdetailscherm.
     func similarMovies(id: Int) async throws -> [TMDBMovie] {
@@ -259,6 +268,12 @@ struct TMDBMovie: Decodable, Identifiable, Hashable {
     /// detail-eindpunt geeft in plaats daarvan volledige `genres`-objecten.
     /// Gebruikt voor de genre-badge op de poster (zie Shared/Theme/PosterEnrichmentSettings.swift).
     let genreIDs: [Int]?
+    /// Alleen aanwezig op TMDB's detail-eindpunt (`movieDetails(id:)`) -- de
+    /// tegenhanger van `genreIDs` daar, met de naam al ingevuld (in plaats van
+    /// enkel een id die eerst via `TMDBGenreNames` opgezocht moet worden).
+    /// Gebruikt om de genre-badge ook te vullen voor bronnen die zelf geen
+    /// genre meeleveren (bv. de Trakt-watchlist, zie `ShelfCatalogService.enrich`).
+    var genres: [TMDBGenreEntry]? = nil
     /// Alleen aanwezig op TMDB's detail-eindpunt (`movieDetails(id:)`), niet op
     /// lijst-/ontdek-eindpunten -- gebruikt voor de speelduur in Veyra Pulse
     /// op `MovieDetailView` (zie `TMDBService.runtimeMinutes(forMovieID:)`).
@@ -274,8 +289,17 @@ struct TMDBMovie: Decodable, Identifiable, Hashable {
         case voteAverage = "vote_average"
         case originalLanguage = "original_language"
         case genreIDs = "genre_ids"
+        case genres
         case runtime
     }
+}
+
+/// Eén genre zoals TMDB's detail-eindpunten die meegeven (`{"id":..,"name":..}`) --
+/// i.t.t. `genreIDs` (enkel op lijst-eindpunten) is de naam hier al vertaald naar
+/// de opgevraagde taal, dus geen aparte opzoektabel nodig.
+struct TMDBGenreEntry: Decodable, Hashable {
+    let id: Int
+    let name: String
 }
 
 struct TMDBExternalIDs: Decodable {

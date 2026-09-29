@@ -28,6 +28,9 @@ enum GeneralSettingsDefaults {
     // Live TV
     static let liveFavoritesOnlyKey = "general.liveFavoritesOnly"
 
+    // Recensies
+    static let showReviewsKey = "general.showReviews"
+
     // Weergave
     static let textSizeKey = "general.textSize"
 

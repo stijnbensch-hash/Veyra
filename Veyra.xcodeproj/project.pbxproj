@@ -9,6 +9,8 @@
 /* Begin PBXBuildFile section */
 		B31BA2E63066D7BF00B8FC0E /* TVServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B31BA2E53066D7BF00B8FC0E /* TVServices.framework */; };
 		B31BA2ED3066D7BF00B8FC0E /* VeyraTopShelf.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B31BA2E33066D7BF00B8FC0E /* VeyraTopShelf.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		B3B1816F306C4086001836FF /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B3B1816E306C4086001836FF /* WebKit.framework */; };
+		B3B18171306C4095001836FF /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B3B18170306C4094001836FF /* WebKit.framework */; };
 		B3B65AF2305A984B003B5F07 /* AetherEngine in Frameworks */ = {isa = PBXBuildFile; productRef = B3B65AF1305A984B003B5F07 /* AetherEngine */; };
 		EE598D814D3F6400CD01A50F /* AetherEngine in Frameworks */ = {isa = PBXBuildFile; productRef = B3B65AF1305A984B003B5F07 /* AetherEngine */; };
 		F0A0000A305E9267002FAC51 /* AetherEngine in Frameworks */ = {isa = PBXBuildFile; productRef = B3B65AF1305A984B003B5F07 /* AetherEngine */; };
@@ -39,6 +41,8 @@
 /* Begin PBXFileReference section */
 		B31BA2E33066D7BF00B8FC0E /* VeyraTopShelf.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = VeyraTopShelf.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		B31BA2E53066D7BF00B8FC0E /* TVServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = TVServices.framework; path = System/Library/Frameworks/TVServices.framework; sourceTree = SDKROOT; };
+		B3B1816E306C4086001836FF /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS27.0.sdk/System/Library/Frameworks/WebKit.framework; sourceTree = DEVELOPER_DIR; };
+		B3B18170306C4094001836FF /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/WebKit.framework; sourceTree = DEVELOPER_DIR; };
 		B3B65AC5305A5A6C003B5F07 /* Veyra.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Veyra.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B3B65B05305AAB69003B5F07 /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
 		B3EE10D6305E9262002FAC51 /* Veyra-iOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Veyra-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -152,12 +156,14 @@
 		B3EE10D3305E9262002FAC51 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
+				B3B1816F306C4086001836FF /* WebKit.framework in Frameworks */,
 				EE598D814D3F6400CD01A50F /* AetherEngine in Frameworks */,
 			);
 		};
 		F0A00005305E9267002FAC51 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
+				B3B18171306C4095001836FF /* WebKit.framework in Frameworks */,
 				F0A0000A305E9267002FAC51 /* AetherEngine in Frameworks */,
 			);
 		};
@@ -167,6 +173,8 @@
 		B31BA2E43066D7BF00B8FC0E /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				B3B1816E306C4086001836FF /* WebKit.framework */,
+				B3B18170306C4094001836FF /* WebKit.framework */,
 				B31BA2E53066D7BF00B8FC0E /* TVServices.framework */,
 			);
 			name = Frameworks;

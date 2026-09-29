@@ -87,6 +87,15 @@ struct SeriesService {
         return response.results
     }
 
+    /// Door kijkers geschreven recensies (Engelstalig -- TMDB vertaalt deze
+    /// niet), voor de recensiesectie op het seriedetailscherm.
+    func reviews(forSeriesID seriesID: Int) async throws -> [TMDBReview] {
+        let response: TMDBReviewsResponse = try await request(
+            path: "/3/tv/\(seriesID)/reviews"
+        )
+        return response.results
+    }
+
     /// Series "van hetzelfde type/genre" als de opgegeven serie, voor de
     /// "Vergelijkbaar"-rij onderaan het seriedetailscherm.
     func similarSeries(id: Int) async throws -> [TMDBSeries] {
@@ -183,6 +192,10 @@ struct TMDBSeriesDetails: Decodable, Identifiable, Hashable {
     let voteAverage: Double?
     let numberOfSeasons: Int?
     let seasons: [TMDBSeason]
+    /// Genre(s) van deze serie, met naam al vertaald -- zie `TMDBGenreEntry`
+    /// (`TMDBClient.swift`). Gebruikt om de genre-badge te vullen voor bronnen
+    /// die zelf geen genre meeleveren (bv. de Trakt-watchlist).
+    var genres: [TMDBGenreEntry]? = nil
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -194,6 +207,7 @@ struct TMDBSeriesDetails: Decodable, Identifiable, Hashable {
         case voteAverage = "vote_average"
         case numberOfSeasons = "number_of_seasons"
         case seasons
+        case genres
     }
 }
 

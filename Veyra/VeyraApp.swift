@@ -14,6 +14,9 @@ struct VeyraApp: App {
     @Environment(\.scenePhase)
     private var scenePhase
 
+    @AppStorage(DataSettingsDefaults.autoRefreshOnForegroundKey)
+    private var autoRefreshOnForeground = true
+
     // tvOS kent `.scrollContentBackground(.hidden)` niet (die modifier
     // bestaat wel op iOS, maar is niet beschikbaar op tvOS), waardoor de
     // standaard lichte achtergrond van List/Form door onze eigen donkere
@@ -108,7 +111,8 @@ struct VeyraApp: App {
                 ) { _, phase in
                     guard
                         phase
-                            == .active
+                            == .active,
+                        autoRefreshOnForeground
                     else {
                         return
                     }

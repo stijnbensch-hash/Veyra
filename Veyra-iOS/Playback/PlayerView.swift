@@ -251,6 +251,11 @@ private struct iOSPlayerSurface: View {
     @State private var nextEpisode: MediaItem?
     @State private var isLandscape = false
 
+    // "Omdat je X keek" -- aanbeveling bij het einde zonder vervolgaflevering
+    // (film, of laatste aflevering van een serie). Zie `BecauseYouWatchedOverlay`.
+    @State private var recommendedItem: MediaItem?
+    @State private var recommendationDismissed = false
+
     // Standaard toont de video het volledige beeld (met zwarte randen indien
     // nodig) i.p.v. bij te snijden -- "scherm vullen" snijdt namelijk altijd een
     // deel van het beeld weg om de randen op te vullen, en dat mag de kijker
@@ -325,6 +330,11 @@ private struct iOSPlayerSurface: View {
     private var showNextEpisodeOverlay: Bool {
         item?.type == .series && nextEpisode != nil
             && isNearEndOfEpisode && !countdownCancelled
+    }
+
+    private var showRecommendationOverlay: Bool {
+        !showNextEpisodeOverlay && isNearEndOfEpisode
+            && recommendedItem != nil && !recommendationDismissed
     }
 
     private enum SkipSegmentKind {
@@ -418,6 +428,25 @@ private struct iOSPlayerSurface: View {
                 .onAppear { startCountdownIfNeeded(for: nextEpisode) }
             }
 
+            if showRecommendationOverlay, let recommendedItem, let item {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        BecauseYouWatchedOverlay(sourceTitle: item.title, recommended: recommendedItem) {
+                            recommendationDismissed = true
+                        } actions: {
+                            WatchlistToggleButton(item: recommendedItem, compact: true)
+                            FavoriteToggleButton(item: recommendedItem, compact: true)
+                        }
+                        .frame(maxWidth: 360)
+                    }
+                }
+                .padding(.trailing, 16)
+                .padding(.bottom, controlsVisible ? 148 : 28)
+                .transition(.opacity)
+            }
+
             if controlsVisible {
                 VStack {
                     topBar
@@ -460,6 +489,11 @@ private struct iOSPlayerSurface: View {
             autoSkippedIntro = false
             introDBSegments = .empty
             nextEpisode = await NextEpisodeResolver.resolve(after: item)
+            recommendedItem = nil
+            recommendationDismissed = false
+            if nextEpisode == nil, let item {
+                recommendedItem = await SimilarTitlesService.similarItems(for: item).first
+            }
             introDBSegments = await IntroDBClient.shared.segments(
                 tmdbID: item?.tmdbID,
                 imdbID: item?.imdbID,
@@ -600,12 +634,23 @@ private struct iOSPlayerSurface: View {
 
                     Spacer()
 
-                    Text(time(engine.duration))
+                    // Kloktijdstip waarop het afloopt i.p.v. de vaste totale duur -- die
+                    // laatste verandert toch nooit tijdens het kijken, dit wel.
+                    Text(finishClockText)
                         .font(.system(size: 17, weight: .semibold).monospacedDigit())
                         .foregroundStyle(.white.opacity(0.9))
                 }
 
                 IOSPlaybackTimeline(engine: engine, isDragging: $isDragging, dragProgress: $dragProgress)
+
+                HStack {
+                    Spacer()
+                    // Telt af hoeveel er nog rest i.p.v. de volledige (vaste) duur -- dat is
+                    // precies de info die je tijdens het kijken wil, niet hoe lang het in totaal is.
+                    Text("-\(time(remainingSeconds))")
+                        .font(.system(size: 13, weight: .medium).monospacedDigit())
+                        .foregroundStyle(.white.opacity(0.6))
+                }
             }
 
             HStack(spacing: 20) {
@@ -857,6 +902,22 @@ private struct iOSPlayerSurface: View {
             return dragProgress * engine.duration
         }
         return engine.currentTime
+    }
+
+    /// Hoeveel er nog rest van de huidige film/aflevering -- 0 zolang de duur nog niet
+    /// gekend is (canSeek false), i.p.v. de volledige duur te tonen alsof er nog niets bekeken is.
+    private var remainingSeconds: Double {
+        guard canSeek else { return 0 }
+        return max(0, engine.duration - displayedTime)
+    }
+
+    /// Het kloktijdstip waarop de film/aflevering afloopt bij dit tempo -- handiger dan de
+    /// vaste totale duur, want dat zegt direct of je op tijd klaar bent i.p.v. te moeten
+    /// optellen bij de huidige tijd.
+    private var finishClockText: String {
+        guard canSeek else { return "—" }
+        let finish = Date().addingTimeInterval(remainingSeconds)
+        return finish.formatted(date: .omitted, time: .shortened)
     }
 
     private func togglePlayback() {

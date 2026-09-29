@@ -168,7 +168,7 @@ enum ShelfCatalogService {
                     releaseDate: item.releaseDate,
                     posterURL: imageURL(details.posterPath),
                     backdropURL: imageURL(details.backdropPath, size: "w1280"),
-                    genre: item.genre,
+                    genre: item.genre ?? details.genres?.first?.name,
                     rating: details.voteAverage ?? item.rating,
                     catalogItemID: item.catalogItemID
                 )
@@ -185,7 +185,7 @@ enum ShelfCatalogService {
                     releaseDate: item.releaseDate,
                     posterURL: imageURL(details.posterPath),
                     backdropURL: imageURL(details.backdropPath, size: "w1280"),
-                    genre: item.genre,
+                    genre: item.genre ?? details.genres?.first?.name,
                     rating: details.voteAverage ?? item.rating,
                     catalogItemID: item.catalogItemID
                 )

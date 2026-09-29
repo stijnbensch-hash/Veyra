@@ -45,6 +45,15 @@ enum AppConfiguration {
         )
     }
 
+    static var mdblistAPIKey: String? {
+        VeyraAPIKeyStore.value(
+            for: .mdblistAPIKey
+        )
+        ?? configuredValue(
+            "MDBListAPIKey"
+        )
+    }
+
     static var privacyPolicyURL: URL? {
         guard
             let value =
@@ -144,6 +153,17 @@ enum AppConfiguration {
                 value,
                 for:
                     .fanartAPIKey
+            )
+    }
+
+    static func setMDBListAPIKey(
+        _ value: String?
+    ) throws {
+        try VeyraAPIKeyStore
+            .set(
+                value,
+                for:
+                    .mdblistAPIKey
             )
     }
 

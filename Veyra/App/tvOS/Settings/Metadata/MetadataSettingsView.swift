@@ -186,24 +186,31 @@ private struct MetadataRatingsSettingsView: View {
     @AppStorage("metadata.rating.tomatometer") private var tomatometer = true
     @AppStorage("metadata.rating.metacritic") private var metacritic = true
     @AppStorage("metadata.rating.trakt") private var trakt = true
-    // Popcornmeter/Letterboxd hebben geen publiek toegankelijke API en tonen
-    // daarom altijd een uitgeschakelde rij (zie `ratingToggleRow` hieronder) --
-    // geen eigen @AppStorage nodig.
+    @AppStorage("metadata.rating.popcornmeter") private var popcornmeter = true
+    @AppStorage("metadata.rating.letterboxd") private var letterboxd = true
     @AppStorage("metadata.rating.mal") private var mal = true
 
     var body: some View {
         Form {
+            Section {
+                MDBListConfigurationCard()
+            } header: {
+                Text("MDBList")
+            } footer: {
+                Text("Popcornmeter en Letterboxd komen via MDBList (mdblist.com). Vul hieronder een gratis API-sleutel in om die twee scores te tonen.")
+            }
+
             Section {
                 ratingToggleRow(providerRow(.imdb), isOn: $imdb)
                 ratingToggleRow(providerRow(.tmdb), isOn: $tmdb)
                 ratingToggleRow(providerRow(.tomatometer), isOn: $tomatometer)
                 ratingToggleRow(providerRow(.metacritic), isOn: $metacritic)
                 ratingToggleRow(providerRow(.trakt), isOn: $trakt)
-                ratingToggleRow(providerRow(.popcornmeter), isOn: .constant(false), disabled: true)
-                ratingToggleRow(providerRow(.letterboxd), isOn: .constant(false), disabled: true)
+                ratingToggleRow(providerRow(.popcornmeter), isOn: $popcornmeter)
+                ratingToggleRow(providerRow(.letterboxd), isOn: $letterboxd)
                 ratingToggleRow(providerRow(.mal), isOn: $mal)
             } footer: {
-                Text("Kies welke ratings zichtbaar zijn op film- en seriepagina's. Popcornmeter en Letterboxd staan uitgeschakeld: die bieden geen publiek toegankelijke API, dus die scores kunnen hier niet worden opgehaald.")
+                Text("Kies welke ratings zichtbaar zijn op film- en seriepagina's. Popcornmeter en Letterboxd tonen enkel iets wanneer hierboven een MDBList API-sleutel is ingesteld.")
             }
 
             Section {
@@ -323,8 +330,8 @@ private struct MetadataRatingsSettingsView: View {
         tomatometer = true
         metacritic = true
         trakt = true
-        // Popcornmeter/Letterboxd bewust overslaan: die toggles zijn uitgeschakeld
-        // omdat er geen publiek toegankelijke API voor is aangesloten.
+        popcornmeter = true
+        letterboxd = true
         mal = true
     }
 
@@ -334,11 +341,101 @@ private struct MetadataRatingsSettingsView: View {
         tomatometer = false
         metacritic = false
         trakt = false
+        popcornmeter = false
+        letterboxd = false
         mal = false
     }
 
     private func resetDefaults() {
         enableAll()
+    }
+}
+
+// MARK: - MDBList Configuration Card
+
+struct MDBListConfigurationCard: View {
+    @State
+    private var apiKey = ""
+
+    @State
+    private var configured = false
+
+    @State
+    private var message: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(spacing: 14) {
+                Image(systemName: "star.leadinghalf.filled")
+                    .foregroundStyle(.orange)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("MDBList")
+                    Text("Popcornmeter- en Letterboxd-scores")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                VeyraPosterBadge(
+                    title: configured ? "Actief" : "API-sleutel nodig",
+                    symbol: configured ? "checkmark.circle.fill" : "key.fill",
+                    accent: configured ? VeyraColors.cyan : VeyraColors.red,
+                    fontSize: 13
+                )
+            }
+
+            Text("Veyra zoekt hiermee de Popcornmeter- en Letterboxd-score op via de IMDb-identificatie van een film of serie. MDBList biedt een gratis API-sleutel aan op mdblist.com.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Text("De API-sleutel wordt lokaal in de beveiligde sleutelhanger van deze Apple TV opgeslagen.")
+                .font(.caption2)
+                .foregroundStyle(.white.opacity(0.52))
+
+            SecureField(
+                configured
+                    ? "Nieuwe MDBList API-sleutel"
+                    : "MDBList API-sleutel",
+                text: $apiKey
+            )
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+
+            Button {
+                saveAPIKey()
+            } label: {
+                Label("Opslaan", systemImage: "key.fill")
+            }
+            .disabled(apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+            if let message {
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(configured ? VeyraColors.ice : .orange)
+            }
+        }
+        .onAppear {
+            configured = AppConfiguration.mdblistAPIKey?.isEmpty == false
+        }
+    }
+
+    private func saveAPIKey() {
+        let value = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return }
+
+        do {
+            try AppConfiguration.setMDBListAPIKey(value)
+            apiKey = ""
+            configured = AppConfiguration.mdblistAPIKey?.isEmpty == false
+            message = configured
+                ? "API-sleutel veilig opgeslagen. Popcornmeter en Letterboxd zijn actief."
+                : "De API-sleutel kon niet worden opgeslagen."
+        } catch {
+            configured = AppConfiguration.mdblistAPIKey?.isEmpty == false
+            message = "Opslaan van de API-sleutel is niet gelukt."
+        }
     }
 }
 

@@ -61,6 +61,11 @@ struct SettingsView: View {
                                      subtitle: "Filmcollecties en planken op het hoofdmenu", status: "", statusColor: VeyraColors.secondary)
                     }
 
+                    settingsSection(title: "Data") {
+                        settingsCard(destination: .data, icon: "internaldrive", title: "Data",
+                                     subtitle: "Cache legen, automatisch verversen, VeyraHub Recorder", status: "", statusColor: VeyraColors.secondary)
+                    }
+
                     settingsSection(title: "Account") {
                         settingsCard(destination: .account, icon: "person.crop.circle", title: "Account",
                                      subtitle: "Trakt, ondertitels en profiel",
@@ -147,6 +152,8 @@ struct SettingsView: View {
                 VeyraCollectionsSettingsView()
             case .home:
                 VeyraHomeSettingsView()
+            case .data:
+                DataSettingsView()
             }
         }
     }
@@ -462,6 +469,7 @@ private enum SettingsDestination:
     case shelves
     case collections
     case home
+    case data
 
     var id: String {
         rawValue
@@ -1950,15 +1958,6 @@ struct AccountView:
 
                 Section {
                     OpenSubtitlesConfigurationCard()
-
-                    NavigationLink {
-                        SubtitlePreferencesView()
-                    } label: {
-                        VeyraSettingsCardRowLabel(icon: "captions.bubble", title: "Taal en ondertitelvoorkeuren") {
-                            VeyraSettingsCardRowValue(value: nil)
-                        }
-                    }
-                    .veyraCardRow()
                 } header: {
                     Text("Ondertitels")
                 }

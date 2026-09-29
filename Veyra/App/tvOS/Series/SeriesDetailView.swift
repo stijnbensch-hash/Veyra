@@ -204,6 +204,8 @@ struct SeriesDetailView: View {
 
                 TrailerSection(item: MediaItem(title: details.name, type: .series, tmdbID: details.id))
 
+                ReviewsSection(item: MediaItem(title: details.name, type: .series, tmdbID: details.id))
+
                 SimilarTitlesRow(item: MediaItem(title: details.name, type: .series, tmdbID: details.id))
                     .padding(.top, 6)
 

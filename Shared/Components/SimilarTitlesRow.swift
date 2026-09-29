@@ -16,7 +16,6 @@ struct SimilarTitlesRow: View {
     @Environment(\.openMediaDetail) private var openMediaDetail
 
     @State private var items: [MediaItem] = []
-    @State private var peekingItemID: UUID?
 
     var body: some View {
         // Niets tonen zolang er niets (meer) gevonden is -- in tegenstelling
@@ -43,9 +42,7 @@ struct SimilarTitlesRow: View {
                                     rating: related.rating,
                                     year: String(related.releaseDate?.prefix(4) ?? ""),
                                     tmdbID: related.tmdbID,
-                                    isMovie: related.type == .movie,
-                                    onOpenDetails: { openMediaDetail(related) },
-                                    peekTrigger: peekBinding(for: related)
+                                    isMovie: related.type == .movie
                                 )
                             }
 #if os(tvOS)
@@ -86,13 +83,6 @@ struct SimilarTitlesRow: View {
 #else
         12
 #endif
-    }
-
-    private func peekBinding(for related: MediaItem) -> Binding<Bool> {
-        Binding(
-            get: { peekingItemID == related.id },
-            set: { peekingItemID = $0 ? related.id : nil }
-        )
     }
 
     private func load() async {

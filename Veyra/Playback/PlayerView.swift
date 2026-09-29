@@ -29,6 +29,9 @@ private struct LiveTVPlayerRoot: View {
     let initialSourceID: UUID
     let sportEvent: SportEvent?
 
+    @Environment(\.veyraPlayerVisibility)
+    private var setPlayerVisible
+
     init(source: PlayableSource, item: MediaItem?, sportEvent: SportEvent? = nil) {
         _activeSource = State(initialValue: source)
         initialItem = item
@@ -55,6 +58,12 @@ private struct LiveTVPlayerRoot: View {
             .id(activeSource.id)
         }
         .task { await guide.reload() }
+        .onAppear {
+            setPlayerVisible(true)
+        }
+        .onDisappear {
+            setPlayerVisible(false)
+        }
     }
 }
 
@@ -269,7 +278,9 @@ private struct PlayerSessionView: View {
             }
         }
         .onAppear {
-            setPlayerVisible(true)
+            if liveGuide == nil {
+                setPlayerVisible(true)
+            }
         }
         .alert("Kijk je nog?", isPresented: Binding(
             get: { viewModel.showStillWatchingPrompt },
@@ -283,7 +294,9 @@ private struct PlayerSessionView: View {
             await viewModel.startPlayback()
         }
         .onDisappear {
-            setPlayerVisible(false)
+            if liveGuide == nil {
+                setPlayerVisible(false)
+            }
             viewModel.stopForDisappear()
         }
         .onChange(

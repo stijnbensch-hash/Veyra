@@ -278,6 +278,10 @@ enum PlaybackAutoSelectSubtitlesOption:
     case off
     case forcedOnly
     case full
+    /// Alleen ondertitels selecteren als de gekozen audiotrack NIET al in de
+    /// eigen ondertiteltaal (`subtitleLanguageKey`) is -- staat bij vreemdtalige
+    /// audio, blijft uit als de audio al in de eigen taal is.
+    case matchAudio
 
     var id: String { rawValue }
 
@@ -291,6 +295,9 @@ enum PlaybackAutoSelectSubtitlesOption:
 
         case .full:
             return "Full Subtitles"
+
+        case .matchAudio:
+            return "Automatisch bij vreemde taal"
         }
     }
 }

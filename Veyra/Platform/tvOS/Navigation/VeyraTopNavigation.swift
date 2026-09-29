@@ -6,7 +6,7 @@ struct VeyraTopNavigation: View {
     var body: some View {
         HStack(spacing: 12) {
             HStack(spacing: 6) {
-                ForEach([MenuDestination.home, .film, .series, .sport, .liveTV, .recordings]) { destination in
+                ForEach([MenuDestination.home, .film, .series, .watchlist, .sport, .liveTV, .recordings]) { destination in
                     item(destination, iconOnly: false)
                 }
             }

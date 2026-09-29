@@ -27,9 +27,8 @@ struct MetadataSettingsView: View {
     @AppStorage(MetadataRatingProvider.tomatometer.storageKey) private var tomatometer = true
     @AppStorage(MetadataRatingProvider.metacritic.storageKey) private var metacritic = true
     @AppStorage(MetadataRatingProvider.trakt.storageKey) private var trakt = true
-    // Popcornmeter/Letterboxd hebben geen publiek toegankelijke API en tonen
-    // daarom altijd een uitgeschakelde rij (zie de `.constant(false)`-toggles
-    // hieronder) -- geen eigen @AppStorage nodig.
+    @AppStorage(MetadataRatingProvider.popcornmeter.storageKey) private var popcornmeter = true
+    @AppStorage(MetadataRatingProvider.letterboxd.storageKey) private var letterboxd = true
     @AppStorage(MetadataRatingProvider.mal.storageKey) private var mal = true
 
     var body: some View {
@@ -92,20 +91,26 @@ struct MetadataSettingsView: View {
                 }
 
                 Section {
+                    MDBListConfigurationCard()
+                } header: {
+                    Text("MDBList")
+                } footer: {
+                    Text("Popcornmeter en Letterboxd komen via MDBList (mdblist.com). Vul hieronder een gratis API-sleutel in om die twee scores te tonen.")
+                }
+
+                Section {
                     toggleRow(.imdb, isOn: $imdb)
                     toggleRow(.tmdb, isOn: $tmdb)
                     toggleRow(.tomatometer, isOn: $tomatometer)
                     toggleRow(.metacritic, isOn: $metacritic)
                     toggleRow(.trakt, isOn: $trakt)
-                    toggleRow(.popcornmeter, isOn: .constant(false))
-                        .disabled(true)
-                    toggleRow(.letterboxd, isOn: .constant(false))
-                        .disabled(true)
+                    toggleRow(.popcornmeter, isOn: $popcornmeter)
+                    toggleRow(.letterboxd, isOn: $letterboxd)
                     toggleRow(.mal, isOn: $mal)
                 } header: {
                     Text("Ratings")
                 } footer: {
-                    Text("Kies welke ratings zichtbaar zijn op film- en seriepagina's. Een titel toont alleen de scores die de bron er daadwerkelijk voor heeft. Popcornmeter en Letterboxd staan uitgeschakeld: die bieden geen publiek toegankelijke API, dus die scores kunnen hier niet worden opgehaald.")
+                    Text("Kies welke ratings zichtbaar zijn op film- en seriepagina's. Een titel toont alleen de scores die de bron er daadwerkelijk voor heeft. Popcornmeter en Letterboxd tonen enkel iets wanneer hierboven een MDBList API-sleutel is ingesteld.")
                 }
 
                 Section {
@@ -181,9 +186,86 @@ struct MetadataSettingsView: View {
         tomatometer = enabled
         metacritic = enabled
         trakt = enabled
-        // Popcornmeter/Letterboxd bewust overslaan: die toggles zijn uitgeschakeld
-        // omdat er geen publiek toegankelijke API voor is aangesloten.
+        popcornmeter = enabled
+        letterboxd = enabled
         mal = enabled
+    }
+}
+
+struct MDBListConfigurationCard: View {
+    @State
+    private var apiKey = ""
+
+    @State
+    private var configured = false
+
+    @State
+    private var message: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                Image(systemName: "star.leadinghalf.filled")
+                    .foregroundStyle(.orange)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("MDBList")
+                    Text("Popcornmeter- en Letterboxd-scores")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Text(configured ? "Actief" : "API-sleutel nodig")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(configured ? VeyraColors.cyan : .orange)
+            }
+
+            Text("Veyra zoekt hiermee de Popcornmeter- en Letterboxd-score op via de IMDb-identificatie van een film of serie. MDBList biedt een gratis API-sleutel aan op mdblist.com.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            SecureField(
+                configured ? "Nieuwe MDBList API-sleutel" : "MDBList API-sleutel",
+                text: $apiKey
+            )
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .textFieldStyle(.roundedBorder)
+
+            Button("Opslaan") {
+                saveAPIKey()
+            }
+            .disabled(apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+            if let message {
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(configured ? VeyraColors.cyan : .orange)
+            }
+        }
+        .padding(.vertical, 4)
+        .onAppear {
+            configured = AppConfiguration.mdblistAPIKey?.isEmpty == false
+        }
+    }
+
+    private func saveAPIKey() {
+        let value = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return }
+
+        do {
+            try AppConfiguration.setMDBListAPIKey(value)
+            apiKey = ""
+            configured = AppConfiguration.mdblistAPIKey?.isEmpty == false
+            message = configured
+                ? "API-sleutel veilig opgeslagen. Popcornmeter en Letterboxd zijn actief."
+                : "De API-sleutel kon niet worden opgeslagen."
+        } catch {
+            configured = AppConfiguration.mdblistAPIKey?.isEmpty == false
+            message = "Opslaan van de API-sleutel is niet gelukt."
+        }
     }
 }
 

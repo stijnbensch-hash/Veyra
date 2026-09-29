@@ -28,10 +28,6 @@ struct IPTVPlaybackSettingsView: View {
                         subtitle: "Afspeelmotor, buffering, catch-up"
                     )
                     categoryCard(
-                        .cache, icon: "arrow.triangle.2.circlepath", title: "Cache & verversen",
-                        subtitle: "Zenderlijst en programmagids"
-                    )
-                    categoryCard(
                         .developer, icon: "ladybug", title: "Ontwikkelaarsopties",
                         subtitle: "FPS-teller"
                     )
@@ -48,7 +44,6 @@ struct IPTVPlaybackSettingsView: View {
             switch destination {
             case .guide: IPTVGuideSettingsView()
             case .playback: IPTVEnginePlaybackSettingsView()
-            case .cache: IPTVCacheSettingsView()
             case .developer: IPTVDeveloperSettingsView()
             }
         }
@@ -97,7 +92,7 @@ struct IPTVPlaybackSettingsView: View {
 }
 
 private enum IPTVPlaybackDestination: String, Identifiable, Hashable {
-    case guide, playback, cache, developer
+    case guide, playback, developer
 
     var id: String { rawValue }
 }
@@ -193,59 +188,6 @@ private struct IPTVEnginePlaybackSettingsView: View {
             .frame(maxWidth: 1000)
         }
         .navigationTitle("Afspelen")
-    }
-}
-
-// MARK: - Cache & verversen
-
-private struct IPTVCacheSettingsView: View {
-    @AppStorage(IPTVPlaybackSettingsDefaults.refreshChannelsIntervalKey)
-    private var refreshChannelsIntervalRaw = IPTVCacheRefreshInterval.sixHours.rawValue
-    @AppStorage(IPTVPlaybackSettingsDefaults.refreshEPGIntervalKey)
-    private var refreshEPGIntervalRaw = IPTVCacheRefreshInterval.twelveHours.rawValue
-
-    @State private var cacheAlertMessage: String?
-
-    var body: some View {
-        ZStack {
-            VeyraBackground().ignoresSafeArea()
-
-            List {
-                Section {
-                    VeyraSettingsChoiceRow<IPTVCacheRefreshInterval>(icon: "list.bullet.rectangle", "Zenderlijst verversen", selection: $refreshChannelsIntervalRaw)
-                    VeyraSettingsChoiceRow<IPTVCacheRefreshInterval>(icon: "calendar", "Programmagids verversen", selection: $refreshEPGIntervalRaw)
-
-                    Button {
-                        cacheAlertMessage = "Er is nog geen zenderlijst-cache in Veyra om te wissen."
-                    } label: {
-                        VeyraSettingsCardRowLabel(icon: "trash", title: "Zenderlijst-cache wissen")
-                    }
-                    .veyraCardRow()
-
-                    Button {
-                        cacheAlertMessage = "Er is nog geen gidscache in Veyra om te wissen."
-                    } label: {
-                        VeyraSettingsCardRowLabel(icon: "trash", title: "Gidscache wissen")
-                    }
-                    .veyraCardRow()
-                } footer: {
-                    Text("Veyra heeft nog geen zenderlijst- of gidscache, dus deze instellingen en knoppen doen voorlopig niets.")
-                }
-            }
-            .frame(maxWidth: 1000)
-        }
-        .navigationTitle("Cache & verversen")
-        .alert(
-            "Cache",
-            isPresented: Binding(
-                get: { cacheAlertMessage != nil },
-                set: { if !$0 { cacheAlertMessage = nil } }
-            )
-        ) {
-            Button("OK", role: .cancel) { cacheAlertMessage = nil }
-        } message: {
-            Text(cacheAlertMessage ?? "")
-        }
     }
 }
 

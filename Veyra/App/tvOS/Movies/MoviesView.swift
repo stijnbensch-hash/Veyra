@@ -9,9 +9,6 @@ struct MoviesView: View {
     @Environment(\.playMediaItem) private var playMediaItem
 
     @State private var movies: [TMDBMovie] = []
-    // Instant Peek: welke film zijn infokaart open staat (per id, niet per kaart -- `movieCard`
-    // is een functie, geen eigen View, dus geen lokale @State per kaart mogelijk).
-    @State private var peekingMovieID: Int?
     @State private var isLoading = true
     @State private var isOpeningMovie = false
     @State private var errorMessage: String?
@@ -281,13 +278,6 @@ struct MoviesView: View {
 
     // MARK: - Movie card
 
-    private func peekBinding(for movie: TMDBMovie) -> Binding<Bool> {
-        Binding(
-            get: { peekingMovieID == movie.id },
-            set: { peekingMovieID = $0 ? movie.id : nil }
-        )
-    }
-
     private func movieCard(
         _ movie: TMDBMovie,
         width: CGFloat
@@ -312,10 +302,7 @@ struct MoviesView: View {
                 tmdbID: movie.id,
                 isMovie: true,
                 releaseDateRaw: movie.releaseDate,
-                watchedTarget: .movie(TraktIDs(tmdb: movie.id)),
-                onPlay: { Task { await openMovieForPlay(movie) } },
-                onOpenDetails: { Task { await openMovie(movie) } },
-                peekTrigger: peekBinding(for: movie)
+                watchedTarget: .movie(TraktIDs(tmdb: movie.id))
             )
         }
         .buttonStyle(
@@ -331,13 +318,7 @@ struct MoviesView: View {
                 type: .movie,
                 tmdbID: movie.id
             )
-        ) {
-            Button {
-                peekingMovieID = movie.id
-            } label: {
-                Label("Snel bekijken", systemImage: "eye")
-            }
-        }
+        )
     }
 
     private func posterURL(

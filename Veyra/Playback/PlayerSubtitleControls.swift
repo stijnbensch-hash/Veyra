@@ -53,6 +53,11 @@ struct PlayerSubtitleControls: View {
     @State private var presentation = VeyraPlayerPresentation()
     @State private var nextEpisode: MediaItem?
 
+    // "Omdat je X keek" -- aanbeveling bij het einde zonder vervolgaflevering
+    // (film, of laatste aflevering van een serie). Zie `BecauseYouWatchedOverlay`.
+    @State private var recommendedItem: MediaItem?
+    @State private var recommendationDismissed = false
+
     // "Hierna"-instellingen (automatisch doorspelen + aftellen). Zelfde
     // sleutels als de iOS-speler, zie `Shared/Theme/PlaybackSettings.swift`.
     @AppStorage(PlaybackSettingsDefaults.autoPlayNextEpisodeKey)
@@ -164,6 +169,11 @@ struct PlayerSubtitleControls: View {
             && isNearEndOfEpisode && !countdownCancelled
     }
 
+    private var showRecommendationOverlay: Bool {
+        !panelVisible && !showNextEpisodeOverlay && isNearEndOfEpisode
+            && recommendedItem != nil && !recommendationDismissed
+    }
+
     // MARK: - Skip segment (intro/recap/aftiteling)
 
     private enum SkipSegmentKind {
@@ -266,6 +276,19 @@ struct PlayerSubtitleControls: View {
                     .onAppear { startCountdownIfNeeded(for: nextEpisode) }
             }
 
+            if showRecommendationOverlay, let recommendedItem, let item {
+                BecauseYouWatchedOverlay(sourceTitle: item.title, recommended: recommendedItem) {
+                    recommendationDismissed = true
+                } actions: {
+                    WatchlistToggleButton(item: recommendedItem)
+                    FavoriteToggleButton(item: recommendedItem)
+                }
+                .frame(maxWidth: 560, alignment: .trailing)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .padding(.trailing, 72)
+                .padding(.bottom, controlsVisible ? 190 : 48)
+            }
+
         }.onChange(of: isNearEndOfEpisode) { _, isNear in
             guard isNear, showNextEpisodeOverlay else { return }
             focused = .nextEpisode
@@ -348,6 +371,11 @@ struct PlayerSubtitleControls: View {
             let resolved = await NextEpisodeResolver.resolve(after: item)
             guard !Task.isCancelled else { return }
             nextEpisode = resolved
+            recommendedItem = nil
+            recommendationDismissed = false
+            if resolved == nil, let item {
+                recommendedItem = await SimilarTitlesService.similarItems(for: item).first
+            }
         }.task(id: item?.id) {
             autoSkippedIntro = false
             introDBSegments = .empty
@@ -499,7 +527,14 @@ struct PlayerSubtitleControls: View {
                 Spacer()
 
                 TimelineView(.periodic(from: .now, by: 30)) { context in
-                    Text(context.date.formatted(date: .omitted, time: .shortened)).font(
+                    // Bij een film/aflevering is het kloktijdstip waarop het AFLOOPT nuttiger
+                    // dan de huidige tijd (die staat toch al op elk ander scherm) -- bij live-tv
+                    // blijft gewoon de huidige tijd staan, dat is daar de EPG-referentie.
+                    let showsFinishTime = !(source?.kind == .liveTV) && engine.duration.isFinite && engine.duration > 0
+                    let displayDate = showsFinishTime
+                        ? context.date.addingTimeInterval(max(0, engine.duration - engine.currentTime))
+                        : context.date
+                    Text(displayDate.formatted(date: .omitted, time: .shortened)).font(
                         .system(size: 22, weight: .semibold, design: .rounded)
                     ).monospacedDigit().foregroundStyle(.white.opacity(0.72))
                 }
@@ -1177,7 +1212,10 @@ private struct VeyraPlaybackTimeline: View {
 
                         Spacer()
 
-                        Text(time(engine.duration))
+                        // Telt af hoeveel er nog rest i.p.v. de vaste totale duur -- dat is de
+                        // info die je tijdens het kijken wil, de totale lengte verandert toch
+                        // nooit terwijl je kijkt.
+                        Text("-\(time(max(0, engine.duration - currentTime)))")
                     }
 
                 } else {

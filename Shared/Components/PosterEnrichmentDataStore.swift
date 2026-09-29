@@ -54,6 +54,41 @@ final class PosterEnrichmentDataStore: ObservableObject {
         }
     }
 
+    // MARK: Genre / beoordeling (voor bronnen die dit zelf niet meeleveren, bv. de
+    // "Veyra Now"-rail: die items komen uit Trakt/EPG-achtige bronnen zonder genre/score)
+
+    private var genreRatingCache: [String: (genre: String?, rating: Double?)] = [:]
+    private var genreRatingInFlight: Set<String> = []
+
+    /// Genre + TMDB-score voor een titel, opgehaald via het detail-eindpunt en gecached
+    /// zodat dezelfde titel niet telkens opnieuw bevraagd wordt. Roep dit vanuit `.task(id:)`
+    /// aan, net als `certification(movieID:)`/`certification(tvID:)` hierboven.
+    func genreAndRating(movieID id: Int) async -> (genre: String?, rating: Double?) {
+        await genreAndRating(key: "movie:\(id)") { token in
+            let details = try await TMDBClient(readAccessToken: token).movieDetails(id: id)
+            return (details.genres?.first?.name, details.voteAverage)
+        }
+    }
+
+    func genreAndRating(tvID id: Int) async -> (genre: String?, rating: Double?) {
+        await genreAndRating(key: "tv:\(id)") { token in
+            guard let service = SeriesService() else { return (nil, nil) }
+            let details = try await service.seriesDetails(id: id)
+            return (details.genres?.first?.name, details.voteAverage)
+        }
+    }
+
+    private func genreAndRating(key: String, fetch: (String) async throws -> (genre: String?, rating: Double?)) async -> (genre: String?, rating: Double?) {
+        if let cached = genreRatingCache[key] { return cached }
+        guard !genreRatingInFlight.contains(key) else { return (nil, nil) }
+        guard let token = AppConfiguration.tmdbReadAccessToken else { return (nil, nil) }
+        genreRatingInFlight.insert(key)
+        defer { genreRatingInFlight.remove(key) }
+        let value = (try? await fetch(token)) ?? (nil, nil)
+        genreRatingCache[key] = value
+        return value
+    }
+
     // MARK: Leeftijdsclassificatie
 
     private var certificationCache: [String: String] = [:]

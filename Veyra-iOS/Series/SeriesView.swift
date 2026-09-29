@@ -5,8 +5,6 @@ struct SeriesView: View {
 
     @State private var series: [TMDBSeries] = []
     @State private var selectedSeries: TMDBSeries?
-    // Instant Peek: welke serie zijn infokaart open staat.
-    @State private var peekingSeriesID: Int?
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var selectedProvider: WatchProvider?
@@ -309,13 +307,7 @@ struct SeriesView: View {
                             isMovie: false,
                             releaseDateRaw: item.firstAirDate,
                             watchedTarget: .show(TraktIDs(tmdb: item.id)),
-                            watchedPartialDisplay: .remaining,
-                            // Geen `onPlay`: zie tvOS SeriesView voor de reden.
-                            onOpenDetails: { selectedSeries = item },
-                            peekTrigger: Binding(
-                                get: { peekingSeriesID == item.id },
-                                set: { peekingSeriesID = $0 ? item.id : nil }
-                            )
+                            watchedPartialDisplay: .remaining
                         )
                     }
                     .buttonStyle(.plain)
@@ -325,13 +317,7 @@ struct SeriesView: View {
                             type: .series,
                             tmdbID: item.id
                         )
-                    ) {
-                        Button {
-                            peekingSeriesID = item.id
-                        } label: {
-                            Label("Snel bekijken", systemImage: "eye")
-                        }
-                    }
+                    )
                 }
             }
         }

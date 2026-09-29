@@ -19,15 +19,8 @@ struct IPTVPlaybackSettingsView: View {
     @AppStorage(IPTVPlaybackSettingsDefaults.catchUpOffsetManualSecondsKey)
     private var catchUpOffsetManualSeconds = 0
 
-    @AppStorage(IPTVPlaybackSettingsDefaults.refreshChannelsIntervalKey)
-    private var refreshChannelsIntervalRaw = IPTVCacheRefreshInterval.sixHours.rawValue
-    @AppStorage(IPTVPlaybackSettingsDefaults.refreshEPGIntervalKey)
-    private var refreshEPGIntervalRaw = IPTVCacheRefreshInterval.twelveHours.rawValue
-
     @AppStorage(IPTVPlaybackSettingsDefaults.showFPSCounterKey)
     private var showFPSCounter = false
-
-    @State private var cacheAlertMessage: String?
 
     private var catchUpOffsetMode: IPTVCatchUpOffsetMode {
         IPTVCatchUpOffsetMode(rawValue: catchUpOffsetModeRaw) ?? .automatic
@@ -85,30 +78,6 @@ struct IPTVPlaybackSettingsView: View {
                 }
 
                 Section {
-                    Picker("Zenderlijst verversen", selection: $refreshChannelsIntervalRaw) {
-                        ForEach(IPTVCacheRefreshInterval.allCases) { interval in
-                            Text(interval.title).tag(interval.rawValue)
-                        }
-                    }
-                    Picker("Programmagids verversen", selection: $refreshEPGIntervalRaw) {
-                        ForEach(IPTVCacheRefreshInterval.allCases) { interval in
-                            Text(interval.title).tag(interval.rawValue)
-                        }
-                    }
-
-                    Button("Zenderlijst-cache wissen", role: .destructive) {
-                        clearCache(guide: false)
-                    }
-                    Button("Gidscache wissen", role: .destructive) {
-                        clearCache(guide: true)
-                    }
-                } header: {
-                    sectionHeader("Cache & verversen", symbol: "arrow.triangle.2.circlepath", tint: VeyraColors.secondary)
-                } footer: {
-                    Text("Zenders en gids worden lokaal bewaard en bij het opstarten geladen. Na het gekozen interval wordt de bron ververst.")
-                }
-
-                Section {
                     Toggle("FPS-teller tonen", isOn: $showFPSCounter)
                 } header: {
                     sectionHeader("Ontwikkelaarsopties", symbol: "ladybug", tint: VeyraColors.red)
@@ -119,17 +88,6 @@ struct IPTVPlaybackSettingsView: View {
             .scrollContentBackground(.hidden)
         }
         .navigationTitle("Live TV")
-        .alert(
-            "Cache",
-            isPresented: Binding(
-                get: { cacheAlertMessage != nil },
-                set: { if !$0 { cacheAlertMessage = nil } }
-            )
-        ) {
-            Button("OK", role: .cancel) { cacheAlertMessage = nil }
-        } message: {
-            Text(cacheAlertMessage ?? "")
-        }
     }
 
     @ViewBuilder
@@ -142,19 +100,6 @@ struct IPTVPlaybackSettingsView: View {
         }
     }
 
-    private func clearCache(guide: Bool) {
-        guard let configuration = try? IPTVConfigurationStore().load() else {
-            cacheAlertMessage = "Geen IPTV-provider ingesteld."
-            return
-        }
-        let identifier = configuration.providerIdentifier
-        let key = (guide ? "live-guide-v1-" : "live-catalog-v1-") + identifier
-        IPTVDiskCache.remove(key: key)
-        let snapshot = (guide ? VeyraIPTVSnapshot.guidePrefix : VeyraIPTVSnapshot.catalogPrefix) + identifier
-        UserDefaults.standard.removeObject(forKey: snapshot)
-        NotificationCenter.default.post(name: .iptvConfigurationDidChange, object: nil)
-        cacheAlertMessage = guide ? "Gidscache gewist. De gids wordt opnieuw geladen." : "Zenderlijst-cache gewist. De zenders worden opnieuw geladen."
-    }
 }
 
 #Preview {

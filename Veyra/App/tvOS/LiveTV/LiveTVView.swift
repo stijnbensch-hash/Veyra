@@ -2259,9 +2259,18 @@ private struct VeyraEPGButtonSurface<
             )
     }
 
+    private var guideTheme: IPTVGuideTheme {
+        IPTVGuideTheme(
+            rawValue: UserDefaults.standard.string(forKey: IPTVPlaybackSettingsDefaults.guideThemeKey)
+                ?? IPTVGuideTheme.colourful.rawValue
+        ) ?? .colourful
+    }
+
     private var backgroundColor:
         Color
     {
+        // Focus blijft in elk gidsthema cyaan -- dat is het bedieningssignaal,
+        // geen kleuraccent, en moet dus ook in Grijs/Zwart herkenbaar blijven.
         if isFocused {
             return
                 VeyraColors.cyan.opacity(
@@ -2269,27 +2278,22 @@ private struct VeyraEPGButtonSurface<
                 )
         }
 
-        if selected {
-            return
-                VeyraColors.cyan.opacity(
-                    0.16
-                )
-        }
+        switch guideTheme {
+        case .colourful:
+            if selected { return VeyraColors.cyan.opacity(0.16) }
+            if onAir { return Color(red: 0.035, green: 0.20, blue: 0.25) }
+            return Color(red: 0.035, green: 0.10, blue: 0.16)
 
-        if onAir {
-            return
-                Color(
-                    red: 0.035,
-                    green: 0.20,
-                    blue: 0.25
-                )
-        }
+        case .grey:
+            if selected { return Color(white: 0.30) }
+            if onAir { return Color(white: 0.24) }
+            return Color(white: 0.14)
 
-        return Color(
-            red: 0.035,
-            green: 0.10,
-            blue: 0.16
-        )
+        case .black:
+            if selected { return Color(white: 0.20) }
+            if onAir { return Color(white: 0.12) }
+            return Color.black
+        }
     }
 }
 
@@ -2297,26 +2301,57 @@ private struct VeyraEPGButtonSurface<
 // MARK: - Theme
 
 private enum VeyraEPGTheme {
-    static let quietFrame = LinearGradient(
-        colors: [VeyraColors.cyan.opacity(0.10), VeyraColors.red.opacity(0.06)],
-        startPoint: .leading,
-        endPoint: .trailing
-    )
+    private static var guideTheme: IPTVGuideTheme {
+        IPTVGuideTheme(
+            rawValue: UserDefaults.standard.string(forKey: IPTVPlaybackSettingsDefaults.guideThemeKey)
+                ?? IPTVGuideTheme.colourful.rawValue
+        ) ?? .colourful
+    }
+
+    static var quietFrame: LinearGradient {
+        switch guideTheme {
+        case .colourful:
+            return LinearGradient(
+                colors: [VeyraColors.cyan.opacity(0.10), VeyraColors.red.opacity(0.06)],
+                startPoint: .leading, endPoint: .trailing
+            )
+        case .grey:
+            return LinearGradient(
+                colors: [Color.white.opacity(0.09), Color.white.opacity(0.09)],
+                startPoint: .leading, endPoint: .trailing
+            )
+        case .black:
+            return LinearGradient(
+                colors: [Color.white.opacity(0.05), Color.white.opacity(0.05)],
+                startPoint: .leading, endPoint: .trailing
+            )
+        }
+    }
 
     static var background:
         LinearGradient
     {
-        LinearGradient(
-            colors: [
-                VeyraColors.background,
-                Color(red: 0.015, green: 0.09, blue: 0.13),
-                Color(red: 0.075, green: 0.015, blue: 0.045)
-            ],
-            startPoint:
-                .bottomLeading,
-            endPoint:
-                .topTrailing
-        )
+        switch guideTheme {
+        case .colourful:
+            return LinearGradient(
+                colors: [
+                    VeyraColors.background,
+                    Color(red: 0.015, green: 0.09, blue: 0.13),
+                    Color(red: 0.075, green: 0.015, blue: 0.045)
+                ],
+                startPoint: .bottomLeading, endPoint: .topTrailing
+            )
+        case .grey:
+            return LinearGradient(
+                colors: [Color(white: 0.07), Color(white: 0.12), Color(white: 0.07)],
+                startPoint: .bottomLeading, endPoint: .topTrailing
+            )
+        case .black:
+            return LinearGradient(
+                colors: [Color.black, Color.black],
+                startPoint: .bottomLeading, endPoint: .topTrailing
+            )
+        }
     }
 }
 

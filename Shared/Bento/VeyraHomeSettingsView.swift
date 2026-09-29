@@ -19,6 +19,15 @@ struct VeyraHomeSettingsView: View {
                     .veyraCardRow()
 
                     NavigationLink {
+                        VeyraNowSettingsView()
+                    } label: {
+                        VeyraSettingsCardRowLabel(icon: "sparkle", title: "Veyra Now") {
+                            VeyraSettingsCardRowValue(value: nil)
+                        }
+                    }
+                    .veyraCardRow()
+
+                    NavigationLink {
                         VeyraHomeContinueWatchingSettingsView()
                     } label: {
                         VeyraSettingsCardRowLabel(icon: "clock.arrow.circlepath", title: "Verder kijken & Binnenkort") {
@@ -67,6 +76,11 @@ struct VeyraHomeSettingsView: View {
                     VeyraHomeLayoutSettingsView()
                 } label: {
                     Label("Indeling", systemImage: "square.grid.2x2")
+                }
+                NavigationLink {
+                    VeyraNowSettingsView()
+                } label: {
+                    Label("Veyra Now", systemImage: "sparkle")
                 }
                 NavigationLink {
                     VeyraHeroSpotlightSettingsView()

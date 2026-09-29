@@ -13,7 +13,6 @@ struct PersonDetailView: View {
     @State private var filter: Filter = .all
     @State private var isLoading = true
     @State private var biographyExpanded = false
-    @State private var peekingKnownForID: UUID?
 
     // Zie MediaNavigation.swift: centrale actie i.p.v. eigen `.navigationDestination(item:)`.
     @Environment(\.openMediaDetail) private var openMediaDetail
@@ -231,9 +230,7 @@ struct PersonDetailView: View {
                                 genre: credit.mediaItem().genre,
                                 rating: credit.voteAverage,
                                 tmdbID: credit.mediaItem().tmdbID,
-                                isMovie: credit.isMovie,
-                                onOpenDetails: { openMediaDetail(credit.mediaItem()) },
-                                peekTrigger: peekBinding(for: credit)
+                                isMovie: credit.isMovie
                             )
                         }
 #if os(tvOS)
@@ -298,13 +295,6 @@ struct PersonDetailView: View {
                 }
             }
         }
-    }
-
-    private func peekBinding(for credit: TMDBPersonCredit) -> Binding<Bool> {
-        Binding(
-            get: { peekingKnownForID == credit.mediaItem().id },
-            set: { peekingKnownForID = $0 ? credit.mediaItem().id : nil }
-        )
     }
 
     private func filmographyLink(_ credit: TMDBPersonCredit) -> some View {

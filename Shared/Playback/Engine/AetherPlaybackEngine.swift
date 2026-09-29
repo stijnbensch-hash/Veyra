@@ -164,17 +164,28 @@ final class AetherPlaybackEngine:
 
         guard autoSelect != .off else { return }
 
+        let primary = PlaybackLanguageOption(
+            rawValue: defaults.string(forKey: PlaybackSettingsDefaults.subtitleLanguageKey)
+                ?? PlaybackLanguageOption.dutch.rawValue
+        ) ?? .dutch
+
+        // "Automatisch bij vreemde taal": alleen ondertitelen als de zonet
+        // (via `applyPreferredAudioTrack`) geselecteerde audiotrack niet al
+        // in de eigen ondertiteltaal is. Is de audio al in die taal, dan
+        // blijven ondertitels uit -- net als bij Netflix/Strand e.d.
+        if autoSelect == .matchAudio {
+            let activeAudio = engine.audioTracks.first { $0.id == engine.activeAudioTrackIndex }
+            if let activeAudio, primary.matches(languageCode: activeAudio.language, trackName: activeAudio.name) {
+                return
+            }
+        }
+
         let candidates =
             autoSelect == .forcedOnly
             ? engine.subtitleTracks.filter { $0.isForced }
             : engine.subtitleTracks
 
         guard !candidates.isEmpty else { return }
-
-        let primary = PlaybackLanguageOption(
-            rawValue: defaults.string(forKey: PlaybackSettingsDefaults.subtitleLanguageKey)
-                ?? PlaybackLanguageOption.dutch.rawValue
-        ) ?? .dutch
 
         if let match = candidates.first(where: {
             primary.matches(languageCode: $0.language, trackName: $0.name)

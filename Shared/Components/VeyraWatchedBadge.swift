@@ -157,8 +157,8 @@ extension View {
 private struct TraktMarkWatchedMenuModifier<Extra: View>: ViewModifier {
     let item: MediaItem
     /// Bewust ook aan te roepen wanneer er geen watched-toggle is (Trakt niet gekoppeld) --
-    /// anders verdwijnt bv. de Instant Peek-knop mee zodra Trakt niet gekoppeld is, terwijl die
-    /// daar niets mee te maken heeft. Zonder watched-toggle én zonder extra inhoud blijft het
+    /// anders verdwijnt een eventueel extra menu-item mee zodra Trakt niet gekoppeld is, terwijl
+    /// dat daar niets mee te maken heeft. Zonder watched-toggle én zonder extra inhoud blijft het
     /// gedrag exact zoals voorheen (geen menu).
     let hasExtra: Bool
     @ViewBuilder let extra: () -> Extra
@@ -185,9 +185,9 @@ private struct TraktMarkWatchedMenuModifier<Extra: View>: ViewModifier {
 
 extension View {
     /// Voegt een lang-indruk-menu toe waarmee een film of aflevering direct als bekeken/niet
-    /// bekeken bij Trakt gemarkeerd kan worden. `extra` voegt eigen menu-items toe (bv. Instant
-    /// Peek se "Snel bekijken") -- op tvOS is lang drukken het systeem-contextmenu, dus een los
-    /// gebaar ernaast verliest altijd van dit menu; alles moet daarom in dezelfde `.contextMenu`.
+    /// bekeken bij Trakt gemarkeerd kan worden. `extra` voegt eigen menu-items toe -- op tvOS is
+    /// lang drukken het systeem-contextmenu, dus een los gebaar ernaast verliest altijd van dit
+    /// menu; alles moet daarom in dezelfde `.contextMenu`.
     func traktMarkWatchedMenu<Extra: View>(_ item: MediaItem, @ViewBuilder extra: @escaping () -> Extra = { EmptyView() }) -> some View {
         modifier(TraktMarkWatchedMenuModifier(item: item, hasExtra: Extra.self != EmptyView.self, extra: extra))
     }

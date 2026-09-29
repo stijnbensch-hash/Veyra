@@ -8,6 +8,13 @@ struct MovieDetailView: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     @ObservedObject private var traktStore = TraktStore.shared
 
+    // MARK: - Hero-trailer
+    // Geluidloze trailer-voorvertoning achter de backdrop, gestart nadat het
+    // scherm een kort moment open staat (geen "rust op de knop" zoals bij
+    // tvOS-afstandsbediening -- op iOS is er geen focus/hover).
+    @State private var heroTrailerKey: String?
+    @State private var showHeroTrailer = false
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
@@ -66,6 +73,8 @@ struct MovieDetailView: View {
 
                 TrailerSection(item: movie)
 
+                ReviewsSection(item: movie)
+
                 SimilarTitlesRow(item: movie)
             }
             .padding(.bottom, 40)
@@ -89,18 +98,33 @@ struct MovieDetailView: View {
         // naar de VStack erboven (die daardoor breder dan het scherm werd
         // en gecentreerd ging overlopen aan beide kanten).
         GeometryReader { geo in
-            AsyncImage(url: movie.backdropURL) { phase in
-                switch phase {
-                case .success(let image):
-                    image.resizable().scaledToFill()
-                default:
-                    VeyraColors.surface
+            ZStack {
+                AsyncImage(url: movie.backdropURL) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image.resizable().scaledToFill()
+                    default:
+                        VeyraColors.surface
+                    }
+                }
+                if showHeroTrailer, let heroTrailerKey {
+                    VeyraTrailerAutoplayView(youtubeKey: heroTrailerKey)
+                        .transition(.opacity)
                 }
             }
             .frame(width: geo.size.width, height: geo.size.height)
             .clipped()
         }
         .frame(height: VeyraPosterMetrics(regular: sizeClass == .regular).backdropHeight)
+        .task(id: movie.id) {
+            heroTrailerKey = nil
+            showHeroTrailer = false
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            guard !Task.isCancelled else { return }
+            heroTrailerKey = await MetadataTrailerService.trailer(for: movie)?.key
+            guard heroTrailerKey != nil else { return }
+            withAnimation(.easeInOut(duration: 0.6)) { showHeroTrailer = true }
+        }
     }
 
     private var floatingBackButton: some View {

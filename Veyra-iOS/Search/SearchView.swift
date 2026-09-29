@@ -13,7 +13,6 @@ struct SearchView: View {
     @State private var movies: [TMDBMovie] = []
     @State private var series: [TMDBSeries] = []
     @State private var selectedSeries: TMDBSeries?
-    @State private var peekingMovieID: Int?
     @State private var isSearching = false
     @State private var isOpeningMovie = false
     @State private var errorMessage: String?
@@ -50,10 +49,7 @@ struct SearchView: View {
                                             width: metrics.posterWidth,
                                             tmdbID: movie.id,
                                             isMovie: true,
-                                            watchedTarget: .movie(TraktIDs(tmdb: movie.id)),
-                                            onPlay: { Task { await openMovieForPlay(movie) } },
-                                            onOpenDetails: { Task { await openMovie(movie) } },
-                                            peekTrigger: peekBinding(for: movie)
+                                            watchedTarget: .movie(TraktIDs(tmdb: movie.id))
                                         )
                                     }
                                     .buttonStyle(.plain)
@@ -101,13 +97,6 @@ struct SearchView: View {
             }
         }
         .mediaNavigationRoot()
-    }
-
-    private func peekBinding(for movie: TMDBMovie) -> Binding<Bool> {
-        Binding(
-            get: { peekingMovieID == movie.id },
-            set: { peekingMovieID = $0 ? movie.id : nil }
-        )
     }
 
     private func sectionTitle(_ title: String) -> some View {

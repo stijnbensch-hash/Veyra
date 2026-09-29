@@ -20,53 +20,6 @@ private enum VeyraBentoEpisodeLabel {
 }
 #endif
 
-// MARK: - Universal Timeline
-
-/// Eén samengevoegd item voor de Universal Timeline: ofwel iets dat je NU verder kunt kijken
-/// (`ContinueItem`), ofwel iets dat later vandaag/morgen begint (`UpcomingItem`). Beide hergebruiken
-/// hun eigen bestaande kaart (`VeyraBentoContinueMiniContent`/`VeyraBentoUpcomingCardContent`)
-/// ongewijzigd -- enkel de volgorde en het tijdlabel erboven zijn nieuw (zie brainstorm
-/// "Universal Timeline": Nu · 13:00 · Vanavond · Morgen i.p.v. losse rijen).
-nonisolated enum VeyraTimelineEntry: Identifiable {
-    case now(ContinueItem)
-    case later(UpcomingItem)
-
-    var id: String {
-        switch self {
-        case .now(let item): return "now-\(item.id)"
-        case .later(let item): return "later-\(item.id)"
-        }
-    }
-
-    /// "Verder kijken" staat altijd vooraan (per definitie NU), daarna chronologisch.
-    var sortKey: Date {
-        switch self {
-        case .now: return .distantPast
-        case .later(let item): return item.airDate
-        }
-    }
-
-    /// Label boven de kaart: "NU" voor Verder kijken, anders het tijdstip.
-    func bucketLabel(now: Date) -> String {
-        switch self {
-        case .now: return "NU"
-        case .later(let item): return VeyraHomeFormat.when(item.airDate, now: now, dateOnly: item.isDateOnly).uppercased()
-        }
-    }
-
-    var isNow: Bool {
-        if case .now = self { return true }
-        return false
-    }
-}
-
-/// Verder kijken + Binnenkort samengevoegd tot invoer voor `VeyraTimelineEntry`, chronologisch
-/// gesorteerd (Verder kijken altijd eerst).
-func veyraTimelineEntries(continueItems: [ContinueItem], upcoming: [UpcomingItem]) -> [VeyraTimelineEntry] {
-    (continueItems.map(VeyraTimelineEntry.now) + upcoming.map(VeyraTimelineEntry.later))
-        .sorted { $0.sortKey < $1.sortKey }
-}
-
 // MARK: - Bouwstenen
 
 /// Kleine hoofdletterkop van een tegel, optioneel met (rode) live-stip en een rechter bijschrift.
@@ -292,6 +245,20 @@ struct VeyraBentoContinueMiniContent: View {
                         .padding(.horizontal, compact ? 8 : 14)
                         .padding(.vertical, compact ? 4 : 7)
                         .background(VeyraHomeStyle.cyan, in: Capsule())
+                        .padding(compact ? 8 : 14)
+                }
+            }
+            .overlay(alignment: .topTrailing) {
+                // Badge rechtsboven met het aantal resterende afleveringen -- enkel voor
+                // series waarvan Trakt zowel gezien als uitgezonden aantallen teruggeeft.
+                if item.kind != .movie, let left = item.episodesLeft, left > 0 {
+                    Text("\(left) te gaan")
+                        .font(.system(size: compact ? 10 : 16, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, compact ? 7 : 12)
+                        .padding(.vertical, compact ? 3 : 6)
+                        .background(.black.opacity(0.55), in: Capsule())
+                        .overlay(Capsule().strokeBorder(VeyraHomeStyle.cyan.opacity(0.6), lineWidth: 1))
                         .padding(compact ? 8 : 14)
                 }
             }

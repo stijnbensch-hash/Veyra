@@ -35,9 +35,6 @@ struct AccountView: View {
                 }
 
                 Section("Ondertitels") {
-                    NavigationLink("Taal en ondertitelvoorkeuren") {
-                        SubtitlePreferencesView()
-                    }
                     OpenSubtitlesConfigurationCard()
                 }
 

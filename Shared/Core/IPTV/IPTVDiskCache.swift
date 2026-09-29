@@ -128,6 +128,15 @@ nonisolated enum IPTVDiskCache {
         }
     }
 
+    /// Wist de volledige schijf-cache (alle providers/sleutels ineens) --
+    /// voor de "Cache legen"-knop in Instellingen → Data.
+    static func removeAll() {
+        guard let directoryURL else { return }
+        writeQueue.sync {
+            try? FileManager.default.removeItem(at: directoryURL)
+        }
+    }
+
     /// Wacht tot eerdere achtergrondsaves klaar zijn voordat andere schermen
     /// de zojuist voorgevulde cache lezen.
     static func flush() async {

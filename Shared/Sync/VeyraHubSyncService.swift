@@ -49,6 +49,7 @@ final class VeyraHubSyncService {
         "general.showUpcoming", "general.showReleaseYear",
         "general.hideTitlesUnderPosters", "general.hideEpisodesRemaining",
         "general.hideScoreSpoilers", "general.chooseChannelOnTap", "general.textSize",
+        "general.liveFavoritesOnly",
         // Posterverrijking — zie Shared/Theme/PosterEnrichmentSettings.swift
         "posterEnrichment.mode", "posterEnrichment.showGenre", "posterEnrichment.showRating",
         "posterEnrichment.ratingSource", "posterEnrichment.showAgeRating",
@@ -70,6 +71,9 @@ final class VeyraHubSyncService {
         "veyra.shelves.configured",
         // Home: filmcollecties en streamingdiensten (volgorde, namen, banners/logo's als https-adres)
         "veyra.bento.collections", "veyra.bento.streaming", "veyra.home.layout", "veyra.home.presetChosen",
+        // Home: Veyra Now-instellingen (brontypes, slimme prioriteit, weggetikte items) --
+        // zie Shared/Bento/VeyraNowSettings.swift.
+        "veyra.now.settings",
     ]
 
     private static let liveTVFolderDataKeys: [String] = [

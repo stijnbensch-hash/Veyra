@@ -7,12 +7,30 @@ struct MovieDetailView: View {
     @State private var runtimeMinutes: Int?
     @ObservedObject private var traktStore = TraktStore.shared
 
+    // MARK: - Hero-trailer
+    // Geluidloze trailer-voorvertoning achter de hero, zodra de kijker
+    // ~2s op de Afspelen-knop rust. `dwellGeneration` annuleert een
+    // wachtende taak zodra de focus eerder wegvalt (zelfde patroon als
+    // `SubtitleService`'s generation-guard).
+    @FocusState private var isPlayFocused: Bool
+    @State private var heroTrailerKey: String?
+    @State private var showHeroTrailer = false
+    @State private var dwellGeneration = UUID()
+
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .topLeading) {
                 background
                     .frame(width: geometry.size.width, height: geometry.size.height)
                     .clipped()
+                    .overlay {
+                        if showHeroTrailer, let heroTrailerKey {
+                            VeyraTrailerAutoplayView(youtubeKey: heroTrailerKey)
+                                .frame(width: geometry.size.width, height: geometry.size.height)
+                                .clipped()
+                                .transition(.opacity)
+                        }
+                    }
                     .overlay {
                         ZStack {
                             Color.black.opacity(0.25)
@@ -41,6 +59,10 @@ struct MovieDetailView: View {
                         .padding(.horizontal, 48)
                         .padding(.top, 12)
 
+                    ReviewsSection(item: movie)
+                        .padding(.horizontal, 48)
+                        .padding(.top, 12)
+
                     SimilarTitlesRow(item: movie)
                         .padding(.horizontal, 48)
                         .padding(.top, 12)
@@ -57,6 +79,28 @@ struct MovieDetailView: View {
             guard let tmdbID = movie.tmdbID else { return }
             ratings = await MetadataRatingsService.movieRatings(tmdbID: tmdbID, imdbID: movie.imdbID, title: movie.title)
             runtimeMinutes = try? await TMDBService()?.runtimeMinutes(forMovieID: tmdbID)
+        }
+        .onChange(of: isPlayFocused) { _, focused in
+            let generation = UUID()
+            dwellGeneration = generation
+            guard focused else {
+                withAnimation(.easeInOut(duration: 0.3)) { showHeroTrailer = false }
+                return
+            }
+            Task {
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                guard !Task.isCancelled, dwellGeneration == generation else { return }
+                if heroTrailerKey == nil {
+                    heroTrailerKey = await MetadataTrailerService.trailer(for: movie)?.key
+                }
+                guard dwellGeneration == generation, heroTrailerKey != nil else { return }
+                withAnimation(.easeInOut(duration: 0.6)) { showHeroTrailer = true }
+            }
+        }
+        .onChange(of: movie.id) { _, _ in
+            heroTrailerKey = nil
+            showHeroTrailer = false
+            dwellGeneration = UUID()
         }
     }
 
@@ -147,6 +191,7 @@ struct MovieDetailView: View {
                             )
                         }
                         .buttonStyle(VeyraFocusButtonStyle(primary: true))
+                        .focused($isPlayFocused)
 
                         TraktProgressResetButton(item: movie, compact: true)
                         WatchedToggleButton(item: movie)

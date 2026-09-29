@@ -13,6 +13,7 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
     case shelves
     case collections
     case home
+    case data
     case account
 
     var id: String { rawValue }
@@ -31,6 +32,7 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
         case .shelves: return "Planken"
         case .collections: return "Filmcollecties"
         case .home: return "Home"
+        case .data: return "Data"
         case .account: return "Account"
         }
     }
@@ -49,6 +51,7 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
         case .shelves: return "Eigen rijen op het hoofdmenu"
         case .collections: return "Collecties op Home toevoegen of verwijderen"
         case .home: return "Filmcollecties en planken op het hoofdmenu"
+        case .data: return "Cache legen, automatisch verversen, VeyraHub Recorder"
         case .account: return "Trakt, TMDB en API-sleutels"
         }
     }
@@ -67,6 +70,7 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
         case .shelves: return "rectangle.grid.1x2"
         case .collections: return "film.stack"
         case .home: return "house"
+        case .data: return "internaldrive"
         case .account: return "person.crop.circle"
         }
     }
@@ -147,6 +151,15 @@ struct SettingsView: View {
                         settingsCard(.metadata, status: "", statusColor: VeyraColors.cyan)
                         settingsCard(.playback, status: "", statusColor: VeyraColors.cyan)
                         settingsCard(.home, status: "", statusColor: VeyraColors.cyan)
+                    }
+
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("DATA")
+                            .font(.system(size: 15, weight: .semibold))
+                            .tracking(2)
+                            .foregroundStyle(VeyraColors.secondary)
+
+                        settingsCard(.data, status: "", statusColor: VeyraColors.secondary)
                     }
 
                     VStack(alignment: .leading, spacing: 14) {
@@ -350,6 +363,7 @@ struct SettingsView: View {
         case .shelves: ShelvesSettingsView()
         case .collections: VeyraCollectionsSettingsView()
         case .home: VeyraHomeSettingsView()
+        case .data: DataSettingsView()
         case .account: AccountView()
         }
     }

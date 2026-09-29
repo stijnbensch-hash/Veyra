@@ -68,7 +68,7 @@ struct MacContentView: View {
     /// `VeyraTopNavigation` -- alleen als verticale lijst i.p.v. horizontale
     /// pillen.
     private var sidebarSections: [MenuDestination] {
-        [.home, .film, .series, .sport, .liveTV, .recordings, .search, .account, .settings]
+        [.home, .film, .series, .watchlist, .sport, .liveTV, .recordings, .search, .account, .settings]
     }
 
     // MARK: - Menubalk boven
@@ -93,6 +93,8 @@ struct MacContentView: View {
             MoviesView()
         case .series:
             SeriesView()
+        case .watchlist:
+            WatchlistView()
         case .search:
             SearchView()
         case .liveTV:

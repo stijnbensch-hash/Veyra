@@ -20,6 +20,10 @@ struct GeneralSettingsView: View {
     @AppStorage(TMDBCatalogLanguageFilter.key)
     private var catalogLanguages = "nl-en"
 
+    // Recensies
+    @AppStorage(GeneralSettingsDefaults.showReviewsKey)
+    private var showReviews = true
+
     // Toegankelijkheid
     @AppStorage(GeneralSettingsDefaults.textSizeKey)
     private var textSizeRaw = GeneralTextSize.defaultSize.rawValue
@@ -27,10 +31,6 @@ struct GeneralSettingsView: View {
     // iPad-navigatie
     @AppStorage(GeneralSettingsDefaults.ipadNavigationStyleKey)
     private var ipadNavigationStyleRaw = IPadNavigationStyle.sidebar.rawValue
-
-    // VeyraHub Recorder
-    @AppStorage(RecorderSettingsDefaults.autoDeleteAfterWatchedKey)
-    private var autoDeleteAfterWatched = false
 
     var body: some View {
         ZStack {
@@ -46,6 +46,14 @@ struct GeneralSettingsView: View {
                     sectionHeader("TMDB-lijsten", symbol: "line.3.horizontal.decrease.circle", tint: VeyraColors.cyan)
                 } footer: {
                     Text("Filtert automatisch samengestelde lijsten, ook op Home. Zoeken en eigen lijsten blijven volledig beschikbaar.")
+                }
+
+                Section {
+                    Toggle("Recensies tonen", isOn: $showReviews)
+                } header: {
+                    sectionHeader("Recensies", symbol: "text.bubble", tint: VeyraColors.cyan)
+                } footer: {
+                    Text("Door kijkers geschreven TMDB-recensies op film- en seriepagina's.")
                 }
 
                 Section {
@@ -99,14 +107,6 @@ struct GeneralSettingsView: View {
                     sectionHeader("Navigatie (iPad & Mac)", symbol: "sidebar.left", tint: VeyraColors.cyan)
                 } footer: {
                     Text("Kies of Veyra op de iPad en op de Mac een zijbalk of een menubalk bovenaan gebruikt — nooit allebei tegelijk. Op iPhone heeft dit geen effect (altijd een tabbalk onderaan).")
-                }
-
-                Section {
-                    Toggle("Verwijder automatisch na kijken", isOn: $autoDeleteAfterWatched)
-                } header: {
-                    sectionHeader("VeyraHub Recorder", symbol: "record.circle", tint: VeyraColors.red)
-                } footer: {
-                    Text("Verwijdert een opname van VeyraHub zodra je hem in Veyra helemaal (of bijna) hebt uitgekeken. Geldt alleen voor opnames die je via Veyra zelf afspeelt.")
                 }
             }
             .scrollContentBackground(.hidden)

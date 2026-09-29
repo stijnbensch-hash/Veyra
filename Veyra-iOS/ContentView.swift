@@ -7,7 +7,7 @@ import SwiftUI
 import UIKit
 
 private enum AppTab: Hashable {
-    case home, movies, series, search, live, sports, recordings, settings
+    case home, movies, series, watchlist, search, live, sports, recordings, settings
 }
 
 struct ContentView: View {
@@ -42,6 +42,7 @@ struct ContentView: View {
             }
             Tab("Films", systemImage: "film.fill", value: AppTab.movies) { MoviesView() }
             Tab("Series", systemImage: "tv.fill", value: AppTab.series) { SeriesView() }
+            Tab("Kijklijst", systemImage: "bookmark.fill", value: AppTab.watchlist) { WatchlistView() }
             if isPad {
                 Tab("Zoeken", systemImage: "magnifyingglass", value: AppTab.search) {
                     SearchView()
@@ -88,6 +89,7 @@ struct ContentView: View {
                 Label("Home", systemImage: "house.fill").tag(AppTab.home)
                 Label("Films", systemImage: "film.fill").tag(AppTab.movies)
                 Label("Series", systemImage: "tv.fill").tag(AppTab.series)
+                Label("Kijklijst", systemImage: "bookmark.fill").tag(AppTab.watchlist)
                 Label("Zoeken", systemImage: "magnifyingglass").tag(AppTab.search)
                 Label("Live", systemImage: "antenna.radiowaves.left.and.right").tag(AppTab.live)
                 Label("Sport", systemImage: "trophy").tag(AppTab.sports)
@@ -155,6 +157,7 @@ struct ContentView: View {
         case .home: HomeView()
         case .movies: MoviesView()
         case .series: SeriesView()
+        case .watchlist: WatchlistView()
         case .search: SearchView()
         case .live: LiveTVView()
         case .sports: SportsView()

@@ -3,9 +3,6 @@ import SwiftUI
 struct SeriesView: View {
     @State private var series: [TMDBSeries] = []
     @State private var selectedSeries: TMDBSeries?
-    // Instant Peek: welke serie zijn infokaart open staat (per id, `seriesCard` is een
-    // functie, geen eigen View, dus geen lokale @State per kaart mogelijk).
-    @State private var peekingSeriesID: Int?
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var selectedProvider: WatchProvider?
@@ -268,13 +265,6 @@ struct SeriesView: View {
 
     // MARK: - Series card
 
-    private func peekBinding(for item: TMDBSeries) -> Binding<Bool> {
-        Binding(
-            get: { peekingSeriesID == item.id },
-            set: { peekingSeriesID = $0 ? item.id : nil }
-        )
-    }
-
     private func seriesCard(
         _ item: TMDBSeries,
         width: CGFloat
@@ -298,12 +288,7 @@ struct SeriesView: View {
                 isMovie: false,
                 releaseDateRaw: item.firstAirDate,
                 watchedTarget: .show(TraktIDs(tmdb: item.id)),
-                watchedPartialDisplay: .remaining,
-                // Geen `onPlay`: welke aflevering "verder kijken" moet starten is hier
-                // niet bekend (dat bepaalt de detailpagina/seizoenslijst). Peek biedt
-                // daarom alleen Details + Toevoegen aan, geen losse Play-knop.
-                onOpenDetails: { selectedSeries = item },
-                peekTrigger: peekBinding(for: item)
+                watchedPartialDisplay: .remaining
             )
         }
         .buttonStyle(
@@ -316,13 +301,7 @@ struct SeriesView: View {
                 type: .series,
                 tmdbID: item.id
             )
-        ) {
-            Button {
-                peekingSeriesID = item.id
-            } label: {
-                Label("Snel bekijken", systemImage: "eye")
-            }
-        }
+        )
     }
 
     private func posterURL(

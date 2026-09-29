@@ -30,19 +30,14 @@ struct VeyraPosterCard: View {
     /// Nu zit het vinkje in de overlay van de posterafbeelding zelf, dus altijd exact op de poster.
     var watchedTarget: TraktWatchedTarget? = nil
     var watchedPartialDisplay: VeyraWatchedPartialDisplay = .hidden
-    /// Instant Peek (lang drukken -> glazen infokaart): enkel aan op schermen die dit meegeven.
-    /// `nil` op beide = huidig gedrag, geen long-press, geen kaart.
-    var onPlay: (() -> Void)? = nil
-    var onOpenDetails: (() -> Void)? = nil
-    /// Op tvOS: laat de aanroeper "Snel bekijken" in zijn eigen `.contextMenu` zetten
-    /// (zie `veyraInstantPeek`'s `externalTrigger`) i.p.v. hier een los, botsend menu te maken.
-    var peekTrigger: Binding<Bool>? = nil
-
     @AppStorage(GeneralSettingsDefaults.showReleaseYearKey)
     private var showReleaseYear = true
 
+    // Standaard AAN (i.p.v. "Uit") -- de genre/beoordeling-badge hoort gewoon overal
+    // op de poster te staan (Films, Series, Kijklijst, ...) zonder dat de gebruiker
+    // die eerst apart in Instellingen → Metadata moet aanzetten.
     @AppStorage(PosterEnrichmentDefaults.modeKey)
-    private var enrichmentSourceRaw = PosterEnrichmentMode.off.rawValue
+    private var enrichmentSourceRaw = PosterEnrichmentMode.betterPosters.rawValue
     @AppStorage(PosterEnrichmentDefaults.showGenreKey)
     private var showGenre = true
     @AppStorage(PosterEnrichmentDefaults.showRatingKey)
@@ -254,11 +249,6 @@ struct VeyraPosterCard: View {
             .frame(height: titleHeight, alignment: .topLeading)
         }.frame(width: width).padding(cardPadding)
         .task(id: tmdbID) { await loadCertificationIfNeeded() }
-        .veyraInstantPeek(
-            title: title, posterURL: url, genre: genre, rating: rating, year: year,
-            tmdbID: tmdbID, isMovie: isMovie, onPlay: onPlay, onOpenDetails: onOpenDetails,
-            peekTrigger: peekTrigger
-        )
     }
 }
 

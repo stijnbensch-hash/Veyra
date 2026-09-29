@@ -6,8 +6,8 @@ struct TVGeneralSettingsView: View {
     private var hideScoreSpoilers = false
     @AppStorage(TMDBCatalogLanguageFilter.key)
     private var catalogLanguages = "nl-en"
-    @AppStorage(RecorderSettingsDefaults.autoDeleteAfterWatchedKey)
-    private var autoDeleteAfterWatched = false
+    @AppStorage(GeneralSettingsDefaults.showReviewsKey)
+    private var showReviews = true
 
     var body: some View {
         ZStack {
@@ -23,6 +23,14 @@ struct TVGeneralSettingsView: View {
                     Text("TMDB-lijsten")
                 } footer: {
                     Text("Filtert automatisch samengestelde lijsten, ook op Home. Zoeken en eigen lijsten blijven volledig beschikbaar.")
+                }
+
+                Section {
+                    VeyraSettingsToggleRow(icon: "text.bubble", title: "Recensies tonen",
+                                           subtitle: "Door kijkers geschreven TMDB-recensies op film- en seriepagina's",
+                                           isOn: $showReviews)
+                } header: {
+                    Text("Recensies")
                 }
 
                 Section {
@@ -51,14 +59,6 @@ struct TVGeneralSettingsView: View {
                     .veyraCardRow()
                 } header: {
                     Text("Sport")
-                }
-
-                Section {
-                    VeyraSettingsToggleRow(icon: "record.circle", title: "Verwijder automatisch na kijken",
-                                           subtitle: "Verwijdert een VeyraHub-opname zodra je hem hebt uitgekeken",
-                                           isOn: $autoDeleteAfterWatched)
-                } header: {
-                    Text("VeyraHub Recorder")
                 }
             }
             .frame(maxWidth: 1000)

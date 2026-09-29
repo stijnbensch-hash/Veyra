@@ -15,8 +15,9 @@ import Foundation
 ///   zou voor een niet-anime titel een willekeurige, onterechte score tonen.
 ///   Voor de meeste titels (geen anime) levert dit dus terecht niets op.
 /// - Popcornmeter (de publieksscore van Rotten Tomatoes) en Letterboxd
-///   hebben geen publiek toegankelijke API en blijven daarom altijd leeg
-///   (zie de uitgeschakelde toggles in Instellingen → Metadata).
+///   komen van MDBList (mdblist.com), een gratis externe ratings-aggregator
+///   die deze twee scores samen met een IMDb-ID opzoekt (vereist een gratis
+///   API-sleutel van mdblist.com, in te stellen via Instellingen → Metadata).
 enum MetadataRatingsService {
     // MARK: - Public
 
@@ -25,12 +26,14 @@ enum MetadataRatingsService {
         // `MediaItem` dat niet via een volledige TMDB-filmdetails-call is
         // opgebouwd), eerst via TMDB proberen te achterhalen -- anders slaan
         // IMDb/Tomatometer/Metacritic (samen één OMDb-call) altijd stil over.
+        let needsImdbID = MetadataPreferences.showIMDb || MetadataPreferences.showTomatometer
+            || MetadataPreferences.showMetacritic
+            || (AppConfiguration.mdblistAPIKey?.isEmpty == false
+                && (MetadataPreferences.showPopcornmeter || MetadataPreferences.showLetterboxd))
         let resolvedImdbID: String?
         if let imdbID, !imdbID.isEmpty {
             resolvedImdbID = imdbID
-        } else if AppConfiguration.omdbAPIKey?.isEmpty == false,
-                  MetadataPreferences.showIMDb || MetadataPreferences.showTomatometer
-                    || MetadataPreferences.showMetacritic {
+        } else if AppConfiguration.omdbAPIKey?.isEmpty == false, needsImdbID {
             resolvedImdbID = await resolveMovieImdbID(tmdbID: tmdbID)
         } else {
             resolvedImdbID = nil
@@ -46,6 +49,7 @@ enum MetadataRatingsService {
         let traktID = (resolvedImdbID?.isEmpty == false) ? resolvedImdbID! : String(tmdbID)
         let traktValue = await fetchTraktRating(id: traktID, kind: "movies")
         let malValue = await fetchMALRating(title: title)
+        let mdblistValue = await fetchMDBList(imdbID: resolvedImdbID)
 
         return MetadataRatings(
             imdb: omdbValue?.imdb,
@@ -53,19 +57,21 @@ enum MetadataRatingsService {
             tomatometer: omdbValue?.tomatometer,
             metacritic: omdbValue?.metacritic,
             trakt: traktValue,
-            popcornmeter: nil,
-            letterboxd: nil,
+            popcornmeter: mdblistValue?.popcornmeter,
+            letterboxd: mdblistValue?.letterboxd,
             mal: malValue
         )
     }
 
     static func seriesRatings(tmdbID: Int, imdbID: String?, title: String, knownTMDBRating: Double? = nil) async -> MetadataRatings {
+        let needsImdbID = MetadataPreferences.showIMDb || MetadataPreferences.showTomatometer
+            || MetadataPreferences.showMetacritic
+            || (AppConfiguration.mdblistAPIKey?.isEmpty == false
+                && (MetadataPreferences.showPopcornmeter || MetadataPreferences.showLetterboxd))
         let resolvedImdbID: String?
         if let imdbID, !imdbID.isEmpty {
             resolvedImdbID = imdbID
-        } else if AppConfiguration.omdbAPIKey?.isEmpty == false,
-                  MetadataPreferences.showIMDb || MetadataPreferences.showTomatometer
-                    || MetadataPreferences.showMetacritic {
+        } else if AppConfiguration.omdbAPIKey?.isEmpty == false, needsImdbID {
             resolvedImdbID = await resolveSeriesImdbID(tmdbID: tmdbID)
         } else {
             resolvedImdbID = nil
@@ -81,6 +87,7 @@ enum MetadataRatingsService {
         let traktID = (resolvedImdbID?.isEmpty == false) ? resolvedImdbID! : String(tmdbID)
         let traktValue = await fetchTraktRating(id: traktID, kind: "shows")
         let malValue = await fetchMALRating(title: title)
+        let mdblistValue = await fetchMDBList(imdbID: resolvedImdbID)
 
         return MetadataRatings(
             imdb: omdbValue?.imdb,
@@ -88,8 +95,8 @@ enum MetadataRatingsService {
             tomatometer: omdbValue?.tomatometer,
             metacritic: omdbValue?.metacritic,
             trakt: traktValue,
-            popcornmeter: nil,
-            letterboxd: nil,
+            popcornmeter: mdblistValue?.popcornmeter,
+            letterboxd: mdblistValue?.letterboxd,
             mal: malValue
         )
     }
@@ -261,5 +268,54 @@ enum MetadataRatingsService {
         value
             .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "en_US_POSIX"))
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    // MARK: - MDBList (Popcornmeter & Letterboxd)
+
+    private struct MDBListResponse: Decodable {
+        struct Rating: Decodable {
+            var source: String
+            var value: Double?
+        }
+
+        var ratings: [Rating]?
+    }
+
+    private static func fetchMDBList(imdbID: String?) async -> (popcornmeter: Int?, letterboxd: Double?)? {
+        guard let imdbID, !imdbID.isEmpty,
+              let apiKey = AppConfiguration.mdblistAPIKey, !apiKey.isEmpty,
+              MetadataPreferences.showPopcornmeter || MetadataPreferences.showLetterboxd
+        else { return nil }
+
+        var components = URLComponents(string: "https://mdblist.com/api/")
+        components?.queryItems = [
+            URLQueryItem(name: "apikey", value: apiKey),
+            URLQueryItem(name: "i", value: imdbID)
+        ]
+
+        guard let url = components?.url else { return nil }
+
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode)
+            else { return nil }
+
+            let decoded = try JSONDecoder().decode(MDBListResponse.self, from: data)
+
+            var popcornmeter: Int?
+            var letterboxd: Double?
+
+            for rating in decoded.ratings ?? [] {
+                if rating.source == "tomatoesaudience", MetadataPreferences.showPopcornmeter {
+                    popcornmeter = rating.value.map { Int($0) }
+                } else if rating.source == "letterboxd", MetadataPreferences.showLetterboxd {
+                    letterboxd = rating.value
+                }
+            }
+
+            return (popcornmeter, letterboxd)
+        } catch {
+            return nil
+        }
     }
 }

@@ -11,7 +11,6 @@ struct ShelfRowView: View {
 
     @State private var items: [MediaItem] = []
     @State private var isLoading = true
-    @State private var peekingItemID: UUID?
 
     var body: some View {
         // Toont de plank altijd zodra hij is toegevoegd — met een laadstatus
@@ -45,9 +44,7 @@ struct ShelfRowView: View {
                                     rating: item.rating,
                                     sourceLabel: item.tmdbID == nil ? shelf.source.subtitle : nil,
                                     tmdbID: item.tmdbID,
-                                    isMovie: item.type == .movie,
-                                    onOpenDetails: { openMediaDetail(item) },
-                                    peekTrigger: peekBinding(for: item)
+                                    isMovie: item.type == .movie
                                 )
                             }
                             .buttonStyle(.plain)
@@ -61,13 +58,6 @@ struct ShelfRowView: View {
         .onReceive(NotificationCenter.default.publisher(for: .veyraShelfConfigurationDidChange)) { _ in
             Task { await load() }
         }
-    }
-
-    private func peekBinding(for item: MediaItem) -> Binding<Bool> {
-        Binding(
-            get: { peekingItemID == item.id },
-            set: { peekingItemID = $0 ? item.id : nil }
-        )
     }
 
     private func load() async {
