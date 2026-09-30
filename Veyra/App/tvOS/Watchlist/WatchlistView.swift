@@ -6,9 +6,6 @@ import SwiftUI
 /// Films-tab (zie `MoviesView.swift`), inclusief genre/beoordeling-badge en
 /// jaartal.
 struct WatchlistView: View {
-    // Navigatie via de centrale `openMediaDetail`-omgevingsactie, net als
-    // `ShelfRowView` -- werkt voor films én series zonder eigen destination.
-    @Environment(\.openMediaDetail) private var openMediaDetail
     @ObservedObject private var trakt = TraktStore.shared
 
     @State private var movies: [MediaItem] = []
@@ -180,7 +177,9 @@ struct WatchlistView: View {
     }
 
     private func card(_ item: MediaItem) -> some View {
-        Button { openMediaDetail(item) } label: {
+        NavigationLink {
+            ShelfItemDestination(item: item)
+        } label: {
             VeyraPosterCard(
                 title: item.title,
                 url: item.posterURL,

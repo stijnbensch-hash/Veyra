@@ -15,6 +15,21 @@
 // dus daar hoeft dit maar op één plek te staan. Op iOS/iPadOS/macOS heeft elk
 // tabblad (Home/Films/Series/Zoeken) zijn eigen `NavigationStack`, dus daar
 // past elk tabblad dit toe op zijn eigen root.
+//
+// BELANGRIJKE SwiftUI-valkuil: een view kan de omgevingswaarde die het via
+// `.mediaNavigationRoot()` op zijn EIGEN `body`-uitvoer zet, niet met een
+// gewone `@Environment`-property op zichzelf terug uitlezen -- die property
+// wordt al bepaald op basis van de omgeving die de view van zijn OUDER
+// binnenkrijgt, dus vóór zijn eigen `.mediaNavigationRoot()` ooit toegepast
+// is. Zo'n `@Environment(\.openMediaDetail)` blijft dan altijd de stille
+// no-op default, en een tik doet letterlijk niets (geen crash, geen
+// foutmelding). Trof `Films`/`Kijklijst`: die schermen zíjn zelf de root
+// van hun `NavigationStack` én wilden ook zelf `openMediaDetail` aanroepen
+// voor hun eigen rasterweergave -- opgelost door daar gewoon een directe
+// `NavigationLink { ShelfItemDestination(item: item) }` te gebruiken i.p.v.
+// de omgevingsactie. Onderliggende schermen (`ShelfRowView`, "Vergelijkbaar"
+// onderaan een detailscherm) hebben dit niet: dat zijn echte child-views,
+// verderop in de boom dan waar `.mediaNavigationRoot()` de waarde zet.
 
 import SwiftUI
 

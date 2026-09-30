@@ -19,6 +19,10 @@ struct VeyraBentoHomeView: View {
     @State private var model: VeyraBentoViewModel
     private let sportModel: VeyraSportViewModel?
     @State private var heroSpotlight = VeyraHeroSpotlightController()
+    @State private var trendingItems: [HeroSpotlightItem] = []
+    @State private var voorJouItems: [HeroSpotlightItem] = []
+    @State private var top10Items: [HeroSpotlightItem] = []
+    @Environment(\.playMediaItem) private var playMediaItem
 
     var onPlay: (ContinueItem) -> Void
     var onToggleReminder: (UpcomingItem, Bool) -> Void
@@ -156,10 +160,28 @@ struct VeyraBentoHomeView: View {
                             bentoTop(now: context.date, contentWidth: contentWidth)
                         }
 
+                        // "Discovery Flow": Trending, los van het bento-raster -- Stap 9 van het
+                        // Home Visual System-spec, direct na "Verder kijken" (spec §97), net als op tvOS.
+                        VeyraDiscoveryFlow(title: "Trending", items: trendingItems)
+
+                        // "Dynamic Mosaic": Voor Jou -- Stap 10, direct na Trending (spec §97).
+                        VeyraMosaicSection(title: "Voor jou", items: voorJouItems)
+
                         TimelineView(.periodic(from: .now, by: 30)) { context in
                             bentoMiddle(now: context.date, contentWidth: contentWidth)
                         }
                         .padding(.top, -14)
+
+                        // "Binnenkort" teruggezet in "Verder kijken"-rij (zie bentoTop) -- geen
+                        // losse Calendar Horizon-sectie meer.
+
+                        // "Live nu" teruggezet als vaste rasterrij (samen met Streaming), i.p.v.
+                        // de losse On Air-sectie van Stap 13 -- op uitdrukkelijk verzoek teruggedraaid.
+                        // "Sports Stage": uitgelichte live wedstrijd, los van de rest van de
+                        // Sport-sectie -- Stap 14, direct na Nu op tv, vóór Live Sport (spec §97).
+                        TimelineView(.periodic(from: .now, by: 30)) { context in
+                            bentoSportsStage(now: context.date)
+                        }
 
                         // Sport onder "Streamingdiensten", net als op tvOS.
                         if layout.showSport, let sportModel, !sportModel.events.isEmpty {
@@ -175,6 +197,10 @@ struct VeyraBentoHomeView: View {
                             }
                             .buttonStyle(.plain)
                         }
+
+                        // "Top 10 Orbit": laatste sectie op Home -- Stap 15, direct na
+                        // Live Sport (spec §97).
+                        VeyraTop10Orbit(title: "Top 10", items: top10Items)
 
                         TimelineView(.periodic(from: .now, by: 30)) { context in
                             bentoBottom(now: context.date, contentWidth: contentWidth)
@@ -204,6 +230,23 @@ struct VeyraBentoHomeView: View {
                 await sportModel?.load()
             }
             .task { await model.load() }
+            // Trending/Voor jou/Top 10 na elkaar laden, niet gelijktijdig --
+            // zelfde reden als op tvOS: te veel gelijktijdige TMDB-clearlogo-
+            // verzoeken bovenop de IPTV-opstart-ververs duwde het geheugen te
+            // hoog (app-crash bij opstart).
+            .task {
+                trendingItems = await HeroSpotlightLoader.load(settings: .default)
+                voorJouItems = await HeroSpotlightLoader.load(settings: HeroSpotlightSettings(
+                    style: .card,
+                    primarySource: .trakt(list: .watchlist, kind: .movie),
+                    secondarySource: .trakt(list: .watchlist, kind: .series)
+                ))
+                top10Items = await HeroSpotlightLoader.load(settings: HeroSpotlightSettings(
+                    style: .card,
+                    primarySource: .tmdb(list: .popular, kind: .movie),
+                    secondarySource: .tmdb(list: .popular, kind: .series)
+                ))
+            }
             .onChange(of: catalogLanguages) { _, _ in Task { await model.load(force: true) } }
             .onReceive(NotificationCenter.default.publisher(for: .veyraHomeLayoutDidChange)) { _ in reloadLayout() }
             .onReceive(NotificationCenter.default.publisher(for: .veyraNowSettingsDidChange)) { _ in nowSettings = VeyraNowSettingsStore.load() }
@@ -236,7 +279,7 @@ struct VeyraBentoHomeView: View {
                 }
             }
         }
-        .background(VeyraHomeStyle.ink.ignoresSafeArea())
+        .background(VeyraBackground())
     }
 
     private var floatingButtonTopPadding: CGFloat {
@@ -294,6 +337,31 @@ struct VeyraBentoHomeView: View {
     // erop, dus wat nú het meest telt (wedstrijd bijna afgelopen > zender die
     // net begint > gewoon verder kijken > iets dat pas later komt) staat vooraan.
 
+    /// Haalt de ontbrekende stukjes (imdbID, seizoen/aflevering) op en stuurt daarna
+    /// rechtstreeks naar bronkeuze -- zie `contextRibbonItems`, "Verder kijken".
+    private func playContinueItemSource(_ item: ContinueItem) async {
+        guard let tmdbID = item.tmdbID, tmdbID > 0 else { return }
+        if item.kind == .movie {
+            guard let service = TMDBService(), let resolved = try? await service.mediaItem(forMovieID: tmdbID) else { return }
+            playMediaItem(resolved)
+        } else {
+            guard let service = SeriesService() else { return }
+            let imdbID = try? await service.externalIDs(forSeriesID: tmdbID).imdbID
+            let (season, episode) = Self.parseEpisodeCode(item.episodeCode)
+            playMediaItem(MediaItem(
+                title: item.title, type: .series, imdbID: imdbID, tmdbID: tmdbID,
+                seasonNumber: season, episodeNumber: episode, backdropURL: item.backdropURL))
+        }
+    }
+
+    /// "S2E4" -> (2, 4).
+    private static func parseEpisodeCode(_ code: String?) -> (season: Int?, episode: Int?) {
+        guard let code, code.hasPrefix("S") else { return (nil, nil) }
+        let parts = code.dropFirst().split(separator: "E", maxSplits: 1)
+        guard parts.count == 2, let season = Int(parts[0]), let episode = Int(parts[1]) else { return (nil, nil) }
+        return (season, episode)
+    }
+
     private func contextRibbonItems(now: Date) -> [VeyraRibbonItem] {
         var items: [VeyraRibbonItem] = []
 
@@ -316,9 +384,13 @@ struct VeyraBentoHomeView: View {
                 text: item.title, detail: item.subtitle ?? item.baseMetaText, contentKind: .continueWatching,
                 priority: continuePriority, logoURL: item.logoURL, backdropURL: item.backdropURL,
                 tmdbID: item.tmdbID, isMovie: item.kind == .movie,
+                reason: item.episodesLeft == 1 ? .almostFinished : .continueWatching,
+                reasonText: item.episodesLeft == 1 ? "Nog 1 aflevering" : nil,
                 onDismiss: { VeyraNowSettingsStore.dismiss(continueID) },
                 onSnooze: { VeyraNowSettingsStore.snoozeForToday(continueID) },
-                action: { onPlay(item) }))
+                // Veyra Now "Verder kijken" gaat rechtstreeks naar bronkeuze i.p.v. via het
+                // detailscherm -- de kijker weet al wat dit is, die stond er net nog middenin.
+                action: { Task { await playContinueItemSource(item) } }))
         }
 
         if showUpcoming,
@@ -336,6 +408,8 @@ struct VeyraBentoHomeView: View {
                 text: item.title, detail: detail, contentKind: .upcoming, priority: airingSoon ? 75 : 40, time: item.airDate,
                 logoURL: item.logoURL, backdropURL: item.backdropURL,
                 tmdbID: item.tmdbID, isMovie: item.kind == .movie,
+                reason: airingSoon ? .startsSoon : .upcoming,
+                reasonText: airingSoon ? "Begint over \(Int(minutesUntilAiring)) min" : nil,
                 onDismiss: { VeyraNowSettingsStore.dismiss(upcomingID) },
                 onSnooze: { VeyraNowSettingsStore.snoozeForToday(upcomingID) },
                 action: { onToggleReminder(item, !model.home.reminderIDs.contains(item.id)) }))
@@ -358,6 +432,7 @@ struct VeyraBentoHomeView: View {
                 id: liveID, icon: "dot.radiowaves.left.and.right", label: "LIVE NU",
                 text: row.title, detail: "nog \(row.remainingMinutes) min", isLive: true, contentKind: .live,
                 priority: justStarted ? 85 : (row.isSports ? 65 : 55), time: now, logoURL: row.logoURL,
+                reason: .live, reasonText: "Nu live",
                 onDismiss: { VeyraNowSettingsStore.dismiss(liveID) },
                 onSnooze: { VeyraNowSettingsStore.snoozeForToday(liveID) },
                 action: { onPlayChannel(row.channelID) }))
@@ -370,15 +445,25 @@ struct VeyraBentoHomeView: View {
                 let live = event.isLive(at: now)
                 let remaining = event.remainingMinutes(at: now) ?? .max
                 let nearEnd = live && remaining <= 20
+                // "Straks" is alleen gepast vlak vóór de aftrap -- een wedstrijd die pas over
+                // dagen begint krijgt de echte datum, niet een misleidend "straks".
+                let minutesUntilStart = event.start.timeIntervalSince(now) / 60
+                let startsSoon = !live && minutesUntilStart > 0 && minutesUntilStart <= 180
+                let dateText = event.start.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).locale(VeyraHomeFormat.locale))
+                let timeText = event.start.formatted(.dateTime.hour().minute().locale(VeyraHomeFormat.locale))
+                let startText = startsSoon ? "Start \(timeText)" : "\(dateText) · \(timeText)"
                 let sportID = "ribbon-sport-\(event.id)"
                 items.append(VeyraRibbonItem(
-                    id: sportID, icon: "sportscourt", label: live ? "SPORT · LIVE" : "SPORT · STRAKS",
+                    id: sportID, icon: "sportscourt",
+                    label: live ? "SPORT · LIVE" : (startsSoon ? "SPORT · STRAKS" : "SPORT"),
                     text: event.title,
-                    detail: live ? "Live op \(event.channelName)" : "Start \(event.start.formatted(.dateTime.hour().minute().locale(VeyraHomeFormat.locale))) · \(event.channelName)",
+                    detail: live ? "Live op \(event.channelName)" : "\(startText) · \(event.channelName)",
                     isLive: live, contentKind: .sport,
                     priority: nearEnd ? 100 : (live ? 90 : 60), time: live ? now : event.start,
                     logoURL: event.homeLogoURL, secondaryLogoURL: event.awayLogoURL,
-                    backdropURL: event.backdropURL, leagueLogoURL: event.leagueLogoURL,
+                    backdropURL: event.backdropURL, leagueLogoURL: SportsLeague.logo(forCompetition: event.competition, fallback: event.leagueLogoURL),
+                    reason: live ? .live : (startsSoon ? .startsSoon : .upcoming),
+                    reasonText: live ? "Nu live" : (startsSoon ? "Begint over \(Int(minutesUntilStart)) min" : nil),
                     onDismiss: { VeyraNowSettingsStore.dismiss(sportID) },
                     onSnooze: { VeyraNowSettingsStore.snoozeForToday(sportID) },
                     action: { onPlaySport(event, .live) }))
@@ -391,13 +476,26 @@ struct VeyraBentoHomeView: View {
         if nowSettings.showReleases {
             let releases = (model.releaseFilms.map { ($0, "Film") } + model.releaseSeries.map { ($0, "Serie") })
                 .sorted { ($0.0.releaseDate ?? .distantPast) > ($1.0.releaseDate ?? .distantPast) }
-            if let (title, kindLabel) = releases.first(where: { !nowSettings.isHidden("ribbon-release-\($0.0.id)", now: now) }) {
+            // Niet altijd dezelfde titel: roteert dagelijks door de meest recente, nog niet
+            // weggetikte releases (i.p.v. permanent de allerlaatste te tonen), zodat dit blok
+            // ook bij herladen/scrollen dezelfde dag stabiel blijft maar van dag tot dag wisselt.
+            let pool = Array(releases.filter { !nowSettings.isHidden("ribbon-release-\($0.0.id)", now: now) }.prefix(10))
+            if !pool.isEmpty {
+                let dayOfYear = Calendar.current.ordinality(of: .day, in: .year, for: now) ?? 0
+                let (title, kindLabel) = pool[dayOfYear % pool.count]
                 let releaseID = "ribbon-release-\(title.id)"
                 items.append(VeyraRibbonItem(
                     id: releaseID, icon: "sparkles", label: "NIEUW UITGEBRACHT",
                     text: title.title, detail: kindLabel, contentKind: .release, priority: 45,
                     backdropURL: title.backdropURL ?? title.posterURL,
                     tmdbID: title.id, isMovie: kindLabel == "Film",
+                    // Geen reasonText hier -- het label "NIEUW UITGEBRACHT" zegt al waarom dit
+                    // item op de rail staat, een tweede regel met dezelfde tekst is dubbelop.
+                    reason: .newRelease,
+                    // Zonder échte backdrop valt dit terug op de poster, en die heeft de titel al
+                    // ingebakken in de afbeelding -- `titleBakedIntoArt` zorgt dat de kaart daar
+                    // dan geen eigen logo/titel nog eens overheen zet (zie `posterContent`).
+                    titleBakedIntoArt: title.backdropURL == nil,
                     onDismiss: { VeyraNowSettingsStore.dismiss(releaseID) },
                     onSnooze: { VeyraNowSettingsStore.snoozeForToday(releaseID) },
                     action: { onOpenTMDBTitle(title) }))
@@ -427,7 +525,9 @@ struct VeyraBentoHomeView: View {
 
     @ViewBuilder
     private func bentoTop(now: Date, contentWidth: CGFloat) -> some View {
-        // "Binnenkort" toont alles wat Trakt teruggeeft, net als op tvOS.
+        // "Binnenkort" teruggezet als vaste rasterrij naast "Verder kijken" (op
+        // uitdrukkelijk verzoek teruggedraaid uit de losse Calendar Horizon-sectie
+        // van Stap 12 -- weer gewoon één rij, zoals voorheen).
         let today = showUpcoming ? model.today(at: now, limit: Int.max) : nil
         let items = showContinueWatching ? model.home.continueItems : []
         let showVolgende = layout.isVisible(.volgende) && !items.isEmpty
@@ -452,7 +552,7 @@ struct VeyraBentoHomeView: View {
                 if showVolgende {
                     VStack(alignment: .leading, spacing: 10) {
                         // Subtiele titel boven de rij, i.p.v. los per tegel.
-                        Text("Verder kijken")
+                        Text("Verder kijken (\(items.count))")
                             .font(.system(size: 12, weight: .bold))
                             .tracking(1.5)
                             .textCase(.uppercase)
@@ -464,11 +564,30 @@ struct VeyraBentoHomeView: View {
                             // gat tussen titel en kaart geeft dan bij "Favorieten"/"College
                             // football" in de Sport-sectie (die wél .top gebruikt).
                             LazyHStack(alignment: .top, spacing: 10) {
-                                ForEach(items) { item in
+                                // "Resume Flow": het meest relevante item krijgt een bredere,
+                                // filmische kaart met backdrop/clearlogo/voortgangslijn -- zelfde
+                                // rijhoogte als de rest, dus de rest van het raster blijft gelijk.
+                                if let hero = items.first {
+                                    Button { onPlay(hero) } label: {
+                                        VeyraBentoContinueHeroContent(item: hero, compact: true, showLabel: false)
+                                            .clipShape(VeyraRadius.posterShape)
+                                            .overlay(VeyraRadius.posterShape.strokeBorder(VeyraFrame.active, lineWidth: 1.5))
+                                            .shadow(color: VeyraColors.cyan.opacity(0.22), radius: 14, x: -2, y: 3)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .contextMenu {
+                                        if hero.playbackID != nil {
+                                            Button(role: .destructive) { Task { await model.home.remove(hero) } } label: {
+                                                Label("Verwijder uit Verder kijken", systemImage: "xmark.circle")
+                                            }
+                                        }
+                                    }
+                                    .frame(width: cardLayout.width * 1.5, height: cardLayout.height)
+                                }
+                                ForEach(items.dropFirst()) { item in
                                     continueButton(item, radius: 16) {
                                         VeyraBentoContinueMiniContent(item: item, compact: true,
-                                                                      cornerRadius: 16, cardLayout: cardLayout,
-                                                                      isFeatured: item.id == items.first?.id)
+                                                                      cornerRadius: 16, cardLayout: cardLayout)
                                     }
                                     .frame(width: cardLayout.width, height: cardLayout.height)
                                 }
@@ -487,9 +606,7 @@ struct VeyraBentoHomeView: View {
                             .textCase(.uppercase)
                             .foregroundStyle(VeyraHomeStyle.cyan.opacity(0.85))
 
-                        // Losse kaarten op een horizontale rij, zonder groot kader eromheen.
                         ScrollView(.horizontal) {
-                            // .top, zelfde reden als bij "Verder kijken" hierboven.
                             LazyHStack(alignment: .top, spacing: 10) {
                                 ForEach(today.items) { item in
                                     let on = model.home.reminderIDs.contains(item.id)
@@ -510,16 +627,26 @@ struct VeyraBentoHomeView: View {
                             }
                         }
                         .scrollIndicators(.hidden)
-                        .sensoryFeedback(.selection, trigger: model.home.reminderIDs)
                     }
-                    .veyraHomeTileMenu(.vandaag)
                     .bentoCell(profile.cell(.vandaag))
+                    .sensoryFeedback(.selection, trigger: model.home.reminderIDs)
                 }
             }
         }
     }
 
-    // MARK: Raster — midden: Live nu · Streamingdiensten
+    // MARK: Sports Stage (Live Sport)
+
+    @ViewBuilder
+    private func bentoSportsStage(now: Date) -> some View {
+        if layout.showSport, let sportModel, let featured = sportModel.liveEvents(at: now).first {
+            VeyraSportsStage(event: featured, now: now) {
+                onPlaySport(featured, .live)
+            }
+        }
+    }
+
+    // MARK: Raster — Streamingdiensten
 
     /// Losstaand van de @ViewBuilder-functie hieronder: `Set.insert` retourneert een tuple, wat de
     /// ViewBuilder in de war brengt als het als een `if`-conditie binnenin een view-body staat.
@@ -569,9 +696,9 @@ struct VeyraBentoHomeView: View {
                     LazyHStack(spacing: 10) {
                         ForEach(model.providers) { provider in
                             Button { onOpenCatalog(provider) } label: {
-                                VeyraBentoStreamingContent(name: provider.name, iconURL: provider.imageURL,
-                                                           wideURL: provider.wideURL, brand: provider.brand, compact: true,
-                                                           customURL: provider.customLogoURL)
+                                VeyraLogoShelfTile(name: provider.name, iconURL: provider.imageURL,
+                                                   wideURL: provider.wideURL, brand: provider.brand, compact: true,
+                                                   customURL: provider.customLogoURL)
                             }
                             .buttonStyle(.plain)
                             .frame(width: min(regular ? 190 : 150, contentWidth), height: regular ? 76 : 60)

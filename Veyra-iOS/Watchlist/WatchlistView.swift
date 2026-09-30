@@ -6,7 +6,6 @@ import SwiftUI
 /// dezelfde als de Films-tab (zie `Movies/MoviesView.swift`), inclusief
 /// genre/beoordeling-badge en jaartal.
 struct WatchlistView: View {
-    @Environment(\.openMediaDetail) private var openMediaDetail
     @ObservedObject private var trakt = TraktStore.shared
     @Environment(\.horizontalSizeClass) private var sizeClass
 
@@ -35,12 +34,14 @@ struct WatchlistView: View {
                     .padding(.top, 12)
                     .padding(.bottom, 40)
                 }
+
             }
             .navigationTitle("Kijklijst")
             .navigationBarTitleDisplayMode(.inline)
         }
         .task { await trakt.refreshIfNeeded() }
         .task(id: reloadKey) { await load() }
+        .mediaNavigationRoot()
     }
 
     private var reloadKey: String {
@@ -138,7 +139,9 @@ struct WatchlistView: View {
     }
 
     private func card(_ item: MediaItem) -> some View {
-        Button { openMediaDetail(item) } label: {
+        NavigationLink {
+            ShelfItemDestination(item: item)
+        } label: {
             VeyraPosterCard(
                 title: item.title,
                 url: item.posterURL,

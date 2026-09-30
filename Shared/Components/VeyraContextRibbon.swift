@@ -21,6 +21,16 @@ nonisolated enum VeyraRibbonContentKind: Sendable {
     case continueWatching, upcoming, live, sport, release
 }
 
+/// Waaróm dit item nu op de rail staat -- de korte, mensvriendelijke reden
+/// ("Nog 1 aflevering", "Nu live", "Begint over 12 min", ...), belangrijker
+/// om te tonen dan de genre/beoordeling-badge (`RibbonEnrichmentBadge`).
+/// Puur informatief voor de aanroeper (`reasonText` op `VeyraRibbonItem` is
+/// de vrije tekst die effectief getoond wordt); dit enum staat er los van
+/// zodat een aanroeper desgewenst ook zelf op reden kan filteren/loggen.
+nonisolated enum VeyraNowReason: Sendable {
+    case continueWatching, almostFinished, newEpisode, newRelease, live, startsSoon, upcoming
+}
+
 nonisolated struct VeyraRibbonItem: Identifiable {
     let id: String
     let icon: String
@@ -54,11 +64,65 @@ nonisolated struct VeyraRibbonItem: Identifiable {
     /// `nil` = geen id beschikbaar (bv. live-kanalen, sport), dan blijft die badge gewoon weg.
     var tmdbID: Int? = nil
     var isMovie: Bool = true
+    /// Korte reden waarom dit item NU relevant is, bv. "Nog 1 aflevering", "Nu live",
+    /// "Begint over 12 min", "Vandaag uitgebracht" -- belangrijker dan genre/beoordeling,
+    /// dus als dit gezet is toont de kaart het prominent boven de gewone `detail`-regel.
+    /// `nil` = geen specifieke reden (bv. gewoon "verder kijken" zonder bijzonderheid).
+    var reason: VeyraNowReason? = nil
+    var reasonText: String? = nil
+    /// `true` als `backdropURL` een poster is (i.p.v. een échte backdrop) waar de titel al
+    /// in de afbeelding zelf gebakken zit (TMDB-posters bevatten vaak een titel-graphic) --
+    /// dan geen eigen logo/titel er nog eens overheen zetten (zie `posterContent`).
+    var titleBakedIntoArt: Bool = false
     /// Lang indrukken: "Niet interessant" (blijvend) -- `nil` = geen menu.
     var onDismiss: (() -> Void)? = nil
     /// Lang indrukken: "Vandaag niet tonen" -- `nil` = geen menu.
     var onSnooze: (() -> Void)? = nil
     let action: () -> Void
+}
+
+/// Async ClearLogo-ophaler voor Veyra Now-kaarten die zelf geen `logoURL` meekrijgen
+/// (bv. "Nieuw uitgebracht", dat alleen een tmdbID heeft) -- zelfde bron als
+/// `VeyraClearLogo` op de detailschermen, hier lokaal zodat de rail geen losse
+/// `MediaItem` model hoeft te bouwen/doorgeven.
+private struct RibbonClearLogo<Fallback: View>: View {
+    let tmdbID: Int
+    let isMovie: Bool
+    let maxWidth: CGFloat
+    let maxHeight: CGFloat
+    let fallback: () -> Fallback
+
+    @State private var logoURL: URL?
+
+    init(tmdbID: Int, isMovie: Bool, maxWidth: CGFloat, maxHeight: CGFloat,
+         @ViewBuilder fallback: @escaping () -> Fallback) {
+        self.tmdbID = tmdbID
+        self.isMovie = isMovie
+        self.maxWidth = maxWidth
+        self.maxHeight = maxHeight
+        self.fallback = fallback
+    }
+
+    var body: some View {
+        Group {
+            if let logoURL {
+                AsyncImage(url: logoURL) { phase in
+                    if case .success(let image) = phase {
+                        image.resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(maxWidth: maxWidth, maxHeight: maxHeight)
+                    } else {
+                        fallback()
+                    }
+                }
+            } else {
+                fallback()
+            }
+        }
+        .task(id: tmdbID) {
+            logoURL = await ClearLogoService.logoURL(for: MediaItem(title: "", type: isMovie ? .movie : .series, tmdbID: tmdbID))
+        }
+    }
 }
 
 struct VeyraContextRibbon: View {
@@ -93,11 +157,11 @@ struct VeyraContextRibbon: View {
         let vPadding: CGFloat
         let headerSize: CGFloat
         let cardGap: CGFloat
-        // Alle kaarten dezelfde breedte i.p.v. per soort moment een eigen bandbreedte --
-        // enkel "Live nu" (`cardWidth` telt niet voor `.live`, zie `widthRange`) is bewust
-        // een stuk breder, als het meest ter-plekke-relevante moment op de rail.
+        // Verleden/toekomst dezelfde breedte -- enkel "nu" (`nowCardWidth`, zie
+        // `widthRange`) is duidelijk breder: het meest ter-plekke-relevante moment op
+        // de rail verdient meer ruimte dan wat al voorbij is of nog moet komen.
         let cardWidth: CGFloat
-        let liveCardWidth: CGFloat
+        let nowCardWidth: CGFloat
     }
 
     // tvOS is 10-voet-UI: duidelijk groter dan op iOS.
@@ -106,18 +170,18 @@ struct VeyraContextRibbon: View {
         Metrics(tagSize: 20, titleSize: 28, nowTitleSize: 33, metaSize: 21,
                 iconCircle: 66, iconSize: 26,
                 cardPaddingH: 30, cardPaddingV: 26, hPadding: 44, vPadding: 34, headerSize: 19, cardGap: 24,
-                cardWidth: 340, liveCardWidth: 460)
+                cardWidth: 320, nowCardWidth: 460)
         #else
         if isCompactPhone {
             Metrics(tagSize: 14, titleSize: 19, nowTitleSize: 22, metaSize: 15,
                     iconCircle: 46, iconSize: 19,
                     cardPaddingH: 18, cardPaddingV: 15, hPadding: 20, vPadding: 16, headerSize: 13, cardGap: 14,
-                    cardWidth: 235, liveCardWidth: 310)
+                    cardWidth: 235, nowCardWidth: 310)
         } else {
             Metrics(tagSize: 11, titleSize: 15, nowTitleSize: 17, metaSize: 12,
                     iconCircle: 36, iconSize: 15,
                     cardPaddingH: 14, cardPaddingV: 12, hPadding: 20, vPadding: 16, headerSize: 12, cardGap: 12,
-                    cardWidth: 190, liveCardWidth: 252)
+                    cardWidth: 190, nowCardWidth: 252)
         }
         #endif
     }
@@ -146,10 +210,11 @@ struct VeyraContextRibbon: View {
         items.sorted { effectiveTime($0) < effectiveTime($1) }
     }
 
-    // Alle kaarten precies dezelfde breedte -- ook "Live nu" niet meer apart breder,
-    // op uitdrukkelijk verzoek (was eerst bewust breder, nu weer gelijk aan de rest).
+    // "Nu" duidelijk breder dan verleden/toekomst (Veyra Now fase 1) -- niet per
+    // brontype (`.live` kreeg dat vroeger apart, nu gelijk aan de rest van `.now`).
     private func widthRange(for item: VeyraRibbonItem, kind: NodeKind) -> (min: CGFloat, max: CGFloat) {
-        (metrics.cardWidth, metrics.cardWidth)
+        let width = kind == .now ? metrics.nowCardWidth : metrics.cardWidth
+        return (width, width)
     }
 
     /// Welk item bij het verschijnen gecentreerd staat -- "nu" als dat er is, anders
@@ -181,10 +246,19 @@ struct VeyraContextRibbon: View {
 
                 ScrollViewReader { proxy in
                     ScrollView(.horizontal, showsIndicators: false) {
+                        // Kaart + tijdmarkering nu SAMEN in één kolom per item, allebei in
+                        // dezelfde HStack/ScrollView (Veyra Now fase 2) -- de tijdlijn scrolt
+                        // zo letterlijk mee met de kaarten i.p.v. een losse, onafhankelijke
+                        // balk eronder die niet meebewoog met wat je net aan het bekijken was.
                         HStack(alignment: .top, spacing: metrics.cardGap) {
                             ForEach(sortedItems) { item in
-                                node(item, kind: kind(for: item))
-                                    .id(item.id)
+                                let itemKind = kind(for: item)
+                                VStack(alignment: .leading, spacing: 10) {
+                                    node(item, kind: itemKind)
+                                    timelineMarker(for: item, kind: itemKind,
+                                                   width: widthRange(for: item, kind: itemKind).max)
+                                }
+                                .id(item.id)
                             }
                         }
                         .padding(.horizontal, 4) // ruimte voor de focus-gloed aan de randen
@@ -205,61 +279,54 @@ struct VeyraContextRibbon: View {
                         }
                     }
                 }
-
-                timelineTrack
             }
             .padding(.horizontal, metrics.hPadding)
             .padding(.vertical, metrics.vPadding)
         }
     }
 
-    /// Blauwe tijdlijn-balk onder de kaartenrij: een dun overzicht van verleden → nu →
-    /// toekomst, met een puls-stip op de relatieve plek van "nu" -- puur decoratief/
-    /// oriënterend (niet gekoppeld aan de scrollpositie van de rij erboven, die de
-    /// gebruiker vrij op en neer scrolt).
-    private var timelineTrack: some View {
-        GeometryReader { proxy in
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(VeyraColors.cyan.opacity(0.25))
-                    .frame(height: 3)
+    /// Eén korte klokttijd (of "NU") per kaart, met een stukje tijdlijn erboven --
+    /// samen vormen die per-kaart-segmenten, allemaal in dezelfde HStack als de kaarten
+    /// zelf, de doorlopende tijdlijn (Veyra Now fase 2). Geen eigen `GeometryReader`/
+    /// absolute positionering meer nodig: de tijdlijn IS nu gewoon de rij.
+    private static let clockFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return formatter
+    }()
 
-                VStack(spacing: 4) {
-                    Text("NU")
-                        .font(.system(size: 12, weight: .bold))
-                        .tracking(1.2)
-                        .foregroundStyle(VeyraColors.cyan)
-                        .fixedSize()
+    /// `nil` tijdstip (bv. "verder kijken", geen vaste klokttijd) toont geen klokttijd --
+    /// het tijdstip-tikje/lijntje blijft wel staan, voor visuele doorlopendheid van de rail.
+    private func timeLabel(for item: VeyraRibbonItem, kind: NodeKind) -> String {
+        if kind == .now { return "NU" }
+        guard let time = item.time else { return "" }
+        return Self.clockFormatter.string(from: time)
+    }
 
+    @ViewBuilder
+    private func timelineMarker(for item: VeyraRibbonItem, kind: NodeKind, width: CGFloat) -> some View {
+        VStack(spacing: 6) {
+            Capsule()
+                .fill(kind == .now ? VeyraColors.cyan.opacity(0.9) : VeyraColors.cyan.opacity(0.22))
+                .frame(height: kind == .now ? 3 : 2)
+
+            HStack(spacing: 4) {
+                if kind == .now {
                     Circle()
                         .fill(VeyraColors.cyan)
-                        .frame(width: 11, height: 11)
-                        .shadow(color: VeyraColors.cyan.opacity(0.8), radius: 6)
+                        .frame(width: 6, height: 6)
+                        .shadow(color: VeyraColors.cyan.opacity(0.8), radius: 5)
                 }
-                .offset(x: dotOffset(in: proxy.size.width))
+                let label = timeLabel(for: item, kind: kind)
+                if !label.isEmpty {
+                    Text(label)
+                        .font(.system(size: metrics.metaSize * 0.72, weight: kind == .now ? .bold : .medium))
+                        .tracking(kind == .now ? 1 : 0)
+                        .foregroundStyle(kind == .now ? VeyraColors.cyan : .white.opacity(kind == .past ? 0.32 : 0.55))
+                }
             }
-            .frame(maxHeight: .infinity, alignment: .bottom)
         }
-        .frame(height: 34)
-        .padding(.top, 6)
-    }
-
-    /// Houdt het "NU"-label + de stip gecentreerd op de berekende plek, ook aan de
-    /// randen van de rail (anders liep het label links/rechts buiten de kaartenrij).
-    private func dotOffset(in width: CGFloat) -> CGFloat {
-        let halfWidth: CGFloat = 15
-        let target = width * nowFraction
-        let clamped = max(halfWidth, min(width - halfWidth, target))
-        return clamped - halfWidth
-    }
-
-    /// Relatieve positie (0...1) van "nu" tussen het eerste en laatste item van de rail --
-    /// bepaalt waar de puls-stip op `timelineTrack` staat.
-    private var nowFraction: CGFloat {
-        let ordered = sortedItems
-        guard ordered.count > 1, let current = flowCurrent,
-              let index = ordered.firstIndex(where: { $0.id == current.id }) else { return 0 }
-        return CGFloat(index) / CGFloat(ordered.count - 1)
+        .frame(width: width)
     }
 
     // MARK: - Kaart
@@ -324,10 +391,15 @@ struct VeyraContextRibbon: View {
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(tint.opacity(kind == .now ? 0.85 : (kind == .past ? 0.18 : 0.4)),
+                    // Verleden: "weinig border" (spec) -- duidelijk dunner/vager dan de
+                    // rustende rand van nu/toekomst, niet enkel iets minder opaak.
+                    .strokeBorder(tint.opacity(kind == .now ? 0.85 : (kind == .past ? 0.12 : 0.4)),
                                   lineWidth: kind == .now ? 2 : 1)
             )
-            .opacity(kind == .past ? 0.75 : 1)
+            // Verleden: gedimd én ontverzadigd (Veyra Now fase 1) -- nog steeds volledig
+            // aantikbaar, dus bewust GEEN `.disabled`, enkel visueel teruggeschroefd.
+            .opacity(kind == .past ? 0.6 : 1)
+            .saturation(kind == .past ? 0.55 : 1)
             .animation(.easeOut(duration: 0.3), value: kind)
         }
         .buttonStyle(VeyraRailNodeStyle())
@@ -338,12 +410,46 @@ struct VeyraContextRibbon: View {
     private func posterContent(_ item: VeyraRibbonItem, kind: NodeKind) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             tagRow(item, kind: kind)
-            Text(item.text)
-                .font(.system(size: kind == .now ? metrics.nowTitleSize : metrics.titleSize, weight: .bold))
-                .foregroundStyle(.white)
-                .shadow(color: .black.opacity(0.6), radius: 4, y: 1)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
+            // Sport: thuis- vs uitploeg naast elkaar i.p.v. één "clearlogo" -- een los teamlogo
+            // zou anders ten onrechte als hét logo van de wedstrijd ogen.
+            if item.contentKind == .sport, let home = item.logoURL, let away = item.secondaryLogoURL {
+                HStack(spacing: 14) {
+                    logoImage(home, maxWidth: 56, maxHeight: 56) { EmptyView() }
+                    Text("–")
+                        .font(.system(size: metrics.titleSize, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.5))
+                    logoImage(away, maxWidth: 56, maxHeight: 56) { EmptyView() }
+                }
+            } else if item.titleBakedIntoArt {
+                // Titel staat al op de afbeelding zelf (posterfallback) -- geen tweede
+                // logo/titel erover heen zetten, dat gaf een dubbele titel.
+                EmptyView()
+            } else if let logoURL = item.logoURL {
+                // ClearLogo i.p.v. titeltekst als die er is (Veyra Now fase 1) -- de titel
+                // staat dan al leesbaar op het logo, dubbele tekst oogt rommelig.
+                logoImage(logoURL, maxWidth: 220, maxHeight: kind == .now ? 66 : 50) {
+                    posterTitleText(item, kind: kind)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else if let tmdbID = item.tmdbID {
+                // Geen logoURL rechtstreeks van de bron (bv. "Nieuw uitgebracht") -- zelfde
+                // TMDB-clearlogo als op de detailschermen (`VeyraClearLogo`), hier async opgehaald.
+                RibbonClearLogo(tmdbID: tmdbID, isMovie: item.isMovie, maxWidth: 220, maxHeight: kind == .now ? 66 : 50) {
+                    posterTitleText(item, kind: kind)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                posterTitleText(item, kind: kind)
+            }
+            // Reden waarom dit item NU relevant is -- belangrijker dan genre/beoordeling,
+            // dus vóór de `detail`-regel en de enrichment-badge (Veyra Now fase 1).
+            if let reasonText = item.reasonText, !reasonText.isEmpty {
+                Text(reasonText)
+                    .font(.system(size: metrics.metaSize, weight: .bold))
+                    .foregroundStyle(VeyraHomeStyle.cyan)
+                    .shadow(color: .black.opacity(0.6), radius: 3, y: 1)
+                    .lineLimit(1)
+            }
             if let detail = item.detail, !detail.isEmpty {
                 Text(detail)
                     .font(.system(size: metrics.metaSize, weight: .semibold))
@@ -355,6 +461,16 @@ struct VeyraContextRibbon: View {
             RibbonEnrichmentBadge(tmdbID: item.tmdbID, isMovie: item.isMovie, fontSize: metrics.metaSize)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func posterTitleText(_ item: VeyraRibbonItem, kind: NodeKind) -> some View {
+        Text(item.text)
+            .font(.system(size: kind == .now ? metrics.nowTitleSize : metrics.titleSize, weight: .bold))
+            .foregroundStyle(.white)
+            .shadow(color: .black.opacity(0.6), radius: 4, y: 1)
+            .lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     /// Genre + score onder de titel op de "Veyra Now"-kaarten -- dezelfde "Better Posters"-info
@@ -418,10 +534,11 @@ struct VeyraContextRibbon: View {
     private func compactNode(_ item: VeyraRibbonItem, kind: NodeKind) -> some View {
         let range = widthRange(for: item, kind: kind)
         let tint = typeColor(item)
-        // Zelfde minimumhoogte als de fotozone van de poster-kaarten -- ook al zijn alle
-        // kaarten nu even breed, zonder dit zou een korte titel (bv. "Live nu") deze kaart
-        // toch een stuk lager maken dan de poster-kaarten ernaast.
-        let minHeight: CGFloat = metrics.cardWidth * 0.64
+        // Zelfde minimumhoogte als de fotozone van de poster-kaarten, geschaald met de
+        // eigen breedte van dít kaartje (nu-kaarten zijn breder, zie `widthRange`) --
+        // anders zou een korte titel (bv. "Live nu") deze kaart een stuk lager maken
+        // dan de poster-kaarten ernaast.
+        let minHeight: CGFloat = range.max * 0.64
         Button(action: item.action) {
             content(item, kind: kind)
                 .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -434,10 +551,13 @@ struct VeyraContextRibbon: View {
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(tint.opacity(kind == .now ? 0.65 : (kind == .past ? 0.12 : 0.28)),
+                        .strokeBorder(tint.opacity(kind == .now ? 0.65 : (kind == .past ? 0.10 : 0.28)),
                                       lineWidth: kind == .now ? 1.5 : 1)
                 )
-                .opacity(kind == .past ? 0.75 : 1)
+                // Verleden: gedimd én ontverzadigd (Veyra Now fase 1) -- nog steeds volledig
+                // aantikbaar, dus bewust GEEN `.disabled`, enkel visueel teruggeschroefd.
+                .opacity(kind == .past ? 0.6 : 1)
+                .saturation(kind == .past ? 0.55 : 1)
                 .animation(.easeOut(duration: 0.3), value: kind)
         }
         .buttonStyle(VeyraRailNodeStyle())
@@ -465,17 +585,13 @@ struct VeyraContextRibbon: View {
         }
     }
 
-    /// De vaste kleuridentiteit van een type moment -- "verder kijken" en live
-    /// blijven Veyra's cyaan/rood, "volgende aflevering" krijgt violet, sport amber.
-    /// Nieuwe types kiezen hier gewoon hun eigen tint bij.
+    /// Veyra's kleuridentiteit: cyaan is de default voor elk type moment, rood is
+    /// gereserveerd voor "nu live" -- GEEN apart contenttype-kleurtje per soort (dat was
+    /// eerst violet/amber/groen per `contentKind`, maar contenttype hoort te blijken uit
+    /// layout/icoon/label, niet uit kleur, zie Veyra's stijlregels). "Verleden" krijgt geen
+    /// eigen kleur hier: dat wordt puur via opacity/saturation gedimd (zie `node(_:kind:)`).
     private func typeColor(_ item: VeyraRibbonItem) -> Color {
-        switch item.contentKind {
-        case .continueWatching: return VeyraHomeStyle.cyan
-        case .upcoming: return Color(red: 0.70, green: 0.57, blue: 0.94)
-        case .live: return item.isLive ? VeyraColors.red : VeyraHomeStyle.cyan
-        case .sport: return Color(red: 1.0, green: 0.64, blue: 0.20)
-        case .release: return Color(red: 0.35, green: 0.82, blue: 0.55)
-        }
+        item.isLive ? VeyraColors.red : VeyraHomeStyle.cyan
     }
 
     /// Elk soort moment krijgt zijn eigen opbouw i.p.v. één generiek sjabloon:
@@ -509,6 +625,12 @@ struct VeyraContextRibbon: View {
                             .lineLimit(2)
                             .fixedSize(horizontal: false, vertical: true)
                     }
+                    if let reasonText = item.reasonText, !reasonText.isEmpty {
+                        Text(reasonText)
+                            .font(.system(size: metrics.metaSize, weight: .bold))
+                            .foregroundStyle(VeyraHomeStyle.cyan.opacity(kind == .past ? 0.55 : 1))
+                            .lineLimit(1)
+                    }
                     if let detail = item.detail, !detail.isEmpty {
                         Text(detail)
                             .font(.system(size: metrics.metaSize, weight: .medium))
@@ -539,6 +661,12 @@ struct VeyraContextRibbon: View {
                         .foregroundStyle(.white.opacity(kind == .past ? 0.55 : 1))
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
+                    if let reasonText = item.reasonText, !reasonText.isEmpty {
+                        Text(reasonText)
+                            .font(.system(size: metrics.metaSize, weight: .bold))
+                            .foregroundStyle(VeyraHomeStyle.cyan.opacity(kind == .past ? 0.55 : 1))
+                            .lineLimit(1)
+                    }
                     if let detail = item.detail, !detail.isEmpty {
                         Text(detail)
                             .font(.system(size: metrics.metaSize, weight: .medium))
@@ -569,6 +697,14 @@ struct VeyraContextRibbon: View {
                         .lineLimit(2)
                         .minimumScaleFactor(0.75)
                         .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity)
+                }
+                if let reasonText = item.reasonText, !reasonText.isEmpty {
+                    Text(reasonText)
+                        .font(.system(size: metrics.metaSize, weight: .bold))
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(VeyraHomeStyle.cyan.opacity(kind == .past ? 0.55 : 1))
+                        .lineLimit(1)
                         .frame(maxWidth: .infinity)
                 }
                 if let detail = item.detail, !detail.isEmpty {
@@ -638,13 +774,15 @@ struct VeyraContextRibbon: View {
             @Environment(\.isFocused) private var isFocused
 
             var body: some View {
+                // Veyra Now fase 1: subtielere focus -- cyaan rand + zachte gloed + kleine
+                // schaal (1.05), i.p.v. een dikke 3pt rand met zware gloed en grote schaal.
                 configuration.label
                     .overlay(
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .strokeBorder(VeyraHomeStyle.cyan, lineWidth: isFocused ? 3 : 0)
+                            .strokeBorder(VeyraHomeStyle.cyan, lineWidth: isFocused ? 2 : 0)
                     )
-                    .shadow(color: isFocused ? VeyraHomeStyle.cyan.opacity(0.5) : .clear, radius: 16)
-                    .scaleEffect(isFocused ? 1.06 : (configuration.isPressed ? 0.97 : 1))
+                    .shadow(color: isFocused ? VeyraHomeStyle.cyan.opacity(0.4) : .clear, radius: 12)
+                    .scaleEffect(isFocused ? 1.05 : (configuration.isPressed ? 0.97 : 1))
                     .opacity(configuration.isPressed ? 0.85 : 1)
                     .zIndex(isFocused ? 1 : 0)
                     .animation(.easeOut(duration: 0.16), value: isFocused)

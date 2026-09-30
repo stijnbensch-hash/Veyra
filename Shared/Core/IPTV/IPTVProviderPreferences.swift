@@ -190,6 +190,15 @@ struct IPTVProviderPreferencesStore {
     private let keyPrefix =
         "veyra.iptv.provider.preferences"
 
+    // In-memory cache, per opslagsleutel: `load(for:)` wordt tijdens het filteren van een hele
+    // IPTV-catalogus (discovery, zie `IPTVDiscoveryVisibility`) per item opnieuw aangeroepen --
+    // zonder cache berekende dat bij elk item opnieuw een SHA256-hash (`providerIdentifier`) EN
+    // decodeerde het opnieuw JSON uit UserDefaults, wat bij een grote catalogus de main thread
+    // merkbaar blokkeerde (app leek dan te "hangen" bij het laden). `static` zodat elke losse
+    // `IPTVProviderPreferencesStore()`-instantie (er bestaan er meerdere in de app) dezelfde cache
+    // deelt en dus altijd de laatst opgeslagen waarde ziet.
+    private static var cache: [String: IPTVProviderPreferences] = [:]
+
     init(
         defaults: UserDefaults = .standard
     ) {
@@ -204,6 +213,10 @@ struct IPTVProviderPreferencesStore {
             for: configuration
         )
 
+        if let cached = Self.cache[key] {
+            return cached
+        }
+
         guard
             let data = defaults.data(
                 forKey: key
@@ -214,9 +227,12 @@ struct IPTVProviderPreferencesStore {
                     from: data
                 )
         else {
-            return IPTVProviderPreferences()
+            let empty = IPTVProviderPreferences()
+            Self.cache[key] = empty
+            return empty
         }
 
+        Self.cache[key] = preferences
         return preferences
     }
 
@@ -229,23 +245,31 @@ struct IPTVProviderPreferencesStore {
         let data = try JSONEncoder()
             .encode(preferences)
 
+        let key = storageKey(
+            for: configuration
+        )
+
         defaults.set(
             data,
-            forKey: storageKey(
-                for: configuration
-            )
+            forKey: key
         )
+
+        Self.cache[key] = preferences
     }
 
     func clear(
         for configuration:
             IPTVStoredConfiguration
     ) {
-        defaults.removeObject(
-            forKey: storageKey(
-                for: configuration
-            )
+        let key = storageKey(
+            for: configuration
         )
+
+        defaults.removeObject(
+            forKey: key
+        )
+
+        Self.cache.removeValue(forKey: key)
     }
 
     // MARK: - Storage Key

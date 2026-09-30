@@ -91,14 +91,6 @@ struct MetadataSettingsView: View {
                 }
 
                 Section {
-                    MDBListConfigurationCard()
-                } header: {
-                    Text("MDBList")
-                } footer: {
-                    Text("Popcornmeter en Letterboxd komen via MDBList (mdblist.com). Vul hieronder een gratis API-sleutel in om die twee scores te tonen.")
-                }
-
-                Section {
                     toggleRow(.imdb, isOn: $imdb)
                     toggleRow(.tmdb, isOn: $tmdb)
                     toggleRow(.tomatometer, isOn: $tomatometer)
@@ -110,7 +102,7 @@ struct MetadataSettingsView: View {
                 } header: {
                     Text("Ratings")
                 } footer: {
-                    Text("Kies welke ratings zichtbaar zijn op film- en seriepagina's. Een titel toont alleen de scores die de bron er daadwerkelijk voor heeft. Popcornmeter en Letterboxd tonen enkel iets wanneer hierboven een MDBList API-sleutel is ingesteld.")
+                    Text("Kies welke ratings zichtbaar zijn op film- en seriepagina's. Een titel toont alleen de scores die de bron er daadwerkelijk voor heeft. Popcornmeter en Letterboxd tonen enkel iets wanneer je bij Account een MDBList API-sleutel hebt ingesteld.")
                 }
 
                 Section {

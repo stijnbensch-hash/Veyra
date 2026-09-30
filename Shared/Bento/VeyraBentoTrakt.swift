@@ -25,6 +25,18 @@ import Observation
 
 nonisolated enum MediaKind: String, Sendable, Codable { case movie, episode }
 
+/// Trakt geeft voor afleveringen zonder eigen titel vaak een kale placeholder terug
+/// ("Episode 10", "Aflevering 10") i.p.v. `nil` -- dat dupliceert wat de episodecode
+/// ("S11E10") al zegt, dus zo'n titel telt hier als "geen titel".
+private func isGenericEpisodeTitle(_ title: String?, code: String?) -> Bool {
+    guard let title else { return false }
+    let trimmed = title.trimmingCharacters(in: .whitespaces)
+    guard let number = code?.split(separator: "E").last else {
+        return trimmed.range(of: #"^(Episode|Aflevering)\s*\d+$"#, options: [.regularExpression, .caseInsensitive]) != nil
+    }
+    return trimmed.range(of: #"^(Episode|Aflevering)\s*0*\#(number)$"#, options: [.regularExpression, .caseInsensitive]) != nil
+}
+
 nonisolated struct Artwork: Sendable, Equatable {
     var backdrop: URL?
     var logo: URL?
@@ -58,8 +70,8 @@ nonisolated struct ContinueItem: Identifiable, Hashable, Sendable, Codable {
 
     var subtitle: String? {
         switch (episodeCode, episodeTitle) {
-        case let (c?, t?): return "\(c) · \(t)"
-        case let (c?, nil): return c
+        case let (c?, t?) where !isGenericEpisodeTitle(t, code: c): return "\(c) · \(t)"
+        case let (c?, _): return c
         default: return year.map(String.init)
         }
     }
@@ -117,8 +129,8 @@ nonisolated struct UpcomingItem: Identifiable, Equatable, Sendable, Codable {
 
     var subtitle: String? {
         switch (episodeCode, episodeTitle) {
-        case let (c?, t?): return "\(c) · \(t)"
-        case let (c?, nil): return c
+        case let (c?, t?) where !isGenericEpisodeTitle(t, code: c): return "\(c) · \(t)"
+        case let (c?, _): return c
         default: return nil
         }
     }
@@ -291,31 +303,21 @@ nonisolated final class TraktHomeAPI: TraktHomeProviding {
     private let session: URLSession
     private let base = URL(string: "https://api.trakt.tv")!
     private let upNextLimit: Int
-    private let upNextMaxAgeDays: Int
 
     init(clientID: String,
          tokens: any TraktTokenProviding,
          session: URLSession = .shared,
-         upNextLimit: Int = 40,
-         upNextMaxAgeDays: Int = 365) {
+         upNextLimit: Int = 200) {
         self.clientID = clientID
         self.tokens = tokens
         self.session = session
         self.upNextLimit = upNextLimit
-        self.upNextMaxAgeDays = upNextMaxAgeDays
     }
 
     // MARK: Verder kijken
 
     func continueWatching(limit: Int) async throws -> [ContinueItem] {
-        let items = await withEpisodeCounts(try await baseContinueWatching(limit: limit))
-        // Een verlopen/niet-opgeschoonde sync/playback-checkpoint kan blijven bestaan nadat een
-        // serie al volledig is bijgewerkt (bv. via de "Bekeken"-knop) -- zonder deze check zou zo'n
-        // stale record de serie hier laten verschijnen terwijl er niets meer te vervolgen is
-        // ("0 te gaan"). Alleen weren als de aflevering-telling daadwerkelijk gelukt is
-        // (episodesLeft != nil); bij een throttled/mislukte telling blijft het item conservatief
-        // staan in plaats van ten onrechte te verdwijnen.
-        return items.filter { $0.kind != .episode || ($0.episodesLeft ?? 1) > 0 }
+        try await baseContinueWatching(limit: limit)
     }
 
     /// Voortgang van één serie: uit de cache, anders van Trakt (niet tijdens een limiet-pauze).
@@ -339,29 +341,34 @@ nonisolated final class TraktHomeAPI: TraktHomeProviding {
 
     /// Vult per serie in hoeveel afleveringen gezien zijn en hoeveel er nog resten (Trakt `progress/watched`).
     private func withEpisodeCounts(_ items: [ContinueItem]) async -> [ContinueItem] {
-        let wanted = items.filter { $0.kind == .episode && $0.airedEpisodes == nil && $0.showTraktID != nil }
-        var counts: [String: (Int, Int)] = [:]
+        var requestedShows = Set<Int>()
+        let wanted = items.compactMap { item -> Int? in
+            guard item.kind == .episode, item.airedEpisodes == nil,
+                  let id = item.showTraktID, requestedShows.insert(id).inserted else { return nil }
+            return id
+        }
+        var counts: [Int: (Int, Int)] = [:]
         var index = 0
         while index < wanted.count, !TraktHomeThrottle.shared.isBlocked {
             let chunk = Array(wanted[index..<min(index + 6, wanted.count)])
             index += 6
-            let part = await withTaskGroup(of: (String, Int, Int)?.self) { group in
-                for item in chunk {
-                    guard let sid = item.showTraktID else { continue }
+            let part = await withTaskGroup(of: (Int, Int, Int)?.self) { group in
+                for sid in chunk {
                     group.addTask { [self] in
                         guard let progress = await showProgress(sid),
                               let aired = progress.aired, let completed = progress.completed else { return nil }
-                        return (item.id, completed, aired)
+                        return (sid, completed, aired)
                     }
                 }
-                var found: [(String, Int, Int)] = []
+                var found: [(Int, Int, Int)] = []
                 for await result in group { if let result { found.append(result) } }
                 return found
             }
             for (id, completed, aired) in part { counts[id] = (completed, aired) }
         }
         return items.map { item in
-            guard let (completed, aired) = counts[item.id] else { return item }
+            guard let id = item.showTraktID,
+                  let (completed, aired) = counts[id] else { return item }
             var copy = item
             copy.watchedEpisodes = completed
             copy.airedEpisodes = aired
@@ -372,10 +379,11 @@ nonisolated final class TraktHomeAPI: TraktHomeProviding {
     private func baseContinueWatching(limit: Int) async throws -> [ContinueItem] {
         let playback: [TraktPlaybackDTO] = try await get("sync/playback", query: [.init(name: "extended", value: "full")])
 
-        // 1. Onderbroken items, nieuwste eerst, één per serie.
-        var seenShows = Set<Int>()
+        // 1. Onderbroken items, nieuwste eerst. Pas na de voortgangscontrole
+        // kiezen we één checkpoint per serie: de nieuwste kan al voltooid zijn.
         var items: [ContinueItem] = []
-        for p in playback.sorted(by: { $0.pausedAt > $1.pausedAt }) {
+        let checkpointScanLimit = max(limit * 4, 100)
+        for p in playback.sorted(by: { $0.pausedAt > $1.pausedAt }).prefix(checkpointScanLimit) {
             let fraction = min(max(p.progress / 100, 0), 1)
             switch p.type {
             case "movie":
@@ -387,7 +395,6 @@ nonisolated final class TraktHomeAPI: TraktHomeProviding {
                     tmdbID: m.ids.tmdb, showTraktID: nil, lastWatched: p.pausedAt, isUpNext: false))
             case "episode":
                 guard let e = p.episode, let s = p.show else { continue }
-                if let sid = s.ids.trakt, !seenShows.insert(sid).inserted { continue }
                 let runtime = e.runtime ?? s.runtime
                 items.append(ContinueItem(
                     id: "pb-\(p.id)", playbackID: p.id, kind: .episode, title: s.title, year: s.year,
@@ -397,41 +404,74 @@ nonisolated final class TraktHomeAPI: TraktHomeProviding {
             default: continue
             }
         }
+        // Controleer checkpoints vóór de limiet: een oude, inmiddels voltooide serie
+        // mag geen plaats innemen die voor een echte volgende aflevering bedoeld is.
+        // Als de telling tijdelijk niet lukt, blijft het checkpoint behouden.
+        items = await withEpisodeCounts(items)
+            .filter { $0.kind != .episode || ($0.episodesLeft ?? 1) > 0 }
+        var seenShows = Set<Int>()
+        items = items.filter { item in
+            guard item.kind == .episode, let id = item.showTraktID else { return true }
+            return seenShows.insert(id).inserted
+        }
         if items.count >= limit { return Array(items.prefix(limit)) }
+        let keptShowIDs = Set(items.compactMap(\.showTraktID))
 
-        // 2. Aanvullen met "volgende aflevering" van recent bekeken series.
-        let cutoff = Date().addingTimeInterval(-Double(upNextMaxAgeDays) * 86_400)
-        let watched: [TraktWatchedShowDTO] = (try? await get("sync/watched/shows", query: [.init(name: "extended", value: "noseasons")])) ?? []
-        let candidates = watched
-            .filter { $0.lastWatchedAt > cutoff }
-            .filter { w in w.show.ids.trakt.map { !seenShows.contains($0) } ?? false }
-            .sorted { $0.lastWatchedAt > $1.lastWatchedAt }
-            .prefix(min(upNextLimit, limit - items.count))
-
+        // 2. Aanvullen met "volgende aflevering" van bekeken series. Oudere series
+        // mogen ook mee: de volgende aflevering kan nog steeds openstaan.
         var upNext: [ContinueItem] = []
-        let list = Array(candidates)
-        var position = 0
-        while position < list.count, !TraktHomeThrottle.shared.isBlocked {
-            let chunk = Array(list[position..<min(position + 6, list.count)])
-            position += 6
-            let part = await withTaskGroup(of: ContinueItem?.self) { group in
-                for w in chunk {
-                    group.addTask { [self] in
-                        guard let sid = w.show.ids.trakt,
-                              let progress = await showProgress(sid),
-                              let next = progress.nextEpisode else { return nil }
-                        return ContinueItem(
-                            id: "next-\(sid)-\(Self.code(next))", playbackID: nil, kind: .episode,
-                            title: w.show.title, year: w.show.year, episodeCode: Self.code(next), episodeTitle: next.title,
-                            progress: 0, remainingMinutes: next.runtime ?? w.show.runtime,
-                            tmdbID: w.show.ids.tmdb, showTraktID: sid, lastWatched: w.lastWatchedAt, isUpNext: true)
-                    }
-                }
-                var out: [ContinueItem] = []
-                for await item in group { if let item { out.append(item) } }
-                return out
+        var page = 1
+        var checkedShows = 0
+        var seenWatchedIDs = Set<Int>()
+        while items.count + upNext.count < limit, checkedShows < upNextLimit,
+              !TraktHomeThrottle.shared.isBlocked {
+            // Sinds juli 2026 geeft Trakt /sync/watched/shows maximaal één pagina
+            // terug per verzoek. Zonder page/limit ontbraken oudere series hier.
+            let watched: [TraktWatchedShowDTO] = try await get(
+                "sync/watched/shows",
+                query: [.init(name: "page", value: String(page)),
+                        .init(name: "limit", value: "250")]
+            )
+            guard !watched.isEmpty else { break }
+            let newRows = watched.filter { row in
+                guard let id = row.show.ids.trakt else { return false }
+                return seenWatchedIDs.insert(id).inserted
             }
-            upNext += part
+            guard !newRows.isEmpty else { break }
+            let candidates = newRows
+                .filter { row in row.show.ids.trakt.map { !keptShowIDs.contains($0) } ?? false }
+                .sorted { $0.lastWatchedAt > $1.lastWatchedAt }
+
+            var position = 0
+            while position < candidates.count, items.count + upNext.count < limit,
+                  checkedShows < upNextLimit, !TraktHomeThrottle.shared.isBlocked {
+                let end = min(position + 6, candidates.count, position + upNextLimit - checkedShows)
+                let chunk = Array(candidates[position..<end])
+                position = end
+                checkedShows += chunk.count
+                let part = await withTaskGroup(of: ContinueItem?.self) { group in
+                    for w in chunk {
+                        group.addTask { [self] in
+                            guard let sid = w.show.ids.trakt,
+                                  let progress = await showProgress(sid),
+                                  let next = progress.nextEpisode else { return nil }
+                            var item = ContinueItem(
+                                id: "next-\(sid)-\(Self.code(next))", playbackID: nil, kind: .episode,
+                                title: w.show.title, year: w.show.year, episodeCode: Self.code(next), episodeTitle: next.title,
+                                progress: 0, remainingMinutes: next.runtime ?? w.show.runtime,
+                                tmdbID: w.show.ids.tmdb, showTraktID: sid, lastWatched: w.lastWatchedAt, isUpNext: true)
+                            item.watchedEpisodes = progress.completed
+                            item.airedEpisodes = progress.aired
+                            return item
+                        }
+                    }
+                    var out: [ContinueItem] = []
+                    for await item in group { if let item { out.append(item) } }
+                    return out
+                }
+                upNext += part
+            }
+            page += 1
         }
         items.append(contentsOf: upNext.sorted { $0.lastWatched > $1.lastWatched })
         return Array(items.prefix(limit))
@@ -620,26 +660,21 @@ final class VeyraHomeViewModel {
         do { return .success(try await work()) } catch { return .failure(error) }
     }
 
-    /// "Algemeen \u2192 Startscherm \u2192 Aantal tegels" (Instellingen) -- begrenst hoeveel
+    /// "Home \u2192 Verder kijken en Binnenkort \u2192 Aantal tegels" begrenst hoeveel
     /// "Verder kijken"-kaarten getoond worden, meest recente behouden. Rechtstreeks uit
     /// UserDefaults gelezen (i.p.v. @AppStorage, dat enkel in Views werkt); 10 als terugval
     /// zolang de instelling nooit is opgeslagen (UserDefaults.integer geeft dan 0 terug).
     private static var continueWatchingLimit: Int {
         let stored = UserDefaults.standard.integer(forKey: GeneralSettingsDefaults.continueWatchingLimitKey)
-        return stored > 0 ? stored : 10
+        return stored > 0 ? min(stored, 50) : 10
     }
 
     func load() async {
         phase = .loading
         let provider = self.provider
-        // Ruimer ophalen dan uiteindelijk getoond wordt (zie `continueWatchingLimit` hieronder):
-        // Trakt-checkpoints die geen "te gaan" meer hebben, worden client-side weggefilterd
-        // (zie `continueWatching(limit:)`), dus een kleine instelling mag niet ook al de
-        // ruwe ophaling beperken -- anders houd je soms minder dan gevraagd over. Wél begrensd
-        // i.p.v. een vaste 80: elk extra item kost een eigen "progress/watched"-aanroep per
-        // serie, dus bij de standaardinstelling (10) onnodig 80 ophalen kostte extra tijd
-        // bovenop de eigenlijke boosdoener (zie `serverErrorRetryDelays` hierboven).
-        let fetchLimit = min(Self.continueWatchingLimit * 2, 40)
+        // De provider filtert voltooide checkpoints vóór hij volgende afleveringen
+        // toevoegt. Daardoor is overmatig ophalen hier niet meer nodig.
+        let fetchLimit = Self.continueWatchingLimit
         async let cont = Self.capture { try await provider.continueWatching(limit: fetchLimit) }
         async let soon = Self.capture { try await provider.upcoming(days: 14) }
         let (c, u) = await (cont, soon)

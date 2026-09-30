@@ -15,6 +15,21 @@ struct VeyraHomeContinueWatchingSettingsView: View {
     @AppStorage(GeneralSettingsDefaults.pulseBadgesKey)
     private var showPulseBadges = true
 
+    // "Aantal tegels" wijzigen paste tot nu toe alleen de al-opgehaalde/gecachete lijst aan --
+    // die was zelf al tot de OUDE limiet afgeknipt (zie `VeyraHomeViewModel.load()`), dus een
+    // hogere waarde toonde niets extra's zonder een verse Trakt-ophaling. Kort debouncen (i.p.v.
+    // bij elke +/-tik meteen) zodat een snelle reeks tikken niet evenzoveel netwerkaanroepen geeft.
+    @State private var reloadTask: Task<Void, Never>?
+
+    private func scheduleReload() {
+        reloadTask?.cancel()
+        reloadTask = Task {
+            try? await Task.sleep(for: .milliseconds(600))
+            guard !Task.isCancelled else { return }
+            await VeyraBentoServices.shared.bento.home.load()
+        }
+    }
+
     var body: some View {
 #if os(tvOS)
         ZStack {
@@ -33,7 +48,7 @@ struct VeyraHomeContinueWatchingSettingsView: View {
                                 Image(systemName: "minus.circle")
                             }
                             Button {
-                                continueWatchingLimit = min(30, continueWatchingLimit + 1)
+                                continueWatchingLimit = min(50, continueWatchingLimit + 1)
                             } label: {
                                 Image(systemName: "plus.circle")
                             }
@@ -50,6 +65,7 @@ struct VeyraHomeContinueWatchingSettingsView: View {
             .frame(maxWidth: 1000)
         }
         .navigationTitle("Verder kijken & Binnenkort")
+        .onChange(of: continueWatchingLimit) { scheduleReload() }
 #else
         Form {
             Section {
@@ -57,7 +73,7 @@ struct VeyraHomeContinueWatchingSettingsView: View {
                 Stepper(
                     "Aantal tegels: \(continueWatchingLimit)",
                     value: $continueWatchingLimit,
-                    in: 1...30
+                    in: 1...50
                 )
                 .disabled(!showContinueWatching)
                 Toggle("Binnenkort tonen", isOn: $showUpcoming)
@@ -67,6 +83,7 @@ struct VeyraHomeContinueWatchingSettingsView: View {
             }
         }
         .navigationTitle("Verder kijken & Binnenkort")
+        .onChange(of: continueWatchingLimit) { scheduleReload() }
 #endif
     }
 }

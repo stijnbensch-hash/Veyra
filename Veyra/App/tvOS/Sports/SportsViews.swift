@@ -10,434 +10,73 @@ private let sportsNavy =
 // MARK: - Sports Center
 
 struct SportsView: View {
-    @StateObject
-    private var store =
-        SportsStore()
+    // Zelfde gedeelde `VeyraSportViewModel`/cache als de Home-sectie "Sport" -- geen tweede fetch
+    // (spec §4/§57). Teams/competities komen rechtstreeks uit de bestaande `SportsFavorites`/
+    // `SportsDisplayPreferences`, geen nieuw favorieten-systeem.
+    private var sportModel: VeyraSportViewModel { VeyraBentoServices.shared.sport }
 
-    @Environment(\.scenePhase)
-    private var scenePhase
-
-    @State
-    private var date =
-        Calendar.current.startOfDay(
-            for: Date()
-        )
-
-    @State
-    private var leagueID: String?
-
-    @State
-    private var filter =
-        SportsFilter.all
-
-    @State
-    private var favoritesOnly =
-        false
-
-    @State
-    private var selectedMatch:
-        SportsMatch?
-
-    @FocusState
-    private var focusedMatchID:
-        String?
-
-    private var filtered:
-        [SportsMatch]
-    {
-        store.matches.filter {
-            (
-                leagueID == nil
-                || $0.league.id == leagueID
-            )
-            &&
-            (
-                !favoritesOnly
-                || store.isFavorite($0)
-            )
-            &&
-            filter.accepts($0)
-        }
-    }
+    @State private var now = Date()
+    @State private var favoriteTeams: [StoredFavoriteTeam] = []
+    @State private var favoriteLeagues: [SportsLeague] = []
+    @State private var sportQuery: SportChannelQuery?
+    @State private var activeSportEvent: SportEvent?
+    @State private var bentoChannel: PlayableSource?
+    @State private var showSettings = false
+    @State private var selectedTeam: StoredFavoriteTeam?
+    @State private var selectedLeague: SportsLeague?
 
     var body: some View {
-        ScrollView(.vertical) {
-            VStack(alignment: .leading, spacing: 28) {
-                featuredEvent
-                sidebar
-                content
+        VeyraSportsHome(
+            sportModel: sportModel,
+            now: now,
+            favoriteTeams: favoriteTeams,
+            favoriteLeagues: favoriteLeagues,
+            onPlay: { event in activeSportEvent = event; sportQuery = SportChannelQuery(event: event) },
+            onSelectTeam: { selectedTeam = $0 },
+            onSelectLeague: { selectedLeague = $0 },
+            onOpenSettings: { showSettings = true }
+        )
+        .preferredColorScheme(.dark)
+        .navigationTitle("")
+        .sportChannelSheet($sportQuery) { bentoChannel = $0 }
+        .navigationDestination(item: $bentoChannel) { source in
+            PlayerView(source: source, item: MediaItem(title: source.name, type: .liveTV), sportEvent: activeSportEvent)
+        }
+        .navigationDestination(isPresented: $showSettings) { SettingsView() }
+        .navigationDestination(item: $selectedTeam) { team in
+            VeyraSportsTeamDetailView(team: team, sportModel: sportModel, now: now) { event in
+                activeSportEvent = event; sportQuery = SportChannelQuery(event: event)
             }
         }
-        .padding(
-            .horizontal,
-            VeyraSpacing.page
-        )
-        .padding(
-            .top,
-            36
-        )
-        .padding(
-            .bottom,
-            50
-        )
-        .background(VeyraBackground())
-        .preferredColorScheme(
-            .dark
-        )
-        .navigationTitle(
-            "Sport"
-        )
-        .navigationDestination(
-            item: $selectedMatch
-        ) { match in
-            SportsMatchView(
-                match: match,
-                store: store
-            )
-        }
-        .task(id: date) {
-            await store.refresh(
-                date: date
-            )
-        }
-        .task(id: scenePhase) {
-            guard
-                scenePhase == .active
-            else {
-                return
+        .navigationDestination(item: $selectedLeague) { league in
+            VeyraSportsLeagueDetailView(league: league, sportModel: sportModel, now: now) { event in
+                activeSportEvent = event; sportQuery = SportChannelQuery(event: event)
             }
-
+        }
+        .task {
+            reloadPreferences()
+            if sportModel.phase == .idle { await sportModel.load() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in
+            reloadPreferences()
+        }
+        .task {
+            // Klok + live stand periodiek verversen zolang het tabblad open is (zelfde ritme als Home).
             while !Task.isCancelled {
-                await store.refresh(
-                    date: date
-                )
-
-                do {
-                    try await Task.sleep(
-                        for: .seconds(60)
-                    )
-                } catch {
-                    return
-                }
-            }
-        }
-        .toolbar {
-            Button {
-                Task {
-                    await store.refresh(
-                        date: date,
-                        force: true
-                    )
-                }
-            } label: {
-                Label(
-                    "Vernieuwen",
-                    systemImage:
-                        "arrow.clockwise"
-                )
-            }
-            .disabled(
-                store.isLoading
-            )
-        }
-    }
-
-    // MARK: - Sidebar
-
-    @ViewBuilder private var featuredEvent: some View {
-        if let match = store.highlights.first {
-            HStack(spacing: 40) {
-                VeyraHero(title: "\(match.home.name) – \(match.away.name)", eyebrow: match.league.name,
-                          overview: store.failedLeagues.contains(match.league.id) ? "Laatste bekende stand · niet actueel" : match.status,
-                          metadata: match.showsScore ? ["\(match.homeScore ?? "–") – \(match.awayScore ?? "–")"] : []) {
-                    Button { selectedMatch = match } label: {
-                        VeyraActionLabel(title: "Wedstrijddetails", symbol: "info.circle")
-                    }.buttonStyle(VeyraFocusButtonStyle(primary: true))
-                    NavigationLink { LiveTVView() } label: {
-                        VeyraActionLabel(title: "Mijn Live TV", symbol: "tv")
-                    }.buttonStyle(VeyraFocusButtonStyle())
-                }
-                HStack(spacing: 28) {
-                    SportsTeamLogo(team: match.home, size: 100)
-                    SportsTeamLogo(team: match.away, size: 100)
-                }.padding(.trailing, 30)
+                now = Date()
+                await sportModel.reload()
+                do { try await Task.sleep(for: .seconds(60)) } catch { return }
             }
         }
     }
 
-    private var sidebar: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            HStack {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Sportcentrum")
-                        .font(VeyraTypography.section)
-                    Text("LIVE, PROGRAMMA EN UITSLAGEN")
-                        .font(.system(size: 15, weight: .medium))
-                        .tracking(2)
-                        .foregroundStyle(VeyraColors.ice.opacity(0.72))
-                }
-                Spacer()
-                Toggle("Mijn teams", isOn: $favoritesOnly).frame(width: 280)
-            }
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 18) {
-                    Button { leagueID = nil } label: {
-                        Label("Alle competities", systemImage: "sportscourt")
-                            .padding(.horizontal, 22).frame(height: 62)
-                    }.buttonStyle(VeyraFocusButtonStyle(primary: leagueID == nil))
-                    ForEach(SportsLeague.all) { league in
-                        Button { leagueID = league.id } label: {
-                            Label(league.name, systemImage: league.symbol)
-                                .padding(.horizontal, 22).frame(height: 62)
-                        }.buttonStyle(VeyraFocusButtonStyle(primary: leagueID == league.id))
-                    }
-                }.padding(12)
-            }.scrollClipDisabled()
-        }.font(.system(size: 22, weight: .medium)).foregroundStyle(.white)
-    }
-
-    // MARK: - Main Content
-
-    private var content:
-        some View
-    {
-        VStack(
-            alignment: .leading,
-            spacing: 28
-        ) {
-            dateHeader
-
-            Picker(
-                "Wedstrijden",
-                selection:
-                    $filter
-            ) {
-                ForEach(
-                    SportsFilter.allCases
-                ) {
-                    Text(
-                        $0.rawValue
-                    )
-                    .tag($0)
-                }
-            }
-            .pickerStyle(
-                .segmented
-            )
-
-            SportsFeedStatus(
-                store: store
-            )
-
-            if filtered.isEmpty {
-                ContentUnavailableView(
-                    store.isLoading
-                        ? "Scores laden"
-                        : "Geen wedstrijden",
-                    systemImage:
-                        store.isLoading
-                        ? "clock"
-                        : "sportscourt",
-                    description:
-                        Text(
-                            emptyMessage
-                        )
-                )
-            } else {
-                Group {
-                    LazyVGrid(
-                        columns: [
-                            GridItem(
-                                .flexible()
-                            ),
-                            GridItem(
-                                .flexible()
-                            )
-                        ],
-                        spacing: 28
-                    ) {
-                        ForEach(
-                            filtered
-                        ) { match in
-                            matchControl(
-                                match
-                            )
-                        }
-                    }
-                    .padding(16)
-                }
-                .scrollClipDisabled()
-            }
-        }
-    }
-
-    // MARK: - Date Header
-
-    private var dateHeader:
-        some View
-    {
-        HStack(
-            spacing: 24
-        ) {
-            Button {
-                changeDate(-1)
-            } label: {
-                Image(
-                    systemName:
-                        "chevron.left"
-                )
-            }
-            .accessibilityLabel(
-                "Vorige dag"
-            )
-
-            Text(
-                date.formatted(
-                    .dateTime
-                        .weekday(.wide)
-                        .day()
-                        .month(.wide)
-                )
-            )
-            .font(
-                .system(
-                    size: 30,
-                    weight: .semibold
-                )
-            )
-            .frame(
-                maxWidth:
-                    .infinity
-            )
-
-            Button {
-                changeDate(1)
-            } label: {
-                Image(
-                    systemName:
-                        "chevron.right"
-                )
-            }
-            .accessibilityLabel(
-                "Volgende dag"
-            )
-
-            Button(
-                "Vandaag"
-            ) {
-                date =
-                    Calendar.current
-                        .startOfDay(
-                            for: Date()
-                        )
-            }
-        }
-    }
-
-    // MARK: - Match Control
-
-    private func matchControl(
-        _ match:
-            SportsMatch
-    ) -> some View {
-        let isFocused =
-            focusedMatchID
-                == match.id
-
-        return SportsScoreCard(
-            match: match,
-            favorite:
-                store.isFavorite(
-                    match
-                ),
-            stale:
-                store.failedLeagues
-                    .contains(
-                        match.league.id
-                    ),
-            isFocused:
-                isFocused
-        )
-        .contentShape(
-            RoundedRectangle(
-                cornerRadius: 20,
-                style: .continuous
-            )
-        )
-        .focusable(true)
-        .focused(
-            $focusedMatchID,
-            equals:
-                match.id
-        )
-        .focusEffectDisabled()
-        .onTapGesture {
-            selectedMatch =
-                match
-        }
-        .contextMenu {
-            Button {
-                store.toggle(match.home)
-            } label: {
-                Label(
-                    match.home.name,
-                    systemImage: store.isFavoriteTeam(match.home) ? "star.fill" : "star"
-                )
-            }
-
-            Button {
-                store.toggle(match.away)
-            } label: {
-                Label(
-                    match.away.name,
-                    systemImage: store.isFavoriteTeam(match.away) ? "star.fill" : "star"
-                )
-            }
-        }
-        .accessibilityElement(
-            children: .ignore
-        )
-        .accessibilityLabel(
-            "\(match.home.name) tegen \(match.away.name)"
-        )
-        .accessibilityValue(
-            match.status
-        )
-    }
-
-    // MARK: - Empty Message
-
-    private var emptyMessage:
-        String
-    {
-        if store.isLoading {
-            return
-                "Het programma en de uitslagen worden opgehaald."
-        }
-
-        if !store
-            .failedLeagues
-            .isEmpty
-        {
-            return
-                "Een deel van de scores is niet bereikbaar. Probeer Vernieuwen."
-        }
-
-        return favoritesOnly
-            ? "Geen wedstrijden voor je favoriete teams bij deze selectie. Zet Mijn teams uit om andere teams te vinden."
-            : "Kies een andere dag, competitie of filter."
-    }
-
-    private func changeDate(
-        _ delta: Int
-    ) {
-        date =
-            Calendar.current.date(
-                byAdding: .day,
-                value: delta,
-                to: date
-            )
-            ?? date
+    /// Herleest favoriete teams + aangezette competities -- reageert zo automatisch op wijzigingen
+    /// in Instellingen zonder herstart (spec §35).
+    private func reloadPreferences() {
+        let ids = SportsFavorites.ids()
+        let info = SportsFavorites.info()
+        favoriteTeams = ids.compactMap { info[$0] }.sorted { $0.name < $1.name }
+        favoriteLeagues = SportsLeague.all.filter { SportsDisplayPreferences.isLeagueEnabled($0.id) }
     }
 }
 

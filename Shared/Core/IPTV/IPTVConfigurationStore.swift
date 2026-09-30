@@ -350,6 +350,8 @@ struct IPTVConfigurationStore {
             at: index
         )
 
+        IPTVProviderEnablement.forget(id)
+
         if state.activeProviderID == id {
             state.activeProviderID =
                 state.providers.first?.id

@@ -87,7 +87,15 @@ private struct HomeDestinations: ViewModifier {
                 VeyraBentoTitleDestination(item: item)
             }
             .navigationDestination(item: $channel) { source in
+                // `sportEvent` geeft op iOS de live-matchoverlay (`VeyraMatchCenterOverlay`) door aan
+                // `PlayerView`. Op macOS is dat een ander type (`MacPlayerView.swift`'s eigen
+                // `PlayerView`, zonder die parameter) -- geen massale refactor hiervoor, gewoon
+                // per platform de juiste initializer aanroepen.
+                #if os(iOS)
                 PlayerView(source: source, item: MediaItem(title: source.name, type: .liveTV), sportEvent: sportEvent)
+                #else
+                PlayerView(source: source, item: MediaItem(title: source.name, type: .liveTV))
+                #endif
             }
             .navigationDestination(item: $film) { film in
                 PlayerView(source: film.playableSource)

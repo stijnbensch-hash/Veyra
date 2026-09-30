@@ -1970,6 +1970,14 @@ struct AccountView:
                     Text("Optioneel: echte banners in de kleine Verder kijken-kaartjes op Home.")
                 }
 
+                Section {
+                    MDBListConfigurationCard()
+                } header: {
+                    Text("MDBList")
+                } footer: {
+                    Text("Popcornmeter en Letterboxd komen via MDBList (mdblist.com). Vul hier een gratis API-sleutel in om die twee scores te tonen bij Instellingen → Metadata → Ratings.")
+                }
+
             }
             .frame(maxWidth: 1000)
         }

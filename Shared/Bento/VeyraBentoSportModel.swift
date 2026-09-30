@@ -378,6 +378,57 @@ final class VeyraSportViewModel {
         return Array(mine.filter { $0.isPast(at: now) }.suffix(limit).reversed())
     }
 
+    /// "Live Voor Jou" (Sport-redesign spec §15/§62): live wedstrijden gerangschikt op
+    /// persoonlijke relevantie -- team-match eerst, dan league-match, dan overige live
+    /// wedstrijden. Score speelt GEEN rol in de rangschikking (enkel relevantie + tijd).
+    func liveForYou(at now: Date, favoriteTeamIDs: Set<String>, favoriteLeagueNames: Set<String>) -> [SportEvent] {
+        func rank(_ event: SportEvent) -> Int {
+            if (event.homeTeamID.map(favoriteTeamIDs.contains) ?? false)
+                || (event.awayTeamID.map(favoriteTeamIDs.contains) ?? false) { return 0 }
+            if let competition = event.competition, favoriteLeagueNames.contains(competition) { return 1 }
+            return 2
+        }
+        return liveEvents(at: now).sorted { a, b in
+            let ra = rank(a), rb = rank(b)
+            return ra == rb ? a.start < b.start : ra < rb
+        }
+    }
+
+    /// "Vandaag" (spec §21-23): alle wedstrijden die vandaag (lokale kalenderdag) starten,
+    /// chronologisch. Tijd blijft altijd leidend; enkel bij een exact gelijke starttijd breekt
+    /// persoonlijke relevantie (team > league > overig) de gelijkstand (spec §23).
+    func today(at now: Date, favoriteTeamIDs: Set<String>, favoriteLeagueNames: Set<String>,
+              calendar: Calendar = .current) -> [SportEvent] {
+        let dayStart = calendar.startOfDay(for: now)
+        guard let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart) else { return [] }
+        func rank(_ event: SportEvent) -> Int {
+            if (event.homeTeamID.map(favoriteTeamIDs.contains) ?? false)
+                || (event.awayTeamID.map(favoriteTeamIDs.contains) ?? false) { return 0 }
+            if let competition = event.competition, favoriteLeagueNames.contains(competition) { return 1 }
+            return 2
+        }
+        let todays = events.filter { $0.start >= dayStart && $0.start < dayEnd }
+        return todays.sorted { a, b in
+            a.start != b.start ? a.start < b.start : rank(a) < rank(b)
+        }
+    }
+
+    /// "Binnenkort" (spec §24/§25): toekomstige wedstrijden (na vandaag) van gekozen teams
+    /// OF competities, gededupliceerd via `Identifiable`, chronologisch. Groepering per dag
+    /// gebeurt in de view zelf (`VeyraSportsUpcomingSection`).
+    func upcoming(at now: Date, favoriteTeamIDs: Set<String>, favoriteLeagueNames: Set<String>,
+                 calendar: Calendar = .current, limit: Int = 30) -> [SportEvent] {
+        guard let tomorrowStart = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now))
+        else { return [] }
+        let relevant = events.filter { event in
+            event.start >= tomorrowStart
+                && ((event.homeTeamID.map(favoriteTeamIDs.contains) ?? false)
+                    || (event.awayTeamID.map(favoriteTeamIDs.contains) ?? false)
+                    || (event.competition.map(favoriteLeagueNames.contains) ?? false))
+        }
+        return Array(relevant.sorted { $0.start < $1.start }.prefix(limit))
+    }
+
     /// Per-competitie-subsecties (bv. "College Football") voor de iOS-Sport-sectie: elke competitie
     /// met minstens 1 relevante wedstrijd krijgt een rij kaarten, live/soonste competitie eerst.
     func leagueSections(at now: Date, limitPerLeague: Int = 6) -> [(name: String, events: [SportEvent])] {

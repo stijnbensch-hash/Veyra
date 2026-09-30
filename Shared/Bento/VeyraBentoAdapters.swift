@@ -393,6 +393,14 @@ final class VeyraLiveGuideSource {
     /// Zenders waarvan de gids rond de aftrap een programma met deze teams heeft (zie `SportChannelMatcher`).
     func sportChannels(teams: [String], start: Date) async -> [SportChannelMatch] {
         await reloadIfNeeded()
+        // De actieve provider staat uit voor discovery (Instellingen > IPTV) -- dan ook geen
+        // sportwedstrijden meer matchen op zijn zenders, net als bij "Nieuw toegevoegd"/"Nieuw
+        // op je zenders". `allChannels` hieronder blijft bewust ongefilterd op categorie/zender-
+        // zichtbaarheid (zie het bestaande commentaar erbij), enkel de provider-aan/uit-schakelaar
+        // geldt hier ook.
+        if let activeProviderID = guide.activeProviderID, !IPTVDiscoveryVisibility.shared.isProviderEnabled(activeProviderID) {
+            return []
+        }
         let index = guide.programmeIndex
         // `allChannels` i.p.v. `channels`: sportwedstrijd-matching moet alle
         // providerzenders met een EPG-naam-match kunnen vinden, ook zenders die
@@ -642,23 +650,26 @@ final class VeyraIPTVNewSource {
     private let maxAge: TimeInterval = 6 * 3600
     private let limit = 20
 
-    /// Zichtbaar volgens Instellingen > IPTV: de categorie én het item zelf moeten zichtbaar zijn.
-    private static func isVisible(_ item: IPTVVODItem, _ preferences: IPTVProviderPreferences) -> Bool {
-        if let categoryID = item.categoryID, !categoryID.isEmpty, !preferences.isVODCategoryVisible(categoryID) { return false }
-        return preferences.isVODItemVisible(item.id)
+    /// Zichtbaar volgens Instellingen > IPTV (categorie + item) EN volgens
+    /// `IPTVProviderEnablement` (provider uit voor discovery) -- via de
+    /// gedeelde `IPTVDiscoveryVisibility`-laag, zodat "Nieuw toegevoegd" dezelfde
+    /// regels volgt als elke andere discovery-sectie.
+    nonisolated private static func isVisible(_ item: IPTVVODItem, provider: IPTVStoredProvider) -> Bool {
+        let categoryID = (item.categoryID?.isEmpty == false) ? item.categoryID : nil
+        return IPTVDiscoveryVisibility.shared.isVODItemVisible(item.id, categoryID: categoryID, provider: provider)
     }
 
-    private static func isVisible(_ series: XtreamSeriesItem, _ preferences: IPTVProviderPreferences) -> Bool {
-        if let categoryID = series.categoryID, !categoryID.isEmpty, !preferences.isSeriesCategoryVisible(categoryID) { return false }
-        return preferences.isSeriesItemVisible(String(series.id))
+    nonisolated private static func isVisible(_ series: XtreamSeriesItem, provider: IPTVStoredProvider) -> Bool {
+        let categoryID = (series.categoryID?.isEmpty == false) ? series.categoryID : nil
+        return IPTVDiscoveryVisibility.shared.isSeriesItemVisible(String(series.id), categoryID: categoryID, provider: provider)
     }
 
+    /// Alleen providers die voor discovery ingeschakeld staan -- een provider die
+    /// de gebruiker hier uitzette mag niet meer in "Nieuw toegevoegd" verschijnen,
+    /// ook al staat hij nog gewoon in zijn eigen Live TV/VOD-schermen.
     private func providers() -> [IPTVStoredProvider] {
-        guard let loaded = try? IPTVConfigurationStore().loadProviders() else {
-            return []
-        }
-        return SourceOrderDefaults.sortedProviders(
-            loaded,
+        SourceOrderDefaults.sortedProviders(
+            IPTVDiscoveryVisibility.shared.enabledProviders(),
             order: SourceOrderDefaults.loadIPTVProviderOrder(),
             id: { $0.id }
         )
@@ -670,7 +681,7 @@ final class VeyraIPTVNewSource {
         let batches = await withTaskGroup(of: [IPTVHomeFilm].self) { group in
             for (index, provider) in providers.enumerated() {
                 guard case .xtream = provider.configuration else { continue }
-                group.addTask { @MainActor in
+                group.addTask {
                     await self.films(from: provider, order: index)
                 }
             }
@@ -694,35 +705,48 @@ final class VeyraIPTVNewSource {
 
     private func films(from provider: IPTVStoredProvider, order: Int) async -> [IPTVHomeFilm] {
         guard case .xtream(let xtream) = provider.configuration else { return [] }
-        let key = "recentlyAdded.vod.raw.\(provider.configuration.providerIdentifier)"
-        let cached = IPTVDiskCache.read([IPTVVODItem].self, key: key)
-        let catalog: [IPTVVODItem]
-        if let cached, Date().timeIntervalSince(cached.savedAt) < maxAge {
-            catalog = cached.value
-        } else {
-            do {
-                catalog = try await IPTVService().loadXtreamVOD(configuration: xtream)
-                IPTVDiskCache.write(catalog, key: key)
-            } catch {
-                catalog = cached?.value ?? []
+        let maxAge = self.maxAge
+        let limit = self.limit
+        // Schijf-lees/decode/filter/sorteer (mogelijk duizenden items) hoort niet op de
+        // main actor -- alleen `self` is @MainActor, dit werk zelf raakt geen UI-state
+        // aan, dus een losse achtergrond-Task houdt de UI/launch-animatie vlot.
+        return await Task.detached(priority: .userInitiated) {
+            let key = "recentlyAdded.vod.raw.\(provider.configuration.providerIdentifier)"
+            let cached = IPTVDiskCache.read([IPTVVODItem].self, key: key)
+            let catalog: [IPTVVODItem]
+            if let cached, Date().timeIntervalSince(cached.savedAt) < maxAge {
+                catalog = cached.value
+            } else {
+                do {
+                    catalog = try await IPTVService().loadXtreamVOD(configuration: xtream)
+                    IPTVDiskCache.write(catalog, key: key)
+                    if !catalog.isEmpty {
+                        await IPTVDiscoverySnapshotStore.shared.recordSuccessfulFetch(
+                            providerID: provider.id,
+                            contentType: "vod",
+                            currentIDs: Set(catalog.map(\.id))
+                        )
+                    }
+                } catch {
+                    catalog = cached?.value ?? []
+                }
             }
-        }
-        let preferences = IPTVProviderPreferencesStore().load(for: provider.configuration)
-        var seenIDs = Set<String>()
-        let visible = catalog.filter {
-            Self.isVisible($0, preferences) && seenIDs.insert($0.id).inserted
-        }.sorted {
-            if $0.added != $1.added {
-                return ($0.added ?? .distantPast) > ($1.added ?? .distantPast)
+            var seenIDs = Set<String>()
+            let visible = catalog.filter {
+                VeyraIPTVNewSource.isVisible($0, provider: provider) && seenIDs.insert($0.id).inserted
+            }.sorted {
+                if $0.added != $1.added {
+                    return ($0.added ?? .distantPast) > ($1.added ?? .distantPast)
+                }
+                let firstID = Int($0.id.split(separator: "-").last ?? "") ?? 0
+                let secondID = Int($1.id.split(separator: "-").last ?? "") ?? 0
+                return firstID > secondID
             }
-            let firstID = Int($0.id.split(separator: "-").last ?? "") ?? 0
-            let secondID = Int($1.id.split(separator: "-").last ?? "") ?? 0
-            return firstID > secondID
-        }
-        return visible.prefix(limit).enumerated().map { rank, item in
-            IPTVHomeFilm(providerID: provider.id, providerName: provider.displayName,
-                         providerOrder: order, providerRank: rank, item: item)
-        }
+            return visible.prefix(limit).enumerated().map { rank, item in
+                IPTVHomeFilm(providerID: provider.id, providerName: provider.displayName,
+                             providerOrder: order, providerRank: rank, item: item)
+            }
+        }.value
     }
 
     func series() async -> [IPTVHomeSeries] {
@@ -731,7 +755,7 @@ final class VeyraIPTVNewSource {
         let batches = await withTaskGroup(of: [IPTVHomeSeries].self) { group in
             for (index, provider) in providers.enumerated() {
                 guard case .xtream = provider.configuration else { continue }
-                group.addTask { @MainActor in
+                group.addTask {
                     await self.series(from: provider, order: index)
                 }
             }
@@ -755,33 +779,43 @@ final class VeyraIPTVNewSource {
 
     private func series(from provider: IPTVStoredProvider, order: Int) async -> [IPTVHomeSeries] {
         guard case .xtream(let xtream) = provider.configuration else { return [] }
-        let key = "recentlyAdded.series.raw.\(provider.configuration.providerIdentifier)"
-        let cached = IPTVDiskCache.read([XtreamSeriesItem].self, key: key)
-        let catalog: [XtreamSeriesItem]
-        if let cached, Date().timeIntervalSince(cached.savedAt) < maxAge {
-            catalog = cached.value
-        } else {
-            do {
-                catalog = try await IPTVService().loadXtreamSeries(configuration: xtream)
-                IPTVDiskCache.write(catalog, key: key)
-            } catch {
-                catalog = cached?.value ?? []
+        let maxAge = self.maxAge
+        let limit = self.limit
+        return await Task.detached(priority: .userInitiated) {
+            let key = "recentlyAdded.series.raw.\(provider.configuration.providerIdentifier)"
+            let cached = IPTVDiskCache.read([XtreamSeriesItem].self, key: key)
+            let catalog: [XtreamSeriesItem]
+            if let cached, Date().timeIntervalSince(cached.savedAt) < maxAge {
+                catalog = cached.value
+            } else {
+                do {
+                    catalog = try await IPTVService().loadXtreamSeries(configuration: xtream)
+                    IPTVDiskCache.write(catalog, key: key)
+                    if !catalog.isEmpty {
+                        await IPTVDiscoverySnapshotStore.shared.recordSuccessfulFetch(
+                            providerID: provider.id,
+                            contentType: "series",
+                            currentIDs: Set(catalog.map { String($0.id) })
+                        )
+                    }
+                } catch {
+                    catalog = cached?.value ?? []
+                }
             }
-        }
-        let preferences = IPTVProviderPreferencesStore().load(for: provider.configuration)
-        var seenIDs = Set<Int>()
-        let visible = catalog.filter {
-            Self.isVisible($0, preferences) && seenIDs.insert($0.id).inserted
-        }.sorted {
-            if $0.added != $1.added {
-                return ($0.added ?? .distantPast) > ($1.added ?? .distantPast)
+            var seenIDs = Set<Int>()
+            let visible = catalog.filter {
+                VeyraIPTVNewSource.isVisible($0, provider: provider) && seenIDs.insert($0.id).inserted
+            }.sorted {
+                if $0.added != $1.added {
+                    return ($0.added ?? .distantPast) > ($1.added ?? .distantPast)
+                }
+                return $0.id > $1.id
             }
-            return $0.id > $1.id
-        }
-        return visible.prefix(limit).enumerated().map { rank, item in
-            IPTVHomeSeries(providerID: provider.id, providerName: provider.displayName,
-                           providerOrder: order, providerRank: rank, item: item)
-        }
+            return visible.prefix(limit).enumerated().map { rank, item in
+                IPTVHomeSeries(providerID: provider.id, providerName: provider.displayName,
+                               providerOrder: order, providerRank: rank, item: item)
+            }
+        }.value
     }
 }
 

@@ -66,7 +66,7 @@ struct VeyraSportBackdrop: View {
                         if case .success(let image) = phase {
                             image.resizable().scaledToFit()
                                 .frame(width: geo.size.height * 0.95, height: geo.size.height * 0.95)
-                                .opacity(0.16)
+                                .opacity(0.24)
                                 .offset(x: geo.size.width * 0.28, y: -geo.size.height * 0.04)
                         }
                     }

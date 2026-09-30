@@ -1,5 +1,7 @@
 import SwiftUI
+#if os(iOS)
 import UIKit
+#endif
 
 /// Algemene Veyra-voorkeuren: startscherm, sportweergave, kaartweergave en
 /// toegankelijkheid. Zie `GeneralSettings.swift` (Shared) voor per
@@ -98,22 +100,18 @@ struct GeneralSettingsView: View {
                     Text("Past tekst aan die Dynamic Type volgt. De meeste titels en koppen in Veyra gebruiken een vaste grootte en reageren hier nog niet op.")
                 }
 
-                // Enkel op iPad tonen -- op iPhone is er sowieso altijd een
-                // tabbalk onderaan, dus deze instelling heeft daar geen
-                // effect en stond enkel nutteloos in de weg.
+                // Enkel op iPad (en altijd op Mac) tonen -- op iPhone is er sowieso
+                // altijd een tabbalk onderaan, dus deze instelling heeft daar geen
+                // effect en stond enkel nutteloos in de weg. `UIDevice` bestaat niet
+                // op macOS, dus daar toont de sectie gewoon altijd (was al de intentie,
+                // zie de footer-tekst hieronder).
+                #if os(iOS)
                 if UIDevice.current.userInterfaceIdiom == .pad {
-                    Section {
-                        Picker("Navigatie", selection: $ipadNavigationStyleRaw) {
-                            ForEach(IPadNavigationStyle.allCases) { style in
-                                Text(style.title).tag(style.rawValue)
-                            }
-                        }
-                    } header: {
-                        sectionHeader("Navigatie (iPad & Mac)", symbol: "sidebar.left", tint: VeyraColors.cyan)
-                    } footer: {
-                        Text("Kies of Veyra op de iPad en op de Mac een zijbalk of een menubalk bovenaan gebruikt — nooit allebei tegelijk.")
-                    }
+                    navigationStyleSection
                 }
+                #else
+                navigationStyleSection
+                #endif
             }
             .scrollContentBackground(.hidden)
         }
@@ -121,6 +119,20 @@ struct GeneralSettingsView: View {
     }
 
     @ViewBuilder
+    private var navigationStyleSection: some View {
+        Section {
+            Picker("Navigatie", selection: $ipadNavigationStyleRaw) {
+                ForEach(IPadNavigationStyle.allCases) { style in
+                    Text(style.title).tag(style.rawValue)
+                }
+            }
+        } header: {
+            sectionHeader("Navigatie (iPad & Mac)", symbol: "sidebar.left", tint: VeyraColors.cyan)
+        } footer: {
+            Text("Kies of Veyra op de iPad en op de Mac een zijbalk of een menubalk bovenaan gebruikt — nooit allebei tegelijk.")
+        }
+    }
+
     private func sectionHeader(_ title: String, symbol: String, tint: Color) -> some View {
         Label {
             Text(title)

@@ -1,16 +1,8 @@
 import SwiftUI
 
 struct MoviesView: View {
-    // Navigatie via de centrale `openMediaDetail`/`playMediaItem`-omgevingsacties
-    // (MediaNavigation.swift) i.p.v. eigen `@State` + `.navigationDestination(item:)`
-    // -- zie ShelfRowView voor waarom (meerdere gelijktijdige destinations voor
-    // hetzelfde type in dezelfde NavigationStack liepen vast).
-    @Environment(\.openMediaDetail) private var openMediaDetail
-    @Environment(\.playMediaItem) private var playMediaItem
-
     @State private var movies: [TMDBMovie] = []
     @State private var isLoading = true
-    @State private var isOpeningMovie = false
     @State private var errorMessage: String?
     @State private var selectedProvider: WatchProvider?
     @State private var selectedGenreID: Int?
@@ -108,18 +100,6 @@ struct MoviesView: View {
             )
             .scrollClipDisabled()
 
-            if isOpeningMovie {
-                ZStack {
-                    Color.black
-                        .opacity(0.55)
-                        .ignoresSafeArea()
-
-                    ProgressView(
-                        "Film openen…"
-                    )
-                    .font(.title3)
-                }
-            }
         }
         .task {
             await TraktStore.shared
@@ -282,13 +262,8 @@ struct MoviesView: View {
         _ movie: TMDBMovie,
         width: CGFloat
     ) -> some View {
-        Button {
-            Task {
-                await openMovie(
-                    movie
-                )
-            }
-
+        NavigationLink {
+            MovieDetailView(movie: mediaItem(for: movie))
         } label: {
             VeyraPosterCard(
                 title: movie.title,
@@ -309,9 +284,6 @@ struct MoviesView: View {
             VeyraPosterFocusStyle(cornerRadius: VeyraRadius.poster)
         )
         .reportsHero(.movie(movie))
-        .disabled(
-            isOpeningMovie
-        )
         .traktMarkWatchedMenu(
             MediaItem(
                 title: movie.title,
@@ -341,6 +313,13 @@ struct MoviesView: View {
                             )
                     )
             )
+    }
+
+    private func backdropURL(
+        for movie: TMDBMovie
+    ) -> URL? {
+        guard let path = movie.backdropPath else { return nil }
+        return URL(string: "https://image.tmdb.org/t/p/w1280" + path)
     }
 
     // MARK: - Load movies
@@ -515,62 +494,27 @@ struct MoviesView: View {
         }
     }
 
-    // MARK: - Open movie (Instant Peek "Afspelen")
-
-    @MainActor
-    private func openMovieForPlay(_ movie: TMDBMovie) async {
-        guard let service = TMDBService() else {
-            errorMessage = "De metadataservice is niet geconfigureerd."
-            return
-        }
-        guard let item = try? await service.mediaItem(for: movie) else { return }
-        playMediaItem(item)
-    }
-
     // MARK: - Open movie
 
-    @MainActor
-    private func openMovie(
-        _ movie: TMDBMovie
-    ) async {
-        guard
-            !isOpeningMovie
-        else {
-            return
-        }
+    // Bouwt het `MediaItem` rechtstreeks uit de al beschikbare `TMDBMovie`.
+    private func mediaItem(for movie: TMDBMovie) -> MediaItem {
+        MediaItem(
+            title: movie.title,
+            type: .movie,
+            tmdbID: movie.id,
+            overview: normalizedOverview(movie.overview),
+            releaseDate: movie.releaseDate,
+            posterURL: posterURL(for: movie),
+            backdropURL: backdropURL(for: movie),
+            genre: TMDBGenreNames.firstMovieName(for: movie.genreIDs ?? []),
+            rating: movie.voteAverage
+        )
+    }
 
-        isOpeningMovie =
-            true
-
-        errorMessage =
-            nil
-
-        defer {
-            isOpeningMovie =
-                false
-        }
-
-        guard
-            let service =
-                TMDBService()
-        else {
-            errorMessage =
-                "De metadataservice is niet geconfigureerd."
-
-            return
-        }
-
-        do {
-            let item = try await service
-                .mediaItem(
-                    for: movie
-                )
-            openMediaDetail(item)
-
-        } catch {
-            errorMessage =
-                error.localizedDescription
-        }
+    private func normalizedOverview(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 }
 

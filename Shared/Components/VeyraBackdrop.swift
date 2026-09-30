@@ -1,35 +1,20 @@
 import SwiftUI
 
+/// Rustige, diagonale gradient (zelfde stijl als de Live TV-gids-achtergrond) --
+/// i.p.v. de eerdere sterkere cyaan/rood-ribbons/gloed. Dit is het ene achtergrond-
+/// idioom voor de hele app: Home, Sport, Instellingen, detailschermen, Bronkeuze, enz.
 struct VeyraBackground: View {
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                VeyraColors.background
-                LinearGradient(
-                    colors: [
-                        VeyraColors.cyan.opacity(0.12),
-                        .clear,
-                        VeyraColors.red.opacity(0.11)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                RadialGradient(colors: [VeyraColors.cyan.opacity(0.22), .clear], center: .bottomLeading,
-                               startRadius: 0, endRadius: geometry.size.width * 0.62)
-                RadialGradient(colors: [VeyraColors.red.opacity(0.19), .clear], center: .topTrailing,
-                               startRadius: 0, endRadius: geometry.size.width * 0.58)
-
-                VeyraLightRibbon(color: VeyraColors.cyan)
-                    .frame(width: geometry.size.width * 0.56, height: 170)
-                    .rotationEffect(.degrees(-29))
-                    .offset(x: -geometry.size.width * 0.36, y: geometry.size.height * 0.32)
-
-                VeyraLightRibbon(color: VeyraColors.red)
-                    .frame(width: geometry.size.width * 0.52, height: 150)
-                    .rotationEffect(.degrees(31))
-                    .offset(x: geometry.size.width * 0.36, y: -geometry.size.height * 0.30)
-            }
-        }.ignoresSafeArea()
+        LinearGradient(
+            colors: [
+                VeyraColors.background,
+                Color(red: 0.015, green: 0.09, blue: 0.13),
+                Color(red: 0.075, green: 0.015, blue: 0.045)
+            ],
+            startPoint: .bottomLeading,
+            endPoint: .topTrailing
+        )
+        .ignoresSafeArea()
     }
 }
 

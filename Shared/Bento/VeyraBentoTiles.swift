@@ -95,6 +95,9 @@ struct VeyraCaptionedCardLayout {
 struct VeyraBentoContinueHeroContent: View {
     let item: ContinueItem
     var compact = false
+    /// `false` als de kaart al onder een eigen "Verder kijken"-sectiekop staat (zie
+    /// `VeyraBentoHome(IOS).swift`) -- anders zou het label hier eronder dubbel getoond worden.
+    var showLabel = true
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -137,11 +140,13 @@ struct VeyraBentoContinueHeroContent: View {
             .padding(.trailing, compact ? 44 : 84)
         }
         .overlay(alignment: .topLeading) {
-            VeyraBentoLabel(title: "Verder kijken", compact: compact)
-                .fixedSize()
-                .padding(.leading, compact ? 14 : 28)
-                .padding(.top, compact ? 12 : 22)
-                .foregroundStyle(.white.opacity(0.9))
+            if showLabel {
+                VeyraBentoLabel(title: "Verder kijken", compact: compact)
+                    .fixedSize()
+                    .padding(.leading, compact ? 14 : 28)
+                    .padding(.top, compact ? 12 : 22)
+                    .foregroundStyle(.white.opacity(0.9))
+            }
         }
         .overlay(alignment: .bottomTrailing) {
             Image(systemName: "play.fill")
@@ -185,7 +190,14 @@ struct VeyraBentoContinueMiniContent: View {
         }
         return item.isUpNext ? "" : "\(Int((item.progress * 100).rounded()))%"
 #else
-        compact ? item.shortMetaText : item.metaText
+        guard compact else { return item.metaText }
+        // "X te gaan" staat al als badge rechtsboven op de kaart (zie de
+        // `.overlay(alignment: .topTrailing)` hieronder) -- niet nog eens herhalen in de
+        // meta-pil onder de kaart.
+        if item.kind != .movie, let left = item.episodesLeft, left > 0 {
+            return item.episodeCode ?? item.shortMetaText
+        }
+        return item.shortMetaText
 #endif
     }
 

@@ -58,8 +58,13 @@ nonisolated enum VeyraNowSettingsStore {
     }
 
     /// "Vandaag niet": komt morgenochtend vroeg gewoon terug.
+    /// DST-safe: telt één KALENDERdag bij i.p.v. een vaste 24u-interval -- op een dag met
+    /// zomer-/wintertijdovergang (23 of 25 uur) gaf `addingTimeInterval(24u)` soms de
+    /// verkeerde dag terug (bv. 's avonds laat een uur te vroeg/laat over de grens).
     static func snoozeForToday(_ id: String, now: Date = Date()) {
-        let tomorrow = Calendar.current.startOfDay(for: now.addingTimeInterval(24 * 60 * 60))
+        let calendar = Calendar.current
+        let startOfToday = calendar.startOfDay(for: now)
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: startOfToday) ?? startOfToday.addingTimeInterval(24 * 60 * 60)
         update { settings in settings.snoozedUntil[id] = tomorrow }
     }
 

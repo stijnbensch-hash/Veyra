@@ -48,6 +48,17 @@ nonisolated struct SportsLeague:
     /// Optionele ESPN "groups"-queryparameter, gebruikt om binnen één ESPN-sport/competitie-pad
     /// (zoals `football/college-football`) te filteren op een specifieke conference.
     var groups: String? = nil
+    /// Vast logo (i.p.v. het via ESPN opgehaalde `SportsCompetition.logoURL`, dat voor losse
+    /// college-football-conferences niet matcht op naam). Bron: Wikipedia/Wikimedia Commons.
+    var logoURL: URL? = nil
+
+    /// Curated logo voor een ESPN-competitienaam (`SportEvent.competition`), met terugval op
+    /// een eventueel al door ESPN zelf meegeleverd logo. Herbruikt overal waar een competitielogo
+    /// nodig is buiten "Jouw Competities" zelf (bv. de match-kaart, de Veyra Now-kaart).
+    static func logo(forCompetition name: String?, fallback: URL? = nil) -> URL? {
+        guard let name else { return fallback }
+        return all.first(where: { $0.name == name })?.logoURL ?? fallback
+    }
 
     static let all: [SportsLeague] = [
         .init(
@@ -55,63 +66,72 @@ nonisolated struct SportsLeague:
             name: "Belgische Pro League",
             path: "soccer/bel.1",
             symbol: "soccerball",
-            sport: .football
+            sport: .football,
+            logoURL: URL(string: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cb/Belgian_Pro_League_logo_%282020%2C_horizontal%29.svg/500px-Belgian_Pro_League_logo_%282020%2C_horizontal%29.svg.png")
         ),
         .init(
             id: "uefa.champions",
             name: "Champions League",
             path: "soccer/uefa.champions",
             symbol: "soccerball",
-            sport: .football
+            sport: .football,
+            logoURL: URL(string: "https://upload.wikimedia.org/wikipedia/en/thumb/f/f5/UEFA_Champions_League.svg/500px-UEFA_Champions_League.svg.png")
         ),
         .init(
             id: "uefa.europa",
             name: "Europa League",
             path: "soccer/uefa.europa",
             symbol: "soccerball",
-            sport: .football
+            sport: .football,
+            logoURL: URL(string: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/UEFA_Europa_League_logo_%282024_version%29.svg/500px-UEFA_Europa_League_logo_%282024_version%29.svg.png")
         ),
         .init(
             id: "eng.1",
             name: "Premier League",
             path: "soccer/eng.1",
             symbol: "soccerball",
-            sport: .football
+            sport: .football,
+            logoURL: URL(string: "https://upload.wikimedia.org/wikipedia/en/thumb/f/f2/Premier_League_Logo.svg/500px-Premier_League_Logo.svg.png")
         ),
         .init(
             id: "esp.1",
             name: "La Liga",
             path: "soccer/esp.1",
             symbol: "soccerball",
-            sport: .football
+            sport: .football,
+            logoURL: URL(string: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/54/LaLiga_EA_Sports_2023_Vertical_Logo.svg/500px-LaLiga_EA_Sports_2023_Vertical_Logo.svg.png")
         ),
         .init(
             id: "ita.1",
             name: "Serie A",
             path: "soccer/ita.1",
             symbol: "soccerball",
-            sport: .football
+            sport: .football,
+            logoURL: URL(string: "https://upload.wikimedia.org/wikipedia/en/thumb/a/ab/Serie_A_ENILIVE_logo.svg/500px-Serie_A_ENILIVE_logo.svg.png")
         ),
         .init(
             id: "ger.1",
             name: "Bundesliga",
             path: "soccer/ger.1",
             symbol: "soccerball",
-            sport: .football
+            sport: .football,
+            logoURL: URL(string: "https://upload.wikimedia.org/wikipedia/en/thumb/d/df/Bundesliga_logo_%282017%29.svg/500px-Bundesliga_logo_%282017%29.svg.png")
         ),
         .init(
             id: "fra.1",
             name: "Ligue 1",
             path: "soccer/fra.1",
             symbol: "soccerball",
-            sport: .football
+            sport: .football,
+            logoURL: URL(string: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Logo_Ligue_1_McDonald%27s_2024.svg/500px-Logo_Ligue_1_McDonald%27s_2024.svg.png")
         ),
         .init(
             id: "nfl",
             name: "NFL",
             path: "football/nfl",
             symbol: "american.football",
-            sport: .americanFootball
+            sport: .americanFootball,
+            logoURL: URL(string: "https://upload.wikimedia.org/wikipedia/en/thumb/a/a2/National_Football_League_logo.svg/500px-National_Football_League_logo.svg.png")
         ),
         .init(
             id: "college-football-acc",
@@ -119,7 +139,8 @@ nonisolated struct SportsLeague:
             path: "football/college-football",
             symbol: "american.football",
             sport: .americanFootball,
-            groups: "1"
+            groups: "1",
+            logoURL: URL(string: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c7/Atlantic_Coast_Conference_logo.svg/500px-Atlantic_Coast_Conference_logo.svg.png")
         ),
         .init(
             id: "college-football-big12",
@@ -127,7 +148,8 @@ nonisolated struct SportsLeague:
             path: "football/college-football",
             symbol: "american.football",
             sport: .americanFootball,
-            groups: "4"
+            groups: "4",
+            logoURL: URL(string: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/29/Big_12_Conference_%28cropped%29_logo.svg/500px-Big_12_Conference_%28cropped%29_logo.svg.png")
         ),
         .init(
             id: "college-football-big-ten",
@@ -135,7 +157,8 @@ nonisolated struct SportsLeague:
             path: "football/college-football",
             symbol: "american.football",
             sport: .americanFootball,
-            groups: "5"
+            groups: "5",
+            logoURL: URL(string: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/39/Big_Ten_Conference_logo.svg/500px-Big_Ten_Conference_logo.svg.png")
         ),
         .init(
             id: "college-football-sec",
@@ -143,7 +166,8 @@ nonisolated struct SportsLeague:
             path: "football/college-football",
             symbol: "american.football",
             sport: .americanFootball,
-            groups: "8"
+            groups: "8",
+            logoURL: URL(string: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/Southeastern_Conference_logo_%282024%29.svg/500px-Southeastern_Conference_logo_%282024%29.svg.png")
         ),
         .init(
             id: "college-football-pac12",
@@ -151,7 +175,8 @@ nonisolated struct SportsLeague:
             path: "football/college-football",
             symbol: "american.football",
             sport: .americanFootball,
-            groups: "9"
+            groups: "9",
+            logoURL: URL(string: "https://upload.wikimedia.org/wikipedia/en/thumb/a/ac/Pac-12_logo.svg/500px-Pac-12_logo.svg.png")
         ),
         .init(
             id: "college-football-aac",
@@ -159,7 +184,8 @@ nonisolated struct SportsLeague:
             path: "football/college-football",
             symbol: "american.football",
             sport: .americanFootball,
-            groups: "151"
+            groups: "151",
+            logoURL: URL(string: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/79/American_Athletic_Conference_logo.svg/500px-American_Athletic_Conference_logo.svg.png")
         ),
         .init(
             id: "college-football-cusa",
@@ -167,7 +193,8 @@ nonisolated struct SportsLeague:
             path: "football/college-football",
             symbol: "american.football",
             sport: .americanFootball,
-            groups: "12"
+            groups: "12",
+            logoURL: URL(string: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/38/CUSA_logo.svg/500px-CUSA_logo.svg.png")
         ),
         .init(
             id: "college-football-mac",
@@ -175,7 +202,8 @@ nonisolated struct SportsLeague:
             path: "football/college-football",
             symbol: "american.football",
             sport: .americanFootball,
-            groups: "15"
+            groups: "15",
+            logoURL: URL(string: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/Mid-American_Conference_logo.svg/500px-Mid-American_Conference_logo.svg.png")
         ),
         .init(
             id: "college-football-mwc",
@@ -183,7 +211,8 @@ nonisolated struct SportsLeague:
             path: "football/college-football",
             symbol: "american.football",
             sport: .americanFootball,
-            groups: "17"
+            groups: "17",
+            logoURL: URL(string: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/Mountain_West_Conference_logo.svg/500px-Mountain_West_Conference_logo.svg.png")
         ),
         .init(
             id: "college-football-sunbelt",
@@ -191,21 +220,24 @@ nonisolated struct SportsLeague:
             path: "football/college-football",
             symbol: "american.football",
             sport: .americanFootball,
-            groups: "37"
+            groups: "37",
+            logoURL: URL(string: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/Sun_Belt_Conference_logo.svg/500px-Sun_Belt_Conference_logo.svg.png")
         ),
         .init(
             id: "nba",
             name: "NBA",
             path: "basketball/nba",
             symbol: "basketball",
-            sport: .basketball
+            sport: .basketball,
+            logoURL: URL(string: "https://upload.wikimedia.org/wikipedia/en/thumb/0/03/National_Basketball_Association_logo.svg/500px-National_Basketball_Association_logo.svg.png")
         ),
         .init(
             id: "euroleague",
             name: "EuroLeague",
             path: "basketball/euroleague",
             symbol: "basketball",
-            sport: .basketball
+            sport: .basketball,
+            logoURL: URL(string: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/90/EuroLeague_logo.svg/500px-EuroLeague_logo.svg.png")
         )
     ]
 }
