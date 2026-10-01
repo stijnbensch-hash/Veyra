@@ -5,6 +5,8 @@ struct MovieDetailView: View {
 
     @State private var ratings = MetadataRatings()
     @State private var runtimeMinutes: Int?
+    // Fase 7 (spec §33): welke officiële TMDB-collectie deze film bevat, indien van toepassing.
+    @State private var belongsToCollection: TMDBBelongsToCollection?
     @Environment(\.horizontalSizeClass) private var sizeClass
     @ObservedObject private var traktStore = TraktStore.shared
 
@@ -65,6 +67,16 @@ struct MovieDetailView: View {
                         WatchedToggleButton(item: movie)
                         FavoriteToggleButton(item: movie, compact: true)
                         WatchlistToggleButton(item: movie, compact: true)
+                        AddToCollectionButton(item: movie, compact: true)
+                        if let belongsToCollection {
+                            NavigationLink {
+                                VeyraCollectionDetailView(source: .official(tmdbCollectionID: belongsToCollection.id, name: belongsToCollection.name))
+                            } label: {
+                                Label("Collectie", systemImage: "rectangle.stack.fill")
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(VeyraColors.cyan)
+                        }
                     }
                 }
                 .padding(.horizontal)
@@ -88,6 +100,7 @@ struct MovieDetailView: View {
             guard let tmdbID = movie.tmdbID else { return }
             ratings = await MetadataRatingsService.movieRatings(tmdbID: tmdbID, imdbID: movie.imdbID, title: movie.title)
             runtimeMinutes = try? await TMDBService()?.runtimeMinutes(forMovieID: tmdbID)
+            belongsToCollection = try? await TMDBService()?.belongsToCollection(forMovieID: tmdbID)
         }
     }
 

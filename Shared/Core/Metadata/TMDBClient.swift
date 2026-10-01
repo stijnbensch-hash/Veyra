@@ -55,6 +55,13 @@ struct TMDBClient {
         try await request(path: "/3/movie/\(id)")
     }
 
+    /// Alle delen van een officiële TMDB-collectie (spec §33/§34, Fase 7) -- bv. "Alien
+    /// Collection". Wordt gevonden via `TMDBMovie.belongsToCollection` op een filmdetail, nooit
+    /// via een hardcoded lijst.
+    func collectionDetails(id: Int) async throws -> TMDBCollectionDetail {
+        try await request(path: "/3/collection/\(id)")
+    }
+
     func popularMovies() async throws -> [TMDBMovie] {
         try await catalogMovies(path: "/3/movie/popular")
     }
@@ -278,6 +285,9 @@ struct TMDBMovie: Decodable, Identifiable, Hashable {
     /// lijst-/ontdek-eindpunten -- gebruikt voor de speelduur in Veyra Pulse
     /// op `MovieDetailView` (zie `TMDBService.runtimeMinutes(forMovieID:)`).
     var runtime: Int? = nil
+    /// Alleen aanwezig op TMDB's detail-eindpunt -- welke officiële TMDB-collectie (bv. "Alien
+    /// Collection") deze film bevat, indien van toepassing. Basis voor Fase 7 (spec §33).
+    var belongsToCollection: TMDBBelongsToCollection? = nil
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -291,6 +301,45 @@ struct TMDBMovie: Decodable, Identifiable, Hashable {
         case genreIDs = "genre_ids"
         case genres
         case runtime
+        case belongsToCollection = "belongs_to_collection"
+    }
+}
+
+/// `belongs_to_collection` op een TMDB-filmdetail -- enkel id/naam nodig om door te verwijzen
+/// naar `TMDBClient.collectionDetails(id:)`.
+struct TMDBBelongsToCollection: Decodable, Hashable {
+    let id: Int
+    let name: String
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+    }
+}
+
+/// Respons van `GET /3/collection/{id}` -- een officiële TMDB-filmreeks (spec §33/§34).
+struct TMDBCollectionDetail: Decodable {
+    let id: Int
+    let name: String
+    let overview: String?
+    let parts: [TMDBCollectionPart]
+}
+
+struct TMDBCollectionPart: Decodable, Hashable {
+    let id: Int
+    let title: String?
+    let overview: String?
+    let posterPath: String?
+    let backdropPath: String?
+    let releaseDate: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case title
+        case overview
+        case posterPath = "poster_path"
+        case backdropPath = "backdrop_path"
+        case releaseDate = "release_date"
     }
 }
 

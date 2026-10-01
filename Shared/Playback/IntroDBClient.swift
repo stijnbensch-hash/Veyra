@@ -35,9 +35,11 @@ struct IntroDBSegments: Equatable {
 /// gevulde database met exacte start-/eindtijden om intro's, recaps,
 /// aftitelingen en previews van films en series over te slaan. Gebruikt
 /// dezelfde publieke `GET /v3/media`-endpoint als de officiële Jellyfin-
-/// plugin (`api.theintrodb.org`), hier zonder API-sleutel (anonieme
-/// aanvragen vallen onder hun standaard rate limit van ~30 verzoeken per
-/// 10 seconden, ruim genoeg voor één opzoeking per afspeelsessie).
+/// plugin (`api.theintrodb.org`). Zonder eigen API-sleutel (Instellingen →
+/// Account → TheIntroDB) vallen aanvragen onder het anonieme rate limit
+/// van ~30 verzoeken per 10 seconden -- ruim genoeg voor één opzoeking per
+/// afspeelsessie, maar een eigen sleutel geeft een hoger limiet en voorkeur
+/// bij matching, dus wordt meegestuurd zodra ingesteld.
 ///
 /// Matcht bij voorkeur op TMDB-id (+ seizoen/aflevering voor series), of op
 /// IMDb-id wanneer een titel nog geen TMDB-id heeft.
@@ -120,6 +122,9 @@ actor IntroDBClient {
             var request = URLRequest(url: url)
             request.setValue("application/json", forHTTPHeaderField: "Accept")
             request.setValue("Veyra/1.0", forHTTPHeaderField: "User-Agent")
+            if let apiKey = AppConfiguration.introDBAPIKey, !apiKey.isEmpty {
+                request.setValue(apiKey, forHTTPHeaderField: "X-Api-Key")
+            }
 
             do {
                 let (data, response) = try await session.data(for: request)

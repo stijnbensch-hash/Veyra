@@ -184,7 +184,10 @@ struct VeyraBentoContinueMiniContent: View {
     private var captionMetaText: String {
 #if os(tvOS)
         if item.kind == .movie || item.episodeCode == nil { return item.shortMetaText }
-        if let left = item.episodesLeft { return "\(left) te gaan" }
+        // "X te gaan" staat al als badge rechtsboven op de kaart (zie de
+        // `.overlay(alignment: .topTrailing)` hieronder) -- niet nog eens herhalen in de
+        // meta-pil onder de kaart. Zelfde aflevering-code-stijl als op iOS.
+        if let left = item.episodesLeft, left > 0 { return item.episodeCode ?? item.shortMetaText }
         if !item.isUpNext, let remaining = item.remainingMinutes {
             return "nog \(remaining) min"
         }

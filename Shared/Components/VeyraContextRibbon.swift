@@ -234,13 +234,14 @@ struct VeyraContextRibbon: View {
     /// (mogelijk allang voorbije) eerste item te beginnen.
     var body: some View {
         if !sortedItems.isEmpty {
-            VStack(alignment: .leading, spacing: 14) {
+            // Zelfde titelstijl + afstand tot kader als "Binnenkort"/"Trending"/"Voor jou".
+            VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 10) {
                     Circle().fill(VeyraHomeStyle.cyan).frame(width: 8, height: 8)
                         .shadow(color: VeyraHomeStyle.cyan.opacity(0.7), radius: 5)
                     Text("VEYRA NOW")
-                        .font(.system(size: metrics.headerSize, weight: .heavy, design: .rounded))
-                        .tracking(2)
+                        .font(.system(size: metrics.headerSize, weight: .bold))
+                        .tracking(1.5)
                         .foregroundStyle(VeyraHomeStyle.cyan)
                 }
 

@@ -110,8 +110,21 @@ final class VeyraHubSyncService {
         "sports.displayPreferences",
     ]
 
+    private static let collectionsDataKeys: [String] = [
+        // Veyra Collections (Fase 10, spec §58/§59) — VeyraCollectionStore's volledige
+        // JSON-gecodeerde [VeyraCollection]. Bewust GEEN apart Hub-document of eigen
+        // sync-stack: het model was al vanaf Fase 2 sync-vriendelijk opgezet (stabiele
+        // collection-/item-ID's, updatedAt, geen stream-URL's/artwork-binaries), dus dit
+        // volgt gewoon dezelfde generieke whole-value-laatste-schrijver-wint-aanpak als
+        // sports.displayPreferences/sourceBadges.packs hierboven. Een echte per-item
+        // reconciliatie (spec §59) bouwen we pas als dit ooit botsingen blijkt te geven —
+        // "Bouw conflict resolution nog niet tenzij bestaande Hub sync dit eenvoudig ondersteunt."
+        "veyra.collections.v1",
+    ]
+
     private static var settingsDataKeys: [String] {
-        shelfHeroDataKeys + liveTVFolderDataKeys + sourceOrderDataKeys + addonDataKeys + sourceBadgeDataKeys + recorderDataKeys + sportsDataKeys
+        shelfHeroDataKeys + liveTVFolderDataKeys + sourceOrderDataKeys + addonDataKeys + sourceBadgeDataKeys +
+            recorderDataKeys + sportsDataKeys + collectionsDataKeys
     }
 
     private static let metadataPrefix = "metadata.rating."

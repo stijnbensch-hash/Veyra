@@ -104,9 +104,11 @@ struct VeyraSportsStage: View {
         }
         .frame(maxWidth: .infinity)
         .background(VeyraColors.surface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        // Zelfde cyaan/rode Veyra-kaderstijl als de rest van Home (VeyraFrame): in rust een
+        // subtiele cyaan-naar-rood gradiëntrand, bij focus feller cyaan (focus is altijd cyaan).
         .overlay(
             RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(isFocused ? VeyraColors.cyan.opacity(0.6) : VeyraColors.red.opacity(0.35),
+                .strokeBorder(isFocused ? VeyraFrame.active : VeyraFrame.resting,
                               lineWidth: isFocused ? 2.5 : 1.5)
         )
         // Zelfde focus-gloed als de andere nieuwe secties (Discovery Flow/On Air/

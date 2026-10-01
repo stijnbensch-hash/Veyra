@@ -144,6 +144,10 @@ struct VeyraApp: App {
     /// blokkeren de andere providers niet — de app heeft hier verder geen
     /// foutmelding voor nodig, de betrokken schermen tonen zelf een
     /// foutstatus zodra de gebruiker ernaartoe navigeert.
+    // Bewust SERIEEL i.p.v. parallel (per provider én per live/VOD-call binnen een provider):
+    // meerdere Xtream-catalogi tegelijk parsen gaf een geheugenpiek tijdens het opstarten die,
+    // gecombineerd met scrollen op Home (focus engine + AsyncImage-laden), de app liet crashen.
+    // Dit duurt iets langer, maar blijft binnen een voorspelbaar geheugenbudget.
     private func refreshAllIPTVDataOnStartup() async {
         guard
             let providers = try? IPTVConfigurationStore().loadProviders(),
@@ -152,12 +156,8 @@ struct VeyraApp: App {
             return
         }
 
-        await withTaskGroup(of: Void.self) { group in
-            for provider in providers {
-                group.addTask {
-                    await refreshIPTVProviderOnStartup(provider.configuration)
-                }
-            }
+        for provider in providers {
+            await refreshIPTVProviderOnStartup(provider.configuration)
         }
     }
 
@@ -166,9 +166,8 @@ struct VeyraApp: App {
 
         switch configuration {
         case .xtream(let xtream):
-            async let liveChannels: [IPTVChannel]? = try? service.loadXtreamLiveChannels(configuration: xtream)
-            async let vodItems: [IPTVVODItem]? = try? service.loadXtreamVOD(configuration: xtream)
-            _ = await (liveChannels, vodItems)
+            _ = try? await service.loadXtreamLiveChannels(configuration: xtream)
+            _ = try? await service.loadXtreamVOD(configuration: xtream)
 
         case .m3u(let m3u):
             _ = try? await service.loadM3UChannels(configuration: m3u)

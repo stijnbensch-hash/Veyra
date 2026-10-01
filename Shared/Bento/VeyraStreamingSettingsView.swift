@@ -120,9 +120,12 @@ struct VeyraStreamingSettingsView: View {
             let url = VeyraStreamingStore.logoURL(for: entry)
                 ?? entry.logoPath.flatMap { URL(string: "https://image.tmdb.org/t/p/w154\($0)") }
             AsyncImage(url: url) { phase in
-                if let image = phase.image { image.resizable().scaledToFit().padding(4) } else { Color.clear }
+                if let image = phase.image {
+                    image.resizable().scaledToFill()
+                } else { Color.clear }
             }
             .background(Color.white.opacity(0.08))
+            .clipped()
         }
     }
 
@@ -344,7 +347,8 @@ struct VeyraStreamingEditorView: View {
                     preview(entries[index])
                         .frame(maxWidth: .infinity)
                         .frame(height: 110)
-                        .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .background(Color.white.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
                     TextField("Eigen logo (https-adres)", text: $urlText)
                         #if os(iOS)
@@ -363,7 +367,7 @@ struct VeyraStreamingEditorView: View {
                 } header: {
                     Text("Logo")
                 } footer: {
-                    Text("Een https-adres wordt ook op je andere apparaten gebruikt; een foto blijft op dit apparaat. Gebruik een liggende afbeelding van ongeveer 500×280 px (verhouding 16:9) met een transparante achtergrond (PNG) voor het beste resultaat -- een vierkant of staand logo wordt kleiner weergegeven zodat het past.")
+                    Text("Een https-adres wordt ook op je andere apparaten gebruikt; een foto blijft op dit apparaat. Het logo vult automatisch het volledige kader, dus elke verhouding werkt -- voor het beste resultaat kies je een afbeelding waarbij het logo het hele vlak vult (zonder brede lege randen).")
                 }
 
                 Section {
@@ -385,17 +389,26 @@ struct VeyraStreamingEditorView: View {
         // woordmerk-logo (`catalogs`) nog een oud logo bevat van vóór deze wijziging.
         let custom = VeyraStreamingStore.logoURL(for: entry)
         if let custom {
+            // Eigen logo via URL: vult meteen het volledige kader (bijsnijden i.p.v. passend
+            // verkleinen), zodat elke verhouding -- vierkant, staand of liggend -- er goed uitziet
+            // zonder dat de gebruiker de afbeelding vooraf op 16:9 moet bijsnijden.
             AsyncImage(url: custom) { phase in
-                if let image = phase.image { image.resizable().scaledToFit().padding(14) } else { Text(entry.name).font(.title3.bold()) }
+                if let image = phase.image {
+                    image.resizable().scaledToFill()
+                } else { Text(entry.name).font(.title3.bold()) }
             }
+            .clipped()
         } else if let catalog = catalogs[entry.id] {
             VeyraBentoStreamingContent(name: catalog.name, iconURL: catalog.imageURL, wideURL: catalog.wideURL,
                                        brand: catalog.brand, customURL: nil)
         } else {
             let url = entry.logoPath.flatMap { URL(string: "https://image.tmdb.org/t/p/w154\($0)") }
             AsyncImage(url: url) { phase in
-                if let image = phase.image { image.resizable().scaledToFit().padding(14) } else { Text(entry.name).font(.title3.bold()) }
+                if let image = phase.image {
+                    image.resizable().scaledToFill()
+                } else { Text(entry.name).font(.title3.bold()) }
             }
+            .clipped()
         }
     }
 

@@ -28,6 +28,13 @@ struct TMDBService {
         try await client.movieDetails(id: id).runtime
     }
 
+    /// Of deze film onderdeel is van een officiële TMDB-collectie (Fase 7, spec §33) -- nooit
+    /// een hardcoded lijst, enkel wat TMDB zelf meegeeft op het filmdetail.
+    func belongsToCollection(forMovieID id: Int) async throws -> TMDBBelongsToCollection? {
+        try await client.movieDetails(id: id).belongsToCollection
+    }
+    
+
     func popularMovies() async throws -> [TMDBMovie] {
         try await client.popularMovies()
     }

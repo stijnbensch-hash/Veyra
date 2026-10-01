@@ -431,6 +431,94 @@ struct MDBListConfigurationCard: View {
     }
 }
 
+// MARK: - TheIntroDB Configuration Card
+
+struct IntroDBConfigurationCard: View {
+    @State
+    private var apiKey = ""
+
+    @State
+    private var configured = false
+
+    @State
+    private var message: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(spacing: 14) {
+                Image(systemName: "forward.end.fill")
+                    .foregroundStyle(VeyraColors.cyan)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("TheIntroDB")
+                    Text("Intro, samenvatting en aftiteling overslaan")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                VeyraPosterBadge(
+                    title: configured ? "Actief" : "Optioneel",
+                    symbol: configured ? "checkmark.circle.fill" : "key.fill",
+                    accent: configured ? VeyraColors.cyan : VeyraColors.ice,
+                    fontSize: 13
+                )
+            }
+
+            Text("Haalt exacte start-/eindtijden op bij theintrodb.org om intro's, samenvattingen en aftitelingen over te slaan tijdens afspelen. Werkt ook zonder sleutel (lager limiet); een gratis sleutel geeft voorrang en een hoger limiet.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Text("De API-sleutel wordt lokaal in de beveiligde sleutelhanger van deze Apple TV opgeslagen.")
+                .font(.caption2)
+                .foregroundStyle(.white.opacity(0.52))
+
+            SecureField(
+                configured
+                    ? "Nieuwe TheIntroDB API-sleutel"
+                    : "TheIntroDB API-sleutel",
+                text: $apiKey
+            )
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+
+            Button {
+                saveAPIKey()
+            } label: {
+                Label("Opslaan", systemImage: "key.fill")
+            }
+            .disabled(apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+            if let message {
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(configured ? VeyraColors.ice : .orange)
+            }
+        }
+        .onAppear {
+            configured = AppConfiguration.introDBAPIKey?.isEmpty == false
+        }
+    }
+
+    private func saveAPIKey() {
+        let value = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return }
+
+        do {
+            try AppConfiguration.setIntroDBAPIKey(value)
+            apiKey = ""
+            configured = AppConfiguration.introDBAPIKey?.isEmpty == false
+            message = configured
+                ? "API-sleutel veilig opgeslagen."
+                : "De API-sleutel kon niet worden opgeslagen."
+        } catch {
+            configured = AppConfiguration.introDBAPIKey?.isEmpty == false
+            message = "Opslaan van de API-sleutel is niet gelukt."
+        }
+    }
+}
+
 #Preview {
     NavigationStack {
         MetadataSettingsView()

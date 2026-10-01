@@ -12,6 +12,27 @@
 
 import SwiftUI
 
+#if os(tvOS)
+/// `VeyraStreamingTileStyle` tekent zelf GEEN focusindicator (`.focusEffectDisabled()` zonder
+/// vervanging) -- zonder dit wrapje lijkt een tegel hier dus onselecteerbaar, want je ziet nooit
+/// welke tegel focus heeft. Zelfde cyaan rand + lichte vergroting als `VeyraTileStyle` elders.
+private struct MosaicFocusRing<Content: View>: View {
+    @Environment(\.isFocused) private var isFocused
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        // Zelfde cyaan/rode Veyra-kaderstijl als de rest van Home (VeyraFrame): subtiele
+        // gradiëntrand in rust, fel cyaan bij focus -- i.p.v. helemaal geen rand in rust.
+        content
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(isFocused ? VeyraFrame.active : VeyraFrame.resting, lineWidth: isFocused ? 3 : 1.5))
+            .shadow(color: isFocused ? VeyraColors.cyan.opacity(0.35) : .clear, radius: 16)
+            .scaleEffect(isFocused ? 1.04 : 1)
+            .animation(.easeOut(duration: 0.16), value: isFocused)
+    }
+}
+#endif
+
 struct VeyraMosaicSection: View {
     let title: String
     let items: [HeroSpotlightItem]
@@ -31,10 +52,11 @@ struct VeyraMosaicSection: View {
 
     var body: some View {
         if !groups.isEmpty {
-            VStack(alignment: .leading, spacing: 14) {
+            // Zelfde titelstijl + afstand tot kader als "Binnenkort"/"Verder kijken" (bentoTop).
+            VStack(alignment: .leading, spacing: 10) {
                 Text(title)
-                    .font(.system(size: headerSize, weight: .heavy, design: .rounded))
-                    .tracking(2)
+                    .font(.system(size: headerSize, weight: .bold))
+                    .tracking(1.5)
                     .textCase(.uppercase)
                     .foregroundStyle(VeyraHomeStyle.cyan.opacity(0.85))
 
@@ -83,7 +105,7 @@ struct VeyraMosaicSection: View {
     private func tile(_ item: HeroSpotlightItem, width: CGFloat, height: CGFloat, showsTitle: Bool) -> some View {
         #if os(tvOS)
         Button { openMediaDetail(item.mediaItem) } label: {
-            tileContent(item, width: width, height: height, showsTitle: showsTitle)
+            MosaicFocusRing { tileContent(item, width: width, height: height, showsTitle: showsTitle) }
         }
         .buttonStyle(VeyraStreamingTileStyle())
         #else
@@ -110,26 +132,47 @@ struct VeyraMosaicSection: View {
                 .frame(width: geo.size.width, height: geo.size.height)
                 .clipped()
             }
-            // Titel alleen op de grote tegel -- de kleine tegels blijven puur beeld,
-            // net als de compacte buurtegels bij "Trending" (niet te veel tekst).
-            if showsTitle {
-                LinearGradient(colors: [.black.opacity(0.82), .clear],
-                               startPoint: .bottom, endPoint: .center)
-                Text(item.title)
-                    .font(.system(size: titleSize, weight: .bold))
-                    .foregroundStyle(.white)
-                    .lineLimit(2)
-                    .padding(tilePaddingH)
-            }
+            // Clearlogo (met titeltekst als terugval) op de grote tegel; de kleine tegels
+            // krijgen enkel een kleiner clearlogo, net als de compacte buurtegels bij
+            // "Trending" -- geen aparte metadata-regel, dat blijft voor de grote tegel elders.
+            LinearGradient(colors: [.black.opacity(showsTitle ? 0.82 : 0.7), .clear],
+                           startPoint: .bottom, endPoint: .center)
+            logo(item, big: showsTitle)
+                .padding(showsTitle ? tilePaddingH : smallTilePaddingH)
         }
         .frame(width: width, height: height)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
+    @ViewBuilder
+    private func logo(_ item: HeroSpotlightItem, big: Bool) -> some View {
+        if let logoURL = item.logoURL {
+            AsyncImage(url: logoURL) { phase in
+                if case .success(let image) = phase {
+                    image.resizable().scaledToFit()
+                } else {
+                    titleText(item, big: big)
+                }
+            }
+            .frame(maxWidth: big ? logoMaxWidth : smallLogoMaxWidth,
+                   maxHeight: big ? logoMaxHeight : smallLogoMaxHeight, alignment: .leading)
+        } else {
+            titleText(item, big: big)
+        }
+    }
+
+    private func titleText(_ item: HeroSpotlightItem, big: Bool) -> some View {
+        Text(item.title)
+            .font(.system(size: big ? titleSize : smallTitleSize, weight: .bold))
+            .foregroundStyle(.white)
+            .lineLimit(2)
+    }
+
+
     // Maten -- tvOS 10-voet-UI, iOS/iPadOS/macOS compacter van dichtbij bekeken
     // (zelfde onderscheid als `VeyraDiscoveryFlow`/`VeyraContextRibbon.Metrics`).
     #if os(tvOS)
-    private let headerSize: CGFloat = 19
+    private let headerSize: CGFloat = 20
     private let groupGap: CGFloat = 32
     private let tileGap: CGFloat = 12
     private let largeWidth: CGFloat = 280
@@ -138,8 +181,14 @@ struct VeyraMosaicSection: View {
     private let smallHeight: CGFloat = 178
     private let titleSize: CGFloat = 20
     private let tilePaddingH: CGFloat = 14
+    private let logoMaxWidth: CGFloat = 220
+    private let logoMaxHeight: CGFloat = 70
+    private let smallTitleSize: CGFloat = 15
+    private let smallTilePaddingH: CGFloat = 10
+    private let smallLogoMaxWidth: CGFloat = 160
+    private let smallLogoMaxHeight: CGFloat = 46
     #else
-    private let headerSize: CGFloat = 13
+    private let headerSize: CGFloat = 12
     private let groupGap: CGFloat = 20
     private let tileGap: CGFloat = 8
     private let largeWidth: CGFloat = 150
@@ -148,5 +197,11 @@ struct VeyraMosaicSection: View {
     private let smallHeight: CGFloat = 99
     private let titleSize: CGFloat = 13
     private let tilePaddingH: CGFloat = 8
+    private let logoMaxWidth: CGFloat = 120
+    private let logoMaxHeight: CGFloat = 38
+    private let smallTitleSize: CGFloat = 10
+    private let smallTilePaddingH: CGFloat = 6
+    private let smallLogoMaxWidth: CGFloat = 96
+    private let smallLogoMaxHeight: CGFloat = 26
     #endif
 }

@@ -9,6 +9,7 @@ enum VeyraAPIKey: String, CaseIterable {
     case omdbAPIKey
     case fanartAPIKey
     case mdblistAPIKey
+    case introDBAPIKey
 
     var account: String {
         switch self {
@@ -32,6 +33,9 @@ enum VeyraAPIKey: String, CaseIterable {
 
         case .mdblistAPIKey:
             return "mdblist.api-key"
+
+        case .introDBAPIKey:
+            return "introdb.api-key"
         }
     }
 }

@@ -5,6 +5,9 @@ struct MovieDetailView: View {
 
     @State private var ratings = MetadataRatings()
     @State private var runtimeMinutes: Int?
+    // Fase 7 (spec §33): welke officiële TMDB-collectie deze film bevat, indien van toepassing --
+    // nooit een hardcoded lijst, enkel wat TMDB's filmdetail meegeeft.
+    @State private var belongsToCollection: TMDBBelongsToCollection?
     @ObservedObject private var traktStore = TraktStore.shared
 
     // MARK: - Hero-trailer
@@ -79,6 +82,7 @@ struct MovieDetailView: View {
             guard let tmdbID = movie.tmdbID else { return }
             ratings = await MetadataRatingsService.movieRatings(tmdbID: tmdbID, imdbID: movie.imdbID, title: movie.title)
             runtimeMinutes = try? await TMDBService()?.runtimeMinutes(forMovieID: tmdbID)
+            belongsToCollection = try? await TMDBService()?.belongsToCollection(forMovieID: tmdbID)
         }
         .onChange(of: isPlayFocused) { _, focused in
             let generation = UUID()
@@ -197,6 +201,15 @@ struct MovieDetailView: View {
                         WatchedToggleButton(item: movie)
                         FavoriteToggleButton(item: movie)
                         WatchlistToggleButton(item: movie)
+                        AddToCollectionButton(item: movie)
+                        if let belongsToCollection {
+                            NavigationLink {
+                                VeyraCollectionDetailView(source: .official(tmdbCollectionID: belongsToCollection.id, name: belongsToCollection.name))
+                            } label: {
+                                VeyraActionLabel(title: "COLLECTIE", symbol: "rectangle.stack.fill", compact: true)
+                            }
+                            .buttonStyle(VeyraFocusButtonStyle())
+                        }
                     }
 
                 }

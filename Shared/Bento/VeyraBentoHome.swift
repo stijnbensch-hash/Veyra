@@ -109,6 +109,15 @@ struct VeyraBentoHomeView: View {
                 // "Dynamic Mosaic": Voor Jou -- Stap 10, direct na Trending (spec §97).
                 VeyraMosaicSection(title: "Voor jou", items: voorJouItems)
 
+                // Collections: "Verder met je collecties" -- toont zichzelf enkel wanneer er
+                // effectief iets te hervatten valt (zie VeyraContinueCollectionsSection).
+                VeyraContinueCollectionsSection()
+
+                // "Jouw Collecties" (uitgebreide Collections-spec, Fase 10, §66/§69/§95): eigen
+                // persoonlijke rail, net voor Streamingdiensten -- verborgen zonder eigen
+                // collecties (spec §68, geen lege shelf).
+                VeyraYourCollectionsSection()
+
                 TimelineView(.periodic(from: .now, by: 30)) { context in
                     bentoMiddle(now: context.date)
                 }
@@ -139,10 +148,6 @@ struct VeyraBentoHomeView: View {
                     .buttonStyle(VeyraTileStyle())
                     .focused($focus, equals: .competition("Sport"))
                 }
-
-                // "Top 10 Orbit": laatste sectie op Home -- Stap 15, direct na
-                // Live Sport (spec §97).
-                VeyraTop10Orbit(title: "Top 10", items: top10Items)
 
                 TimelineView(.periodic(from: .now, by: 30)) { context in
                     bentoBottom(now: context.date)
@@ -387,7 +392,7 @@ struct VeyraBentoHomeView: View {
 
     @ViewBuilder
     private func liveColumn(_ rows: [BentoLiveRow]) -> some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 14) {
             ForEach(rows) { row in
                 Button { onPlayChannel(row.channelID) } label: {
                     VeyraBentoLiveRowContent(row: row)

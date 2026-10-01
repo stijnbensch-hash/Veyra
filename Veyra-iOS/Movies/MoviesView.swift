@@ -94,6 +94,15 @@ struct MoviesView: View {
                         ) {
                             header
 
+                            NavigationLink {
+                                VeyraCollectionsBrowserView()
+                            } label: {
+                                Label("Collecties", systemImage: "rectangle.stack.fill")
+                                    .font(.subheadline.weight(.semibold))
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(VeyraColors.cyan)
+
                             MediaFiltersRowIOS(
                                 kind: .movie,
                                 selectedGenreID:

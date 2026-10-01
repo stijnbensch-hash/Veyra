@@ -85,7 +85,7 @@ struct MediaItem: Identifiable, Hashable {
     }
 }
 
-enum MediaType: String, Hashable {
+enum MediaType: String, Codable, Hashable {
     case movie
     case series
     case liveTV

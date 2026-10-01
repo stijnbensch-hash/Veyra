@@ -473,7 +473,13 @@ nonisolated final class TraktHomeAPI: TraktHomeProviding {
             }
             page += 1
         }
-        items.append(contentsOf: upNext.sorted { $0.lastWatched > $1.lastWatched })
+        // Zelfde check als bij de onderbroken items hierboven: Trakt's "volgende aflevering"
+        // kan verwijzen naar een episode die in `progress/watched` nog niet als "aired" meetelt
+        // (net uitgezonden, cache-vertraging), waardoor completed == aired en er dus 0 te gaan
+        // zou staan terwijl de kaart wél een volgende aflevering toont. Zonder deze filter
+        // verschenen zulke tegels toch in "Verder kijken" met een misleidende "0 te gaan".
+        let validUpNext = upNext.filter { ($0.episodesLeft ?? 1) > 0 }
+        items.append(contentsOf: validUpNext.sorted { $0.lastWatched > $1.lastWatched })
         return Array(items.prefix(limit))
     }
 
@@ -573,7 +579,7 @@ nonisolated final class TraktHomeAPI: TraktHomeProviding {
         return d
     }
 
-    private static func code(_ e: TraktEpisodeDTO) -> String { "S\(e.season)E\(e.number)" }
+    private static func code(_ e: TraktEpisodeDTO) -> String { String(format: "S%02dE%02d", e.season, e.number) }
 
     private static func dayString(_ date: Date) -> String {
         let c = Calendar.current.dateComponents([.year, .month, .day], from: date)

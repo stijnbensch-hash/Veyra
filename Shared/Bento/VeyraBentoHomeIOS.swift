@@ -167,6 +167,9 @@ struct VeyraBentoHomeView: View {
                         // "Dynamic Mosaic": Voor Jou -- Stap 10, direct na Trending (spec §97).
                         VeyraMosaicSection(title: "Voor jou", items: voorJouItems)
 
+                        // "Jouw Collecties" -- zelfde sectie als op tvOS (Fase 10).
+                        VeyraYourCollectionsSection()
+
                         TimelineView(.periodic(from: .now, by: 30)) { context in
                             bentoMiddle(now: context.date, contentWidth: contentWidth)
                         }
@@ -197,10 +200,6 @@ struct VeyraBentoHomeView: View {
                             }
                             .buttonStyle(.plain)
                         }
-
-                        // "Top 10 Orbit": laatste sectie op Home -- Stap 15, direct na
-                        // Live Sport (spec §97).
-                        VeyraTop10Orbit(title: "Top 10", items: top10Items)
 
                         TimelineView(.periodic(from: .now, by: 30)) { context in
                             bentoBottom(now: context.date, contentWidth: contentWidth)

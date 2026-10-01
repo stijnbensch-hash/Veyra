@@ -1978,6 +1978,14 @@ struct AccountView:
                     Text("Popcornmeter en Letterboxd komen via MDBList (mdblist.com). Vul hier een gratis API-sleutel in om die twee scores te tonen bij Instellingen → Metadata → Ratings.")
                 }
 
+                Section {
+                    IntroDBConfigurationCard()
+                } header: {
+                    Text("TheIntroDB")
+                } footer: {
+                    Text("Voor \"Intro overslaan\" tijdens het afspelen. Een gratis API-sleutel (theintrodb.org) geeft een hoger limiet en betere matching dan anoniem gebruik.")
+                }
+
             }
             .frame(maxWidth: 1000)
         }

@@ -62,10 +62,78 @@ struct AccountView: View {
                     Text("Popcornmeter en Letterboxd komen via MDBList (mdblist.com). Vul hier een gratis API-sleutel in om die twee scores te tonen bij Instellingen → Metadata → Ratings.")
                 }
 
+                Section {
+                    IntroDBConfigurationCard()
+                } header: {
+                    Text("TheIntroDB")
+                } footer: {
+                    Text("Voor \"Intro overslaan\" tijdens het afspelen. Een gratis API-sleutel (theintrodb.org) geeft een hoger limiet en betere matching dan anoniem gebruik.")
+                }
+
             }
             .scrollContentBackground(.hidden)
         }
         .navigationTitle("Account")
+    }
+}
+
+private struct IntroDBConfigurationCard: View {
+    @State private var apiKey = ""
+    @State private var configured = false
+    @State private var message: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 12) {
+                Image(systemName: "forward.end.fill")
+                    .foregroundStyle(VeyraColors.cyan)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("TheIntroDB")
+                    Text("Intro, samenvatting en aftiteling overslaan")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Text(configured ? "Actief" : "Optioneel")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(configured ? VeyraColors.cyan : .secondary)
+            }
+
+            SecureField(configured ? "Nieuwe TheIntroDB API-sleutel" : "TheIntroDB API-sleutel", text: $apiKey)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+
+            Button("Opslaan") { save() }
+                .disabled(apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+            if let message {
+                Text(message)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(configured ? VeyraColors.cyan : .orange)
+            }
+        }
+        .padding(.vertical, 6)
+        .onAppear {
+            configured = AppConfiguration.introDBAPIKey?.isEmpty == false
+        }
+    }
+
+    private func save() {
+        let value = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return }
+
+        do {
+            try AppConfiguration.setIntroDBAPIKey(value)
+            apiKey = ""
+            configured = AppConfiguration.introDBAPIKey?.isEmpty == false
+            message = configured ? "Sleutel veilig opgeslagen." : "De sleutel kon niet worden opgeslagen."
+        } catch {
+            configured = AppConfiguration.introDBAPIKey?.isEmpty == false
+            message = "Opslaan van de sleutel is niet gelukt."
+        }
     }
 }
 

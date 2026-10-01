@@ -74,6 +74,15 @@ struct MoviesView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         header
 
+                        HStack(spacing: 20) {
+                            NavigationLink {
+                                VeyraCollectionsBrowserView()
+                            } label: {
+                                VeyraActionLabel(title: "COLLECTIES", symbol: "rectangle.stack.fill", compact: true)
+                            }
+                            .buttonStyle(VeyraFocusButtonStyle())
+                        }
+
                         MediaFiltersRow(
                             kind: .movie,
                             selectedGenreID: $selectedGenreID,

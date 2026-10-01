@@ -256,146 +256,84 @@ final class TraktStore: ObservableObject {
             return
         }
 
-        do {
-            let settings:
-                TraktSettings =
-                try await client.request(
-                    "users/settings"
-                )
+        // Elke groep hieronder haalt zijn eigen stuk data op en slaagt of faalt onafhankelijk
+        // van de rest. Voorheen stond dit allemaal in één grote `do`/`catch`: als bv. de
+        // geschiedenis of de lijsten (de laatste twee requests in de keten) faalden -- bv. door
+        // Trakt's rate limit, al snel bereikt met alle losse "Verder kijken"/sport-aanroepen
+        // elders in de app -- dan werd `watchlist` helemaal niet toegewezen, zelfs al waren de
+        // kijklijst-requests zelf vlak daarvoor wél gelukt. Zo kon de Kijklijst-tab leeg lijken
+        // terwijl Trakt zelf wel degelijk items had.
+        async let settingsResult: TraktSettings? = {
+            do { return try await client.request("users/settings") } catch { return nil }
+        }()
 
-            let movies:
-                [TraktEntry] =
-                try await client.allPages(
-                    "sync/watchlist/movies/added/desc"
-                )
+        async let watchlistResult: [TraktEntry]? = {
+            do {
+                let movies: [TraktEntry] = try await client.allPages("sync/watchlist/movies/added/desc")
+                let shows: [TraktEntry] = try await client.allPages("sync/watchlist/shows/added/desc")
+                let episodes: [TraktEntry] = try await client.allPages("sync/watchlist/episodes/added/desc")
+                return movies + shows + episodes
+            } catch { return nil }
+        }()
 
-            let shows:
-                [TraktEntry] =
-                try await client.allPages(
-                    "sync/watchlist/shows/added/desc"
-                )
+        // Trakt kent enkel favorieten voor films en series, geen losse afleveringen.
+        async let favoritesResult: [TraktEntry]? = {
+            do {
+                let favoriteMovies: [TraktEntry] = try await client.allPages("sync/favorites/movies/added/desc")
+                let favoriteShows: [TraktEntry] = try await client.allPages("sync/favorites/shows/added/desc")
+                return favoriteMovies + favoriteShows
+            } catch { return nil }
+        }()
 
-            let episodes:
-                [TraktEntry] =
-                try await client.allPages(
-                    "sync/watchlist/episodes/added/desc"
-                )
+        async let playbackResult: [TraktEntry]? = {
+            do {
+                let movieProgress: [TraktEntry] = try await client.allPages("sync/playback/movies")
+                let episodeProgress: [TraktEntry] = try await client.allPages("sync/playback/episodes")
+                return (movieProgress + episodeProgress).sorted { ($0.pausedAt ?? "") > ($1.pausedAt ?? "") }
+            } catch { return nil }
+        }()
 
-            // Trakt kent enkel favorieten voor films en series, geen
-            // losse afleveringen.
-            let favoriteMovies:
-                [TraktEntry] =
-                try await client.allPages(
-                    "sync/favorites/movies/added/desc"
-                )
+        async let ratingsResult: [TraktEntry]? = {
+            do {
+                let movieRatings: [TraktEntry] = try await client.allPages("users/me/ratings/movies")
+                let showRatings: [TraktEntry] = try await client.allPages("users/me/ratings/shows")
+                let episodeRatings: [TraktEntry] = try await client.allPages("users/me/ratings/episodes")
+                return movieRatings + showRatings + episodeRatings
+            } catch { return nil }
+        }()
 
-            let favoriteShows:
-                [TraktEntry] =
-                try await client.allPages(
-                    "sync/favorites/shows/added/desc"
-                )
+        async let listsResult: [TraktList]? = {
+            do { return try await client.allPages("users/me/lists") } catch { return nil }
+        }()
 
-            let movieProgress:
-                [TraktEntry] =
-                try await client.allPages(
-                    "sync/playback/movies"
-                )
+        async let historyResult: [TraktEntry]? = {
+            do { return try await client.request("users/me/history?page=1&limit=100") } catch { return nil }
+        }()
 
-            let episodeProgress:
-                [TraktEntry] =
-                try await client.allPages(
-                    "sync/playback/episodes"
-                )
+        let (settings, watchlistValues, favoritesValues, playbackValues, ratingsValues, listsValues, historyValues) =
+            await (settingsResult, watchlistResult, favoritesResult, playbackResult, ratingsResult, listsResult, historyResult)
 
-            let movieRatings:
-                [TraktEntry] =
-                try await client.allPages(
-                    "users/me/ratings/movies"
-                )
-
-            let showRatings:
-                [TraktEntry] =
-                try await client.allPages(
-                    "users/me/ratings/shows"
-                )
-
-            let episodeRatings:
-                [TraktEntry] =
-                try await client.allPages(
-                    "users/me/ratings/episodes"
-                )
-
-            let personalLists:
-                [TraktList] =
-                try await client.allPages(
-                    "users/me/lists"
-                )
-
-            let recentHistory:
-                [TraktEntry] =
-                try await client.request(
-                    "users/me/history?page=1&limit=100"
-                )
-
-            guard
-                snapshot == revision
-            else {
-                return
-            }
-
-            user =
-                settings.user
-
-            watchlist =
-                movies
-                + shows
-                + episodes
-
-            favorites =
-                favoriteMovies
-                + favoriteShows
-
-            playback =
-                (
-                    movieProgress
-                    + episodeProgress
-                )
-                .sorted {
-                    ($0.pausedAt ?? "")
-                        >
-                    ($1.pausedAt ?? "")
-                }
-
-            ratings =
-                movieRatings
-                + showRatings
-                + episodeRatings
-
-            lists =
-                personalLists
-
-            history =
-                recentHistory
-
-            lastSync =
-                Date()
-
-            // Nieuwe serverdata direct lokaal bewaren.
-            saveHomeCache()
-
-        } catch is CancellationError {
+        guard
+            snapshot == revision,
+            !Task.isCancelled
+        else {
             return
+        }
 
-        } catch {
-            guard
-                snapshot == revision
-            else {
-                return
-            }
+        if let settings { user = settings.user }
+        if let watchlistValues { watchlist = watchlistValues }
+        if let favoritesValues { favorites = favoritesValues }
+        if let playbackValues { playback = playbackValues }
+        if let ratingsValues { ratings = ratingsValues }
+        if let listsValues { lists = listsValues }
+        if let historyValues { history = historyValues }
 
-            // Als Trakt tijdelijk faalt blijft de reeds
-            // geladen Home-cache gewoon zichtbaar.
-            report(error)
+        // Elke groep hierboven faalt stil (en behoudt de vorige waarde) als Trakt tijdelijk
+        // niet reageert -- alleen als minstens íets gelukt is, is er nieuwe data om te bewaren.
+        if settings != nil || watchlistValues != nil || favoritesValues != nil || playbackValues != nil
+            || ratingsValues != nil || listsValues != nil || historyValues != nil {
+            lastSync = Date()
+            saveHomeCache()
         }
     }
 
@@ -888,6 +826,19 @@ final class TraktStore: ObservableObject {
             return
         }
 
+        // Meteen lokaal bijwerken (zelfde aanpak als de scrobble-flow via
+        // `applyLocalProgress`/`markWatchedLocally`) zodat de "bekeken"-badge/knop
+        // overal direct reageert i.p.v. te wachten op de volledige `loadSnapshot()`
+        // hierna. De netwerkcall + `refreshAfterMutation()` zorgen nog steeds voor
+        // de definitieve synchronisatie.
+        if watched {
+            markWatchedLocally(item)
+        } else {
+            unmarkWatchedLocally(item)
+        }
+        TraktHomeThrottle.shared.invalidate()
+        NotificationCenter.default.post(name: .veyraTraktHistoryDidChange, object: nil)
+
         try await mutate(
             "sync/history"
                 + (
@@ -1164,6 +1115,35 @@ final class TraktStore: ObservableObject {
                 progress: 100, rating: nil, watchedAt: nil, pausedAt: nil, plays: nil,
                 seasons: [TraktWatchedSeason(number: season, episodes: [TraktWatchedEpisode(number: episode, plays: 1)])]
             ))
+        }
+        saveHomeCache()
+    }
+
+    /// Tegenhanger van `markWatchedLocally`: verwijdert een item lokaal meteen uit
+    /// "bekeken", in hetzelfde formaat (film: los entry; aflevering: genest-per-seizoen
+    /// `seasons`-vorm) -- voor de "Markeer als niet bekeken"-kant van `setWatched`.
+    private func unmarkWatchedLocally(_ item: MediaItem) {
+        if item.type == .movie {
+            watchedMovies.removeAll { $0.matches(item) }
+            saveHomeCache()
+            return
+        }
+
+        guard let season = item.seasonNumber, let episode = item.episodeNumber else { return }
+        let ids = TraktIDs(imdb: item.imdbID, tmdb: item.tmdbID)
+
+        guard let index = watchedShows.firstIndex(where: { $0.show?.ids.matches(ids) ?? false }) else { return }
+        var seasons = watchedShows[index].seasons ?? []
+        if let seasonIndex = seasons.firstIndex(where: { $0.number == season }) {
+            seasons[seasonIndex].episodes.removeAll { $0.number == episode }
+            if seasons[seasonIndex].episodes.isEmpty {
+                seasons.remove(at: seasonIndex)
+            }
+        }
+        if seasons.isEmpty {
+            watchedShows.remove(at: index)
+        } else {
+            watchedShows[index].seasons = seasons
         }
         saveHomeCache()
     }

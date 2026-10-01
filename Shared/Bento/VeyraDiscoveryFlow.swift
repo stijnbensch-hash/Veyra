@@ -33,10 +33,11 @@ struct VeyraDiscoveryFlow: View {
 
     var body: some View {
         if !items.isEmpty {
-            VStack(alignment: .leading, spacing: 14) {
+            // Zelfde titelstijl + afstand tot kader als "Binnenkort"/"Verder kijken" (bentoTop).
+            VStack(alignment: .leading, spacing: 10) {
                 Text(title)
-                    .font(.system(size: headerSize, weight: .heavy, design: .rounded))
-                    .tracking(2)
+                    .font(.system(size: headerSize, weight: .bold))
+                    .tracking(1.5)
                     .textCase(.uppercase)
                     .foregroundStyle(VeyraHomeStyle.cyan.opacity(0.85))
 
@@ -104,18 +105,24 @@ struct VeyraDiscoveryFlow: View {
                 info(item)
                     .padding(cardPaddingH)
             } else {
-                // Compacte buurtegel: enkel gedimd, geen eigen tekst -- die komt pas
-                // wanneer dit item zelf de grote tegel wordt (spec §29/§30). Sommige
-                // backdrops zijn zelf erg licht/wit -- 0.55 i.p.v. 0.38 zodat de rij
-                // ook dan donker genoeg blijft (Veyra-stijl blijft dominant).
+                // Compacte buurtegel: gedimd, met enkel een klein clearlogo (of titel als
+                // terugval) onderaan -- zonder metadata-regel, dat blijft voorbehouden aan de
+                // grote tegel (spec §29/§30). Sommige backdrops zijn zelf erg licht/wit --
+                // 0.55 i.p.v. 0.38 zodat de rij ook dan donker genoeg blijft.
                 Color.black.opacity(0.55)
+                LinearGradient(colors: [.black.opacity(0.75), .clear],
+                               startPoint: .bottom, endPoint: .center)
+                smallInfo(item)
+                    .padding(smallCardPaddingH)
             }
         }
         .frame(width: big ? bigWidth : smallWidth, height: cardHeight)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        // Zelfde cyaan/rode Veyra-kaderstijl als de rest van Home (VeyraFrame) i.p.v. enkel
+        // effen cyaan op de grote tegel en helemaal geen rand op de kleine buurtegels.
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(big ? VeyraColors.cyan.opacity(0.6) : .clear, lineWidth: 2)
+                .strokeBorder(big ? VeyraFrame.active : VeyraFrame.resting, lineWidth: big ? 2 : 1.5)
         )
         .shadow(color: .black.opacity(big ? 0.35 : 0), radius: big ? 16 : 0, y: big ? 8 : 0)
         .animation(.easeOut(duration: 0.3), value: big)
@@ -145,6 +152,30 @@ struct VeyraDiscoveryFlow: View {
         }
     }
 
+    @ViewBuilder
+    private func smallInfo(_ item: HeroSpotlightItem) -> some View {
+        if let logoURL = item.logoURL {
+            AsyncImage(url: logoURL) { phase in
+                if case .success(let image) = phase {
+                    image.resizable().scaledToFit()
+                } else {
+                    smallTitleText(item)
+                }
+            }
+            .frame(maxWidth: smallLogoMaxWidth, maxHeight: smallLogoMaxHeight, alignment: .leading)
+        } else {
+            smallTitleText(item)
+        }
+    }
+
+    private func smallTitleText(_ item: HeroSpotlightItem) -> some View {
+        Text(item.title)
+            .font(.system(size: smallTitleSize, weight: .bold))
+            .foregroundStyle(.white)
+            .lineLimit(2)
+            .multilineTextAlignment(.leading)
+    }
+
     private func metaLine(_ item: HeroSpotlightItem) -> String {
         var parts: [String] = []
         if let year = item.year { parts.append(year) }
@@ -156,7 +187,7 @@ struct VeyraDiscoveryFlow: View {
     // Maten -- tvOS 10-voet-UI, iOS/iPadOS/macOS compacter van dichtbij bekeken
     // (zelfde onderscheid als `VeyraContextRibbon.Metrics`).
     #if os(tvOS)
-    private let headerSize: CGFloat = 19
+    private let headerSize: CGFloat = 20
     private let cardGap: CGFloat = 20
     private let bigWidth: CGFloat = 640
     private let smallWidth: CGFloat = 170
@@ -166,8 +197,12 @@ struct VeyraDiscoveryFlow: View {
     private let logoMaxHeight: CGFloat = 90
     private let titleSize: CGFloat = 32
     private let metaSize: CGFloat = 20
+    private let smallCardPaddingH: CGFloat = 12
+    private let smallLogoMaxWidth: CGFloat = 146
+    private let smallLogoMaxHeight: CGFloat = 54
+    private let smallTitleSize: CGFloat = 15
     #else
-    private let headerSize: CGFloat = 13
+    private let headerSize: CGFloat = 12
     private let cardGap: CGFloat = 12
     private let bigWidth: CGFloat = 360
     private let smallWidth: CGFloat = 96
@@ -177,5 +212,9 @@ struct VeyraDiscoveryFlow: View {
     private let logoMaxHeight: CGFloat = 48
     private let titleSize: CGFloat = 17
     private let metaSize: CGFloat = 12
+    private let smallCardPaddingH: CGFloat = 8
+    private let smallLogoMaxWidth: CGFloat = 80
+    private let smallLogoMaxHeight: CGFloat = 28
+    private let smallTitleSize: CGFloat = 10
     #endif
 }

@@ -34,7 +34,9 @@ struct VeyraLogoShelfTile: View {
         let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
         ZStack {
             // Rustige, neutrale achtergrond -- geen brandkleur-vlak meer. Enkel bij
-            // focus een zachte gloed in de merkkleur (spec §38).
+            // focus een zachte gloed in de merkkleur (spec §38) -- bewust BEHOUDEN
+            // (i.p.v. overal cyaan): de merkherkenning van elke streamingdienst is
+            // hier expliciet gewenst, in tegenstelling tot de rest van Home.
             VeyraColors.surface
             if isFocused {
                 RadialGradient(colors: [tint.opacity(0.32), .clear], center: .center,
