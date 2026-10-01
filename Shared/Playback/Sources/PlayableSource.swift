@@ -41,6 +41,15 @@ struct PlayableSource: Identifiable, Hashable {
     /// is on. nil for every other source.
     let recorderCleanup: VeyraHubRecorderCleanup?
 
+    /// Present only for a source that came from a genuine, directly
+    /// connected Jellyfin server (not VeyraHub, not an addon/IPTV — see
+    /// `JellyfinSourceProvider`). Lets the Skip Segment Engine query that
+    /// exact item's server-side markers via Jellyfin's Media Segments API
+    /// (spec "Multi-source skip segment system" §20-22) — more reliable
+    /// than an external database when available, since it's scoped to the
+    /// EXACT file being played. nil for every other source.
+    let jellyfinSkipSegments: JellyfinSkipSegmentsContext?
+
     init(
         id: UUID = UUID(),
         name: String,
@@ -53,7 +62,8 @@ struct PlayableSource: Identifiable, Hashable {
         epgProgrammes: [VeyraEPGProgramme] = [],
         requiresSoftwareVideo: Bool = false,
         progressSync: VeyraHubProgressSync? = nil,
-        recorderCleanup: VeyraHubRecorderCleanup? = nil
+        recorderCleanup: VeyraHubRecorderCleanup? = nil,
+        jellyfinSkipSegments: JellyfinSkipSegmentsContext? = nil
     ) {
         self.id = id
         self.name = name
@@ -68,7 +78,16 @@ struct PlayableSource: Identifiable, Hashable {
             requiresSoftwareVideo
         self.progressSync = progressSync
         self.recorderCleanup = recorderCleanup
+        self.jellyfinSkipSegments = jellyfinSkipSegments
     }
+}
+
+/// Wat de Skip Segment Engine nodig heeft om Jellyfin's Media Segments API
+/// te bevragen voor het EXACTE afgespeelde item — zie
+/// `PlayableSource.jellyfinSkipSegments`.
+struct JellyfinSkipSegmentsContext: Hashable, Sendable {
+    let account: MediaServerAccount
+    let itemID: String
 }
 
 enum SourceKind: String, Hashable {

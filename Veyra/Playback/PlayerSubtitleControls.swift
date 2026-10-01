@@ -79,7 +79,8 @@ struct PlayerSubtitleControls: View {
     // per sessie, niet een blijvende voorkeur, net als op iOS.
     @State private var playbackRate: Float = 1.0
 
-    // Intro/recap/aftiteling overslaan — zie `Shared/Playback/IntroDBClient.swift`
+    // Intro/recap/aftiteling overslaan — via `VeyraSkipSegmentStore` (zie
+    // `Shared/Playback/SkipSegments/`, momenteel TheIntroDB als enige bron)
     // en de bijbehorende instellingen in `Shared/Theme/PlaybackSettings.swift`.
     @AppStorage(PlaybackSettingsDefaults.showSkipIntroButtonKey)
     private var showSkipIntroButton = true
@@ -89,9 +90,19 @@ struct PlayerSubtitleControls: View {
     private var showSkipRecapButton = true
     @AppStorage(PlaybackSettingsDefaults.showSkipCreditsButtonKey)
     private var showSkipCreditsButton = true
+    @AppStorage(PlaybackSettingsDefaults.showSkipPreviewButtonKey)
+    private var showSkipPreviewButton = true
+    @AppStorage(PlaybackSettingsDefaults.autoSkipRecapKey)
+    private var autoSkipRecap = false
+    @AppStorage(PlaybackSettingsDefaults.autoSkipCreditsKey)
+    private var autoSkipCredits = false
+    @AppStorage(PlaybackSettingsDefaults.autoSkipPreviewKey)
+    private var autoSkipPreview = false
 
-    @State private var introDBSegments: IntroDBSegments = .empty
-    @State private var autoSkippedIntro = false
+    // Uniform Veyra-model, bronneutraal (zie Shared/Playback/SkipSegments/) --
+    // deze view weet niet dat TheIntroDB de bron is.
+    @State private var skipSegments: [VeyraSkipSegment] = []
+    @State private var autoSkippedSegmentIDs: Set<String> = []
 
     private var controlsVisible: Bool { presentation.controlsVisible }
 
@@ -177,48 +188,77 @@ struct PlayerSubtitleControls: View {
     // MARK: - Skip segment (intro/recap/aftiteling)
 
     private enum SkipSegmentKind {
-        case intro, recap, credits
+        case intro, recap, credits, preview
 
         var label: String {
             switch self {
             case .intro: return "Intro overslaan"
             case .recap: return "Samenvatting overslaan"
             case .credits: return "Aftiteling overslaan"
+            case .preview: return "Preview overslaan"
             }
         }
     }
 
-    private var activeSkipSegment: (kind: SkipSegmentKind, segment: IntroDBSegment)? {
-        guard !showNextEpisodeOverlay, !panelVisible else { return nil }
+    private var activeSkipSegment: (kind: SkipSegmentKind, segment: VeyraSkipSegment)? {
+        guard !panelVisible else { return nil }
+
+        // Aftiteling mag wél samen met de "Volgende aflevering"-overlay in
+        // beeld staan (spec §57: "[CREDITS OVERSLAAN] [VOLGENDE
+        // AFLEVERING]") -- ze staan aan weerszijden van het scherm, zie
+        // body. De andere segmenttypen horen niet thuis op het moment dat
+        // de aflevering toch al bijna afloopt.
+        if showSkipCreditsButton,
+           let credits = skipSegments.first(where: { $0.type == .credits && $0.contains(engine.currentTime) }) {
+            return (.credits, credits)
+        }
+
+        guard !showNextEpisodeOverlay else { return nil }
 
         if showSkipIntroButton,
-           let intro = introDBSegments.intros.first(where: { $0.contains(engine.currentTime) }) {
+           let intro = skipSegments.first(where: { $0.type == .intro && $0.contains(engine.currentTime) }) {
             return (.intro, intro)
         }
         if showSkipRecapButton,
-           let recap = introDBSegments.recaps.first(where: { $0.contains(engine.currentTime) }) {
+           let recap = skipSegments.first(where: { $0.type == .recap && $0.contains(engine.currentTime) }) {
             return (.recap, recap)
         }
-        if showSkipCreditsButton,
-           let credits = introDBSegments.creditsSegments.first(where: { $0.contains(engine.currentTime) }) {
-            return (.credits, credits)
+        if showSkipPreviewButton,
+           let preview = skipSegments.first(where: { $0.type == .preview && $0.contains(engine.currentTime) }) {
+            return (.preview, preview)
         }
         return nil
     }
 
-    private func skipSegment(_ segment: IntroDBSegment) {
+    private func skipSegment(_ segment: VeyraSkipSegment) {
         let target = segment.end ?? engine.duration
         guard target.isFinite, target > engine.currentTime else { return }
         Task { await engine.seek(to: target) }
     }
 
+    /// Per segmenttype in te stellen (spec §69), en alleen voor een
+    /// segment dat de minimale confidence-drempel haalt (spec §70) --
+    /// `autoSkippedSegmentIDs` voorkomt dat hetzelfde segment bij elke
+    /// timer-tick opnieuw geseekt wordt.
     private func handleAutoSkip(at time: Double) {
-        guard autoSkipIntro, !autoSkippedIntro,
-            let intro = introDBSegments.intros.first(where: { $0.contains(time) }),
-            let end = intro.end
-        else { return }
-        autoSkippedIntro = true
-        Task { await engine.seek(to: end) }
+        let candidates: [(enabled: Bool, type: VeyraSkipSegmentType)] = [
+            (autoSkipIntro, .intro),
+            (autoSkipRecap, .recap),
+            (autoSkipCredits, .credits),
+            (autoSkipPreview, .preview),
+        ]
+        for (enabled, type) in candidates {
+            guard enabled,
+                let segment = skipSegments.first(where: { $0.type == type && $0.contains(time) }),
+                segment.isEligibleForAutoSkip,
+                !autoSkippedSegmentIDs.contains(segment.id)
+            else { continue }
+            let target = segment.end ?? engine.duration
+            guard target.isFinite, target > time else { continue }
+            autoSkippedSegmentIDs.insert(segment.id)
+            Task { await engine.seek(to: target) }
+            return
+        }
     }
 
     var body: some View {
@@ -376,18 +416,33 @@ struct PlayerSubtitleControls: View {
             if resolved == nil, let item {
                 recommendedItem = await SimilarTitlesService.similarItems(for: item).first
             }
+            // Spec §41: alvast de skip-markers van de volgende aflevering
+            // ophalen zodat de skip-knop meteen klaarstaat bij autoplay, i.p.v.
+            // pas te beginnen zoeken zodra die aflevering start.
+            if let resolved {
+                let nextIdentity = VeyraSkipMediaIdentity(
+                    tmdbID: resolved.tmdbID,
+                    imdbID: resolved.imdbID,
+                    season: resolved.type == .series ? resolved.seasonNumber : nil,
+                    episode: resolved.type == .series ? resolved.episodeNumber : nil,
+                    duration: nil
+                )
+                await VeyraSkipSegmentStore.shared.prefetch(nextIdentity)
+            }
         }.task(id: item?.id) {
-            autoSkippedIntro = false
-            introDBSegments = .empty
-            let loaded = await IntroDBClient.shared.segments(
+            autoSkippedSegmentIDs = []
+            skipSegments = []
+            let identity = VeyraSkipMediaIdentity(
                 tmdbID: item?.tmdbID,
                 imdbID: item?.imdbID,
                 season: item?.type == .series ? item?.seasonNumber : nil,
                 episode: item?.type == .series ? item?.episodeNumber : nil,
-                durationSeconds: canSeek ? engine.duration : nil
+                duration: canSeek ? engine.duration : nil,
+                jellyfinContext: source?.jellyfinSkipSegments
             )
+            let loaded = await VeyraSkipSegmentStore.shared.segments(for: identity)
             guard !Task.isCancelled else { return }
-            introDBSegments = loaded
+            skipSegments = loaded
         }.onChange(of: engine.currentTime) { _, time in
             handleAutoSkip(at: time)
         }
@@ -395,7 +450,7 @@ struct PlayerSubtitleControls: View {
 
     // MARK: - Skip segment overlay
 
-    private func skipSegmentButton(_ kind: SkipSegmentKind, _ segment: IntroDBSegment) -> some View {
+    private func skipSegmentButton(_ kind: SkipSegmentKind, _ segment: VeyraSkipSegment) -> some View {
         Button {
             skipSegment(segment)
         } label: {
@@ -564,7 +619,8 @@ struct PlayerSubtitleControls: View {
     private var seekTimeline: some View {
         VeyraPlaybackTimeline(
             engine: engine, displayedTime: seekController.previewTime,
-            isFocused: focused == .timeline, isSeeking: seekController.isSeeking
+            isFocused: focused == .timeline, isSeeking: seekController.isSeeking,
+            segments: skipSegments
         ).contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous)).focusable(
             canSeek
         ).focused($focused, equals: .timeline).focusEffectDisabled().onMoveCommand {
@@ -1162,6 +1218,9 @@ private struct VeyraPlaybackTimeline: View {
     let displayedTime: Double?
     let isFocused: Bool
     let isSeeking: Bool
+    // Fase 2 (skip-segment progressbar-markers): nog enkel doorgegeven, de
+    // markerlaag zelf wordt pas in Fase 3 getekend.
+    let segments: [VeyraSkipSegment]
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 0.5)) { _ in
@@ -1199,6 +1258,12 @@ private struct VeyraPlaybackTimeline: View {
                                             geometry.size.width * CGFloat(progress) - 9)))
                             }
                         }
+                        .overlay(alignment: .topLeading) {
+                            VeyraSkipSegmentMarkerLayer(
+                                segments: segments, duration: engine.duration,
+                                trackWidth: geometry.size.width, currentTime: currentTime
+                            ).offset(y: -8)
+                        }
                     }.frame(height: isFocused ? 18 : 7).animation(
                         VeyraAnimation.focus, value: isFocused)
 
@@ -1208,6 +1273,12 @@ private struct VeyraPlaybackTimeline: View {
                         if displayedTime != nil {
                             Text(isSeeking ? "Spoelen..." : "Nieuwe positie").foregroundStyle(
                                 VeyraColors.cyan)
+                            // Spec §25: scrub-context toont segmenttype als de nieuwe positie
+                            // binnen een skip-segment valt -- hergebruikt bestaande scrub-tekst,
+                            // geen nieuwe popup-engine.
+                            if let label = segments.first(where: { $0.contains(currentTime) })?.type.shortLabel {
+                                Text("· \(label)").foregroundStyle(VeyraColors.cyan.opacity(0.75))
+                            }
                         }
 
                         Spacer()

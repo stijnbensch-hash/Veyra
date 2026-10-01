@@ -33,8 +33,63 @@ final class TraktStore: ObservableObject {
     @Published private(set) var ratings: [TraktEntry] = []
     @Published private(set) var lists: [TraktList] = []
 
-    @Published private(set) var watchedMovies: [TraktEntry] = []
-    @Published private(set) var watchedShows: [TraktEntry] = []
+    @Published private(set) var watchedMovies: [TraktEntry] = [] {
+        didSet {
+            let index = Self.indexWatchedMovies(watchedMovies)
+            watchedMovieTMDBIDs = index.tmdb
+            watchedMovieIMDBIDs = index.imdb
+        }
+    }
+    @Published private(set) var watchedShows: [TraktEntry] = [] {
+        didSet {
+            let index = Self.indexWatchedEpisodes(watchedShows)
+            watchedEpisodesByShowTMDBID = index.tmdb
+            watchedEpisodesByShowIMDBID = index.imdb
+        }
+    }
+
+    // O(1) "bekeken"-opzoeking (audit P1 §13): bijgehouden via `didSet` hierboven zodat
+    // elke bestaande plek die `watchedMovies`/`watchedShows` wijzigt (sync, lokale
+    // mutatie, cache-herstel) de index vanzelf meekrijgt, zonder die plekken zelf aan te
+    // passen. `isWatched(_:)` deed hiervoor een lineaire `.contains`-scan per aanroep --
+    // merkbaar bij bv. 200 Home-kaarten die elk hun eigen "bekeken"-badge opvragen.
+    private var watchedMovieTMDBIDs: Set<Int> = []
+    private var watchedMovieIMDBIDs: Set<String> = []
+    private var watchedEpisodesByShowTMDBID: [Int: [Int: Set<Int>]] = [:]
+    private var watchedEpisodesByShowIMDBID: [String: [Int: Set<Int>]] = [:]
+
+    private static func indexWatchedMovies(_ entries: [TraktEntry]) -> (tmdb: Set<Int>, imdb: Set<String>) {
+        var tmdb: Set<Int> = []
+        var imdb: Set<String> = []
+        for entry in entries {
+            if let t = entry.movie?.ids.tmdb { tmdb.insert(t) }
+            if let i = entry.movie?.ids.imdb { imdb.insert(i) }
+        }
+        return (tmdb, imdb)
+    }
+
+    private static func indexWatchedEpisodes(
+        _ entries: [TraktEntry]
+    ) -> (tmdb: [Int: [Int: Set<Int>]], imdb: [String: [Int: Set<Int>]]) {
+        var byTMDB: [Int: [Int: Set<Int>]] = [:]
+        var byIMDB: [String: [Int: Set<Int>]] = [:]
+        for entry in entries {
+            guard let seasons = entry.seasons else { continue }
+            var seasonMap: [Int: Set<Int>] = [:]
+            for season in seasons {
+                let watchedNumbers = season.episodes.filter { ($0.plays ?? 1) > 0 }.map(\.number)
+                seasonMap[season.number, default: []].formUnion(watchedNumbers)
+            }
+            guard !seasonMap.isEmpty else { continue }
+            if let t = entry.show?.ids.tmdb {
+                byTMDB[t, default: [:]].merge(seasonMap) { existing, new in existing.union(new) }
+            }
+            if let i = entry.show?.ids.imdb {
+                byIMDB[i, default: [:]].merge(seasonMap) { existing, new in existing.union(new) }
+            }
+        }
+        return (byTMDB, byIMDB)
+    }
 
     @Published private(set) var lastWatchedSync: Date?
     @Published private(set) var lastSync: Date?
@@ -680,9 +735,9 @@ final class TraktStore: ObservableObject {
         _ item: MediaItem
     ) -> Bool {
         if item.type == .movie {
-            return watchedMovies.contains {
-                $0.matches(item)
-            }
+            if let tmdb = item.tmdbID, watchedMovieTMDBIDs.contains(tmdb) { return true }
+            if let imdb = item.imdbID, watchedMovieIMDBIDs.contains(imdb) { return true }
+            return false
         }
 
         guard
@@ -700,47 +755,13 @@ final class TraktStore: ObservableObject {
             ) == .watched
         }
 
-        return watchedShows.contains {
-            entry in
-
-            let matches =
-                entry.show?
-                    .ids
-                    .matches(
-                        TraktIDs(
-                            imdb:
-                                item.imdbID,
-                            tmdb:
-                                item.tmdbID
-                        )
-                    )
-                ?? false
-
-            return matches
-                && (
-                    entry.seasons?
-                        .contains {
-                            seasonValue in
-
-                            seasonValue.number
-                                == season
-                                &&
-                            seasonValue.episodes
-                                .contains {
-                                    episodeValue in
-
-                                    episodeValue.number
-                                        == episode
-                                        &&
-                                    (
-                                        episodeValue.plays
-                                        ?? 1
-                                    ) > 0
-                                }
-                        }
-                    ?? false
-                )
+        if let tmdb = item.tmdbID, watchedEpisodesByShowTMDBID[tmdb]?[season]?.contains(episode) == true {
+            return true
         }
+        if let imdb = item.imdbID, watchedEpisodesByShowIMDBID[imdb]?[season]?.contains(episode) == true {
+            return true
+        }
+        return false
     }
 
     // MARK: - Mutations

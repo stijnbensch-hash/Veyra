@@ -12,6 +12,16 @@ import Foundation
 /// gevonden bij dezelfde provider, dan valt de aanroeper terug op
 /// `SourceSelectionView`.
 enum NextEpisodeSourceResolver {
+    /// Harde bovengrens op de volledige bronresolutie. Elke individuele
+    /// netwerkaanvraag heeft al een eigen timeoutInterval, maar als één
+    /// bron (addon/IPTV/Jellyfin) daar toch voorbij hangt (trage server,
+    /// hoop accounts na elkaar, ...) dan bleef de "Volgende aflevering"-knop
+    /// tot nu toe onbeperkt op "Volgende aflevering zoeken…" staan, omdat
+    /// de tuple-await op alle drie wacht. Door hier te racen tegen een
+    /// sleep-task nemen we gewoon het eerst klare resultaat (net als de
+    /// per-addon-timeout op VeyraHub) i.p.v. voor altijd te wachten.
+    private static let overallTimeout: Duration = .seconds(12)
+
     static func resolve(matching current: PlayableSource, for item: MediaItem) async -> PlayableSource? {
         guard let providerName = current.providerName, !providerName.isEmpty else { return nil }
 
@@ -20,15 +30,30 @@ enum NextEpisodeSourceResolver {
         // Zelfde drie bronnen bevragen als `SourceSelectionViewModel`,
         // maar dan voor de volgende aflevering, en parallel om geen extra
         // netwerk-vertraging op te lopen t.o.v. het bronkeuzescherm.
-        async let addonValuesTask = resolver.addonSources(for: item)
-        async let iptvValuesTask = resolver.iptvSources(for: item)
-        async let jellyfinValuesTask = resolver.jellyfinSources(for: item)
-        let (addonValues, iptvValues, jellyfinValues) = await (addonValuesTask, iptvValuesTask, jellyfinValuesTask)
+        let combinedValues: [ResolvedSource] = await withTaskGroup(of: [ResolvedSource]?.self) { group in
+            group.addTask {
+                async let addonValuesTask = resolver.addonSources(for: item)
+                async let iptvValuesTask = resolver.iptvSources(for: item)
+                async let jellyfinValuesTask = resolver.jellyfinSources(for: item)
+                let (addonValues, iptvValues, jellyfinValues) = await (addonValuesTask, iptvValuesTask, jellyfinValuesTask)
+                return addonValues + iptvValues + jellyfinValues
+            }
+            group.addTask {
+                try? await Task.sleep(for: overallTimeout)
+                return nil
+            }
+            // Neem wat het eerst klaar is -- bij een timeout dus een lege
+            // lijst (en de nog hangende bron-taak wordt daarna geannuleerd
+            // i.p.v. afgewacht).
+            let first = (await group.next()) ?? nil
+            group.cancelAll()
+            return first ?? []
+        }
 
         // Zelfde provider (addon/mediaserver/IPTV) én zelfde soort bron —
         // een gelijknamige provider van een ander type zou toevallig
         // kunnen matchen, maar is nooit "dezelfde bron".
-        let candidates = (addonValues + iptvValues + jellyfinValues)
+        let candidates = combinedValues
             .map(\.source)
             .filter {
                 $0.kind == current.kind

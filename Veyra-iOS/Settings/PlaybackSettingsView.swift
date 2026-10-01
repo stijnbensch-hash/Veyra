@@ -40,6 +40,14 @@ struct PlaybackSettingsView: View {
     private var showSkipRecapButton = true
     @AppStorage(PlaybackSettingsDefaults.showSkipCreditsButtonKey)
     private var showSkipCreditsButton = true
+    @AppStorage(PlaybackSettingsDefaults.showSkipPreviewButtonKey)
+    private var showSkipPreviewButton = true
+    @AppStorage(PlaybackSettingsDefaults.autoSkipRecapKey)
+    private var autoSkipRecap = false
+    @AppStorage(PlaybackSettingsDefaults.autoSkipCreditsKey)
+    private var autoSkipCredits = false
+    @AppStorage(PlaybackSettingsDefaults.autoSkipPreviewKey)
+    private var autoSkipPreview = false
 
     // Hierna
     @AppStorage(PlaybackSettingsDefaults.autoPlayNextCountdownEnabledKey)
@@ -97,11 +105,15 @@ struct PlaybackSettingsView: View {
                     Toggle("Knop 'Intro overslaan' tonen", isOn: $showSkipIntroButton)
                     Toggle("Intro automatisch overslaan", isOn: $autoSkipIntro)
                     Toggle("Knop 'Samenvatting overslaan' tonen", isOn: $showSkipRecapButton)
+                    Toggle("Samenvatting automatisch overslaan", isOn: $autoSkipRecap)
                     Toggle("Knop 'Aftiteling overslaan' tonen", isOn: $showSkipCreditsButton)
+                    Toggle("Aftiteling automatisch overslaan", isOn: $autoSkipCredits)
+                    Toggle("Knop 'Preview overslaan' tonen", isOn: $showSkipPreviewButton)
+                    Toggle("Preview automatisch overslaan", isOn: $autoSkipPreview)
                 } header: {
                     Text("Oversla-segmenten")
                 } footer: {
-                    Text("Tijden komen van TheIntroDB en zijn niet voor elke film of aflevering beschikbaar.")
+                    Text("Automatisch overslaan gebeurt alleen bij voldoende betrouwbare tijden. Tijden zijn niet voor elke film of aflevering beschikbaar.")
                 }
 
                 Section {

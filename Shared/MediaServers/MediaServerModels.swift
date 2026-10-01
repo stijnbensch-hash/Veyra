@@ -6,7 +6,8 @@ enum MediaServerKind:
     String,
     Codable,
     CaseIterable,
-    Hashable
+    Hashable,
+    Sendable
 {
     case jellyfin
     case plex
@@ -57,7 +58,8 @@ struct MediaServerAccount:
     Codable,
     Identifiable,
     Equatable,
-    Hashable
+    Hashable,
+    Sendable
 {
     var id: UUID
     var name: String

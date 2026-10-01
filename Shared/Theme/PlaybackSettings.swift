@@ -33,6 +33,10 @@ enum PlaybackSettingsDefaults {
     static let autoSkipIntroKey = "playback.autoSkipIntro"
     static let showSkipRecapButtonKey = "playback.showSkipRecapButton"
     static let showSkipCreditsButtonKey = "playback.showSkipCreditsButton"
+    static let showSkipPreviewButtonKey = "playback.showSkipPreviewButton"
+    static let autoSkipRecapKey = "playback.autoSkipRecap"
+    static let autoSkipCreditsKey = "playback.autoSkipCredits"
+    static let autoSkipPreviewKey = "playback.autoSkipPreview"
 
     // Hierna
     static let autoPlayNextCountdownEnabledKey = "playback.autoPlayNextCountdownEnabled"

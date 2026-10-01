@@ -189,6 +189,14 @@ private struct PlaybackSkipSegmentsSettingsView: View {
     private var showSkipRecapButton = true
     @AppStorage(PlaybackSettingsDefaults.showSkipCreditsButtonKey)
     private var showSkipCreditsButton = true
+    @AppStorage(PlaybackSettingsDefaults.showSkipPreviewButtonKey)
+    private var showSkipPreviewButton = true
+    @AppStorage(PlaybackSettingsDefaults.autoSkipRecapKey)
+    private var autoSkipRecap = false
+    @AppStorage(PlaybackSettingsDefaults.autoSkipCreditsKey)
+    private var autoSkipCredits = false
+    @AppStorage(PlaybackSettingsDefaults.autoSkipPreviewKey)
+    private var autoSkipPreview = false
 
     var body: some View {
         ZStack {
@@ -199,9 +207,13 @@ private struct PlaybackSkipSegmentsSettingsView: View {
                     VeyraSettingsToggleRow(icon: "forward.frame", title: "Knop 'Intro overslaan' tonen", isOn: $showSkipIntroButton)
                     VeyraSettingsToggleRow(icon: "bolt.fill", title: "Intro automatisch overslaan", isOn: $autoSkipIntro)
                     VeyraSettingsToggleRow(icon: "arrow.uturn.forward", title: "Knop 'Samenvatting overslaan' tonen", isOn: $showSkipRecapButton)
+                    VeyraSettingsToggleRow(icon: "bolt.fill", title: "Samenvatting automatisch overslaan", isOn: $autoSkipRecap)
                     VeyraSettingsToggleRow(icon: "text.below.photo", title: "Knop 'Aftiteling overslaan' tonen", isOn: $showSkipCreditsButton)
+                    VeyraSettingsToggleRow(icon: "bolt.fill", title: "Aftiteling automatisch overslaan", isOn: $autoSkipCredits)
+                    VeyraSettingsToggleRow(icon: "forward.end", title: "Knop 'Preview overslaan' tonen", isOn: $showSkipPreviewButton)
+                    VeyraSettingsToggleRow(icon: "bolt.fill", title: "Preview automatisch overslaan", isOn: $autoSkipPreview)
                 } footer: {
-                    Text("Tijden komen van TheIntroDB en zijn niet voor elke film of aflevering beschikbaar.")
+                    Text("Automatisch overslaan gebeurt alleen bij voldoende betrouwbare tijden. Tijden zijn niet voor elke film of aflevering beschikbaar.")
                 }
             }
             .frame(maxWidth: 1000)

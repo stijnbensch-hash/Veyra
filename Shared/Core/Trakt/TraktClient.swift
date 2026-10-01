@@ -55,6 +55,18 @@ final class TraktClient {
     private var refreshTask: Task<TraktToken, Error>?
     private var generation = UUID()
     private var retryAfter: Date?
+
+    // Circuit breaker (audit P2 §34-36): pas na meerdere recente tijdelijke fouten
+    // (5xx/netwerktimeout) binnen een kort venster even helemaal geen nieuwe requests
+    // meer proberen -- niet bij één enkele timeout (expliciet vereist: "geen agressieve
+    // circuit breaker"). Los van `retryAfter` hierboven, dat specifiek de door Trakt
+    // opgegeven 429 Retry-After respecteert.
+    private var recentFailureTimestamps: [Date] = []
+    private var circuitOpenUntil: Date?
+    private static let circuitFailureThreshold = 3
+    private static let circuitFailureWindow: TimeInterval = 60
+    private static let circuitCooldown: TimeInterval = 30
+
     let decoder: JSONDecoder
     let encoder: JSONEncoder
     private(set) var restorationError: Error?
@@ -224,25 +236,68 @@ final class TraktClient {
                       body: [String: Any]?, access: String? = nil) async throws -> (Data, HTTPURLResponse) {
         guard let credentials else { throw TraktError.configuration }
         if let retryAfter, retryAfter > Date() { throw TraktError.http(429, retryAfter.timeIntervalSinceNow, nil) }
+
+        // HALF_OPEN: de cooldown is voorbij maar het circuit is nog niet weer dicht --
+        // deze aanroep is dan de ene toegestane proefaanroep.
+        let isHalfOpenProbe: Bool
+        if let openUntil = circuitOpenUntil {
+            if openUntil > Date() { throw TraktError.http(503, openUntil.timeIntervalSinceNow, "circuit_open") }
+            isHalfOpenProbe = true
+        } else {
+            isHalfOpenProbe = false
+        }
+
         guard let url = URL(string: "https://\(host)/\(path)") else { throw TraktError.invalidResponse }
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.timeoutInterval = 30
         request.cachePolicy = .reloadIgnoringLocalCacheData
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("2", forHTTPHeaderField: "trakt-api-version")
-        request.setValue(credentials.clientID, forHTTPHeaderField: "trakt-api-key")
-        if let access { request.setValue("Bearer \(access)", forHTTPHeaderField: "Authorization") }
+        TraktRequestHeaders.apply(to: &request, clientID: credentials.clientID, accessToken: access)
         if let body { request.httpBody = try JSONSerialization.data(withJSONObject: body) }
-        let (data, response) = try await session.data(for: request)
-        guard let response = response as? HTTPURLResponse else { throw TraktError.invalidResponse }
-        guard (200...299).contains(response.statusCode) else {
-            let retry = response.value(forHTTPHeaderField: "Retry-After").flatMap(Double.init)
-            if response.statusCode == 429 { retryAfter = Date().addingTimeInterval(retry ?? 10) }
-            let errorBody = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
-            throw TraktError.http(response.statusCode, retry, errorBody?["error"] as? String)
+        do {
+            let (data, response) = try await session.data(for: request)
+            guard let response = response as? HTTPURLResponse else { throw TraktError.invalidResponse }
+            guard (200...299).contains(response.statusCode) else {
+                let retry = response.value(forHTTPHeaderField: "Retry-After").flatMap(Double.init)
+                if response.statusCode == 429 { retryAfter = Date().addingTimeInterval(retry ?? 10) }
+                if (500...599).contains(response.statusCode) { recordCircuitFailure(isHalfOpenProbe: isHalfOpenProbe) }
+                let errorBody = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+                throw TraktError.http(response.statusCode, retry, errorBody?["error"] as? String)
+            }
+            circuitOpenUntil = nil
+            recentFailureTimestamps.removeAll()
+            return (data, response)
+        } catch let error as URLError {
+            if Self.isTransientNetworkError(error) { recordCircuitFailure(isHalfOpenProbe: isHalfOpenProbe) }
+            throw error
         }
-        return (data, response)
+    }
+
+    /// Eén proefaanroep na cooldown die opnieuw faalt, opent het circuit meteen weer
+    /// (geen nieuwe drempel van 3 nodig -- zo bedoeld voor HALF_OPEN). Daarbuiten pas
+    /// open na `circuitFailureThreshold` fouten binnen `circuitFailureWindow`.
+    private func recordCircuitFailure(isHalfOpenProbe: Bool) {
+        let now = Date()
+        if isHalfOpenProbe {
+            circuitOpenUntil = now.addingTimeInterval(Self.circuitCooldown)
+            recentFailureTimestamps.removeAll()
+            return
+        }
+        recentFailureTimestamps = recentFailureTimestamps.filter { now.timeIntervalSince($0) < Self.circuitFailureWindow }
+        recentFailureTimestamps.append(now)
+        if recentFailureTimestamps.count >= Self.circuitFailureThreshold {
+            circuitOpenUntil = now.addingTimeInterval(Self.circuitCooldown)
+            recentFailureTimestamps.removeAll()
+        }
+    }
+
+    private static func isTransientNetworkError(_ error: URLError) -> Bool {
+        switch error.code {
+        case .timedOut, .networkConnectionLost, .cannotConnectToHost, .notConnectedToInternet,
+             .dnsLookupFailed, .cannotFindHost, .resourceUnavailable:
+            return true
+        default:
+            return false
+        }
     }
 }

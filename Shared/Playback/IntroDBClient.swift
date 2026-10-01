@@ -61,7 +61,20 @@ actor IntroDBClient {
     }
 
     private var cache: [CacheKey: CachedSegments] = [:]
-    private var inFlight: [CacheKey: Task<IntroDBSegments, Never>] = [:]
+    private var inFlight: [CacheKey: Task<FetchResult, Never>] = [:]
+
+    // Audit P0: een mislukte opzoeking (timeout/offline/429/5xx) is GEEN geldig
+    // "geen segmenten"-antwoord en mag niet als zodanig gecached worden -- anders
+    // duurt het bij een tijdelijke TheIntroDB-storing tot 10 minuten voor Veyra het
+    // opnieuw probeert. `FetchResult` maakt dat onderscheid expliciet; alleen
+    // `.success` (ook met lege arrays, of een bevestigde 404 "niet gevonden")
+    // wordt in `cache` geschreven. Een 429 blokkeert nieuwe aanroepen tot
+    // `Retry-After` is verstreken, zonder dat als lege cache te bewaren.
+    enum FetchResult {
+        case success(IntroDBSegments)
+        case failure(retryAfter: TimeInterval?)
+    }
+    private var blockedUntil: Date?
 
     init(session: URLSession = .shared) {
         self.session = session
@@ -75,6 +88,28 @@ actor IntroDBClient {
         tmdbID: Int?, imdbID: String? = nil,
         season: Int?, episode: Int?, durationSeconds: Double?
     ) async -> IntroDBSegments {
+        switch await lookup(
+            tmdbID: tmdbID, imdbID: imdbID,
+            season: season, episode: episode, durationSeconds: durationSeconds
+        ) {
+        case .success(let segments): return segments
+        case .failure: return .empty
+        }
+    }
+
+    /// Zelfde opzoeking als `segments(...)`, maar geeft het echte resultaat
+    /// terug inclusief het onderscheid tussen een bevestigd leeg antwoord en
+    /// een mislukte poging -- voor aanroepers (zoals `VeyraSkipSegmentProvider`)
+    /// die een storing willen doorgeven in plaats van laten verdwijnen in `.empty`.
+    func lookup(
+        tmdbID: Int?, imdbID: String? = nil,
+        season: Int?, episode: Int?, durationSeconds: Double?
+    ) async -> FetchResult {
+        #if DEBUG
+        // Nooit de key zelf loggen (spec §3/74) -- alleen of er een
+        // geconfigureerd is.
+        print("[SkipSegments][TheIntroDB] apiKeyConfigured=\(AppConfiguration.introDBAPIKey?.isEmpty == false)")
+        #endif
         let identifier: String
         let idQueryItem: URLQueryItem
         if let tmdbID, tmdbID > 0 {
@@ -86,21 +121,27 @@ actor IntroDBClient {
             identifier = "imdb:\(imdbID)"
             idQueryItem = URLQueryItem(name: "imdb_id", value: imdbID)
         } else {
-            return .empty
+            return .failure(retryAfter: nil)
         }
 
         let key = CacheKey(identifier: identifier, season: season, episode: episode)
 
         if let cached = cache[key],
            cached.value != .empty || Date().timeIntervalSince(cached.fetchedAt) < 600 {
-            return cached.value
+            return .success(cached.value)
+        }
+
+        if let blockedUntil, blockedUntil > Date() {
+            // Recent een 429 gehad -- nog even niets nieuws proberen, maar ook niet
+            // als "geen segmenten" cachen.
+            return .failure(retryAfter: nil)
         }
 
         if let existing = inFlight[key] {
             return await existing.value
         }
 
-        let task = Task<IntroDBSegments, Never> { [baseURL, session] in
+        let task = Task<FetchResult, Never> { [baseURL, session] in
             var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)!
             var items = [idQueryItem]
 
@@ -117,7 +158,7 @@ actor IntroDBClient {
 
             components.queryItems = items
 
-            guard let url = components.url else { return .empty }
+            guard let url = components.url else { return .failure(retryAfter: nil) }
 
             var request = URLRequest(url: url)
             request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -128,23 +169,60 @@ actor IntroDBClient {
 
             do {
                 let (data, response) = try await session.data(for: request)
+                guard let http = response as? HTTPURLResponse else {
+                    #if DEBUG
+                    print("[SkipSegments][TheIntroDB] error=invalidResponse")
+                    #endif
+                    return .failure(retryAfter: nil)
+                }
 
-                guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-                    return .empty
+                // 404 "niet gevonden" is een bevestigd, geldig antwoord van TheIntroDB
+                // zelf (geen marker-data voor deze titel) -- geen storing, dus wél
+                // cachebaar als leeg resultaat.
+                if http.statusCode == 404 {
+                    #if DEBUG
+                    print("[SkipSegments][TheIntroDB] noSegments (404)")
+                    #endif
+                    return .success(.empty)
+                }
+
+                if http.statusCode == 429 {
+                    let retry = http.value(forHTTPHeaderField: "Retry-After").flatMap(Double.init)
+                    #if DEBUG
+                    print("[SkipSegments][TheIntroDB] error=rateLimited retryAfter=\(retry ?? 30)")
+                    #endif
+                    return .failure(retryAfter: retry ?? 30)
+                }
+
+                guard http.statusCode == 200 else {
+                    #if DEBUG
+                    print("[SkipSegments][TheIntroDB] error=serverError status=\(http.statusCode)")
+                    #endif
+                    return .failure(retryAfter: nil)
                 }
 
                 let decoded = try JSONDecoder().decode(IntroDBMediaResponse.self, from: data)
-                return decoded.segments
+                return .success(decoded.segments)
             } catch {
-                return .empty
+                #if DEBUG
+                let kind = (error as? URLError)?.code == .timedOut ? "timeout" : "invalidResponse"
+                print("[SkipSegments][TheIntroDB] error=\(kind) (\(error.localizedDescription))")
+                #endif
+                return .failure(retryAfter: nil)
             }
         }
 
         inFlight[key] = task
-        let result = await task.value
+        let outcome = await task.value
         inFlight[key] = nil
-        cache[key] = CachedSegments(value: result, fetchedAt: Date())
-        return result
+
+        switch outcome {
+        case .success(let segments):
+            cache[key] = CachedSegments(value: segments, fetchedAt: Date())
+        case .failure(let retryAfter):
+            if let retryAfter { blockedUntil = Date().addingTimeInterval(max(retryAfter, 1)) }
+        }
+        return outcome
     }
 }
 

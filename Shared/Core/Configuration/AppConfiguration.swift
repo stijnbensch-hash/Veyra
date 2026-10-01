@@ -81,21 +81,25 @@ enum AppConfiguration {
         return url
     }
 
-    static var tmdbReadAccessToken:
-        String?
-    {
-        if let stored = VeyraAPIKeyStore.value(for: .tmdbReadAccessToken) {
-            return stored
-        }
+    /// Fase 2 (Request Foundation, TMDB-performance-spec §10 "Request builder"/audit-P0):
+    /// elke TMDB-aanroep las voorheen bij ELK verzoek synchroon de Keychain -- nu één keer per
+    /// sessie gecached, en ongeldig gemaakt zodra sleutels wijzigen (Instellingen of Hub-sync
+    /// posten al `.veyraAPIKeysDidChange`).
+    static var tmdbReadAccessToken: String? {
+        TMDBTokenCache.shared.cachedOrCompute {
+            if let stored = VeyraAPIKeyStore.value(for: .tmdbReadAccessToken) {
+                return stored
+            }
 
-        guard let configured = configuredValue("TMDBReadAccessToken") else {
-            return nil
+            guard let configured = configuredValue("TMDBReadAccessToken") else {
+                return nil
+            }
+            // De Top Shelf-extensie kan de appconfiguratie niet lezen. Bewaar de
+            // bestaande sleutel lokaal in de gedeelde keychain zodra de app hem
+            // gebruikt, zonder hem in de extensiebundel op te nemen.
+            try? VeyraAPIKeyStore.set(configured, for: .tmdbReadAccessToken)
+            return configured
         }
-        // De Top Shelf-extensie kan de appconfiguratie niet lezen. Bewaar de
-        // bestaande sleutel lokaal in de gedeelde keychain zodra de app hem
-        // gebruikt, zonder hem in de extensiebundel op te nemen.
-        try? VeyraAPIKeyStore.set(configured, for: .tmdbReadAccessToken)
-        return configured
     }
 
     static var openSubtitlesAPIKey:
@@ -294,5 +298,45 @@ enum AppConfiguration {
         }
 
         return trimmed
+    }
+}
+
+/// In-memory cache voor `AppConfiguration.tmdbReadAccessToken` (Fase 2, zie daar). Simpele
+/// lock-beveiligde singleton i.p.v. een actor, omdat de token overal als gewone, synchrone
+/// `static var` wordt gelezen (geen `await`-punten door de hele TMDB-stack heen).
+private final class TMDBTokenCache: @unchecked Sendable {
+    static let shared = TMDBTokenCache()
+
+    private let lock = NSLock()
+    private var cached: String??
+    private var observer: NSObjectProtocol?
+
+    private init() {
+        observer = NotificationCenter.default.addObserver(
+            forName: .veyraAPIKeysDidChange, object: nil, queue: nil
+        ) { [weak self] _ in
+            self?.invalidate()
+        }
+    }
+
+    func cachedOrCompute(_ compute: () -> String?) -> String? {
+        lock.lock()
+        if let cached {
+            lock.unlock()
+            return cached
+        }
+        lock.unlock()
+
+        let value = compute()
+        lock.lock()
+        cached = value
+        lock.unlock()
+        return value
+    }
+
+    private func invalidate() {
+        lock.lock()
+        cached = nil
+        lock.unlock()
     }
 }

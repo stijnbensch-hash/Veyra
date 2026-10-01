@@ -149,18 +149,20 @@ struct SeriesService {
             forHTTPHeaderField: "Accept"
         )
 
-        let (data, response) = try await URLSession.shared.data(
-            for: request
-        )
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw TMDBError.invalidResponse
-        }
-
-        guard (200...299).contains(httpResponse.statusCode) else {
-            throw TMDBError.httpError(
-                statusCode: httpResponse.statusCode
-            )
+        // Fase 2 (Request Foundation): zelfde gedeelde single-flight/retry/429-afhandeling als
+        // `TMDBClient` -- zie `TMDBRequestCoordinator`.
+        let data: Data
+        do {
+            data = try await TMDBRequestCoordinator.shared.data(for: request, key: url.absoluteString)
+        } catch let error as TMDBCoordinatorError {
+            switch error {
+            case .httpError(let statusCode):
+                throw TMDBError.httpError(statusCode: statusCode)
+            case .rateLimited:
+                throw TMDBError.httpError(statusCode: 429)
+            case .invalidResponse:
+                throw TMDBError.invalidResponse
+            }
         }
 
         do {

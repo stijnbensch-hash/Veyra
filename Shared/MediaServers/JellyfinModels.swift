@@ -205,3 +205,53 @@ struct JellyfinMediaSource:
         case addonName = "AddonName"
     }
 }
+
+// MARK: - Media Segments (skip intro/outro/recap/preview)
+
+/// Eén marker uit Jellyfin's officiële Media Segments API
+/// (`GET /MediaSegments/{itemId}`, Jellyfin 10.9+, meestal gevuld via de
+/// Intro Skipper-plugin) — betrekking op het EXACTE afgespeelde bestand.
+/// Zie `JellyfinService.mediaSegments(itemID:)` en spec §20-22.
+struct JellyfinMediaSegment: Decodable, Hashable {
+    enum SegmentType: String, Decodable, Hashable {
+        case intro = "Intro"
+        case outro = "Outro"
+        case recap = "Recap"
+        case preview = "Preview"
+        case commercial = "Commercial"
+        case unknown = "Unknown"
+    }
+
+    let type: SegmentType
+    let startTicks: Int64
+    let endTicks: Int64
+
+    enum CodingKeys: String, CodingKey {
+        case type = "Type"
+        case startTicks = "StartTicks"
+        case endTicks = "EndTicks"
+    }
+
+    /// Jellyfin-ticks zijn eenheden van 100ns -- centraal omrekenen naar
+    /// seconden, zie spec §15 ("vanaf dat punt werkt heel Veyra uitsluitend
+    /// met seconden").
+    var startSeconds: Double { Double(startTicks) / 10_000_000 }
+    var endSeconds: Double { Double(endTicks) / 10_000_000 }
+}
+
+/// `GET /MediaSegments/{itemId}` komt afhankelijk van Jellyfin-versie terug
+/// als kale array of als `QueryResult<MediaSegmentDto>` (`{"Items": [...]}`)
+/// -- probeer beide vormen in plaats van op één te gokken.
+enum JellyfinMediaSegmentsResponseDecoder {
+    private struct Wrapped: Decodable {
+        let items: [JellyfinMediaSegment]
+        enum CodingKeys: String, CodingKey { case items = "Items" }
+    }
+
+    static func decode(_ data: Data) throws -> [JellyfinMediaSegment] {
+        if let wrapped = try? JSONDecoder().decode(Wrapped.self, from: data) {
+            return wrapped.items
+        }
+        return try JSONDecoder().decode([JellyfinMediaSegment].self, from: data)
+    }
+}

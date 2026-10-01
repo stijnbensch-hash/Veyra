@@ -387,7 +387,12 @@ struct JellyfinSourceProvider:
                     kind:
                         .direct,
                     providerName:
-                        account.name
+                        account.name,
+                    jellyfinSkipSegments:
+                        JellyfinSkipSegmentsContext(
+                            account: account,
+                            itemID: jellyfinItem.id
+                        )
                 )
 
             // Zelfde groepering als het native pad hierboven: op de naam

@@ -352,6 +352,49 @@ struct JellyfinService {
         )
     }
 
+    // MARK: - Media Segments (skip intro/outro/recap/preview)
+
+    /// Haalt server-side skip-markers op voor het EXACTE item (spec §20-22:
+    /// Jellyfin Media Segments API, meestal via de Intro Skipper-plugin).
+    /// Gebruikt een kort begrensde timeout zodat een trage/offline server de
+    /// Skip Segment Engine nooit laat hangen (spec §81) -- een server zonder
+    /// deze API (geen plugin, oudere Jellyfin) antwoordt met 404, wat hier
+    /// als bevestigd leeg geldt, geen storing. Elke andere fout gooit
+    /// gewoon door, nooit stilzwijgend "geen segmenten" (spec §37, "error ≠
+    /// empty") -- dat onderscheid maakt de aanroepende provider.
+    func mediaSegments(itemID: String) async throws -> [JellyfinMediaSegment] {
+        let url = endpoint("MediaSegments/\(itemID)")
+
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 8
+        addAuthorizationHeaders(to: &request)
+
+        let (data, response) = try await session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            #if DEBUG
+            print("[SkipSegments][jellyfinServer] error=invalidResponse")
+            #endif
+            throw JellyfinServiceError.invalidResponse
+        }
+
+        if httpResponse.statusCode == 404 {
+            #if DEBUG
+            print("[SkipSegments][jellyfinServer] noSegments (404, geen Media Segments-plugin/data)")
+            #endif
+            return []
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            #if DEBUG
+            print("[SkipSegments][jellyfinServer] error=serverError status=\(httpResponse.statusCode)")
+            #endif
+            throw JellyfinServiceError.server(httpResponse.statusCode)
+        }
+
+        return try JellyfinMediaSegmentsResponseDecoder.decode(data)
+    }
+
     // MARK: - Networking
 
     private func endpoint(
