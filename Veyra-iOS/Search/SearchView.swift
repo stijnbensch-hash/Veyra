@@ -17,6 +17,14 @@ struct SearchView: View {
     @State private var isOpeningMovie = false
     @State private var errorMessage: String?
 
+    // Fase 7 (Search §43: pagination) -- eerste pagina snel, volgende pas bij scroll.
+    @State private var moviePage = 1
+    @State private var movieTotalPages = 1
+    @State private var isLoadingMoreMovies = false
+    @State private var seriesPage = 1
+    @State private var seriesTotalPages = 1
+    @State private var isLoadingMoreSeries = false
+
     private var metrics: VeyraPosterMetrics {
         VeyraPosterMetrics(regular: sizeClass == .regular)
     }
@@ -54,6 +62,9 @@ struct SearchView: View {
                                     }
                                     .buttonStyle(.plain)
                                     .disabled(isOpeningMovie)
+                                    .task {
+                                        if movie.id == movies.last?.id { await loadMoreMoviesIfNeeded() }
+                                    }
                                 }
                             }
                         }
@@ -74,6 +85,9 @@ struct SearchView: View {
                                         )
                                     }
                                     .buttonStyle(.plain)
+                                    .task {
+                                        if item.id == series.last?.id { await loadMoreSeriesIfNeeded() }
+                                    }
                                 }
                             }
                         }
@@ -132,12 +146,16 @@ struct SearchView: View {
                 isSearching = false
                 return
             }
-            async let movieResults = movieService.searchMovies(query: text)
-            async let seriesResults = seriesService.searchSeries(query: text)
-            let results = try await (movieResults, seriesResults)
+            async let moviePageResult = movieService.searchMovies(query: text, page: 1)
+            async let seriesPageResult = seriesService.searchSeries(query: text, page: 1)
+            let results = try await (moviePageResult, seriesPageResult)
             try Task.checkCancellation()
-            movies = results.0
-            series = results.1
+            movies = results.0.results
+            moviePage = results.0.page
+            movieTotalPages = max(results.0.totalPages, 1)
+            series = results.1.results
+            seriesPage = results.1.page
+            seriesTotalPages = max(results.1.totalPages, 1)
         } catch is CancellationError {
             return
         } catch {
@@ -146,6 +164,47 @@ struct SearchView: View {
             errorMessage = error.localizedDescription
         }
         isSearching = false
+    }
+
+    /// Fase 7 (Search §43): volgende pagina pas bij scroll naar het laatste item, nooit vooraf.
+    @MainActor
+    private func loadMoreMoviesIfNeeded() async {
+        guard !isLoadingMoreMovies, moviePage < movieTotalPages else { return }
+        guard let service = TMDBService() else { return }
+        let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        isLoadingMoreMovies = true
+        defer { isLoadingMoreMovies = false }
+        do {
+            let nextPage = moviePage + 1
+            let page = try await service.searchMovies(query: text, page: nextPage)
+            guard text == query.trimmingCharacters(in: .whitespacesAndNewlines) else { return }
+            movies.append(contentsOf: page.results)
+            moviePage = page.page
+            movieTotalPages = max(page.totalPages, 1)
+        } catch {
+            // Stil negeren: de eerste pagina resultaten blijven gewoon zichtbaar.
+        }
+    }
+
+    @MainActor
+    private func loadMoreSeriesIfNeeded() async {
+        guard !isLoadingMoreSeries, seriesPage < seriesTotalPages else { return }
+        guard let service = SeriesService() else { return }
+        let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        isLoadingMoreSeries = true
+        defer { isLoadingMoreSeries = false }
+        do {
+            let nextPage = seriesPage + 1
+            let page = try await service.searchSeries(query: text, page: nextPage)
+            guard text == query.trimmingCharacters(in: .whitespacesAndNewlines) else { return }
+            series.append(contentsOf: page.results)
+            seriesPage = page.page
+            seriesTotalPages = max(page.totalPages, 1)
+        } catch {
+            // Stil negeren: eerdere resultaten blijven gewoon zichtbaar.
+        }
     }
 
     @MainActor

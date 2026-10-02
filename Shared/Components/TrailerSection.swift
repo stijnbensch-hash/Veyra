@@ -7,6 +7,10 @@ import UIKit
 /// Staat op film- en seriedetails direct onder de cast.
 struct TrailerSection: View {
     let item: MediaItem
+    /// Fase 4 (TMDB-spec, append_to_response): hergebruikt een al opgehaalde `videos`-respons
+    /// i.p.v. zelf nog een `/videos`-aanvraag te doen -- `.none` (default) betekent
+    /// gewoon zelf ophalen, zoals voorheen.
+    var preloadedTrailer: TMDBPreload<TMDBVideo?> = .none
 
     @State private var trailer: TMDBVideo?
     @State private var selectedYoutubeKey: String?
@@ -53,11 +57,18 @@ struct TrailerSection: View {
             Text("Installeer de YouTube-app op Apple TV om deze trailer te bekijken.")
         }
         #endif
-        .task(id: "\(item.type.rawValue)|\(item.tmdbID ?? 0)") {
-            trailer = nil
-            let result = await MetadataTrailerService.trailer(for: item)
-            guard !Task.isCancelled else { return }
-            trailer = result
+        .task(id: "\(item.type.rawValue)|\(item.tmdbID ?? 0)|\(preloadedTrailer.stageKey)") {
+            switch preloadedTrailer {
+            case .value(let preloaded):
+                trailer = preloaded
+            case .pending:
+                break // de aanroeper is bezig met een gecombineerde aanvraag -- even wachten.
+            case .none:
+                trailer = nil
+                let result = await MetadataTrailerService.trailer(for: item)
+                guard !Task.isCancelled else { return }
+                trailer = result
+            }
         }
     }
 

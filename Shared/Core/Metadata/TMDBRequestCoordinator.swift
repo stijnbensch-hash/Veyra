@@ -49,6 +49,7 @@ actor TMDBRequestCoordinator {
             #if DEBUG
             print("[TMDB] rateLimited blockedUntil=\(blockedUntil)")
             #endif
+            await TMDBDiagnostics.shared.recordRateLimited()
             throw TMDBCoordinatorError.rateLimited(retryAfter: blockedUntil.timeIntervalSinceNow)
         }
 
@@ -56,9 +57,11 @@ actor TMDBRequestCoordinator {
             #if DEBUG
             print("[TMDB] request coalesced key=\(key)")
             #endif
+            await TMDBDiagnostics.shared.recordCoalesced()
             return try await existing.value
         }
 
+        await TMDBDiagnostics.shared.recordRequestStarted()
         let session = self.session
         let task = Task<Data, Error> {
             try await Self.performWithRetry(session: session, request: request)
@@ -83,6 +86,7 @@ actor TMDBRequestCoordinator {
     private static func performWithRetry(session: URLSession, request: URLRequest) async throws -> Data {
         var attempt = 0
         while true {
+            let startedAt = Date()
             do {
                 let (data, response) = try await session.data(for: request)
                 guard let http = response as? HTTPURLResponse else {
@@ -95,6 +99,7 @@ actor TMDBRequestCoordinator {
                         #if DEBUG
                         print("[TMDB] 429 retryAfter=\(retryAfter ?? -1) attempt=\(attempt)")
                         #endif
+                        await TMDBDiagnostics.shared.recordRateLimited()
                         try await Task.sleep(
                             nanoseconds: UInt64((retryAfter ?? backoffDelay(attempt: attempt)) * 1_000_000_000))
                         attempt += 1
@@ -113,11 +118,18 @@ actor TMDBRequestCoordinator {
                     throw TMDBCoordinatorError.httpError(statusCode: http.statusCode)
                 }
 
+                #if DEBUG
+                // Spec §63: netwerkstatus + duur per aanvraag, zodat trage endpoints zichtbaar zijn.
+                let durationMS = Int(Date().timeIntervalSince(startedAt) * 1000)
+                print("[TMDB] \(request.url?.path ?? "?") network=\(http.statusCode) duration=\(durationMS)ms")
+                #endif
+
                 return data
             } catch let urlError as URLError where urlError.code == .timedOut && attempt < maxAttempts - 1 {
                 #if DEBUG
                 print("[TMDB] timeout attempt=\(attempt)")
                 #endif
+                await TMDBDiagnostics.shared.recordTimeout()
                 try? await Task.sleep(nanoseconds: UInt64(backoffDelay(attempt: attempt) * 1_000_000_000))
                 attempt += 1
                 continue

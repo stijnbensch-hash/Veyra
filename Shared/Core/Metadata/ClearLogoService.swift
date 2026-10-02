@@ -35,7 +35,7 @@ enum ClearLogoService {
             ?? logos.first
 
         guard let filePath = best?.filePath else { return nil }
-        return URL(string: "https://image.tmdb.org/t/p/w500\(filePath)")
+        return TMDBImageURLBuilder.logo(filePath)
     }
 }
 

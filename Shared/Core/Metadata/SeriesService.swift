@@ -41,26 +41,25 @@ struct SeriesService {
         return Array(titles.prefix(20))
     }
 
+    /// Fase 7 (Search §43: pagination, §42: cache) -- zelfde aanpak als
+    /// `TMDBClient.searchMovies(query:page:)`.
     func searchSeries(
-        query: String
-    ) async throws -> [TMDBSeries] {
-        guard !query.trimmingCharacters(
-            in: .whitespacesAndNewlines
-        ).isEmpty else {
-            return []
+        query: String,
+        page: Int = 1
+    ) async throws -> TMDBSeriesPage {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return TMDBSeriesPage(page: page, results: [], totalPages: 0)
         }
 
-        let response: TMDBSeriesPage = try await request(
+        return try await request(
             path: "/3/search/tv",
             queryItems: [
-                URLQueryItem(
-                    name: "query",
-                    value: query
-                )
-            ]
+                URLQueryItem(name: "query", value: trimmed),
+                URLQueryItem(name: "page", value: String(page))
+            ],
+            cacheKey: "search:series:\(trimmed.lowercased()):\(page):\(language)"
         )
-
-        return response.results
     }
 
     func seriesDetails(
@@ -114,8 +113,14 @@ struct SeriesService {
 
     private func request<Response: Decodable>(
         path: String,
-        queryItems: [URLQueryItem] = []
+        queryItems: [URLQueryItem] = [],
+        cacheKey: String? = nil
     ) async throws -> Response {
+        if let cacheKey, let cached = await TMDBSearchCache.shared.data(for: cacheKey),
+           let decoded = try? JSONDecoder().decode(Response.self, from: cached) {
+            return decoded
+        }
+
         var components = URLComponents()
 
         components.scheme = "https"
@@ -166,10 +171,14 @@ struct SeriesService {
         }
 
         do {
-            return try JSONDecoder().decode(
+            let decoded = try JSONDecoder().decode(
                 Response.self,
                 from: data
             )
+            if let cacheKey {
+                await TMDBSearchCache.shared.store(data, for: cacheKey)
+            }
+            return decoded
         } catch {
             throw TMDBError.decodingFailed
         }

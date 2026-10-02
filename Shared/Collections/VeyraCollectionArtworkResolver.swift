@@ -32,7 +32,7 @@ enum VeyraCollectionArtworkResolver {
 /// EXPLICIET gekozen `clearLogoReference` (sync, geen netwerk). De automatische TMDB-clearlogo
 /// van het meest prominente deel blijft bewust beperkt tot de Stage (`VeyraClearLogo` in
 /// `VeyraCollectionDetailView`), nooit per kaart in een raster -- anders komt de "te veel
-/// gelijktijdige TMDB-aanvragen"-traagheid terug die `VeyraCollectionMetadataCache` net oploste.
+/// gelijktijdige TMDB-aanvragen"-traagheid terug die de gedeelde `TMDBMetadataCache` net oploste.
 enum VeyraCollectionClearLogoResolver {
     static func resolvedURL(for collection: VeyraCollection) -> URL? {
         guard let custom = collection.clearLogoReference, !custom.isEmpty else { return nil }

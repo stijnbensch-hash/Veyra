@@ -7,6 +7,10 @@ import SwiftUI
 
 struct ReviewsSection: View {
     let item: MediaItem
+    /// Fase 4 (TMDB-spec, append_to_response): hergebruikt een al opgehaalde `reviews`-respons
+    /// i.p.v. zelf nog een `/reviews`-aanvraag te doen. `nil` (default) = niet meegegeven, dus
+    /// zelf ophalen zoals voorheen -- een lege array is een geldige, bevestigde "geen reviews".
+    var preloadedReviews: TMDBPreload<[TMDBReview]> = .none
 
     @AppStorage(GeneralSettingsDefaults.showReviewsKey)
     private var showReviews = true
@@ -38,7 +42,7 @@ struct ReviewsSection: View {
         }
     }
 
-    private var taskID: String { "\(item.type.rawValue)|\(item.tmdbID ?? 0)" }
+    private var taskID: String { "\(item.type.rawValue)|\(item.tmdbID ?? 0)|\(preloadedReviews.stageKey)" }
 
     private func reviewCard(_ review: TMDBReview) -> some View {
         let isExpanded = expandedIDs.contains(review.id)
@@ -114,7 +118,14 @@ struct ReviewsSection: View {
     }
 
     private func load() async {
-        reviews = await MetadataReviewsService.reviews(for: item)
+        switch preloadedReviews {
+        case .value(let preloaded):
+            reviews = preloaded
+        case .pending:
+            break // de aanroeper is bezig met een gecombineerde aanvraag -- even wachten.
+        case .none:
+            reviews = await MetadataReviewsService.reviews(for: item)
+        }
     }
 
     private var contentPreviewLimit: Int { 320 }

@@ -6,6 +6,31 @@ import Foundation
 /// alsnog aan de bestaande detailschermen gelinkt kunnen worden, die op
 /// TMDB-ID werken (zie `ShelfItemDestination`).
 enum TMDBExternalLookup {
+    /// Fase 9 (IPTV-mapping §50/§51/§52): centrale ingang die eerst `IPTVTMDBMappingCache`
+    /// raadpleegt (geen hernieuwde TMDB-aanvraag voor een al bekende mapping, positief of
+    /// negatief) en pas bij een cache-miss de IMDb- en vervolgens titel-opzoeking doet, waarna
+    /// het resultaat (ook een "niet gevonden") teruggeschreven wordt naar de cache. Vervangt de
+    /// losse IMDb-/titel-aanroepen + eigen cache-logica die voorheen in `ShelfCatalogService`
+    /// zaten.
+    static func tmdbID(forIMDbID imdbID: String?, title: String, year: Int?, kind: ShelfMediaKind) async -> Int? {
+        if case .some(let cached) = await IPTVTMDBMappingCache.shared.cachedTMDBID(
+            imdbID: imdbID, title: title, year: year, kind: kind
+        ) {
+            return cached
+        }
+
+        var found: Int?
+        if let imdbID, !imdbID.isEmpty {
+            found = await tmdbID(forIMDbID: imdbID, kind: kind)
+        }
+        if found == nil {
+            found = await tmdbID(forTitle: title, year: year, kind: kind)
+        }
+
+        await IPTVTMDBMappingCache.shared.store(tmdbID: found, imdbID: imdbID, title: title, year: year, kind: kind)
+        return found
+    }
+
     static func tmdbID(forIMDbID imdbID: String, kind: ShelfMediaKind) async -> Int? {
         guard let token = AppConfiguration.tmdbReadAccessToken else { return nil }
 
@@ -26,11 +51,9 @@ enum TMDBExternalLookup {
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let httpResponse = response as? HTTPURLResponse,
-                  (200...299).contains(httpResponse.statusCode)
-            else { return nil }
-
+            // Fase 9: ook deze aanroep via de gedeelde coordinator (Fase 2) i.p.v. een losse
+            // `URLSession.shared.data(for:)` -- zelfde single-flight/retry/429-afhandeling.
+            let data = try await TMDBRequestCoordinator.shared.data(for: request, key: url.absoluteString)
             let result = try JSONDecoder().decode(TMDBFindResult.self, from: data)
             return kind == .movie ? result.movieResults.first?.id : result.tvResults.first?.id
         } catch {
@@ -63,11 +86,11 @@ enum TMDBExternalLookup {
 
         do {
             if kind == .movie {
-                let results = try await TMDBClient(readAccessToken: token).searchMovies(query: title)
-                return bestMatch(results.map { ($0.id, $0.releaseDate) }, year: year)
+                let page = try await TMDBClient(readAccessToken: token).searchMovies(query: title)
+                return bestMatch(page.results.map { ($0.id, $0.releaseDate) }, year: year)
             } else if let service = SeriesService() {
-                let results = try await service.searchSeries(query: title)
-                return bestMatch(results.map { ($0.id, $0.firstAirDate) }, year: year)
+                let page = try await service.searchSeries(query: title)
+                return bestMatch(page.results.map { ($0.id, $0.firstAirDate) }, year: year)
             }
             return nil
         } catch {

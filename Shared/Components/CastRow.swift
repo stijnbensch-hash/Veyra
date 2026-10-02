@@ -4,6 +4,10 @@ import SwiftUI
 /// Tikken op iemand opent de biografie en bekende titels.
 struct CastRow: View {
     let item: MediaItem
+    /// Fase 4 (TMDB-spec, append_to_response): als de aanroeper dit al heeft (via één
+    /// gecombineerde movieDetails-call), wordt dat hergebruikt i.p.v. een eigen `/credits`-
+    /// aanvraag -- blijft `.none` (dus zelf ophalen) voor elke andere aanroeper.
+    var preloadedCredits: TMDBPreload<TMDBCredits?> = .none
 
     @State private var credits: TMDBCredits?
     @State private var isLoading = true
@@ -75,7 +79,7 @@ struct CastRow: View {
         }
         // SeriesDetailView maakt zijn MediaItem in `body`; diens UUID wisselt
         // per render. Een stabiele metadata-sleutel voorkomt herhaalde requests.
-        .task(id: "\(item.type.rawValue)|\(item.tmdbID.map(String.init) ?? "")|\(item.imdbID ?? "")|\(item.title)") {
+        .task(id: "\(item.type.rawValue)|\(item.tmdbID.map(String.init) ?? "")|\(item.imdbID ?? "")|\(item.title)|\(preloadedCredits.stageKey)") {
             await load()
         }
     }
@@ -156,8 +160,16 @@ struct CastRow: View {
     }
 
     private func load() async {
-        isLoading = true
-        credits = await CreditsService.credits(for: item)
-        isLoading = false
+        switch preloadedCredits {
+        case .value(let preloaded):
+            credits = preloaded
+            isLoading = false
+        case .pending:
+            break // de aanroeper is bezig met een gecombineerde aanvraag -- even wachten.
+        case .none:
+            isLoading = true
+            credits = await CreditsService.credits(for: item)
+            isLoading = false
+        }
     }
 }

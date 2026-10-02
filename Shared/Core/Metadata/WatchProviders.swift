@@ -8,9 +8,10 @@ struct WatchProvider: Decodable, Identifiable, Hashable {
     enum CodingKeys: String, CodingKey {
         case id = "provider_id", name = "provider_name", logoPath = "logo_path", priority = "display_priority"
     }
+    // Fase 5 (TMDB-spec, oversized-image-audit P2): dit laadde voorheen `original` voor een
+    // klein streamingdienst-badge-logo -- `w92` is ruim voldoende en ruim kleiner.
     var logoURL: URL? {
-        guard let logoPath, !logoPath.isEmpty else { return nil }
-        return URL(string: "https://image.tmdb.org/t/p/original")?.appendingPathComponent(logoPath.trimmingCharacters(in: CharacterSet(charactersIn: "/")))
+        TMDBImageURLBuilder.logo(logoPath, variant: .small)
     }
 }
 

@@ -7,6 +7,11 @@ struct MovieDetailView: View {
     @State private var runtimeMinutes: Int?
     // Fase 7 (spec §33): welke officiële TMDB-collectie deze film bevat, indien van toepassing.
     @State private var belongsToCollection: TMDBBelongsToCollection?
+    // Fase 4 (TMDB-spec, append_to_response/progressive enrichment): resultaat van de ÉNE
+    // gecombineerde movieDetails-call (credits/videos/reviews erin).
+    @State private var details: TMDBMovie?
+    // Onderscheidt "nog niet geprobeerd" van "geprobeerd, evt. zonder resultaat".
+    @State private var didLoadDetails = false
     @Environment(\.horizontalSizeClass) private var sizeClass
     @ObservedObject private var traktStore = TraktStore.shared
 
@@ -81,11 +86,11 @@ struct MovieDetailView: View {
                 }
                 .padding(.horizontal)
 
-                CastRow(item: movie)
+                CastRow(item: movie, preloadedCredits: movie.tmdbID == nil ? .none : (didLoadDetails ? .value(details?.credits) : .pending))
 
-                TrailerSection(item: movie)
+                TrailerSection(item: movie, preloadedTrailer: movie.tmdbID == nil ? .none : (didLoadDetails ? .value(details?.videos?.results.bestTrailer) : .pending))
 
-                ReviewsSection(item: movie)
+                ReviewsSection(item: movie, preloadedReviews: movie.tmdbID == nil ? .none : (didLoadDetails ? .value(details?.reviews?.results.withUsableContent ?? []) : .pending))
 
                 SimilarTitlesRow(item: movie)
             }
@@ -97,10 +102,25 @@ struct MovieDetailView: View {
         .overlay(alignment: .topLeading) { floatingBackButton }
         .ignoresSafeArea(edges: .top)
         .task(id: movie.id) {
+            didLoadDetails = false
+            details = nil
+            defer { didLoadDetails = true }
             guard let tmdbID = movie.tmdbID else { return }
-            ratings = await MetadataRatingsService.movieRatings(tmdbID: tmdbID, imdbID: movie.imdbID, title: movie.title)
-            runtimeMinutes = try? await TMDBService()?.runtimeMinutes(forMovieID: tmdbID)
-            belongsToCollection = try? await TMDBService()?.belongsToCollection(forMovieID: tmdbID)
+            // Fase 3+4 (TMDB-spec, duplicate-request cleanup + append_to_response): één
+            // gecombineerde movieDetails-call i.p.v. 3 losse (ratings/runtime/collection), plus
+            // credits/videos/reviews erin zodat CastRow/TrailerSection/ReviewsSection die niet
+            // nog eens apart hoeven op te vragen.
+            var loaded: TMDBMovie?
+            if let token = AppConfiguration.tmdbReadAccessToken {
+                loaded = try? await TMDBClient(readAccessToken: token)
+                    .movieDetails(id: tmdbID, append: ["credits", "videos", "reviews"])
+            }
+            details = loaded
+            ratings = await MetadataRatingsService.movieRatings(
+                tmdbID: tmdbID, imdbID: movie.imdbID, title: movie.title, knownTMDBRating: loaded?.voteAverage
+            )
+            runtimeMinutes = loaded?.runtime
+            belongsToCollection = loaded?.belongsToCollection
         }
     }
 

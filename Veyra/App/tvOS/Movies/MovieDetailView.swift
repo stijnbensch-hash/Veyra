@@ -8,6 +8,13 @@ struct MovieDetailView: View {
     // Fase 7 (spec §33): welke officiële TMDB-collectie deze film bevat, indien van toepassing --
     // nooit een hardcoded lijst, enkel wat TMDB's filmdetail meegeeft.
     @State private var belongsToCollection: TMDBBelongsToCollection?
+    // Fase 4 (TMDB-spec, append_to_response/progressive enrichment): resultaat van de ÉNE
+    // gecombineerde movieDetails-call (credits/videos/reviews erin), zodat CastRow/
+    // TrailerSection/ReviewsSection die niet nog eens apart hoeven op te vragen.
+    @State private var details: TMDBMovie?
+    // Onderscheidt "nog niet geprobeerd" van "geprobeerd, evt. zonder resultaat" -- anders zou
+    // de eerste render (details nog nil) ten onrechte als "bevestigd leeg" doorgegeven worden.
+    @State private var didLoadDetails = false
     @ObservedObject private var traktStore = TraktStore.shared
 
     // MARK: - Hero-trailer
@@ -54,15 +61,15 @@ struct MovieDetailView: View {
                 ScrollView {
                     hero
 
-                    CastRow(item: movie)
+                    CastRow(item: movie, preloadedCredits: movie.tmdbID == nil ? .none : (didLoadDetails ? .value(details?.credits) : .pending))
                         .padding(.horizontal, 48)
                         .padding(.top, 12)
 
-                    TrailerSection(item: movie)
+                    TrailerSection(item: movie, preloadedTrailer: movie.tmdbID == nil ? .none : (didLoadDetails ? .value(details?.videos?.results.bestTrailer) : .pending))
                         .padding(.horizontal, 48)
                         .padding(.top, 12)
 
-                    ReviewsSection(item: movie)
+                    ReviewsSection(item: movie, preloadedReviews: movie.tmdbID == nil ? .none : (didLoadDetails ? .value(details?.reviews?.results.withUsableContent ?? []) : .pending))
                         .padding(.horizontal, 48)
                         .padding(.top, 12)
 
@@ -79,10 +86,25 @@ struct MovieDetailView: View {
         }
         .ignoresSafeArea()
         .task(id: movie.id) {
+            didLoadDetails = false
+            details = nil
+            defer { didLoadDetails = true }
             guard let tmdbID = movie.tmdbID else { return }
-            ratings = await MetadataRatingsService.movieRatings(tmdbID: tmdbID, imdbID: movie.imdbID, title: movie.title)
-            runtimeMinutes = try? await TMDBService()?.runtimeMinutes(forMovieID: tmdbID)
-            belongsToCollection = try? await TMDBService()?.belongsToCollection(forMovieID: tmdbID)
+            // Fase 3+4 (TMDB-spec, duplicate-request cleanup + append_to_response): dit haalde
+            // voorheen 3x los hetzelfde filmdetail-eindpunt op (ratings/runtime/collection), en
+            // CastRow/TrailerSection/ReviewsSection vroegen daarna ZELF nog eens credits/videos/
+            // reviews los op -- nu allemaal in ÉÉN gecombineerde aanvraag.
+            var loaded: TMDBMovie?
+            if let token = AppConfiguration.tmdbReadAccessToken {
+                loaded = try? await TMDBClient(readAccessToken: token)
+                    .movieDetails(id: tmdbID, append: ["credits", "videos", "reviews"])
+            }
+            details = loaded
+            ratings = await MetadataRatingsService.movieRatings(
+                tmdbID: tmdbID, imdbID: movie.imdbID, title: movie.title, knownTMDBRating: loaded?.voteAverage
+            )
+            runtimeMinutes = loaded?.runtime
+            belongsToCollection = loaded?.belongsToCollection
         }
         .onChange(of: isPlayFocused) { _, focused in
             let generation = UUID()

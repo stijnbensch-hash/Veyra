@@ -11,7 +11,6 @@ struct SeriesDetailView: View {
     private var focusedSeasonNumber:
         Int?
 
-    @State private var ratings = MetadataRatings()
 
     private let imageBaseURL =
         URL(
@@ -30,7 +29,8 @@ struct SeriesDetailView: View {
                 wrappedValue:
                     SeriesDetailViewModel(
                         seriesID:
-                            series.id
+                            series.id,
+                        title: series.name
                     )
             )
     }
@@ -99,11 +99,6 @@ struct SeriesDetailView: View {
             await viewModel
                 .loadDetails()
         }
-        .task(id: series.id) {
-            ratings = await MetadataRatingsService.seriesRatings(
-                tmdbID: series.id, imdbID: nil, title: series.name
-            )
-        }
         .task {
             await TraktStore
                 .shared
@@ -156,7 +151,7 @@ struct SeriesDetailView: View {
                                 )
                         }
 
-                        MetadataRatingsView(ratings: ratings)
+                        MetadataRatingsView(ratings: viewModel.ratings)
 
                         if !details
                             .overview

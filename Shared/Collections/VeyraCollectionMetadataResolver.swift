@@ -18,19 +18,6 @@ struct VeyraResolvedCollectionItem: Identifiable, Hashable {
     var id: UUID { collectionItemID }
 }
 
-// In-memory cache, per TMDB-ID: Home ("Jouw Collecties", "Verder met je collecties") en de
-// Collections-browser resolven onafhankelijk van elkaar vaak dezelfde films tegelijk op het
-// startscherm -- zonder deze cache leidde dat tot tientallen/honderden gelijktijdige TMDB-
-// aanvragen bij elke Home-load, wat de tvOS-app liet vasthangen. Geldig voor de hele sessie
-// (films veranderen hun metadata niet tijdens een sessie).
-private actor VeyraCollectionMetadataCache {
-    static let shared = VeyraCollectionMetadataCache()
-    private var items: [Int: MediaItem] = [:]
-
-    func get(_ tmdbID: Int) -> MediaItem? { items[tmdbID] }
-    func set(_ tmdbID: Int, _ media: MediaItem) { items[tmdbID] = media }
-}
-
 enum VeyraCollectionMetadataResolver {
     static func resolve(_ items: [VeyraCollectionItem]) async -> [VeyraResolvedCollectionItem] {
         guard !items.isEmpty else { return [] }
@@ -50,7 +37,11 @@ enum VeyraCollectionMetadataResolver {
         var media = MediaItem(title: "?", type: item.mediaType, imdbID: item.imdbID, tmdbID: item.tmdbID)
 
         if let tmdbID = item.tmdbID {
-            if let cached = await VeyraCollectionMetadataCache.shared.get(tmdbID) {
+            // Fase 6 (TMDB-spec, §44/§53): gedeelde cache met Home/Shelves i.p.v. een eigen los
+            // Collections-systeem -- Home ("Jouw Collecties", "Verder met je collecties") en de
+            // Collections-browser bevroegen voorheen onafhankelijk van elkaar vaak dezelfde
+            // films tegelijk op het startscherm. Collections is vooralsnog films-only (spec §41).
+            if let cached = await TMDBMetadataCache.shared.get(tmdbID: tmdbID, kind: .movie) {
                 media = cached
             } else if let token = AppConfiguration.tmdbReadAccessToken,
                       let details = try? await TMDBClient(readAccessToken: token).movieDetails(id: tmdbID) {
@@ -61,12 +52,12 @@ enum VeyraCollectionMetadataResolver {
                     tmdbID: item.tmdbID,
                     overview: details.overview,
                     releaseDate: details.releaseDate,
-                    posterURL: imageURL(details.posterPath),
-                    backdropURL: imageURL(details.backdropPath, size: "w1280"),
+                    posterURL: TMDBImageURLBuilder.poster(details.posterPath),
+                    backdropURL: TMDBImageURLBuilder.backdrop(details.backdropPath),
                     genre: details.genres?.first?.name,
                     rating: details.voteAverage
                 )
-                await VeyraCollectionMetadataCache.shared.set(tmdbID, media)
+                await TMDBMetadataCache.shared.set(tmdbID: tmdbID, kind: .movie, media)
             }
         }
 
@@ -74,8 +65,4 @@ enum VeyraCollectionMetadataResolver {
                                            chronologyIndex: item.chronologyIndex, addedAt: item.addedAt, media: media)
     }
 
-    private static func imageURL(_ path: String?, size: String = "w500") -> URL? {
-        guard let path, !path.isEmpty else { return nil }
-        return URL(string: "https://image.tmdb.org/t/p/\(size)\(path)")
-    }
 }

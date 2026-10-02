@@ -19,7 +19,8 @@ enum VeyraOfficialCollectionResolver {
             let media = MediaItem(
                 title: part.title ?? detail.name, type: .movie, imdbID: nil, tmdbID: part.id,
                 overview: part.overview, releaseDate: part.releaseDate,
-                posterURL: imageURL(part.posterPath), backdropURL: imageURL(part.backdropPath, size: "w1280")
+                posterURL: TMDBImageURLBuilder.poster(part.posterPath),
+                backdropURL: TMDBImageURLBuilder.backdrop(part.backdropPath)
             )
             return VeyraResolvedCollectionItem(collectionItemID: UUID(), manualSortIndex: index, chronologyIndex: nil,
                                                addedAt: Date(), media: media)
@@ -27,8 +28,4 @@ enum VeyraOfficialCollectionResolver {
         return (detail.overview, items)
     }
 
-    private static func imageURL(_ path: String?, size: String = "w500") -> URL? {
-        guard let path, !path.isEmpty else { return nil }
-        return URL(string: "https://image.tmdb.org/t/p/\(size)\(path)")
-    }
 }

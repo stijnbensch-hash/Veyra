@@ -158,7 +158,7 @@ struct TMDBPersonCredit: Decodable, Hashable {
             type: isMovie ? .movie : .series,
             tmdbID: id,
             releaseDate: displayDate,
-            posterURL: posterPath.flatMap { URL(string: "https://image.tmdb.org/t/p/w500\($0)") },
+            posterURL: TMDBImageURLBuilder.poster(posterPath),
             genre: isMovie ? TMDBGenreNames.firstMovieName(for: genreIDs ?? []) : TMDBGenreNames.firstTVName(for: genreIDs ?? []),
             rating: voteAverage
         )

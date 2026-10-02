@@ -156,9 +156,31 @@ enum ShelfCatalogService {
 
         guard let tmdbID = item.tmdbID else { return item }
 
+        // Fase 6 (TMDB-spec, Home cache-first): dezelfde titel komt vaak op meerdere planken en
+        // op "Verder met je collecties" voor -- cache-first voorkomt dat elke plek die los
+        // opnieuw bevraagt. Alleen de poster/backdrop/genre/score (afgeleid van TMDB) komen uit
+        // de cache; `item`-specifieke velden (catalogItemID, lokale overview) blijven van dit
+        // exemplaar.
+        if let cached = await TMDBMetadataCache.shared.get(tmdbID: tmdbID, kind: kind) {
+            return MediaItem(
+                id: item.id,
+                title: item.title,
+                type: item.type,
+                imdbID: item.imdbID,
+                tmdbID: item.tmdbID,
+                overview: item.overview,
+                releaseDate: item.releaseDate,
+                posterURL: cached.posterURL,
+                backdropURL: cached.backdropURL,
+                genre: item.genre ?? cached.genre,
+                rating: cached.rating ?? item.rating,
+                catalogItemID: item.catalogItemID
+            )
+        }
+
         if kind == .movie, let token = AppConfiguration.tmdbReadAccessToken {
             if let details = try? await TMDBClient(readAccessToken: token).movieDetails(id: tmdbID) {
-                return MediaItem(
+                let enriched = MediaItem(
                     id: item.id,
                     title: item.title,
                     type: item.type,
@@ -166,16 +188,18 @@ enum ShelfCatalogService {
                     tmdbID: item.tmdbID,
                     overview: item.overview,
                     releaseDate: item.releaseDate,
-                    posterURL: imageURL(details.posterPath),
-                    backdropURL: imageURL(details.backdropPath, size: "w1280"),
+                    posterURL: TMDBImageURLBuilder.poster(details.posterPath),
+                    backdropURL: TMDBImageURLBuilder.backdrop(details.backdropPath),
                     genre: item.genre ?? details.genres?.first?.name,
                     rating: details.voteAverage ?? item.rating,
                     catalogItemID: item.catalogItemID
                 )
+                await TMDBMetadataCache.shared.set(tmdbID: tmdbID, kind: kind, enriched)
+                return enriched
             }
         } else if kind == .series, let service = SeriesService() {
             if let details = try? await service.seriesDetails(id: tmdbID) {
-                return MediaItem(
+                let enriched = MediaItem(
                     id: item.id,
                     title: item.title,
                     type: item.type,
@@ -183,21 +207,18 @@ enum ShelfCatalogService {
                     tmdbID: item.tmdbID,
                     overview: item.overview,
                     releaseDate: item.releaseDate,
-                    posterURL: imageURL(details.posterPath),
-                    backdropURL: imageURL(details.backdropPath, size: "w1280"),
+                    posterURL: TMDBImageURLBuilder.poster(details.posterPath),
+                    backdropURL: TMDBImageURLBuilder.backdrop(details.backdropPath),
                     genre: item.genre ?? details.genres?.first?.name,
                     rating: details.voteAverage ?? item.rating,
                     catalogItemID: item.catalogItemID
                 )
+                await TMDBMetadataCache.shared.set(tmdbID: tmdbID, kind: kind, enriched)
+                return enriched
             }
         }
 
         return item
-    }
-
-    private static func imageURL(_ path: String?, size: String = "w500") -> URL? {
-        guard let path, !path.isEmpty else { return nil }
-        return URL(string: "https://image.tmdb.org/t/p/\(size)\(path)")
     }
 
     // MARK: - TMDB
@@ -265,8 +286,8 @@ enum ShelfCatalogService {
             tmdbID: item.id,
             overview: item.overview,
             releaseDate: item.displayReleaseDate,
-            posterURL: imageURL(item.posterPath),
-            backdropURL: imageURL(item.backdropPath, size: "w1280")
+            posterURL: TMDBImageURLBuilder.poster(item.posterPath),
+            backdropURL: TMDBImageURLBuilder.backdrop(item.backdropPath)
         )
     }
 
@@ -277,8 +298,8 @@ enum ShelfCatalogService {
             tmdbID: movie.id,
             overview: movie.overview,
             releaseDate: movie.releaseDate,
-            posterURL: imageURL(movie.posterPath),
-            backdropURL: imageURL(movie.backdropPath, size: "w1280"),
+            posterURL: TMDBImageURLBuilder.poster(movie.posterPath),
+            backdropURL: TMDBImageURLBuilder.backdrop(movie.backdropPath),
             genre: TMDBGenreNames.firstMovieName(for: movie.genreIDs ?? []),
             rating: movie.voteAverage
         )
@@ -291,8 +312,8 @@ enum ShelfCatalogService {
             tmdbID: series.id,
             overview: series.overview,
             releaseDate: series.firstAirDate,
-            posterURL: imageURL(series.posterPath),
-            backdropURL: imageURL(series.backdropPath, size: "w1280"),
+            posterURL: TMDBImageURLBuilder.poster(series.posterPath),
+            backdropURL: TMDBImageURLBuilder.backdrop(series.backdropPath),
             genre: TMDBGenreNames.firstTVName(for: series.genreIDs ?? []),
             rating: series.voteAverage
         )
@@ -344,23 +365,16 @@ enum ShelfCatalogService {
     private static func resolveTMDBID(_ item: MediaItem, kind: ShelfMediaKind) async -> MediaItem {
         guard item.tmdbID == nil else { return item }
 
-        var found: Int?
-        if let imdbID = item.imdbID, !imdbID.isEmpty {
-            found = await TMDBExternalLookup.tmdbID(forIMDbID: imdbID, kind: kind)
+        // Fase 9 (IPTV-mapping §50/§51/§52): IMDb-opzoeking, titel-fallback én de persistente
+        // mapping-cache zitten nu gecentraliseerd in `TMDBExternalLookup` i.p.v. hier losse
+        // aanroepen + eigen cache-logica.
+        let year = item.releaseDate.flatMap { date -> Int? in
+            guard date.count >= 4 else { return nil }
+            return Int(date.prefix(4))
         }
-        // Geen (bruikbare) IMDb-ID, of de opzoeking daarmee leverde niets op
-        // (bv. VeyraHub-bibliotheken zonder `ProviderIds`) — laatste redmiddel:
-        // op titel zoeken. Geef er een jaartal bij als we dat weten, anders
-        // kan een generieke titel de verkeerde (populairdere, gelijknamige)
-        // titel als match opleveren.
-        if found == nil {
-            let year = item.releaseDate.flatMap { date -> Int? in
-                guard date.count >= 4 else { return nil }
-                return Int(date.prefix(4))
-            }
-            found = await TMDBExternalLookup.tmdbID(forTitle: item.title, year: year, kind: kind)
-        }
-        guard let found else { return item }
+        guard let found = await TMDBExternalLookup.tmdbID(
+            forIMDbID: item.imdbID, title: item.title, year: year, kind: kind
+        ) else { return item }
 
         return MediaItem(
             id: item.id,

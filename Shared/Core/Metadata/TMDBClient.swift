@@ -55,11 +55,29 @@ struct TMDBClient {
         try await request(path: "/3/movie/\(id)")
     }
 
+    /// Fase 4 (duplicate-request cleanup/`append_to_response`): combineert het filmdetail met
+    /// gerelateerde subresources (credits/videos/reviews/...) in ÉÉN TMDB-aanvraag, zodat
+    /// `CastRow`/`TrailerSection`/`ReviewsSection` die niet elk apart hoeven op te vragen (spec
+    /// §13: "in plaats van /movie/{id} /movie/{id}/credits /movie/{id}/videos ..."). Alleen
+    /// gebruikt waar het scherm die subresources ook werkelijk meteen nodig heeft (spec §14).
+    func movieDetails(id: Int, append: [String]) async throws -> TMDBMovie {
+        guard !append.isEmpty else { return try await movieDetails(id: id) }
+        return try await request(
+            path: "/3/movie/\(id)",
+            queryItems: [URLQueryItem(name: "append_to_response", value: append.joined(separator: ","))]
+        )
+    }
+
     /// Alle delen van een officiële TMDB-collectie (spec §33/§34, Fase 7) -- bv. "Alien
     /// Collection". Wordt gevonden via `TMDBMovie.belongsToCollection` op een filmdetail, nooit
-    /// via een hardcoded lijst.
+    /// via een hardcoded lijst. Fase 8 (Collections §45): lang gecached -- collectiedetails/parts
+    /// wijzigen zelden, dus niet iedere keer dat een Collection-detail geopend wordt opnieuw ophalen.
     func collectionDetails(id: Int) async throws -> TMDBCollectionDetail {
-        try await request(path: "/3/collection/\(id)")
+        try await request(
+            path: "/3/collection/\(id)",
+            cacheKey: "collection:\(id):\(language)",
+            cacheTTL: TMDBSearchCache.longTTL
+        )
     }
 
     func popularMovies() async throws -> [TMDBMovie] {
@@ -94,24 +112,22 @@ struct TMDBClient {
         return Array(titles.prefix(20))
     }
 
-    func searchMovies(query: String) async throws -> [TMDBMovie] {
-        guard !query.trimmingCharacters(
-            in: .whitespacesAndNewlines
-        ).isEmpty else {
-            return []
+    /// Fase 7 (Search §43: pagination, §42: cache). `page` oplopend bij "meer laden"
+    /// (scroll/prefetch), nooit vooraf meerdere pagina's tegelijk ophalen.
+    func searchMovies(query: String, page: Int = 1) async throws -> TMDBMoviePage {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return TMDBMoviePage(page: page, results: [], totalPages: 0)
         }
 
-        let response: TMDBMoviePage = try await request(
+        return try await request(
             path: "/3/search/movie",
             queryItems: [
-                URLQueryItem(
-                    name: "query",
-                    value: query
-                )
-            ]
+                URLQueryItem(name: "query", value: trimmed),
+                URLQueryItem(name: "page", value: String(page))
+            ],
+            cacheKey: "search:movie:\(trimmed.lowercased()):\(page):\(language)"
         )
-
-        return response.results
     }
 
     func externalIDs(
@@ -155,8 +171,15 @@ struct TMDBClient {
 
     func request<Response: Decodable>(
         path: String,
-        queryItems: [URLQueryItem] = []
+        queryItems: [URLQueryItem] = [],
+        cacheKey: String? = nil,
+        cacheTTL: TimeInterval = TMDBSearchCache.defaultTTL
     ) async throws -> Response {
+        if let cacheKey, let cached = await TMDBSearchCache.shared.data(for: cacheKey),
+           let decoded = try? JSONDecoder().decode(Response.self, from: cached) {
+            return decoded
+        }
+
         var components = URLComponents()
 
         components.scheme = "https"
@@ -207,10 +230,14 @@ struct TMDBClient {
         }
 
         do {
-            return try JSONDecoder().decode(
+            let decoded = try JSONDecoder().decode(
                 Response.self,
                 from: data
             )
+            if let cacheKey {
+                await TMDBSearchCache.shared.store(data, for: cacheKey, ttl: cacheTTL)
+            }
+            return decoded
         } catch {
             throw TMDBError.decodingFailed
         }
@@ -220,6 +247,13 @@ struct TMDBClient {
 struct TMDBMoviePage: Decodable {
     let page: Int
     let results: [TMDBMovie]
+    let totalPages: Int
+
+    enum CodingKeys: String, CodingKey {
+        case page
+        case results
+        case totalPages = "total_pages"
+    }
 }
 
 /// Respons van `GET /4/list/{list_id}` — een (eigen) TMDB-lijst, die films
@@ -290,6 +324,11 @@ struct TMDBMovie: Decodable, Identifiable, Hashable {
     /// Alleen aanwezig op TMDB's detail-eindpunt -- welke officiële TMDB-collectie (bv. "Alien
     /// Collection") deze film bevat, indien van toepassing. Basis voor Fase 7 (spec §33).
     var belongsToCollection: TMDBBelongsToCollection? = nil
+    /// Alleen aanwezig als `movieDetails(id:append:)` dit opvroeg (Fase 4) -- anders `nil`,
+    /// en haalt de aanroepende component (CastRow e.d.) het zelf op zoals voorheen.
+    var credits: TMDBCredits? = nil
+    var videos: TMDBVideosResponse? = nil
+    var reviews: TMDBReviewsResponse? = nil
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -304,6 +343,9 @@ struct TMDBMovie: Decodable, Identifiable, Hashable {
         case genres
         case runtime
         case belongsToCollection = "belongs_to_collection"
+        case credits
+        case videos
+        case reviews
     }
 }
 

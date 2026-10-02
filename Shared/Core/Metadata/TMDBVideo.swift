@@ -12,7 +12,7 @@ struct TMDBVideo: Decodable, Identifiable, Hashable {
     let official: Bool
 }
 
-struct TMDBVideosResponse: Decodable {
+struct TMDBVideosResponse: Decodable, Hashable {
     let results: [TMDBVideo]
 }
 

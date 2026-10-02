@@ -43,10 +43,10 @@ extension TMDBReview {
     var avatarURL: URL? {
         guard let path = authorDetails?.avatarPath, !path.isEmpty else { return nil }
         if path.hasPrefix("/http") { return URL(string: String(path.dropFirst())) }
-        return URL(string: "https://image.tmdb.org/t/p/w185\(path)")
+        return TMDBImageURLBuilder.profile(path)
     }
 }
 
-struct TMDBReviewsResponse: Decodable {
+struct TMDBReviewsResponse: Decodable, Hashable {
     let results: [TMDBReview]
 }

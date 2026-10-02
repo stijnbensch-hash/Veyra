@@ -28,7 +28,7 @@ enum MetadataReviewsService {
     }
 }
 
-private extension Array where Element == TMDBReview {
+extension Array where Element == TMDBReview {
     /// Een enkele lege of kapotte review (voorkomt in TMDB's data) mag de
     /// hele sectie niet leeg laten lijken bij een verder prima resultaat.
     var withUsableContent: [TMDBReview] {

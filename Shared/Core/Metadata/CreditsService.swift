@@ -55,7 +55,7 @@ enum CreditsService {
     }
 }
 
-struct TMDBCredits: Decodable {
+struct TMDBCredits: Decodable, Hashable {
     let cast: [TMDBCastMember]
     let crew: [TMDBCrewMember]
 
@@ -85,8 +85,7 @@ struct TMDBCastMember: Decodable, Identifiable, Hashable {
 
     /// Gebruikt door `VeyraLensCastRow` (Veyra Lens) voor het portret.
     var profileURL: URL? {
-        guard let profilePath, !profilePath.isEmpty else { return nil }
-        return URL(string: "https://image.tmdb.org/t/p/w185\(profilePath)")
+        TMDBImageURLBuilder.profile(profilePath)
     }
 }
 

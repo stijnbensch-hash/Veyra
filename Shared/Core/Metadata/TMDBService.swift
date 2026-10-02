@@ -3,10 +3,6 @@ import Foundation
 struct TMDBService {
     private let client: TMDBClient
 
-    private let imageBaseURL = URL(
-        string: "https://image.tmdb.org/t/p/"
-    )!
-
     init?() {
         guard let token = AppConfiguration.tmdbReadAccessToken else {
             return nil
@@ -39,8 +35,10 @@ struct TMDBService {
         try await client.popularMovies()
     }
 
-    func searchMovies(query: String) async throws -> [TMDBMovie] {
-        try await client.searchMovies(query: query)
+    /// Fase 7 (Search §43: pagination). `page` 1 = eerste, snelle resultaten; hogere
+    /// pagina's enkel op expliciete "meer laden" (scroll/prefetch) vanuit de view.
+    func searchMovies(query: String, page: Int = 1) async throws -> TMDBMoviePage {
+        try await client.searchMovies(query: query, page: page)
     }
 
     func mediaItem(for movie: TMDBMovie) async throws -> MediaItem {
@@ -55,35 +53,11 @@ struct TMDBService {
             tmdbID: movie.id,
             overview: normalized(movie.overview),
             releaseDate: normalized(movie.releaseDate),
-            posterURL: imageURL(
-                path: movie.posterPath,
-                size: "w500"
-            ),
-            backdropURL: imageURL(
-                path: movie.backdropPath,
-                size: "w1280"
-            )
+            // Fase 5 (TMDB-spec, image URL builder): gecentraliseerd i.p.v. een eigen
+            // `imageBaseURL`/`imageURL(path:size:)` hier.
+            posterURL: TMDBImageURLBuilder.poster(movie.posterPath),
+            backdropURL: TMDBImageURLBuilder.backdrop(movie.backdropPath)
         )
-    }
-
-    private func imageURL(
-        path: String?,
-        size: String
-    ) -> URL? {
-        guard
-            let path,
-            !path.isEmpty
-        else {
-            return nil
-        }
-
-        return imageBaseURL
-            .appendingPathComponent(size)
-            .appendingPathComponent(
-                path.trimmingCharacters(
-                    in: CharacterSet(charactersIn: "/")
-                )
-            )
     }
 
     private func normalized(

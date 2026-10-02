@@ -45,8 +45,8 @@ enum SimilarTitlesService {
             tmdbID: movie.id,
             overview: movie.overview,
             releaseDate: movie.releaseDate,
-            posterURL: imageURL(movie.posterPath),
-            backdropURL: imageURL(movie.backdropPath, size: "w1280"),
+            posterURL: TMDBImageURLBuilder.poster(movie.posterPath),
+            backdropURL: TMDBImageURLBuilder.backdrop(movie.backdropPath),
             genre: TMDBGenreNames.firstMovieName(for: movie.genreIDs ?? []),
             rating: movie.voteAverage
         )
@@ -59,15 +59,10 @@ enum SimilarTitlesService {
             tmdbID: series.id,
             overview: series.overview,
             releaseDate: series.firstAirDate,
-            posterURL: imageURL(series.posterPath),
-            backdropURL: imageURL(series.backdropPath, size: "w1280"),
+            posterURL: TMDBImageURLBuilder.poster(series.posterPath),
+            backdropURL: TMDBImageURLBuilder.backdrop(series.backdropPath),
             genre: TMDBGenreNames.firstTVName(for: series.genreIDs ?? []),
             rating: series.voteAverage
         )
-    }
-
-    private static func imageURL(_ path: String?, size: String = "w500") -> URL? {
-        guard let path, !path.isEmpty else { return nil }
-        return URL(string: "https://image.tmdb.org/t/p/\(size)\(path)")
     }
 }

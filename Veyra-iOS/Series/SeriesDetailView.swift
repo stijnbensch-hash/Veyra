@@ -11,9 +11,6 @@ struct SeriesDetailView: View {
     @StateObject private var viewModel:
         SeriesDetailViewModel
 
-    @State private var ratings =
-        MetadataRatings()
-
     // MARK: - Hero-trailer
     // Zelfde geluidloze voorvertoning als bij films -- zie
     // `Veyra-iOS/Movies/MovieDetailView.swift` voor de toelichting.
@@ -29,7 +26,8 @@ struct SeriesDetailView: View {
             StateObject(
                 wrappedValue:
                     SeriesDetailViewModel(
-                        seriesID: series.id
+                        seriesID: series.id,
+                        title: series.name
                     )
             )
     }
@@ -99,7 +97,7 @@ struct SeriesDetailView: View {
 
                         MetadataRatingsView(
                             ratings:
-                                ratings
+                                viewModel.ratings
                         )
 
                         if !details
@@ -253,20 +251,6 @@ struct SeriesDetailView: View {
                 detailsTask,
                 traktTask
             )
-        }
-        .task(
-            id: series.id
-        ) {
-            ratings =
-                await MetadataRatingsService
-                    .seriesRatings(
-                        tmdbID:
-                            series.id,
-                        imdbID:
-                            nil,
-                        title:
-                            series.name
-                    )
         }
     }
 
