@@ -13,10 +13,13 @@ actor TMDBMetadataCache {
         let kind: ShelfMediaKind
     }
 
-    private var items: [Key: MediaItem] = [:]
+    private var items = VeyraBoundedCache<Key, MediaItem>(countLimit: 512)
+
+    var cachedCount: Int { items.count }
+    func clearCache() { items.removeAll() }
 
     func get(tmdbID: Int, kind: ShelfMediaKind) async -> MediaItem? {
-        let media = items[Key(tmdbID: tmdbID, kind: kind)]
+        let media = items.value(for: Key(tmdbID: tmdbID, kind: kind))
         if media != nil {
             #if DEBUG
             print("[TMDB] \(kind.rawValue) \(tmdbID) cache=memory")
@@ -27,6 +30,6 @@ actor TMDBMetadataCache {
     }
 
     func set(tmdbID: Int, kind: ShelfMediaKind, _ media: MediaItem) {
-        items[Key(tmdbID: tmdbID, kind: kind)] = media
+        items.insert(media, for: Key(tmdbID: tmdbID, kind: kind))
     }
 }

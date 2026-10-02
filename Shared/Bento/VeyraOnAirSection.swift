@@ -84,7 +84,7 @@ struct VeyraOnAirSection: View {
     private func cardContent(_ row: BentoLiveRow, big: Bool) -> some View {
         VStack(alignment: .leading, spacing: big ? 12 : 8) {
             HStack(alignment: .top) {
-                AsyncImage(url: row.logoURL) { phase in
+                VeyraAsyncImage(url: row.logoURL) { phase in
                     if let image = phase.image {
                         image.resizable().scaledToFit()
                     } else {

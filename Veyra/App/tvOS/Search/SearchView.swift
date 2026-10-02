@@ -333,7 +333,7 @@ struct SearchView: View {
         url: URL?,
         placeholderSystemName: String
     ) -> some View {
-        AsyncImage(url: url) { phase in
+        VeyraAsyncImage(url: url) { phase in
             switch phase {
             case .empty:
                 ZStack {

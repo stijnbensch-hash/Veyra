@@ -69,7 +69,7 @@ struct VeyraCollectionCard: View {
             VeyraColors.surface
         } else if let artworkURL {
             GeometryReader { geo in
-                AsyncImage(url: artworkURL) { phase in
+                VeyraAsyncImage(url: artworkURL) { phase in
                     if case .success(let image) = phase {
                         let position = artworkPosition ?? VeyraArtworkPosition()
                         image.resizable().scaledToFill()
@@ -105,7 +105,7 @@ struct VeyraCollectionCard: View {
     @ViewBuilder
     private var titleView: some View {
         if let clearLogoURL {
-            AsyncImage(url: clearLogoURL) { phase in
+            VeyraAsyncImage(url: clearLogoURL) { phase in
                 if case .success(let image) = phase {
                     image.resizable().scaledToFit()
                         .frame(maxWidth: cardWidth * 0.55, maxHeight: logoMaxHeight, alignment: .leading)

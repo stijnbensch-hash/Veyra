@@ -570,7 +570,7 @@ private struct SportsTeamLogo:
             if let logoURL =
                 team.logoURL
             {
-                AsyncImage(
+                VeyraAsyncImage(
                     url: logoURL
                 ) { phase in
                     switch phase {

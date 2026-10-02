@@ -1,7 +1,7 @@
 import Foundation
 import CryptoKit
 
-struct IPTVProviderPreferences: Codable, Hashable {
+nonisolated struct IPTVProviderPreferences: Codable, Hashable, Sendable {
     var hiddenLiveCategoryIDs: Set<String>
     var hiddenLiveChannelIDs: Set<String>
 
@@ -198,6 +198,13 @@ nonisolated struct IPTVProviderPreferencesStore {
     // `IPTVProviderPreferencesStore()`-instantie (er bestaan er meerdere in de app) dezelfde cache
     // deelt en dus altijd de laatst opgeslagen waarde ziet.
     private static var cache: [String: IPTVProviderPreferences] = [:]
+    // `load(for:)` wordt tijdens IPTV-discovery/-filtering vanuit veel gelijktijdige Tasks
+    // per item aangeroepen (bewezen crash: onbeveiligde concurrente toegang tot deze `static`
+    // dictionary corrumpeerde het geheugen en gaf een willekeurige Objective-C-bridging-crash,
+    // "-[__NSCFNumber objectForKey:]: unrecognized selector" -- een klassiek Swift-Dictionary-
+    // datarace-symptoom). Lock beschermt de volledige load/save/clear-transactie: een oude load mag
+    // een recent opgeslagen voorkeur niet terug overschrijven.
+    private static let cacheLock = NSLock()
 
     init(
         defaults: UserDefaults = .standard
@@ -213,8 +220,11 @@ nonisolated struct IPTVProviderPreferencesStore {
             for: configuration
         )
 
-        if let cached = Self.cache[key] {
-            return cached
+        Self.cacheLock.lock()
+        defer { Self.cacheLock.unlock() }
+        let cachedValue = Self.cache[key]
+        if let cachedValue {
+            return cachedValue
         }
 
         guard
@@ -249,6 +259,8 @@ nonisolated struct IPTVProviderPreferencesStore {
             for: configuration
         )
 
+        Self.cacheLock.lock()
+        defer { Self.cacheLock.unlock() }
         defaults.set(
             data,
             forKey: key
@@ -265,10 +277,9 @@ nonisolated struct IPTVProviderPreferencesStore {
             for: configuration
         )
 
-        defaults.removeObject(
-            forKey: key
-        )
-
+        Self.cacheLock.lock()
+        defer { Self.cacheLock.unlock() }
+        defaults.removeObject(forKey: key)
         Self.cache.removeValue(forKey: key)
     }
 
@@ -284,7 +295,7 @@ nonisolated struct IPTVProviderPreferencesStore {
 
 // MARK: - Provider Identifier
 
-extension IPTVStoredConfiguration {
+nonisolated extension IPTVStoredConfiguration {
     var providerIdentifier: String {
         let identity: String
 

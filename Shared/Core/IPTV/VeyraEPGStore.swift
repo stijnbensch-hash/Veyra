@@ -312,7 +312,8 @@ final class VeyraEPGStore: ObservableObject {
             }
 
             let cacheKey = "live-catalog-v1-\(configuration.providerIdentifier)"
-            let diskCatalog = IPTVDiskCache.read(VeyraLiveCatalog.self, key: cacheKey)
+            let diskCatalog = await IPTVDiskCache.readAsync(VeyraLiveCatalog.self, key: cacheKey)
+            guard generation == token, !Task.isCancelled else { return }
             let syncedCatalog = UserDefaults.standard.data(
                 forKey: VeyraIPTVSnapshot.catalogPrefix + configuration.providerIdentifier
             ).flatMap { VeyraIPTVSnapshot.decode(VeyraCatalogSnapshot.self, from: $0) }
@@ -335,8 +336,9 @@ final class VeyraEPGStore: ObservableObject {
                 loadingChannels = false
             }
             let guideCacheKey = "live-guide-v1-\(configuration.providerIdentifier)"
-            let diskGuide = IPTVDiskCache.read([String: [VeyraEPGProgramme]].self,
+            let diskGuide = await IPTVDiskCache.readAsync([String: [VeyraEPGProgramme]].self,
                                                key: guideCacheKey)
+            guard generation == token, !Task.isCancelled else { return }
             let syncedGuide = UserDefaults.standard.data(
                 forKey: VeyraIPTVSnapshot.guidePrefix + configuration.providerIdentifier
             ).flatMap { VeyraIPTVSnapshot.decode(VeyraGuideSnapshot.self, from: $0) }

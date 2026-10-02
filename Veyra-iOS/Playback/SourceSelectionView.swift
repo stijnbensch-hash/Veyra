@@ -461,7 +461,7 @@ struct SourceSelectionView: View {
     @ViewBuilder
     private func sourceBadgeChipContent(_ badge: SourceBadge, isWide: Bool) -> some View {
         if let imageURL = badge.imageURL {
-            AsyncImage(url: imageURL) { phase in
+            VeyraAsyncImage(url: imageURL) { phase in
                 if let image = phase.image {
                     image.resizable().scaledToFit()
                 } else {

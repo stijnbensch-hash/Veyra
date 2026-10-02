@@ -141,7 +141,7 @@ struct TVFavoriteTeamsSettingsView: View {
 
     private func row(name: String, logo: URL?, favorite: Bool) -> some View {
         HStack(spacing: 18) {
-            AsyncImage(url: logo) { phase in
+            VeyraAsyncImage(url: logo) { phase in
                 if let image = phase.image {
                     image.resizable().scaledToFit()
                 } else {

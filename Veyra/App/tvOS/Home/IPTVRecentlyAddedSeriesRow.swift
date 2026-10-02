@@ -547,7 +547,7 @@ struct AllSeriesListView: View {
                 alignment: .leading,
                 spacing: 10
             ) {
-                AsyncImage(
+                VeyraAsyncImage(
                     url:
                         item.coverURL
                 ) { phase in

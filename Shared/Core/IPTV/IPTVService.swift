@@ -13,12 +13,15 @@ nonisolated struct IPTVService {
 
     // MARK: - M3U
 
+    @concurrent
     func loadM3UChannels(
         configuration: M3UConfiguration
     ) async throws -> [IPTVChannel] {
         do {
             return try await loadM3UChannels(url: configuration.playlistURL)
         } catch {
+            try Task.checkCancellation()
+            if (error as? URLError)?.code == .cancelled { throw error }
             // Hoofdadres onbereikbaar: meteen het reserveadres proberen,
             // als dat ingesteld staat -- zelfde aanpak als bij Xtream, zie
             // `withXtreamFailover` hieronder.
@@ -27,6 +30,7 @@ nonisolated struct IPTVService {
         }
     }
 
+    @concurrent
     private func loadM3UChannels(url: URL) async throws -> [IPTVChannel] {
         var request = URLRequest(url: url)
 
@@ -56,6 +60,7 @@ nonisolated struct IPTVService {
             )
         }
 
+        try Task.checkCancellation()
         guard
             let content = String(
                 data: data,
@@ -83,6 +88,7 @@ nonisolated struct IPTVService {
     /// Geldt voor elke Xtream-aanroep hieronder -- categorieën, zenders,
     /// VOD en series -- dus zowel bij verversen als (via een vers geladen
     /// stream-URL) bij afspelen.
+    @concurrent
     private func withXtreamFailover<T>(
         configuration: XtreamConfiguration,
         _ operation: (XtreamClient) async throws -> T
@@ -90,6 +96,8 @@ nonisolated struct IPTVService {
         do {
             return try await operation(XtreamClient(configuration: configuration, session: session))
         } catch {
+            try Task.checkCancellation()
+            if (error as? URLError)?.code == .cancelled { throw error }
             guard let backupServerURL = configuration.backupServerURL else { throw error }
             let backupConfiguration = XtreamConfiguration(
                 displayName: configuration.displayName,
@@ -103,12 +111,14 @@ nonisolated struct IPTVService {
 
     // MARK: - Xtream Live
 
+    @concurrent
     func loadXtreamLiveCategories(
         configuration: XtreamConfiguration
     ) async throws -> [IPTVCategory] {
         try await withXtreamFailover(configuration: configuration) { try await $0.liveCategories() }
     }
 
+    @concurrent
     func loadXtreamLiveChannels(
         configuration: XtreamConfiguration,
         categoryID: String? = nil
@@ -120,12 +130,14 @@ nonisolated struct IPTVService {
 
     // MARK: - Xtream VOD
 
+    @concurrent
     func loadXtreamVODCategories(
         configuration: XtreamConfiguration
     ) async throws -> [IPTVCategory] {
         try await withXtreamFailover(configuration: configuration) { try await $0.vodCategories() }
     }
 
+    @concurrent
     func loadXtreamVOD(
         configuration: XtreamConfiguration,
         categoryID: String? = nil
@@ -137,12 +149,14 @@ nonisolated struct IPTVService {
 
     // MARK: - Xtream Series
 
+    @concurrent
     func loadXtreamSeriesCategories(
         configuration: XtreamConfiguration
     ) async throws -> [IPTVCategory] {
         try await withXtreamFailover(configuration: configuration) { try await $0.seriesCategories() }
     }
 
+    @concurrent
     func loadXtreamSeries(
         configuration: XtreamConfiguration,
         categoryID: String? = nil
@@ -152,6 +166,7 @@ nonisolated struct IPTVService {
         }
     }
 
+    @concurrent
     func loadXtreamSeriesInfo(
         configuration: XtreamConfiguration,
         seriesID: Int

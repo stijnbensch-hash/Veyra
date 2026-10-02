@@ -84,7 +84,7 @@ struct VeyraCollectionFanartPickerView: View {
         Form {
             Section {
                 GeometryReader { geo in
-                    AsyncImage(url: previewURL) { phase in
+                    VeyraAsyncImage(url: previewURL) { phase in
                         if case .success(let image) = phase {
                             image.resizable().scaledToFill()
                                 .scaleEffect(position.zoom)
@@ -239,7 +239,7 @@ struct VeyraCollectionFanartPickerView: View {
         Color.white.opacity(0.08)
             .frame(width: 180, height: 180 * 9 / 16)
             .overlay {
-                AsyncImage(url: url) { phase in
+                VeyraAsyncImage(url: url) { phase in
                     if let image = phase.image { image.resizable().scaledToFill() } else { Color.clear }
                 }
             }

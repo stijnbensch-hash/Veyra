@@ -1,5 +1,10 @@
 import Foundation
 
+// Notification normally declared by the shelf UI, excluded from this store-only harness.
+extension Notification.Name {
+    static let veyraShelfConfigurationDidChange = Notification.Name("veyraShelfConfigurationDidChange")
+}
+
 @main
 struct CollectionsChecks {
     @MainActor static func main() async throws {

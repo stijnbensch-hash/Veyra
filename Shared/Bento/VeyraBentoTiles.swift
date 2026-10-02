@@ -109,7 +109,11 @@ struct VeyraBentoContinueHeroContent: View {
                 VeyraTitleLogo(title: item.title, logoURL: item.logoURL,
                                size: compact ? 16 : 28, maxLogoHeight: compact ? 32 : 60)
                 Text(item.baseMetaText)
+                    #if os(tvOS)
+                    .font(compact ? .caption.weight(.semibold) : .system(size: 32, weight: .semibold))
+                    #else
                     .font(compact ? .caption.weight(.semibold) : .title3.weight(.semibold))
+                    #endif
                     .foregroundStyle(.white.opacity(0.9))
                     .lineLimit(1)
                 // Alleen tonen (en dus ook alleen dan de VStack-spacing
@@ -233,19 +237,6 @@ struct VeyraBentoContinueMiniContent: View {
             // focus net iets meer dan de titel/metadata eronder.
             .scaleEffect(isFocused ? 1.045 : 1)
 #endif
-            .overlay(alignment: .bottomLeading) {
-#if os(tvOS)
-                if let label = VeyraBentoEpisodeLabel.expanded(item.episodeCode) {
-                    Text(label)
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.9))
-                        .lineLimit(1)
-                        .shadow(color: .black, radius: 4)
-                        .padding(.leading, 14)
-                        .padding(.bottom, 14)
-                }
-#endif
-            }
             .overlay(alignment: .bottom) {
                 if item.progress > 0 { VeyraHairline(progress: item.progress, height: compact ? 3 : 4) }
             }
@@ -268,7 +259,11 @@ struct VeyraBentoContinueMiniContent: View {
                 // series waarvan Trakt zowel gezien als uitgezonden aantallen teruggeeft.
                 if item.kind != .movie, let left = item.episodesLeft, left > 0 {
                     Text("\(left) te gaan")
+                        #if os(tvOS)
+                        .font(.system(size: compact ? 10 : 20, weight: .bold, design: .rounded))
+                        #else
                         .font(.system(size: compact ? 10 : 16, weight: .bold, design: .rounded))
+                        #endif
                         .foregroundStyle(.white)
                         .padding(.horizontal, compact ? 7 : 12)
                         .padding(.vertical, compact ? 3 : 6)
@@ -403,7 +398,7 @@ struct VeyraBentoLiveRowContent: View {
     private var channelLogo: some View {
         return ZStack {
             if let url = row.logoURL {
-                AsyncImage(url: url) { phase in
+                VeyraAsyncImage(url: url) { phase in
                     if case .success(let image) = phase {
                         image.resizable().scaledToFit()
                     } else {
@@ -734,7 +729,7 @@ struct VeyraBentoPosterContent: View {
             ZStack {
                 VeyraArt(url: nil, seed: title)
                 if let shown = fallbackURL ?? VeyraPosterURL.optimized(url) {
-                    AsyncImage(url: shown) { phase in
+                    VeyraAsyncImage(url: shown) { phase in
                         switch phase {
                         case .success(let image): image.resizable().scaledToFill()
                         case .failure: Color.clear.onAppear { failed = true }
@@ -956,7 +951,7 @@ struct VeyraBentoStreamingContent: View {
     @ViewBuilder
     private var content: some View {
         if let customURL {
-            AsyncImage(url: customURL) { phase in
+            VeyraAsyncImage(url: customURL) { phase in
                 if let image = phase.image {
                     image.resizable().scaledToFit()
                 } else {
@@ -964,7 +959,7 @@ struct VeyraBentoStreamingContent: View {
                 }
             }
         } else if let wideURL {
-            AsyncImage(url: wideURL) { phase in
+            VeyraAsyncImage(url: wideURL) { phase in
                 if let image = phase.image {
                     image.renderingMode(.template).resizable().scaledToFit().foregroundStyle(.white)
                 } else {
@@ -974,7 +969,7 @@ struct VeyraBentoStreamingContent: View {
         } else {
             HStack(spacing: compact ? 8 : 14) {
                 if let iconURL {
-                    AsyncImage(url: iconURL) { phase in
+                    VeyraAsyncImage(url: iconURL) { phase in
                         if let image = phase.image { image.resizable().scaledToFill() } else { Color.white.opacity(0.1) }
                     }
                     .frame(width: compact ? 34 : 64, height: compact ? 34 : 64)
@@ -1010,7 +1005,7 @@ struct VeyraBentoLandscapeContent: View {
         ZStack(alignment: .bottomLeading) {
             VeyraArt(url: nil, seed: title)
             if let url {
-                AsyncImage(url: url) { phase in
+                VeyraAsyncImage(url: url) { phase in
                     if let image = phase.image { image.resizable().scaledToFill() } else { Color.clear }
                 }
             }
@@ -1064,7 +1059,7 @@ struct VeyraBentoCollectionMiniContent: View {
                 // Het kader (deze hele Color-laag) blijft de maat van de aanroeper; de afbeelding zelf
                 // krijgt wat marge zodat ze iets kleiner dan het kader oogt in plaats van het strak te vullen.
                 if let url {
-                    AsyncImage(url: url) { phase in
+                    VeyraAsyncImage(url: url) { phase in
                         if let image = phase.image { image.resizable().scaledToFill() } else { Color.clear }
                     }
                     .padding(compact ? 3 : 5)

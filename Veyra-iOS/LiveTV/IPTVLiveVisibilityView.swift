@@ -153,7 +153,7 @@ struct IPTVLiveVisibilityView: View {
             save(updated)
         } label: {
             HStack(spacing: 12) {
-                AsyncImage(url: ChannelLogoOverrideStore.effectiveLogoURL(
+                VeyraAsyncImage(url: ChannelLogoOverrideStore.effectiveLogoURL(
                     channelID: channel.id, defaultLogoURL: channel.logoURL
                 )) { phase in
                     if let image = phase.image {

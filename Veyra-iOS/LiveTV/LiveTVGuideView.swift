@@ -122,7 +122,7 @@ struct LiveTVGuideView: View {
                     selection = ProgrammeSelection(row: row, programme: onAir(for: row, at: Date()))
                 } label: {
                     VStack(spacing: 3) {
-                        AsyncImage(url: ChannelLogoOverrideStore.effectiveLogoURL(
+                        VeyraAsyncImage(url: ChannelLogoOverrideStore.effectiveLogoURL(
                             channelID: row.channel.id, defaultLogoURL: row.channel.logoURL
                         )) { phase in
                             if let image = phase.image {

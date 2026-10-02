@@ -23,6 +23,7 @@ struct VeyraMacApp: App {
             MacContentView()
                 .preferredColorScheme(.dark)
                 .task {
+                    VeyraRuntimeDiagnostics.shared.start()
                     VeyraHubSyncService.shared.start()
 
                     // Fase 2 ("Regional Releases"): registreer de (tijdelijke) mock-provider,

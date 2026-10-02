@@ -109,7 +109,7 @@ struct VeyraArtworkPickerView: View {
         } label: {
             ZStack {
                 Color.white.opacity(0.08)
-                AsyncImage(url: candidate.url) { phase in
+                VeyraAsyncImage(url: candidate.url) { phase in
                     if case .success(let image) = phase {
                         image.resizable().aspectRatio(contentMode: candidate.type == .clearLogo ? .fit : .fill)
                             .padding(candidate.type == .clearLogo ? 8 : 0)

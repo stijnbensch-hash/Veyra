@@ -69,7 +69,7 @@ struct LiveTVFavoritesOrderView: View {
         HStack(
             spacing: 14
         ) {
-            AsyncImage(
+            VeyraAsyncImage(
                 url:
                     ChannelLogoOverrideStore
                         .effectiveLogoURL(

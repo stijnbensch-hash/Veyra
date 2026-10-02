@@ -115,7 +115,7 @@ struct SeasonEpisodesView: View {
             } label: {
                 HStack(alignment: .top, spacing: 14) {
                     ZStack(alignment: .bottom) {
-                        AsyncImage(url: imageURL(path: episode.stillPath)) { phase in
+                        VeyraAsyncImage(url: imageURL(path: episode.stillPath)) { phase in
                             switch phase {
                             case .success(let image):
                                 image.resizable().scaledToFill()

@@ -139,7 +139,7 @@ struct MovieDetailView: View {
         // en gecentreerd ging overlopen aan beide kanten).
         GeometryReader { geo in
             ZStack {
-                AsyncImage(url: movie.backdropURL) { phase in
+                VeyraAsyncImage(url: movie.backdropURL) { phase in
                     switch phase {
                     case .success(let image):
                         image.resizable().scaledToFill()

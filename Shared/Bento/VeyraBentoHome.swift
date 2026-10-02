@@ -102,6 +102,9 @@ struct VeyraBentoHomeView: View {
                     bentoTop(now: context.date)
                 }
 
+                bentoMiddle(now: .now, tiles: [.streaming])
+                VeyraYourCollectionsSection()
+
                 // "Nieuw van hier" (Regional Releases fase 4, spec §4/§30): volledig regionaal
                 // discovery-overzicht, meteen onder "Verder kijken"/"Binnenkort" -- zelfde
                 // prominentie als de rest van de Home-top, los van het bento-raster net als
@@ -121,19 +124,14 @@ struct VeyraBentoHomeView: View {
                 // effectief iets te hervatten valt (zie VeyraContinueCollectionsSection).
                 VeyraContinueCollectionsSection()
 
-                // "Jouw Collecties" (uitgebreide Collections-spec, Fase 10, §66/§69/§95): eigen
-                // persoonlijke rail, net voor Streamingdiensten -- verborgen zonder eigen
-                // collecties (spec §68, geen lege shelf).
-                VeyraYourCollectionsSection()
-
                 TimelineView(.periodic(from: .now, by: 30)) { context in
-                    bentoMiddle(now: context.date)
+                    bentoMiddle(now: context.date, tiles: [.live])
                 }
 
                 // "Binnenkort" teruggezet in "Verder kijken"-rij (zie bentoTop) -- geen
                 // losse Calendar Horizon-sectie meer.
 
-                // "Live nu" teruggezet als vaste rasterrij (samen met Streaming), i.p.v.
+                // "Live nu" als eigen rasterrij, i.p.v.
                 // de losse On Air-sectie van Stap 13 -- op uitdrukkelijk verzoek teruggedraaid.
                 // "Sports Stage": uitgelichte live wedstrijd, los van de rest van de
                 // Sport-sectie -- Stap 14, direct na Nu op tv, vóór Live Sport (spec §97).
@@ -209,6 +207,9 @@ struct VeyraBentoHomeView: View {
         // Aflevering/film afgekeken (Trakt-stop): "Verder kijken" meteen opnieuw ophalen.
         .onReceive(NotificationCenter.default.publisher(for: .veyraTraktHistoryDidChange)) { _ in
             Task { await model.load(force: true) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .veyraTraktSnapshotDidChange)) { _ in
+            Task { await model.home.refreshContinueOrder() }
         }
         .onAppear { askPreset = !VeyraHomeLayoutStore.hasChosen }
         .sheet(isPresented: $askPreset, onDismiss: { VeyraHomeLayoutStore.markChosen() }) {
@@ -654,46 +655,48 @@ struct VeyraBentoHomeView: View {
     }
 
     @ViewBuilder
-    private func bentoMiddle(now: Date) -> some View {
-        let live = model.liveRows(at: now, limit: 8, recentFirst: true, favoritesOnly: liveFavoritesOnly)
-        let present = middlePresentTiles(live: live)
+    private func bentoMiddle(now: Date, tiles: Set<BentoTile>) -> some View {
+        let live = tiles.contains(.live) ? model.liveRows(at: now, limit: 8, recentFirst: true, favoritesOnly: liveFavoritesOnly) : []
+        let present = middlePresentTiles(live: live).intersection(tiles)
         let order = layout.orderedTiles.filter { present.contains($0) }
         let profile = BentoProfile.make(.tv, order: order)
 
-        VeyraBentoGrid(profile: profile) {
-            if present.contains(.live) {
-                // De 8 laatst bekeken zenders in twee kolommen van 4, zodat het blok op zijn vaste hoogte blijft.
-                VeyraBentoLiveList {
-                    HStack(alignment: .top, spacing: 24) {
-                        liveColumn(Array(live.prefix(4)))
-                        liveColumn(Array(live.dropFirst(4).prefix(4)))
-                    }
-                }
-                .frame(maxHeight: .infinity, alignment: .center)
-                .bentoCell(profile.cell(.live))
-            }
-
-            if present.contains(.streaming) {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(spacing: 24) {
-                        ForEach(model.providers) { provider in
-                            Button { onOpenCatalog(provider) } label: {
-                                VeyraLogoShelfTile(name: provider.name, iconURL: provider.imageURL,
-                                                   wideURL: provider.wideURL, brand: provider.brand,
-                                                   customURL: provider.customLogoURL)
-                            }
-                            .buttonStyle(VeyraStreamingTileStyle())
-                            .focused($focus, equals: .shelf("prov-\(provider.id)"))
-                            .frame(width: 300, height: 132)
+        if !present.isEmpty {
+            VeyraBentoGrid(profile: profile) {
+                if present.contains(.live) {
+                    // De 8 laatst bekeken zenders in twee kolommen van 4, zodat het blok op zijn vaste hoogte blijft.
+                    VeyraBentoLiveList {
+                        HStack(alignment: .top, spacing: 24) {
+                            liveColumn(Array(live.prefix(4)))
+                            liveColumn(Array(live.dropFirst(4).prefix(4)))
                         }
                     }
-                    .padding(12)
+                    .frame(maxHeight: .infinity, alignment: .center)
+                    .bentoCell(profile.cell(.live))
                 }
-                .scrollClipDisabled()
-                // Gecentreerd tussen de kaders, net als de andere rijen -- extra ruimte boven/onder
-                // via de grotere tegelhoogte (zie BentoTile.height(.streaming) in VeyraBentoLayout.swift).
-                .frame(maxHeight: .infinity, alignment: .center)
-                .bentoCell(profile.cell(.streaming))
+
+                if present.contains(.streaming) {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        LazyHStack(spacing: 24) {
+                            ForEach(model.providers) { provider in
+                                Button { onOpenCatalog(provider) } label: {
+                                    VeyraLogoShelfTile(name: provider.name, iconURL: provider.imageURL,
+                                                       wideURL: provider.wideURL, brand: provider.brand,
+                                                       customURL: provider.customLogoURL)
+                                }
+                                .buttonStyle(VeyraStreamingTileStyle())
+                                .focused($focus, equals: .shelf("prov-\(provider.id)"))
+                                .frame(width: 300, height: 132)
+                            }
+                        }
+                        .padding(12)
+                    }
+                    .scrollClipDisabled()
+                    // Gecentreerd tussen de kaders, net als de andere rijen -- extra ruimte boven/onder
+                    // via de grotere tegelhoogte (zie BentoTile.height(.streaming) in VeyraBentoLayout.swift).
+                    .frame(maxHeight: .infinity, alignment: .center)
+                    .bentoCell(profile.cell(.streaming))
+                }
             }
         }
     }

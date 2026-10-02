@@ -273,7 +273,7 @@ struct VeyraFlowChannelLogo: View {
     var body: some View {
         ZStack {
             Color.white.opacity(0.05)
-            AsyncImage(url: effectiveURL) { phase in
+            VeyraAsyncImage(url: effectiveURL) { phase in
                 if case .success(let image) = phase {
                     image.resizable().scaledToFit().padding(10)
                 } else {

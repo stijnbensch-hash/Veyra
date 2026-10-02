@@ -143,7 +143,7 @@ struct LiveTVFolderChannelsView: View {
     @ViewBuilder
     private func rowLabel(for channel: ShelfIPTVChannel) -> some View {
         HStack(spacing: 14) {
-            AsyncImage(url: effectiveLogoURL(for: channel)) { phase in
+            VeyraAsyncImage(url: effectiveLogoURL(for: channel)) { phase in
                 if case .success(let image) = phase {
                     image.resizable().scaledToFit()
                 } else {

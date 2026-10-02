@@ -301,7 +301,7 @@ private struct WatchProviderLogo: View {
     let provider: WatchProvider
 
     var body: some View {
-        AsyncImage(
+        VeyraAsyncImage(
             url: provider.logoURL
         ) { phase in
             switch phase {

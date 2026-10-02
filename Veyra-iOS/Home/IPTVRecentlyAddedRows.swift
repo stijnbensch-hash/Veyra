@@ -66,7 +66,7 @@ struct IPTVHomeFilmsRow: View {
 
         if forceRefresh { items = [] }
 
-        if items.isEmpty, let cached = IPTVDiskCache.read([IPTVVODItem].self, key: cacheKey)?.value {
+        if items.isEmpty, let cached = await IPTVDiskCache.readAsync([IPTVVODItem].self, key: cacheKey)?.value {
             items = cached.filter { preferences.isVODItemVisible($0.id) }
         }
 
@@ -174,7 +174,7 @@ struct IPTVHomeSeriesRow: View {
 
         if forceRefresh { items = [] }
 
-        if items.isEmpty, let cached = IPTVDiskCache.read([XtreamSeriesItem].self, key: cacheKey)?.value {
+        if items.isEmpty, let cached = await IPTVDiskCache.readAsync([XtreamSeriesItem].self, key: cacheKey)?.value {
             items = cached.filter { preferences.isSeriesItemVisible(String($0.id)) }
         }
 

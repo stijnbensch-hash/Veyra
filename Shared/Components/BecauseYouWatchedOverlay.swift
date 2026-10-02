@@ -16,7 +16,7 @@ struct BecauseYouWatchedOverlay<Actions: View>: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
-            AsyncImage(url: recommended.posterURL) { phase in
+            VeyraAsyncImage(url: recommended.posterURL) { phase in
                 if case .success(let image) = phase {
                     image.resizable().scaledToFill()
                 } else {

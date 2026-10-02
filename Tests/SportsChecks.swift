@@ -19,7 +19,7 @@ struct SportsChecks {
             """
             return try JSONDecoder().decode(ESPNScoreboard.self, from: Data(json.utf8))
         }
-        let nfl = SportsLeague.all[3]
+        let nfl = SportsLeague.all.first { $0.id == "nfl" }!
         let scheduled = try fixture("STATUS_SCHEDULED", "pre", false).matches(league: nfl)[0]
         precondition(!scheduled.showsScore, "Scheduled zero scores must stay hidden")
         precondition(scheduled.home.name == "Home", "Do not depend on competitor order")
@@ -29,7 +29,7 @@ struct SportsChecks {
         precondition(postponed.phase == .postponed && !postponed.showsScore)
         let live = try fixture("STATUS_IN_PROGRESS", "in", false).matches(league: nfl)[0]
         precondition(live.phase == .live && live.showsScore)
-        let college = try fixture("STATUS_SCHEDULED", "pre", false).matches(league: SportsLeague.all[4])[0]
+        let college = try fixture("STATUS_SCHEDULED", "pre", false).matches(league: SportsLeague.all.first { $0.id == "college-football-acc" }!)[0]
         precondition(college.home.id != scheduled.home.id, "Unrelated sport leagues must not share favorite IDs")
         let domestic = try fixture("STATUS_SCHEDULED", "pre", false).matches(league: SportsLeague.all[0])[0]
         let european = try fixture("STATUS_SCHEDULED", "pre", false).matches(league: SportsLeague.all[1])[0]
@@ -46,7 +46,7 @@ struct SportsChecks {
         precondition(SportsStore(provider: provider, defaults: defaults).favorites.contains(live.home.id))
         provider.shouldFail = true
         await store.refresh(date: live.date, force: true)
-        precondition(store.matches.count == 1 && store.failedLeagues.count == 6, "Keep last known scores on failure and mark stale")
+        precondition(store.matches.count == 1 && store.failedLeagues.count == SportsLeague.all.filter { SportsDisplayPreferences.isLeagueEnabled($0.id, defaults: defaults) }.count, "Keep last known scores on failure and mark stale")
         await store.refresh(date: live.date.addingTimeInterval(86400), force: true)
         precondition(store.matches.isEmpty, "Do not show yesterday's data as today's scores")
         if CommandLine.arguments.contains("--live") {

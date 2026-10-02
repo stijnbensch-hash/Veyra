@@ -130,7 +130,7 @@ struct IPTVSeriesVisibilityView: View {
             save(updated)
         } label: {
             HStack(spacing: 12) {
-                AsyncImage(url: item.coverURL) { phase in
+                VeyraAsyncImage(url: item.coverURL) { phase in
                     if let image = phase.image { image.resizable().scaledToFill() }
                     else { Image(systemName: "tv").foregroundStyle(.secondary) }
                 }

@@ -106,7 +106,7 @@ struct SportsFavoritesSettingsView: View {
     }
 
     private func logo(_ url: URL?) -> some View {
-        AsyncImage(url: url) { phase in
+        VeyraAsyncImage(url: url) { phase in
             if let image = phase.image {
                 image.resizable().scaledToFit()
             } else {

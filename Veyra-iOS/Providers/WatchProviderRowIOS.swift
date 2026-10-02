@@ -153,7 +153,7 @@ private struct WatchProviderLogoIOS: View {
     let provider: WatchProvider
 
     var body: some View {
-        AsyncImage(url: provider.logoURL) { phase in
+        VeyraAsyncImage(url: provider.logoURL) { phase in
             switch phase {
             case .success(let image):
                 image.resizable().scaledToFit()

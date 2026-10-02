@@ -1175,7 +1175,7 @@ private struct IPTVChannelManagementView:
     private func channelLogo(
         _ channel: IPTVChannel
     ) -> some View {
-        AsyncImage(
+        VeyraAsyncImage(
             url: ChannelLogoOverrideStore.effectiveLogoURL(
                 channelID: channel.id, defaultLogoURL: channel.logoURL
             )

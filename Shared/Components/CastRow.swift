@@ -86,7 +86,7 @@ struct CastRow: View {
 
     private func personCard(_ person: Person) -> some View {
         VStack(spacing: 8) {
-            AsyncImage(
+            VeyraAsyncImage(
                 url: person.profilePath.flatMap { URL(string: "https://image.tmdb.org/t/p/w185\($0)") }
             ) { phase in
                 switch phase {

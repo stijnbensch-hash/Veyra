@@ -106,7 +106,7 @@ final class VeyraLocalLiveFallback {
         key: String
     ) async throws -> [IPTVChannel] {
         if let loaded = loaded[key] { return loaded }
-        if let cached = IPTVDiskCache.read(
+        if let cached = await IPTVDiskCache.readAsync(
             [IPTVChannel].self, key: "local-live-fallback-v1-\(key)"
         )?.value {
             loaded[key] = cached

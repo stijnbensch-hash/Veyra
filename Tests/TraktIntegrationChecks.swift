@@ -4,6 +4,7 @@ import Foundation
 // Deze gerichte controles bouwen de volledige Home-weergave niet mee.
 extension Notification.Name {
     static let veyraTraktHistoryDidChange = Notification.Name("veyra.trakt.historyDidChange")
+    static let veyraTraktSnapshotDidChange = Notification.Name("veyra.trakt.snapshotDidChange")
 }
 
 final class TraktHomeThrottle {
@@ -42,6 +43,20 @@ final class MockTraktProtocol: URLProtocol, @unchecked Sendable {
 @main
 struct TraktIntegrationChecks {
     @MainActor static func main() async throws {
+        let activityDecoder = JSONDecoder()
+        activityDecoder.keyDecodingStrategy = .convertFromSnakeCase
+        let upNextJSON = Data(#"{"show":{"ids":{"trakt":10}},"last_watched_at":"2026-10-02T20:00:00.000Z","progress":{"aired":2,"completed":1,"last_watched_at":"2026-10-02T19:00:00Z","next_episode":{"ids":{"trakt":20},"season":1,"number":2,"first_aired":"2026-10-02T21:00:00.000Z"}}}"#.utf8)
+        let dated = try activityDecoder.decode(TraktUpNext.self, from: upNextJSON)
+        precondition(dated.lastWatchedAt == "2026-10-02T20:00:00.000Z")
+        precondition(dated.progress.lastWatchedAt == "2026-10-02T19:00:00Z")
+        precondition(dated.progress.nextEpisode?.firstAired == "2026-10-02T21:00:00.000Z")
+        let oldCacheJSON = Data(#"{"show":{"ids":{"trakt":10}},"progress":{"aired":2,"completed":1}}"#.utf8)
+        let undated = try activityDecoder.decode(TraktUpNext.self, from: oldCacheJSON)
+        precondition(undated.lastWatchedAt == nil && undated.progress.lastWatchedAt == nil)
+        let watchedJSON = Data(#"{"show":{"ids":{"trakt":10}},"last_watched_at":"2026-10-02T20:00:00Z"}"#.utf8)
+        let watchedDateEntry = try activityDecoder.decode(TraktEntry.self, from: watchedJSON)
+        precondition(watchedDateEntry.lastWatchedAt == "2026-10-02T20:00:00Z")
+        print("PASS Trakt watch/release dates decode from API fields and old caches remain readable")
         let watchedIDs = TraktIDs(tmdb: 777)
         let watchedShow = TraktMedia(title: "Test", ids: watchedIDs)
         let watchedEntry = TraktEntry(show: watchedShow, seasons: [
@@ -230,9 +245,9 @@ struct TraktIntegrationChecks {
             return (200, [:], Data("[]".utf8))
         }
         await store.refresh()
-        precondition(store.lastSync == nil && store.lastWatchedSync != nil && store.isWatched(episode))
+        precondition(store.lastSync != nil && store.lastWatchedSync != nil && store.isWatched(episode), "A failed ratings request must not discard successful snapshot groups")
         precondition(store.watchedMovies.count == 2 && store.watchedMovies.last?.movie?.ids.tmdb == 888)
-        precondition(store.errorMessage != nil)
+        precondition(store.ratings.isEmpty, "Failed ratings preserve the previous group")
         print("PASS watched data loads across pages and remains visible when another Trakt endpoint fails")
         failLibrary = false
         await store.refresh()

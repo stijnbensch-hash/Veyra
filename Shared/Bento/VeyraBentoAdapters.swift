@@ -58,6 +58,11 @@ nonisolated struct VeyraTMDBArtwork: ArtworkProviding {
     }
 
     func artwork(for kind: MediaKind, tmdbID: Int) async -> Artwork? {
+        await artwork(for: kind, tmdbID: tmdbID, onUpdate: { _ in })
+    }
+
+    func artwork(for kind: MediaKind, tmdbID: Int,
+                 onUpdate: @escaping @Sendable (Artwork) async -> Void) async -> Artwork? {
         let token: String? = await MainActor.run { AppConfiguration.tmdbReadAccessToken }
         guard let token, !token.isEmpty else { return nil }
 
@@ -77,19 +82,23 @@ nonisolated struct VeyraTMDBArtwork: ArtworkProviding {
 
         let textless = images.backdrops.filter { $0.iso_639_1 == nil }
         let bestBackdrop = (textless.isEmpty ? images.backdrops : textless).max { $0.vote_average < $1.vote_average }
-        let banner = await fanartBanner(kind: kind, tmdbID: tmdbID, token: token)
+        guard !Task.isCancelled else { return nil }
+        let backdrop = bestBackdrop.flatMap { URL(string: "https://image.tmdb.org/t/p/w1280\($0.file_path)") }
+        // Display the primary image as soon as TMDB responds. Optional artwork
+        // must not hold the backdrop behind two more provider requests.
+        await onUpdate(Artwork(backdrop: backdrop, logo: nil, banner: nil))
+        async let banner = fanartBanner(kind: kind, tmdbID: tmdbID, token: token)
         // Fase 3 stap 2 (artwork-engine-spec §29/§30/§44): logo via de centrale
         // `ArtworkResolver` i.p.v. hier altijd rechtstreeks uit deze eigen `/images`-aanvraag te
         // plukken -- respecteert zo ook een gekozen AIOMetadata-addon voor de Home-hero/Bento-
         // tegels. De backdrop- en fanart.tv-banner-aanroepen blijven ongewijzigd (geen
         // ClearLogo, geen dubbele logica elders).
-        let logo = await ArtworkResolver.shared.clearLogoURL(
+        async let logo = ArtworkResolver.shared.clearLogoURL(
             for: MediaItem(title: "", type: kind == .movie ? .movie : .series, tmdbID: tmdbID)
         )
-        return Artwork(
-            backdrop: bestBackdrop.flatMap { URL(string: "https://image.tmdb.org/t/p/w1280\($0.file_path)") },
-            logo: logo,
-            banner: banner)
+        let (resolvedLogo, resolvedBanner) = await (logo, banner)
+        guard !Task.isCancelled else { return nil }
+        return Artwork(backdrop: backdrop, logo: resolvedLogo, banner: resolvedBanner)
     }
 
     // MARK: fanart.tv-banners (breed formaat, ±1000×185)
@@ -420,9 +429,10 @@ final class VeyraLiveGuideSource {
                 logoURL: ChannelLogoOverrideStore.effectiveLogoURL(channelID: row.channel.id, defaultLogoURL: row.channel.logoURL),
                 tvgID: (row.channel.tvgID ?? "").trimmingCharacters(in: .whitespacesAndNewlines))
         }
-        return await Task.detached(priority: .userInitiated) {
+        let task = Task.detached(priority: .userInitiated) {
             SportChannelMatcher.matches(teams: teams, start: start, index: index, channels: channels)
-        }.value
+        }
+        return await withTaskCancellationHandler { await task.value } onCancel: { task.cancel() }
     }
 
     func channels() async -> [EPGChannel] {
@@ -662,14 +672,14 @@ final class VeyraIPTVNewSource {
     /// `IPTVProviderEnablement` (provider uit voor discovery) -- via de
     /// gedeelde `IPTVDiscoveryVisibility`-laag, zodat "Nieuw toegevoegd" dezelfde
     /// regels volgt als elke andere discovery-sectie.
-    nonisolated private static func isVisible(_ item: IPTVVODItem, provider: IPTVStoredProvider) -> Bool {
+    nonisolated private static func isVisible(_ item: IPTVVODItem, preferences: IPTVProviderPreferences) -> Bool {
         let categoryID = (item.categoryID?.isEmpty == false) ? item.categoryID : nil
-        return IPTVDiscoveryVisibility.shared.isVODItemVisible(item.id, categoryID: categoryID, provider: provider)
+        return (categoryID.map { preferences.isVODCategoryVisible($0) } ?? true) && preferences.isVODItemVisible(item.id)
     }
 
-    nonisolated private static func isVisible(_ series: XtreamSeriesItem, provider: IPTVStoredProvider) -> Bool {
+    nonisolated private static func isVisible(_ series: XtreamSeriesItem, preferences: IPTVProviderPreferences) -> Bool {
         let categoryID = (series.categoryID?.isEmpty == false) ? series.categoryID : nil
-        return IPTVDiscoveryVisibility.shared.isSeriesItemVisible(String(series.id), categoryID: categoryID, provider: provider)
+        return (categoryID.map { preferences.isSeriesCategoryVisible($0) } ?? true) && preferences.isSeriesItemVisible(String(series.id))
     }
 
     /// Alleen providers die voor discovery ingeschakeld staan -- een provider die
@@ -713,20 +723,24 @@ final class VeyraIPTVNewSource {
 
     private func films(from provider: IPTVStoredProvider, order: Int) async -> [IPTVHomeFilm] {
         guard case .xtream(let xtream) = provider.configuration else { return [] }
+        guard IPTVProviderEnablement.isEnabled(provider.id), !Task.isCancelled else { return [] }
+        let preferences = IPTVProviderPreferencesStore().load(for: provider.configuration)
         let maxAge = self.maxAge
         let limit = self.limit
         // Schijf-lees/decode/filter/sorteer (mogelijk duizenden items) hoort niet op de
         // main actor -- alleen `self` is @MainActor, dit werk zelf raakt geen UI-state
         // aan, dus een losse achtergrond-Task houdt de UI/launch-animatie vlot.
-        return await Task.detached(priority: .userInitiated) {
+        let task = Task.detached(priority: .userInitiated) { () async -> [IPTVHomeFilm] in
             let key = "recentlyAdded.vod.raw.\(provider.configuration.providerIdentifier)"
-            let cached = IPTVDiskCache.read([IPTVVODItem].self, key: key)
+            let cached = await IPTVDiskCache.readAsync([IPTVVODItem].self, key: key)
             let catalog: [IPTVVODItem]
             if let cached, Date().timeIntervalSince(cached.savedAt) < maxAge {
                 catalog = cached.value
             } else {
                 do {
-                    catalog = try await IPTVService().loadXtreamVOD(configuration: xtream)
+                    let downloaded = try await IPTVService().loadXtreamVOD(configuration: xtream)
+                    try Task.checkCancellation()
+                    catalog = downloaded
                     IPTVDiskCache.write(catalog, key: key)
                     if !catalog.isEmpty {
                         await IPTVDiscoverySnapshotStore.shared.recordSuccessfulFetch(
@@ -739,9 +753,10 @@ final class VeyraIPTVNewSource {
                     catalog = cached?.value ?? []
                 }
             }
+            guard !Task.isCancelled else { return [] }
             var seenIDs = Set<String>()
             let visible = catalog.filter {
-                VeyraIPTVNewSource.isVisible($0, provider: provider) && seenIDs.insert($0.id).inserted
+                VeyraIPTVNewSource.isVisible($0, preferences: preferences) && seenIDs.insert($0.id).inserted
             }.sorted {
                 if $0.added != $1.added {
                     return ($0.added ?? .distantPast) > ($1.added ?? .distantPast)
@@ -754,7 +769,8 @@ final class VeyraIPTVNewSource {
                 IPTVHomeFilm(providerID: provider.id, providerName: provider.displayName,
                              providerOrder: order, providerRank: rank, item: item)
             }
-        }.value
+        }
+        return await withTaskCancellationHandler { await task.value } onCancel: { task.cancel() }
     }
 
     func series() async -> [IPTVHomeSeries] {
@@ -787,17 +803,21 @@ final class VeyraIPTVNewSource {
 
     private func series(from provider: IPTVStoredProvider, order: Int) async -> [IPTVHomeSeries] {
         guard case .xtream(let xtream) = provider.configuration else { return [] }
+        guard IPTVProviderEnablement.isEnabled(provider.id), !Task.isCancelled else { return [] }
+        let preferences = IPTVProviderPreferencesStore().load(for: provider.configuration)
         let maxAge = self.maxAge
         let limit = self.limit
-        return await Task.detached(priority: .userInitiated) {
+        let task = Task.detached(priority: .userInitiated) { () async -> [IPTVHomeSeries] in
             let key = "recentlyAdded.series.raw.\(provider.configuration.providerIdentifier)"
-            let cached = IPTVDiskCache.read([XtreamSeriesItem].self, key: key)
+            let cached = await IPTVDiskCache.readAsync([XtreamSeriesItem].self, key: key)
             let catalog: [XtreamSeriesItem]
             if let cached, Date().timeIntervalSince(cached.savedAt) < maxAge {
                 catalog = cached.value
             } else {
                 do {
-                    catalog = try await IPTVService().loadXtreamSeries(configuration: xtream)
+                    let downloaded = try await IPTVService().loadXtreamSeries(configuration: xtream)
+                    try Task.checkCancellation()
+                    catalog = downloaded
                     IPTVDiskCache.write(catalog, key: key)
                     if !catalog.isEmpty {
                         await IPTVDiscoverySnapshotStore.shared.recordSuccessfulFetch(
@@ -810,9 +830,10 @@ final class VeyraIPTVNewSource {
                     catalog = cached?.value ?? []
                 }
             }
+            guard !Task.isCancelled else { return [] }
             var seenIDs = Set<Int>()
             let visible = catalog.filter {
-                VeyraIPTVNewSource.isVisible($0, provider: provider) && seenIDs.insert($0.id).inserted
+                VeyraIPTVNewSource.isVisible($0, preferences: preferences) && seenIDs.insert($0.id).inserted
             }.sorted {
                 if $0.added != $1.added {
                     return ($0.added ?? .distantPast) > ($1.added ?? .distantPast)
@@ -823,7 +844,8 @@ final class VeyraIPTVNewSource {
                 IPTVHomeSeries(providerID: provider.id, providerName: provider.displayName,
                                providerOrder: order, providerRank: rank, item: item)
             }
-        }.value
+        }
+        return await withTaskCancellationHandler { await task.value } onCancel: { task.cancel() }
     }
 }
 

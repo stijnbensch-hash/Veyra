@@ -80,7 +80,7 @@ struct SportsMatchDetailIOS: View {
             .buttonStyle(.plain)
             .accessibilityLabel(favorites.isFavoriteTeam(team) ? "Verwijder uit favoriete teams" : "Maak favoriet team")
 
-            AsyncImage(url: team.logoURL ?? SportsTeam.fallbackLogoURL(abbreviation: team.abbreviation)) { phase in
+            VeyraAsyncImage(url: team.logoURL ?? SportsTeam.fallbackLogoURL(abbreviation: team.abbreviation)) { phase in
                 switch phase {
                 case .success(let image):
                     image.resizable().scaledToFit()

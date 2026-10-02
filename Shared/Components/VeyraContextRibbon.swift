@@ -109,7 +109,7 @@ private struct RibbonClearLogo<Fallback: View>: View {
     var body: some View {
         Group {
             if let logoURL {
-                AsyncImage(url: logoURL) { phase in
+                VeyraAsyncImage(url: logoURL) { phase in
                     if case .success(let image) = phase {
                         image.resizable()
                             .aspectRatio(contentMode: .fit)
@@ -344,7 +344,7 @@ struct VeyraContextRibbon: View {
         // icoon+tekst-kaart van hiervoor gewoon bestaan.
         if let backdrop = item.backdropURL {
             posterNode(item, kind: kind) {
-                AsyncImage(url: backdrop) { phase in
+                VeyraAsyncImage(url: backdrop) { phase in
                     if case .success(let image) = phase {
                         image.resizable().aspectRatio(contentMode: .fill)
                     } else {
@@ -730,7 +730,7 @@ struct VeyraContextRibbon: View {
     @ViewBuilder
     private func logoImage<Fallback: View>(_ url: URL, maxWidth: CGFloat, maxHeight: CGFloat,
                                             @ViewBuilder fallback: @escaping () -> Fallback) -> some View {
-        AsyncImage(url: url) { phase in
+        VeyraAsyncImage(url: url) { phase in
             if case .success(let image) = phase {
                 image.resizable()
                     .aspectRatio(contentMode: .fit)

@@ -95,7 +95,7 @@ struct VeyraTop10Orbit: View {
 
         return ZStack(alignment: .bottomLeading) {
             GeometryReader { geo in
-                AsyncImage(url: item.posterURL ?? item.backdropURL) { phase in
+                VeyraAsyncImage(url: item.posterURL ?? item.backdropURL) { phase in
                     if case .success(let image) = phase {
                         image.resizable().scaledToFill()
                     } else {

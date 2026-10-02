@@ -166,7 +166,7 @@ struct VeyraPosterCard: View {
                 .overlay(Capsule().strokeBorder(posterBadgeBorder, lineWidth: 1))
                 .opacity(trendBadgeText == nil ? 0 : 1)
                 .frame(maxWidth: .infinity, alignment: .bottom)
-            AsyncImage(url: url) { phase in
+            VeyraAsyncImage(url: url) { phase in
                 if let image = phase.image { image.resizable().scaledToFill() }
                 else {
                     ZStack {

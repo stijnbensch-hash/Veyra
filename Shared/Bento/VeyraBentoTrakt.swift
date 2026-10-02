@@ -62,6 +62,7 @@ nonisolated struct ContinueItem: Identifiable, Hashable, Sendable, Codable {
     var bannerURL: URL? = nil
     var watchedEpisodes: Int? = nil      // afleveringen gezien (Trakt-voortgang)
     var airedEpisodes: Int? = nil        // afleveringen uitgezonden
+    var availableAt: Date? = nil
 
     var episodesLeft: Int? {
         guard let watched = watchedEpisodes, let aired = airedEpisodes else { return nil }
@@ -141,6 +142,13 @@ nonisolated struct UpcomingItem: Identifiable, Equatable, Sendable, Codable {
 nonisolated enum VeyraHomeFormat {
     static let locale = Locale(identifier: "nl_BE")
 
+    static func traktDate(_ value: String?) -> Date? {
+        guard let value else { return nil }
+        if let date = try? Date(value, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true)) { return date }
+        if let date = try? Date(value, strategy: Date.ISO8601FormatStyle()) { return date }
+        return try? Date(value, strategy: Date.ISO8601FormatStyle().year().month().day())
+    }
+
     /// "Vandaag 20:00" · "Morgen 20:00" · "vr 25 sep"
     static func when(_ date: Date, now: Date, dateOnly: Bool = false, calendar: Calendar = .current) -> String {
         let time = date.formatted(.dateTime.hour().minute().locale(locale))
@@ -177,6 +185,15 @@ nonisolated protocol TraktTokenProviding: Sendable {
 nonisolated protocol ArtworkProviding: Sendable {
     /// Backdrop + clearlogo via TMDB (`/images`, taalkeuze NL → EN → taalloos: zie pickClearlogoURL).
     func artwork(for kind: MediaKind, tmdbID: Int) async -> Artwork?
+    func artwork(for kind: MediaKind, tmdbID: Int,
+                 onUpdate: @escaping @Sendable (Artwork) async -> Void) async -> Artwork?
+}
+
+nonisolated extension ArtworkProviding {
+    func artwork(for kind: MediaKind, tmdbID: Int,
+                 onUpdate: @escaping @Sendable (Artwork) async -> Void) async -> Artwork? {
+        await artwork(for: kind, tmdbID: tmdbID)
+    }
 }
 
 nonisolated protocol TraktHomeProviding: Sendable {
@@ -212,6 +229,7 @@ nonisolated struct TraktMovieDTO: Decodable, Sendable {
     let year: Int?
     let ids: TraktHomeIDs
     let runtime: Int?
+    var released: String? = nil
 }
 nonisolated struct TraktShowDTO: Decodable, Sendable {
     let title: String
@@ -225,6 +243,7 @@ nonisolated struct TraktEpisodeDTO: Decodable, Sendable {
     let title: String?
     let ids: TraktHomeIDs?
     let runtime: Int?
+    var firstAired: Date? = nil
 }
 nonisolated struct TraktPlaybackDTO: Decodable, Sendable {
     let id: Int
@@ -260,6 +279,7 @@ nonisolated struct TraktCalendarMovieDTO: Decodable, Sendable {
 extension Notification.Name {
     /// Trakt-kijkgeschiedenis is net gewijzigd (bv. aflevering afgekeken): Home moet "Verder kijken" opnieuw ophalen.
     static let veyraTraktHistoryDidChange = Notification.Name("veyra.trakt.historyDidChange")
+    static let veyraTraktSnapshotDidChange = Notification.Name("veyra.trakt.snapshotDidChange")
 }
 
 nonisolated final class TraktHomeThrottle: @unchecked Sendable {
@@ -396,19 +416,23 @@ nonisolated final class TraktHomeAPI: TraktHomeProviding {
             switch p.type {
             case "movie":
                 guard let m = p.movie else { continue }
-                items.append(ContinueItem(
+                var item = ContinueItem(
                     id: "pb-\(p.id)", playbackID: p.id, kind: .movie, title: m.title, year: m.year,
                     episodeCode: nil, episodeTitle: nil, progress: fraction,
                     remainingMinutes: m.runtime.map { Int((Double($0) * (1 - fraction)).rounded()) },
-                    tmdbID: m.ids.tmdb, showTraktID: nil, lastWatched: p.pausedAt, isUpNext: false))
+                    tmdbID: m.ids.tmdb, showTraktID: nil, lastWatched: p.pausedAt, isUpNext: false)
+                item.availableAt = VeyraHomeFormat.traktDate(m.released)
+                items.append(item)
             case "episode":
                 guard let e = p.episode, let s = p.show else { continue }
                 let runtime = e.runtime ?? s.runtime
-                items.append(ContinueItem(
+                var item = ContinueItem(
                     id: "pb-\(p.id)", playbackID: p.id, kind: .episode, title: s.title, year: s.year,
                     episodeCode: Self.code(e), episodeTitle: e.title, progress: fraction,
                     remainingMinutes: runtime.map { Int((Double($0) * (1 - fraction)).rounded()) },
-                    tmdbID: s.ids.tmdb, showTraktID: s.ids.trakt, lastWatched: p.pausedAt, isUpNext: false))
+                    tmdbID: s.ids.tmdb, showTraktID: s.ids.trakt, lastWatched: p.pausedAt, isUpNext: false)
+                item.availableAt = e.firstAired
+                items.append(item)
             default: continue
             }
         }
@@ -551,6 +575,8 @@ final class VeyraHomeViewModel {
     @ObservationIgnored private var artworkCache: [Int: Artwork] = [:]
     @ObservationIgnored private var bannerAttempts: [Int: Int] = [:]
     @ObservationIgnored private var cachedWithFanartKey = false
+    @ObservationIgnored private var artworkGeneration = UUID()
+    @ObservationIgnored private var continueCheckpoints: [ContinueItem] = []
 
     init(provider: any TraktHomeProviding, artwork: (any ArtworkProviding)? = nil, reminders: Set<String> = []) {
         self.provider = provider
@@ -561,7 +587,20 @@ final class VeyraHomeViewModel {
         // wordt zo dadelijk gewoon overschreven door de verse Trakt-data.
         if let cached = Self.loadCache() {
             continueItems = cached.continueItems
+            continueCheckpoints = cached.continueItems.filter { !$0.isUpNext }
             upcoming = cached.upcoming
+            // Preserve known URLs when fresh Trakt items arrive without artwork.
+            for item in cached.continueItems {
+                if let id = item.tmdbID, item.backdropURL != nil {
+                    artworkCache[id] = Artwork(backdrop: item.backdropURL, logo: item.logoURL, banner: item.bannerURL)
+                }
+            }
+            for item in cached.upcoming {
+                if let id = item.tmdbID, artworkCache[id] == nil, item.backdropURL != nil {
+                    artworkCache[id] = Artwork(backdrop: item.backdropURL, logo: item.logoURL, banner: nil)
+                }
+            }
+            cachedWithFanartKey = !(AppConfiguration.fanartAPIKey ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }
         // Opruimen: eerdere (inmiddels verwijderde) versie schreef deze cache nog naar
         // UserDefaults, waar een te grote waarde de app kon laten crashen ("byte count limit
@@ -626,6 +665,7 @@ final class VeyraHomeViewModel {
             // Voltooide checkpoints wegfilteren en series zonder actief hervatpunt aanvullen
             // met hun volgende aflevering gebeurt hier lokaal, uit `TraktStore.shared.upNext`
             // (al opgehaald via de gewone Trakt-refresh) -- zie `mergedWithLocalUpNext`.
+            continueCheckpoints = items
             continueItems = mergedWithLocalUpNext(items, limit: Self.continueWatchingLimit)
         }
         if case .success(let items) = u { upcoming = items }
@@ -647,6 +687,17 @@ final class VeyraHomeViewModel {
         saveCache()
     }
 
+    /// Fresh Trakt snapshot data can arrive after the Home requests. Re-rank
+    /// locally instead of downloading playback/calendar/catalogues again.
+    func refreshContinueOrder() async {
+        guard phase != .loading else { return }
+        continueItems = mergedWithLocalUpNext(continueCheckpoints, limit: Self.continueWatchingLimit)
+        for (id, art) in artworkCache { apply(art, to: id) }
+        saveCache()
+        await enrichArtwork()
+        saveCache()
+    }
+
     /// Vult de door de provider geleverde "Verder kijken"-checkpoints lokaal aan,
     /// zonder extra Trakt-aanroepen: filtert checkpoints die volgens Trakt's eigen
     /// voortgangstelling al voltooid zijn, en vult series zonder actief hervatpunt aan
@@ -656,7 +707,13 @@ final class VeyraHomeViewModel {
     /// `TraktHomeAPI.baseContinueWatching` voor de volledige toelichting.
     private func mergedWithLocalUpNext(_ items: [ContinueItem], limit: Int) -> [ContinueItem] {
         let upNext = TraktStore.shared.upNext
-        guard !upNext.isEmpty else { return items }
+        let now = Date()
+        var watchedByShow: [Int: Date] = [:]
+        for entry in TraktStore.shared.watchedShows + TraktStore.shared.history {
+            guard let sid = entry.show?.ids.trakt,
+                  let date = VeyraHomeFormat.traktDate(entry.lastWatchedAt ?? entry.watchedAt), date <= now else { continue }
+            watchedByShow[sid] = max(watchedByShow[sid] ?? .distantPast, date)
+        }
 
         var progressByShow: [Int: TraktShowProgress] = [:]
         for entry in upNext {
@@ -674,8 +731,7 @@ final class VeyraHomeViewModel {
             return (copy.episodesLeft ?? 1) > 0 ? copy : nil
         }
 
-        guard merged.count < limit else { return Array(merged.prefix(limit)) }
-        let keptShowIDs = Set(merged.compactMap(\.showTraktID))
+        var keptShowIDs = Set(merged.compactMap(\.showTraktID))
 
         // 2. Series zonder actief hervatpunt aanvullen met hun volgende aflevering.
         let additions: [ContinueItem] = upNext.compactMap { entry in
@@ -683,18 +739,35 @@ final class VeyraHomeViewModel {
                   let next = entry.progress.nextEpisode,
                   entry.progress.aired - entry.progress.completed > 0
             else { return nil }
+            let availableAt = VeyraHomeFormat.traktDate(next.firstAired)
+            if let availableAt, availableAt > now { return nil }
+            guard keptShowIDs.insert(sid).inserted else { return nil }
+            let lastWatched = [VeyraHomeFormat.traktDate(entry.lastWatchedAt),
+                               VeyraHomeFormat.traktDate(entry.progress.lastWatchedAt),
+                               watchedByShow[sid]].compactMap { $0 }.filter { $0 <= now }.max() ?? .distantPast
             let code = String(format: "S%02dE%02d", next.season ?? 0, next.number ?? 0)
             var item = ContinueItem(
                 id: "next-\(sid)-\(code)", playbackID: nil, kind: .episode,
                 title: entry.show.title ?? "Serie", year: entry.show.year, episodeCode: code,
                 episodeTitle: next.title, progress: 0, remainingMinutes: nil,
-                tmdbID: entry.show.ids.tmdb, showTraktID: sid, lastWatched: Date(), isUpNext: true)
+                tmdbID: entry.show.ids.tmdb, showTraktID: sid, lastWatched: lastWatched, isUpNext: true)
+            item.availableAt = availableAt
             item.watchedEpisodes = entry.progress.completed
             item.airedEpisodes = entry.progress.aired
             return item
         }
 
-        merged.append(contentsOf: additions.prefix(max(0, limit - merged.count)))
+        merged.append(contentsOf: additions)
+        // A progress checkpoint is a playback capability, not a ranking tier.
+        // Newly aired episodes and real watch activity share one timeline.
+        merged.sort { lhs, rhs in
+            func date(_ item: ContinueItem) -> Date {
+                max(item.lastWatched, item.availableAt.flatMap { $0 <= now ? $0 : nil } ?? .distantPast)
+            }
+            if date(lhs) != date(rhs) { return date(lhs) > date(rhs) }
+            if lhs.lastWatched != rhs.lastWatched { return lhs.lastWatched > rhs.lastWatched }
+            return lhs.id < rhs.id
+        }
         return Array(merged.prefix(limit))
     }
 
@@ -702,7 +775,11 @@ final class VeyraHomeViewModel {
         guard let id = item.playbackID else { return }
         let before = continueItems
         continueItems.removeAll { $0.id == item.id }
-        do { try await provider.removePlayback(id: id); saveCache() } catch { continueItems = before }
+        do {
+            try await provider.removePlayback(id: id)
+            continueCheckpoints.removeAll { $0.id == item.id }
+            saveCache()
+        } catch { continueItems = before }
     }
 
     /// Geeft terug of de herinnering nu aan staat. Plan de echte notificatie in de app (UNUserNotificationCenter).
@@ -733,29 +810,53 @@ final class VeyraHomeViewModel {
         for i in continueItems { if let id = i.tmdbID, needsArtwork(id) { wanted.append((i.kind, id)) } }
         for i in upcoming { if let id = i.tmdbID, needsArtwork(id) { wanted.append((i.kind, id)) } }
 
+        let generation = UUID()
+        artworkGeneration = generation
+        var queued = Set<Int>()
+        var pending = wanted.filter { queued.insert($0.1).inserted }.makeIterator()
         await withTaskGroup(of: (Int, Artwork?).self) { group in
-            var queued = Set<Int>()
-            for (kind, id) in wanted where queued.insert(id).inserted {
-                group.addTask { (id, await artwork.artwork(for: kind, tmdbID: id)) }
+            func enqueue(_ request: (MediaKind, Int)) {
+                let (kind, id) = request
+                group.addTask { [weak self] in
+                    guard let self else { return (id, nil) }
+                    let result = await artwork.artwork(for: kind, tmdbID: id) { partial in
+                        await self.applyProgressiveArtwork(partial, to: id, generation: generation)
+                    }
+                    return (id, result)
+                }
             }
+            // Prioritize Continue Watching, then Upcoming; avoid launching an entire
+            // calendar of metadata requests at once.
+            for _ in 0..<6 { if let request = pending.next() { enqueue(request) } }
             for await (id, art) in group {
-                guard let art else { continue }
-                if hasKey { bannerAttempts[id, default: 0] += 1 }
-                artworkCache[id] = art
-                apply(art, to: id)
+                guard !Task.isCancelled, artworkGeneration == generation else {
+                    group.cancelAll()
+                    break
+                }
+                if let art {
+                    if hasKey { bannerAttempts[id, default: 0] += 1 }
+                    artworkCache[id] = art
+                    apply(art, to: id)
+                }
+                if let request = pending.next() { enqueue(request) }
             }
         }
     }
 
+    private func applyProgressiveArtwork(_ art: Artwork, to tmdbID: Int, generation: UUID) {
+        guard artworkGeneration == generation, !Task.isCancelled else { return }
+        apply(art, to: tmdbID)
+    }
+
     private func apply(_ art: Artwork, to tmdbID: Int) {
         for idx in continueItems.indices where continueItems[idx].tmdbID == tmdbID {
-            continueItems[idx].backdropURL = art.backdrop
-            continueItems[idx].logoURL = art.logo
-            continueItems[idx].bannerURL = art.banner
+            if let url = art.backdrop { continueItems[idx].backdropURL = url }
+            if let url = art.logo { continueItems[idx].logoURL = url }
+            if let url = art.banner { continueItems[idx].bannerURL = url }
         }
         for idx in upcoming.indices where upcoming[idx].tmdbID == tmdbID {
-            upcoming[idx].backdropURL = art.backdrop
-            upcoming[idx].logoURL = art.logo
+            if let url = art.backdrop { upcoming[idx].backdropURL = url }
+            if let url = art.logo { upcoming[idx].logoURL = url }
         }
     }
 

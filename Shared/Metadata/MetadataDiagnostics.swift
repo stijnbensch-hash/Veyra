@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 /// Artwork-engine-spec §72/§73: diagnostics horen NIET in de normale UI (geen source-label op
 /// Home, §72) maar wel in een apart diagnostics-scherm onder Instellingen → Metadata. Puur
@@ -67,6 +68,10 @@ extension MetadataDiagnosticsRecorder {
         since start: Date
     ) async {
         let durationMs = Int(Date().timeIntervalSince(start) * 1000)
+        // Persist only provider choice and timings for correlation with memory samples.
+        // Candidate URLs, addon names and account identifiers remain out of unified logs.
+        Logger(subsystem: "com.veyra.runtime", category: "Metadata").debug(
+            "selected=\(sourceSelected, privacy: .public) used=\(sourceActuallyUsed, privacy: .public) cacheHit=\(cacheHit) fallback=\(fallbackUsed) durationMs=\(durationMs)")
         await shared.record(MetadataDiagnosticsEvent(
             kind: kind, canonicalID: canonicalID, sourceSelected: sourceSelected,
             sourceActuallyUsed: sourceActuallyUsed, fallbackUsed: fallbackUsed, cacheHit: cacheHit,

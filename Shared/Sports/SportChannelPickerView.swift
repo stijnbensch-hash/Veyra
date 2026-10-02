@@ -50,6 +50,24 @@ struct SportChannelPickerView: View {
     @State private var loading = true
 
     var body: some View {
+        #if os(tvOS)
+        VStack(spacing: 20) {
+            Text("Waar kijken?")
+                .font(.system(size: 32, weight: .bold))
+                .foregroundStyle(.white)
+            content
+        }
+        .padding(28)
+        .frame(width: 740, height: 680)
+        .overlay {
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .strokeBorder(VeyraFrame.resting, lineWidth: 1.5)
+        }
+        .presentationBackground(.clear)
+        .preferredColorScheme(.dark)
+        .onExitCommand { dismiss() }
+        .task { await load() }
+        #else
         NavigationStack {
             ZStack {
                 VeyraHomeStyle.ink.ignoresSafeArea()
@@ -66,6 +84,7 @@ struct SportChannelPickerView: View {
             #endif
         }
         .task { await load() }
+        #endif
     }
 
     @ViewBuilder
@@ -95,7 +114,11 @@ struct SportChannelPickerView: View {
                         .padding(.bottom, 4)
                     ForEach(matches) { match in
                         Button { pick(match) } label: { row(match) }
+                            #if os(tvOS)
+                            .buttonStyle(SportChannelOutlineStyle())
+                            #else
                             .buttonStyle(.plain)
+                            #endif
                     }
                 }
                 .padding(20)
@@ -106,7 +129,7 @@ struct SportChannelPickerView: View {
     private func row(_ match: SportChannelMatch) -> some View {
         let live = match.isLive(at: Date())
         return HStack(spacing: 14) {
-            AsyncImage(url: match.logoURL) { phase in
+            VeyraAsyncImage(url: match.logoURL) { phase in
                 if let image = phase.image {
                     image.resizable().scaledToFit()
                 } else {
@@ -140,7 +163,9 @@ struct SportChannelPickerView: View {
             Image(systemName: "play.fill").foregroundStyle(VeyraHomeStyle.cyan)
         }
         .padding(14)
+        #if !os(tvOS)
         .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        #endif
     }
 
     private func timeRange(_ match: SportChannelMatch) -> String {
@@ -160,6 +185,32 @@ struct SportChannelPickerView: View {
         onPick(source)
     }
 }
+
+#if os(tvOS)
+private struct SportChannelOutlineStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        Label(configuration: configuration)
+            .focusEffectDisabled()
+    }
+
+    private struct Label: View {
+        let configuration: ButtonStyleConfiguration
+        @Environment(\.isFocused) private var isFocused
+
+        var body: some View {
+            let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+            configuration.label
+                .contentShape(shape)
+                .overlay {
+                    shape.strokeBorder(isFocused ? VeyraFrame.active : VeyraFrame.resting,
+                                       lineWidth: isFocused ? 3 : 1.5)
+                }
+                .opacity(configuration.isPressed ? 0.8 : 1)
+                .animation(.easeOut(duration: 0.15), value: isFocused)
+        }
+    }
+}
+#endif
 
 /// Toont de zenderkeuze als sheet en geeft de gekozen bron door nadat de sheet gesloten is.
 struct SportChannelSheetModifier: ViewModifier {

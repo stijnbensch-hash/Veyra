@@ -62,7 +62,7 @@ struct VeyraLogoShelfTile: View {
     @ViewBuilder
     private var content: some View {
         if let customURL {
-            AsyncImage(url: customURL) { phase in
+            VeyraAsyncImage(url: customURL) { phase in
                 if let image = phase.image {
                     image.resizable().scaledToFit()
                 } else {
@@ -70,7 +70,7 @@ struct VeyraLogoShelfTile: View {
                 }
             }
         } else if let wideURL {
-            AsyncImage(url: wideURL) { phase in
+            VeyraAsyncImage(url: wideURL) { phase in
                 if let image = phase.image {
                     // Wit i.p.v. op de merkkleur -- de achtergrond is nu neutraal,
                     // dus het woordmerk moet zelf zichtbaar blijven ("rustige" Logo Shelf).
@@ -82,7 +82,7 @@ struct VeyraLogoShelfTile: View {
         } else {
             HStack(spacing: compact ? 8 : 14) {
                 if let iconURL {
-                    AsyncImage(url: iconURL) { phase in
+                    VeyraAsyncImage(url: iconURL) { phase in
                         if let image = phase.image { image.resizable().scaledToFill() } else { Color.white.opacity(0.1) }
                     }
                     .frame(width: compact ? 34 : 64, height: compact ? 34 : 64)

@@ -125,7 +125,7 @@ private final class LivePlayerEPGModel: ObservableObject {
 
         let now = Date()
         let cacheKey = "live-guide-v1-\(provider.configuration.providerIdentifier)"
-        let cached = IPTVDiskCache.read([String: [VeyraEPGProgramme]].self, key: cacheKey)
+        let cached = await IPTVDiskCache.readAsync([String: [VeyraEPGProgramme]].self, key: cacheKey)
         if let cached,
            let cachedProgrammes = cached.value[channelID], !cachedProgrammes.isEmpty,
            (programmes.isEmpty || cached.savedAt > (lastNetworkLoad ?? .distantPast)) {

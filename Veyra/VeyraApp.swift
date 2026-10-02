@@ -69,6 +69,7 @@ struct VeyraApp: App {
                     .all
                 )
                 .task {
+                    VeyraRuntimeDiagnostics.shared.start()
                     _ = AppConfiguration.tmdbReadAccessToken
                     TVTopShelfContentProvider.topShelfContentDidChange()
 
@@ -104,14 +105,7 @@ struct VeyraApp: App {
                                 nil
                         )
 
-                    // IPTV VOD en EPG (zenderlijst) rechtstreeks
-                    // verversen bij opstarten, voor elke
-                    // geconfigureerde provider tegelijk. De kleine
-                    // badge (zie `iptvStartupRefresh`) blijft
-                    // zichtbaar zolang dit loopt.
-                    await iptvStartupRefresh.beginRefresh {
-                        await refreshAllIPTVDataOnStartup()
-                    }
+
                 }
                 .onChange(
                     of:
@@ -145,40 +139,4 @@ struct VeyraApp: App {
                 }
     }
 
-    // MARK: - IPTV startup refresh
-
-    /// Ververst voor elke geconfigureerde IPTV-provider de zenderlijst
-    /// ("EPG") en de VOD-catalogus tegelijk. Fouten bij één provider
-    /// blokkeren de andere providers niet — de app heeft hier verder geen
-    /// foutmelding voor nodig, de betrokken schermen tonen zelf een
-    /// foutstatus zodra de gebruiker ernaartoe navigeert.
-    // Bewust SERIEEL i.p.v. parallel (per provider én per live/VOD-call binnen een provider):
-    // meerdere Xtream-catalogi tegelijk parsen gaf een geheugenpiek tijdens het opstarten die,
-    // gecombineerd met scrollen op Home (focus engine + AsyncImage-laden), de app liet crashen.
-    // Dit duurt iets langer, maar blijft binnen een voorspelbaar geheugenbudget.
-    private func refreshAllIPTVDataOnStartup() async {
-        guard
-            let providers = try? IPTVConfigurationStore().loadProviders(),
-            !providers.isEmpty
-        else {
-            return
-        }
-
-        for provider in providers {
-            await refreshIPTVProviderOnStartup(provider.configuration)
-        }
-    }
-
-    private func refreshIPTVProviderOnStartup(_ configuration: IPTVStoredConfiguration) async {
-        let service = IPTVService()
-
-        switch configuration {
-        case .xtream(let xtream):
-            _ = try? await service.loadXtreamLiveChannels(configuration: xtream)
-            _ = try? await service.loadXtreamVOD(configuration: xtream)
-
-        case .m3u(let m3u):
-            _ = try? await service.loadM3UChannels(configuration: m3u)
-        }
-    }
 }

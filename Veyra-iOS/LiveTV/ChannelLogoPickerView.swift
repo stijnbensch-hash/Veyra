@@ -179,7 +179,7 @@ struct ChannelLogoPickerView: View {
 
     private var currentLogoPreview: some View {
         HStack(spacing: 16) {
-            AsyncImage(url: currentOverrideURL) { phase in
+            VeyraAsyncImage(url: currentOverrideURL) { phase in
                 if case .success(let image) = phase {
                     image.resizable().scaledToFit()
                 } else {
@@ -201,7 +201,7 @@ struct ChannelLogoPickerView: View {
             apply(url: result.logoURL)
         } label: {
             HStack(spacing: 14) {
-                AsyncImage(url: result.logoURL) { phase in
+                VeyraAsyncImage(url: result.logoURL) { phase in
                     if case .success(let image) = phase {
                         image.resizable().scaledToFit()
                     } else {

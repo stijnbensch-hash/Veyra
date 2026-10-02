@@ -40,6 +40,8 @@ actor TMDBRequestCoordinator {
         session = URLSession(configuration: configuration)
     }
 
+    func clearCache() { session.configuration.urlCache?.removeAllCachedResponses() }
+
     /// Haalt data op voor `request`, gededupliceerd op `key` (normaal gesproken de volledige
     /// URL, incl. querystring -- zie de aanroepers). Een tweede aanvraag met dezelfde key terwijl
     /// de eerste nog loopt deelt gewoon dezelfde `Task` i.p.v. een tweede HTTP-request te starten

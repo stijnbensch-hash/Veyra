@@ -72,7 +72,7 @@ struct VeyraSportsTeamDetailView: View {
 
     private var identity: some View {
         HStack(spacing: 18) {
-            AsyncImage(url: team.logo.flatMap(URL.init(string:))) { phase in
+            VeyraAsyncImage(url: team.logo.flatMap(URL.init(string:))) { phase in
                 if let image = phase.image { image.resizable().scaledToFit() }
                 else { Image(systemName: "shield").resizable().scaledToFit().foregroundStyle(.white.opacity(0.25)) }
             }
@@ -129,7 +129,7 @@ struct VeyraSportsTeamDetailView: View {
 
     @ViewBuilder
     private func rowLogo(_ url: URL?) -> some View {
-        AsyncImage(url: url) { phase in
+        VeyraAsyncImage(url: url) { phase in
             if let image = phase.image {
                 image.resizable().scaledToFit()
             } else {

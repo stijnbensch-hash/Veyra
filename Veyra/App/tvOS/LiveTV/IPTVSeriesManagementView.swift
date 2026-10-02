@@ -1063,7 +1063,7 @@ private struct IPTVSeriesItemManagementView:
     private func poster(
         _ item: XtreamSeriesItem
     ) -> some View {
-        AsyncImage(
+        VeyraAsyncImage(
             url: item.coverURL
         ) { phase in
             switch phase {

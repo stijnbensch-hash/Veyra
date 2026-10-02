@@ -1163,7 +1163,7 @@ private struct IPTVVODItemManagementView:
     private func poster(
         _ item: IPTVVODItem
     ) -> some View {
-        AsyncImage(
+        VeyraAsyncImage(
             url: item.posterURL
         ) { phase in
             switch phase {

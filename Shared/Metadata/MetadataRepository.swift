@@ -42,7 +42,15 @@ actor MetadataRepository {
     // zit in de key. Een wissel van AIOMetadata → TMDB raakt deze cache niet
     // — dat pad loopt via de al bestaande `TMDBMetadataCache`, die apart
     // blijft (gebruikt ook door Collections, zie Fase 0-audit).
-    private var aioCache: [AIOCacheKey: AIOMetaItem] = [:]
+    private var aioCache = VeyraBoundedCache<AIOCacheKey, AIOMetaItem>(countLimit: 512)
+    private var cacheGeneration: UInt64 = 0
+    var cachedCount: Int { aioCache.count }
+    func clearCache() {
+        cacheGeneration &+= 1
+        aioCache.removeAll()
+        for task in inFlight.values { task.cancel() }
+        inFlight.removeAll()
+    }
 
     // Request-deduplicatie (§24): als meerdere cards tegelijk om dezelfde
     // AIOMetadata-meta vragen, wacht de tweede op de al lopende aanvraag in
@@ -131,7 +139,7 @@ actor MetadataRepository {
     /// zonder zelf een aanvraag te starten.
     private func aioCacheContains(addon: AddonManifest, imdbID: String?, tmdbID: Int?, kind: ShelfMediaKind) -> Bool {
         guard let lookup = Self.canonicalLookup(imdbID: imdbID, tmdbID: tmdbID) else { return false }
-        return aioCache[AIOCacheKey(addonID: addon.id, lookupKey: lookup.cacheKey, kind: kind)] != nil
+        return aioCache.contains(AIOCacheKey(addonID: addon.id, lookupKey: lookup.cacheKey, kind: kind))
     }
 
     /// Bugfix (gevonden via Diagnostics, na de `imdbRating`-decodefix): verschillende
@@ -155,13 +163,14 @@ actor MetadataRepository {
         guard let cacheLookup = Self.canonicalLookup(imdbID: imdbID, tmdbID: tmdbID) else { return nil }
         let key = AIOCacheKey(addonID: addon.id, lookupKey: cacheLookup.cacheKey, kind: kind)
 
-        if let cached = aioCache[key] {
+        if let cached = aioCache.value(for: key) {
             return cached
         }
         if let running = inFlight[key] {
             return await running.value
         }
 
+        let generation = cacheGeneration
         let task = Task<AIOMetaItem?, Never> { [addon] in
             let client = AIOMetadataClient(baseURL: addon.baseURL)
             let type = kind == .movie ? "movie" : "series"
@@ -179,9 +188,10 @@ actor MetadataRepository {
         inFlight[key] = task
 
         let result = await task.value
+        guard generation == cacheGeneration else { return nil }
         inFlight[key] = nil
         if let result {
-            aioCache[key] = result
+            aioCache.insert(result, for: key)
         }
         return result
     }

@@ -1340,7 +1340,7 @@ struct LiveTVView: View {
     private func channelLogo(
         _ row: VeyraGuideChannel
     ) -> some View {
-        AsyncImage(
+        VeyraAsyncImage(
             url:
                 ChannelLogoOverrideStore
                     .effectiveLogoURL(

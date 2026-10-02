@@ -102,7 +102,7 @@ struct ReviewsSection: View {
         ZStack {
             Circle().fill(VeyraColors.surface)
             if let url = review.avatarURL {
-                AsyncImage(url: url) { phase in
+                VeyraAsyncImage(url: url) { phase in
                     if case .success(let image) = phase {
                         image.resizable().scaledToFill()
                     }

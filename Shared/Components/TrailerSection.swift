@@ -73,7 +73,7 @@ struct TrailerSection: View {
     }
 
     private func thumbnail(for trailer: TMDBVideo) -> some View {
-        AsyncImage(url: URL(string: "https://img.youtube.com/vi/\(trailer.key)/hqdefault.jpg")) { phase in
+        VeyraAsyncImage(url: URL(string: "https://img.youtube.com/vi/\(trailer.key)/hqdefault.jpg")) { phase in
             if case .success(let image) = phase {
                 image.resizable().scaledToFill()
             } else {

@@ -312,7 +312,7 @@ struct SeasonView: View {
             spacing: 25
         ) {
             ZStack(alignment: .bottom) {
-                AsyncImage(
+                VeyraAsyncImage(
                     url:
                         imageURL(
                             path:

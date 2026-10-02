@@ -29,29 +29,33 @@ final class VeyraFlowPreviewController: ObservableObject {
         )
 
         do {
-            let player = try AetherPlaybackEngine()
+            let player = try AetherPlaybackEngine(isPreview: true)
             engine = player
             loadTask = Task { @MainActor [weak self] in
                 do {
                     try await player.play(source)
-                    guard !Task.isCancelled, self?.channelID == row.id else {
+                    guard !Task.isCancelled, self?.engine === player else {
                         player.stop()
                         return
                     }
 
                     if !(await Self.waitForVideo(player)),
                        player.engine.playbackBackend == .native {
+                        guard !Task.isCancelled, self?.engine === player else { return }
                         try? await player.engine.reloadAtCurrentPosition {
                             $0.preferredDecodePath = .software
                         }
+                        guard !Task.isCancelled, self?.engine === player else { return }
                         player.engine.play()
                     }
 
-                    guard !Task.isCancelled, self?.channelID == row.id else {
+                    guard !Task.isCancelled, self?.engine === player else {
                         player.stop()
                         return
                     }
-                    guard await Self.waitForVideo(player) else {
+                    let ready = await Self.waitForVideo(player)
+                    guard !Task.isCancelled, self?.engine === player else { return }
+                    guard ready else {
                         self?.stop()
                         self?.failed = true
                         return
@@ -59,7 +63,7 @@ final class VeyraFlowPreviewController: ObservableObject {
                     self?.loading = false
                 } catch {
                     player.stop()
-                    guard !Task.isCancelled, self?.channelID == row.id else { return }
+                    guard !Task.isCancelled, self?.engine === player else { return }
                     self?.engine = nil
                     self?.loading = false
                     self?.failed = true

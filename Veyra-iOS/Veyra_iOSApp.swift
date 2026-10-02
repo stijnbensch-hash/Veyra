@@ -53,6 +53,7 @@ struct Veyra_iOSApp: App {
                     // `GeneralSettings.swift`.
                     .environment(\.dynamicTypeSize, (GeneralTextSize(rawValue: textSizeRaw) ?? .defaultSize).dynamicTypeSize)
                     .task {
+                    VeyraRuntimeDiagnostics.shared.start()
                         // Instellingen/planken/hero/addons spiegelen tussen
                         // apparaten via de gekoppelde VeyraHub-server — zie
                         // `Shared/Sync/VeyraHubSyncService.swift`.

@@ -37,7 +37,7 @@ struct LiveTVFavoritesOrderView:
         height:
             CGFloat
     ) -> some View {
-        AsyncImage(
+        VeyraAsyncImage(
             url:
                 ChannelLogoOverrideStore
                     .effectiveLogoURL(

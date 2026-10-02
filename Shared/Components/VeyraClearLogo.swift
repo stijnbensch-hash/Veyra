@@ -26,7 +26,7 @@ struct VeyraClearLogo: View {
         Group {
             if let logoURL {
                 VStack(alignment: alignment, spacing: 6) {
-                    AsyncImage(url: logoURL) { phase in
+                    VeyraAsyncImage(url: logoURL) { phase in
                         switch phase {
                         case .success(let image):
                             image

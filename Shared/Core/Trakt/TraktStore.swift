@@ -115,6 +115,7 @@ final class TraktStore: ObservableObject {
     private var refreshTask: Task<Void, Never>?
     private var refreshID = UUID()
     private var revision = UUID()
+    private var restoreTask: Task<Void, Never>?
     private var scrobbleTail: Task<Void, Never>?
 
     private static let homeCacheKey =
@@ -151,7 +152,11 @@ final class TraktStore: ObservableObject {
         // Cache eerst tonen.
         // Geen netwerk nodig.
         if isConnected {
-            restoreHomeCache()
+            let snapshot = revision
+            restoreTask = Task { [weak self] in
+                guard let self else { return }
+                await self.restoreHomeCache(expectedRevision: snapshot)
+            }
         }
     }
 
@@ -228,6 +233,8 @@ final class TraktStore: ObservableObject {
     }
 
     func refresh() async {
+        await restoreTask?.value
+        restoreTask = nil
         if let refreshTask {
             await refreshTask.value
             return
@@ -390,6 +397,8 @@ final class TraktStore: ObservableObject {
             lastSync = Date()
             saveHomeCache()
         }
+        guard snapshot == revision, !Task.isCancelled else { return }
+        NotificationCenter.default.post(name: .veyraTraktSnapshotDidChange, object: nil)
     }
 
     // MARK: - Watched snapshot
@@ -494,14 +503,16 @@ final class TraktStore: ObservableObject {
 
     // MARK: - Home cache
 
-    private func restoreHomeCache() {
+    private func restoreHomeCache(expectedRevision: UUID) async {
         // Sinds kort staat deze cache in een los bestand op schijf i.p.v.
         // UserDefaults — een grote (2000+ bekeken titels) cache in
         // UserDefaults/CFPreferences kan op tvOS de hele app laten
         // crashen zodra de totale opslag daar over ~1 MB gaat (zie ook
         // VeyraEPGStore en VeyraHubSyncService). `IPTVDiskCache` kent die
         // limiet niet.
-        if let cache = IPTVDiskCache.read(TraktHomeCache.self, key: Self.homeCacheKey)?.value {
+        let restored = await IPTVDiskCache.readAsync(TraktHomeCache.self, key: Self.homeCacheKey)
+        guard expectedRevision == revision, isConnected, !Task.isCancelled else { return }
+        if let cache = restored?.value {
             applyHomeCache(cache)
             return
         }

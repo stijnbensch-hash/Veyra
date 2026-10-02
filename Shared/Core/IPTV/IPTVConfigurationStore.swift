@@ -1,14 +1,14 @@
 import Foundation
 import Security
 
-enum IPTVStoredConfiguration: Hashable, Sendable {
+nonisolated enum IPTVStoredConfiguration: Hashable, Sendable {
     case m3u(M3UConfiguration)
     case xtream(XtreamConfiguration)
 }
 
 // MARK: - Stored Provider
 
-struct IPTVStoredProvider: Identifiable, Hashable, Sendable {
+nonisolated struct IPTVStoredProvider: Identifiable, Hashable, Sendable {
     let id: UUID
     var configuration: IPTVStoredConfiguration
 

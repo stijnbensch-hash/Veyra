@@ -163,15 +163,10 @@ final class VeyraBentoViewModel {
         self.providersSource = streaming
         self.collectionsSource = collections
         self.availableMinutes = availableMinutes
-        // "Live nu" meteen tonen met de laatst bekende zenders, i.p.v. leeg te wachten tot de
-        // eerste EPG-fetch klaar is; hieronder ververst load()/refreshLive() dit stilletjes verder.
-        self.channels = IPTVDiskCache.read([EPGChannel].self, key: Self.liveChannelsCacheKey)?.value ?? []
-        // Spec §60 ("Home cache-first"): meteen de laatst gecachte regionale releases tonen,
-        // net als bij "Live nu" hierboven -- `cachedEvents` is een synchrone schijf-lezing,
-        // geen netwerk, dus hier zonder `await` op te roepen.
-        self.regionalReleases = RegionalReleaseRepository.shared.cachedEvents(region: RegionalReleaseContext.defaultRegion)
+
     }
 
+    private var restoredDiskCache = false
     private static let liveChannelsCacheKey = "bento.liveChannels"
 
     // MARK: Laden
@@ -195,6 +190,15 @@ final class VeyraBentoViewModel {
 
     /// `force: false` slaat over als er net geladen is (terugkeren naar Home mag niet elke keer alles opnieuw ophalen).
     func load(force: Bool = false) async {
+        if !restoredDiskCache {
+            restoredDiskCache = true
+            let cached = await IPTVDiskCache.readAsync([EPGChannel].self, key: Self.liveChannelsCacheKey)
+            guard !Task.isCancelled else { restoredDiskCache = false; return }
+            if channels.isEmpty { channels = cached?.value ?? [] }
+            let releases = await RegionalReleaseRepository.shared.cachedEvents(region: RegionalReleaseContext.defaultRegion)
+            guard !Task.isCancelled else { return }
+            if regionalReleases.isEmpty { regionalReleases = releases }
+        }
         if !force, let lastLoad, Date().timeIntervalSince(lastLoad) < 45, home.phase == .loaded {
             // Goedkoop en altijd actueel: IPTV-lijsten opnieuw filteren op de zichtbaarheidsinstellingen,
             // en de filmcollecties opnieuw lezen (kan net in Instellingen aangepast zijn).

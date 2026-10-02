@@ -278,7 +278,7 @@ struct VeyraCollectionDetailView: View {
     private var stageTitleView: some View {
         // Expliciet gekozen clearlogo gaat voor de automatische per-film TMDB-lookup.
         if let collection, let customLogoURL = VeyraCollectionClearLogoResolver.resolvedURL(for: collection) {
-            AsyncImage(url: customLogoURL) { phase in
+            VeyraAsyncImage(url: customLogoURL) { phase in
                 if case .success(let image) = phase {
                     image.resizable().scaledToFit()
                         .frame(maxWidth: stageLogoMaxWidth, maxHeight: stageLogoMaxHeight)
@@ -312,7 +312,7 @@ struct VeyraCollectionDetailView: View {
     private var stageBackground: some View {
         if let url = stageArtworkURL {
             GeometryReader { geo in
-                AsyncImage(url: url) { phase in
+                VeyraAsyncImage(url: url) { phase in
                     if case .success(let image) = phase {
                         let position = collection?.artworkPosition ?? VeyraArtworkPosition()
                         image.resizable().scaledToFill()
@@ -562,7 +562,7 @@ struct VeyraCollectionDetailView: View {
     private func posterImage(_ url: URL?, small: Bool = false) -> some View {
         let w: CGFloat = small ? posterSmallWidth : posterWidth
         let h: CGFloat = small ? posterSmallHeight : posterHeight
-        AsyncImage(url: url) { phase in
+        VeyraAsyncImage(url: url) { phase in
             if case .success(let image) = phase { image.resizable().scaledToFill() }
             else { VeyraColors.surface }
         }

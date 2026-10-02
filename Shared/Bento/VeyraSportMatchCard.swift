@@ -179,7 +179,7 @@ struct VeyraSportMatchCard: View {
             // (geen logo-URL, of de AsyncImage-fase mislukt) krijgt nog een subtiel rond vlak zodat de
             // initialen leesbaar blijven.
             if let url {
-                AsyncImage(url: url) { phase in
+                VeyraAsyncImage(url: url) { phase in
                     switch phase {
                     case .success(let image):
                         image.resizable().scaledToFit()

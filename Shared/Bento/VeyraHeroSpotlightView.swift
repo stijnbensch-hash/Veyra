@@ -180,7 +180,7 @@ struct VeyraHeroSpotlightView: View {
     /// terwijl het losse clearlogo onderaan de hero die titel opnieuw toont.
     private func scrollingBackdrop(_ item: HeroSpotlightItem) -> some View {
         return GeometryReader { geo in
-            AsyncImage(url: item.backdropURL) { phase in
+            VeyraAsyncImage(url: item.backdropURL) { phase in
                 if case .success(let image) = phase {
                     image.resizable().scaledToFill()
                 } else {
@@ -254,7 +254,7 @@ struct VeyraHeroSpotlightView: View {
                 // dezelfde ZStack; iOS/macOS tekenen die buiten de slide.
                 if style == .card {
                     GeometryReader { geo in
-                        AsyncImage(url: item.backdropURL) { phase in
+                        VeyraAsyncImage(url: item.backdropURL) { phase in
                             if case .success(let image) = phase {
                                 image.resizable().scaledToFill()
                             } else {
@@ -289,7 +289,7 @@ struct VeyraHeroSpotlightView: View {
                 VeyraPulseBadge(info: info, compact: pulseBadgeCompact)
             }
             if let logoURL = item.logoURL {
-                AsyncImage(url: logoURL) { phase in
+                VeyraAsyncImage(url: logoURL) { phase in
                     if case .success(let image) = phase {
                         image.resizable().scaledToFit()
                     }
@@ -434,7 +434,7 @@ struct VeyraHeroAmbientBackdrop: View {
 
     var body: some View {
         GeometryReader { geo in
-            AsyncImage(url: url) { phase in
+            VeyraAsyncImage(url: url) { phase in
                 if case .success(let image) = phase {
                     image.resizable().scaledToFill()
                 } else {

@@ -1053,8 +1053,8 @@ private struct IOSPlaybackTimeline: View {
             .overlay(alignment: .topLeading) {
                 VeyraSkipSegmentMarkerLayer(
                     segments: segments, duration: duration, trackWidth: geometry.size.width,
-                    currentTime: liveTime
-                ).offset(y: -8)
+                    trackHeight: 14, currentTime: liveTime
+                )
             }
             .frame(height: 14)
             .contentShape(Rectangle().inset(by: -10))

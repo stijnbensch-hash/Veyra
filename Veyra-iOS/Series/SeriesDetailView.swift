@@ -271,7 +271,7 @@ struct SeriesDetailView: View {
         // overlopend aan beide kanten).
         GeometryReader { geo in
             ZStack {
-                AsyncImage(
+                VeyraAsyncImage(
                     url: imageURL(
                         path: viewModel.details?.backdropPath ?? series.backdropPath,
                         size: "w1280"

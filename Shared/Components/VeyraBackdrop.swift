@@ -58,7 +58,7 @@ struct VeyraArtworkBackground: View {
         GeometryReader { geometry in
             ZStack(alignment: .top) {
                 VeyraBackground()
-                AsyncImage(url: url) { image in
+                VeyraAsyncImage(url: url, maxPixelSize: 1920) { image in
                     image.resizable().scaledToFill()
                 } placeholder: { Color.clear }
                 .frame(width: geometry.size.width, height: min(geometry.size.height, 900))

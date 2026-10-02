@@ -12,7 +12,7 @@
 
 import Foundation
 
-enum IPTVProviderEnablement {
+nonisolated enum IPTVProviderEnablement {
     private static let key = "veyra.iptv.provider.disabled"
 
     // In-memory cache: `isEnabled` wordt aangeroepen per item tijdens het filteren van
@@ -20,39 +20,36 @@ enum IPTVProviderEnablement {
     // parsete dat bij elk item opnieuw de hele UserDefaults-set, wat bij een grote catalogus
     // de main thread merkbaar blokkeerde (app leek dan te "hangen" bij het laden).
     private static var cachedDisabledIDs: Set<UUID>?
+    // Zelfde bewezen bug als `IPTVProviderPreferencesStore.cache`: deze cache wordt per item
+    // aangeroepen tijdens IPTV-discovery/-filtering vanuit veel gelijktijdige Tasks --
+    // onbeveiligde concurrente toegang tot een `static var` is een datarace en kan de app laten
+    // crashen. Lock beschermt enkel de cache zelf, niet de UserDefaults-I/O.
+    private static let cacheLock = NSLock()
 
-    private static var disabledIDs: Set<UUID> {
-        get {
-            if let cached = cachedDisabledIDs { return cached }
-            guard let strings = UserDefaults.standard.stringArray(forKey: key) else {
-                cachedDisabledIDs = []
-                return []
-            }
-            let ids = Set(strings.compactMap(UUID.init))
-            cachedDisabledIDs = ids
-            return ids
-        }
-        set {
-            cachedDisabledIDs = newValue
-            UserDefaults.standard.set(newValue.map(\.uuidString), forKey: key)
-        }
+    // Called only while cacheLock is held, including persistence and read/modify/write.
+    private static func loadDisabledIDs() -> Set<UUID> {
+        if let cachedDisabledIDs { return cachedDisabledIDs }
+        let ids = Set((UserDefaults.standard.stringArray(forKey: key) ?? []).compactMap(UUID.init))
+        cachedDisabledIDs = ids
+        return ids
     }
 
     static func isEnabled(_ providerID: UUID) -> Bool {
-        !disabledIDs.contains(providerID)
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+        return !loadDisabledIDs().contains(providerID)
     }
 
     static func setEnabled(_ providerID: UUID, _ enabled: Bool) {
-        var ids = disabledIDs
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+        var ids = loadDisabledIDs()
         if enabled { ids.remove(providerID) } else { ids.insert(providerID) }
-        disabledIDs = ids
+        cachedDisabledIDs = ids
+        UserDefaults.standard.set(ids.map(\.uuidString), forKey: key)
     }
 
-    /// Opschonen wanneer een provider volledig verwijderd wordt (`IPTVConfigurationStore.removeProvider`)
-    /// -- anders blijft er een dood ID in de set staan.
     static func forget(_ providerID: UUID) {
-        var ids = disabledIDs
-        ids.remove(providerID)
-        disabledIDs = ids
+        setEnabled(providerID, true)
     }
 }

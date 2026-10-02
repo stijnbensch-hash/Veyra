@@ -75,7 +75,7 @@ struct VeyraCollectionClearLogoPickerView: View {
                 ZStack {
                     Color.white.opacity(0.08)
                     if let previewURL {
-                        AsyncImage(url: previewURL) { phase in
+                        VeyraAsyncImage(url: previewURL) { phase in
                             if case .success(let image) = phase {
                                 image.resizable().scaledToFit().padding(20)
                             } else {
@@ -173,7 +173,7 @@ struct VeyraCollectionClearLogoPickerView: View {
     private func logoThumbnail(_ url: URL, onTap: @escaping () -> Void) -> some View {
         ZStack {
             Color.white.opacity(0.08)
-            AsyncImage(url: url) { phase in
+            VeyraAsyncImage(url: url) { phase in
                 if case .success(let image) = phase { image.resizable().scaledToFit().padding(8) } else { Color.clear }
             }
         }

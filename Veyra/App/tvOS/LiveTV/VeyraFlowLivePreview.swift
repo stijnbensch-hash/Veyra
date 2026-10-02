@@ -75,7 +75,7 @@ struct VeyraFlowLivePreview: View {
                    channelID: row.channel.id,
                    defaultLogoURL: row.channel.logoURL
                ) {
-                AsyncImage(url: logoURL) { phase in
+                VeyraAsyncImage(url: logoURL) { phase in
                     if case .success(let image) = phase {
                         image.resizable().scaledToFit()
                     }

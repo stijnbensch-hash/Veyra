@@ -97,7 +97,7 @@ private struct TeamTileContent: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            AsyncImage(url: team.logo.flatMap(URL.init(string:))) { phase in
+            VeyraAsyncImage(url: team.logo.flatMap(URL.init(string:))) { phase in
                 if let image = phase.image {
                     image.resizable().scaledToFit()
                 } else {

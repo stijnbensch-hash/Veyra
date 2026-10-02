@@ -24,14 +24,14 @@ actor RegionalReleaseRepository {
 
     /// Spec §60: "cached normalized releases -> immediate UI" -- synchrone schijf-lezing, geen
     /// netwerk, geschikt om meteen te tonen bij het openen van "Nieuw van hier".
-    nonisolated func cachedEvents(region: String) -> [RegionalReleaseEvent] {
-        IPTVDiskCache.read([RegionalReleaseEvent].self, key: Self.cacheKey(region: region))?.value ?? []
+    nonisolated func cachedEvents(region: String) async -> [RegionalReleaseEvent] {
+        await IPTVDiskCache.readAsync([RegionalReleaseEvent].self, key: Self.cacheKey(region: region))?.value ?? []
     }
 
     /// Ouderdom van de cache, voor een eventuele "ververst..." / stale-indicator -- `nil` als er
     /// nog nooit gecached is voor deze regio.
-    nonisolated func cacheAge(region: String) -> TimeInterval? {
-        guard let saved = IPTVDiskCache.read([RegionalReleaseEvent].self, key: Self.cacheKey(region: region))?.savedAt else {
+    nonisolated func cacheAge(region: String) async -> TimeInterval? {
+        guard let saved = await IPTVDiskCache.readAsync([RegionalReleaseEvent].self, key: Self.cacheKey(region: region))?.savedAt else {
             return nil
         }
         return Date().timeIntervalSince(saved)
@@ -47,7 +47,7 @@ actor RegionalReleaseRepository {
         guard !providers.isEmpty else {
             // Spec §61 ("successful empty" is geen fout): geen geregistreerde bron is geen reden
             // om de bestaande cache te legen -- geef gewoon terug wat er al was.
-            return cachedEvents(region: context.region)
+            return await cachedEvents(region: context.region)
         }
 
         let fetched = await withTaskGroup(of: [RegionalReleaseEvent].self) { group in

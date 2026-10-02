@@ -297,8 +297,14 @@ struct PlayerSubtitleControls: View {
                 .padding(.bottom, controlsVisible ? 190 : 48)
                 .focusSection()
                 .onAppear {
-                    revealControls()
-                    restoreControlFocus(.skipSegment)
+                    // Bewust GEEN `revealControls()` hier (anders dan voorheen) -- de
+                    // skip-knop moet op zichzelf kunnen verschijnen, zonder de volledige
+                    // controlebalk/progressbar mee te forceren. Zelfde patroon als de
+                    // "Volgende aflevering"-knop hieronder (`focused = .nextEpisode` via
+                    // `.onChange(of: isNearEndOfEpisode)`): rechtstreeks focus zetten i.p.v.
+                    // via `restoreControlFocus`, want die bevat een `guard controlsVisible`
+                    // die hier net niet van toepassing mag zijn.
+                    focused = .skipSegment
                 }
                 .onDisappear {
                     if focused == .skipSegment {
@@ -850,7 +856,7 @@ struct PlayerSubtitleControls: View {
 
     private var titleTabContent: some View {
         HStack(alignment: .top, spacing: 28) {
-            AsyncImage(url: metadataPosterURL ?? item?.posterURL) { phase in
+            VeyraAsyncImage(url: metadataPosterURL ?? item?.posterURL) { phase in
                 switch phase {
                 case .success(let image):
                     image.resizable().scaledToFill()
@@ -1261,8 +1267,9 @@ private struct VeyraPlaybackTimeline: View {
                         .overlay(alignment: .topLeading) {
                             VeyraSkipSegmentMarkerLayer(
                                 segments: segments, duration: engine.duration,
-                                trackWidth: geometry.size.width, currentTime: currentTime
-                            ).offset(y: -8)
+                                trackWidth: geometry.size.width,
+                                trackHeight: isFocused ? 18 : 7, currentTime: currentTime
+                            )
                         }
                     }.frame(height: isFocused ? 18 : 7).animation(
                         VeyraAnimation.focus, value: isFocused)

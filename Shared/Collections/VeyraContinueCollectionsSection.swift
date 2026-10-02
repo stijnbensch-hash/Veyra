@@ -102,7 +102,7 @@ struct VeyraContinueCollectionsSection: View {
         ZStack(alignment: .bottomLeading) {
             if let artworkURL {
                 GeometryReader { geo in
-                    AsyncImage(url: artworkURL) { phase in
+                    VeyraAsyncImage(url: artworkURL) { phase in
                         if case .success(let image) = phase {
                             let position = collection.artworkPosition ?? VeyraArtworkPosition()
                             image.resizable().scaledToFill()

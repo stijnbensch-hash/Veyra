@@ -22,7 +22,15 @@ actor ArtworkResolver {
     // Cache + dedup voor de TMDB-kant, zelfde patroon als `MetadataRepository`
     // (§22/§24) — `ClearLogoService` deed voorheen bij elke aanroep een
     // nieuwe `/images`-aanvraag, ook als meerdere views dezelfde titel tonen.
-    private var tmdbLogoCache: [TMDBLogoKey: URL?] = [:]
+    private var tmdbLogoCache = VeyraBoundedCache<TMDBLogoKey, URL?>(countLimit: 512)
+    private var cacheGeneration: UInt64 = 0
+    var cachedCount: Int { tmdbLogoCache.count }
+    func clearCache() {
+        cacheGeneration &+= 1
+        tmdbLogoCache.removeAll()
+        for task in tmdbLogoInFlight.values { task.cancel() }
+        tmdbLogoInFlight.removeAll()
+    }
     private var tmdbLogoInFlight: [TMDBLogoKey: Task<URL?, Never>] = [:]
 
     func clearLogoURL(for item: MediaItem) async -> URL? {
@@ -88,21 +96,23 @@ actor ArtworkResolver {
         guard let tmdbID = item.tmdbID else { return (nil, false) }
         let key = TMDBLogoKey(tmdbID: tmdbID, kind: kind)
 
-        if let cached = tmdbLogoCache[key] {
+        if let cached = tmdbLogoCache.value(for: key) {
             return (cached, true)
         }
         if let running = tmdbLogoInFlight[key] {
             return (await running.value, false)
         }
 
+        let generation = cacheGeneration
         let task = Task<URL?, Never> { [item] in
             await ClearLogoService.logoURL(for: item)
         }
         tmdbLogoInFlight[key] = task
 
         let result = await task.value
+        guard generation == cacheGeneration else { return (nil, false) }
         tmdbLogoInFlight[key] = nil
-        tmdbLogoCache[key] = result
+        tmdbLogoCache.insert(result, for: key)
         return (result, false)
     }
 }

@@ -105,7 +105,7 @@ nonisolated struct IPTVCategory: Identifiable, Hashable, Codable, Sendable {
     let contentType: IPTVContentType
 }
 
-struct M3UConfiguration: Hashable, Sendable {
+nonisolated struct M3UConfiguration: Hashable, Sendable {
     let displayName: String
     let playlistURL: URL
 
@@ -125,7 +125,7 @@ struct M3UConfiguration: Hashable, Sendable {
     }
 }
 
-struct XtreamConfiguration: Hashable, Sendable {
+nonisolated struct XtreamConfiguration: Hashable, Sendable {
     let displayName: String
     let serverURL: URL
     let username: String

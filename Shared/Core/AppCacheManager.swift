@@ -8,7 +8,7 @@ import Foundation
 enum AppCacheManager {
     static func clearAll() {
         URLCache.shared.removeAllCachedResponses()
-        IPTVDiskCache.removeAll()
+        VeyraArtworkLoader.shared.clearAll()
 
         if let configuration = try? IPTVConfigurationStore().load() {
             let identifier = configuration.providerIdentifier
@@ -16,7 +16,12 @@ enum AppCacheManager {
             UserDefaults.standard.removeObject(forKey: VeyraIPTVSnapshot.guidePrefix + identifier)
         }
 
-        NotificationCenter.default.post(name: .iptvConfigurationDidChange, object: nil)
-        NotificationCenter.default.post(name: .iptvHomeRefreshRequested, object: nil)
+        Task {
+            await VeyraRuntimeDiagnostics.clearMetadataCaches()
+            await TMDBRequestCoordinator.shared.clearCache()
+            await IPTVDiskCache.removeAllAsync()
+            NotificationCenter.default.post(name: .iptvConfigurationDidChange, object: nil)
+            NotificationCenter.default.post(name: .iptvHomeRefreshRequested, object: nil)
+        }
     }
 }

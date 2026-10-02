@@ -270,7 +270,7 @@ struct MovieDetailView: View {
         if let backdropURL =
             movie.backdropURL
         {
-            AsyncImage(
+            VeyraAsyncImage(
                 url: backdropURL
             ) { phase in
                 switch phase {

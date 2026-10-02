@@ -133,7 +133,7 @@ struct LivePlayerChannelPanel: View {
             HStack(spacing: 12) {
                 Button { onSelect(row) } label: {
                     HStack(spacing: 22) {
-                        AsyncImage(url: ChannelLogoOverrideStore.logoURL(
+                        VeyraAsyncImage(url: ChannelLogoOverrideStore.logoURL(
                             forChannelID: row.channel.id) ?? row.channel.logoURL
                         ) { phase in
                             if let image = phase.image {

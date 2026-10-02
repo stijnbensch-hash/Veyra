@@ -952,7 +952,7 @@ struct VeyraBentoCatalogView: View {
             Color.white.opacity(0.05)
                 .overlay {
                     if let heroURL {
-                        AsyncImage(url: heroURL) { phase in
+                        VeyraAsyncImage(url: heroURL) { phase in
                             if let image = phase.image { image.resizable().scaledToFill() }
                         }
                     }
@@ -979,7 +979,7 @@ struct VeyraBentoCatalogView: View {
     @ViewBuilder
     private var heroTitle: some View {
         if let custom = catalog.customLogoURL {
-            AsyncImage(url: custom) { phase in
+            VeyraAsyncImage(url: custom) { phase in
                 switch phase {
                 case .success(let image): image.resizable().scaledToFit()
                 case .failure: nameText
@@ -989,7 +989,7 @@ struct VeyraBentoCatalogView: View {
             .frame(width: compact ? 200 : 460, height: compact ? 56 : 130, alignment: .leading)
             .shadow(color: .black.opacity(0.5), radius: 10)
         } else if let wide = catalog.wideURL {
-            AsyncImage(url: wide) { phase in
+            VeyraAsyncImage(url: wide) { phase in
                 switch phase {
                 case .success(let image):
                     image.renderingMode(.template).resizable().scaledToFit().foregroundStyle(.white)
@@ -1010,7 +1010,7 @@ struct VeyraBentoCatalogView: View {
     private var iconAndName: some View {
         if let icon = catalog.imageURL, catalog.isService {
             HStack(spacing: compact ? 12 : 22) {
-                AsyncImage(url: icon) { phase in
+                VeyraAsyncImage(url: icon) { phase in
                     if let image = phase.image { image.resizable().scaledToFill() } else { Color.white.opacity(0.1) }
                 }
                 .frame(width: compact ? 48 : 100, height: compact ? 48 : 100)
@@ -1238,7 +1238,7 @@ struct VeyraCollectionsSettingsView: View {
             Color.white.opacity(0.08)
                 .frame(width: 108, height: 37)
                 .overlay {
-                    AsyncImage(url: VeyraCollectionsStore.imageURL(for: entry)) { phase in
+                    VeyraAsyncImage(url: VeyraCollectionsStore.imageURL(for: entry)) { phase in
                         if let image = phase.image { image.resizable().scaledToFill() } else { Color.clear }
                     }
                 }
@@ -1350,7 +1350,7 @@ struct VeyraCollectionEditorView: View {
                         .frame(maxWidth: .infinity)
                         .aspectRatio(Self.bannerAspect, contentMode: .fit)
                         .overlay {
-                            AsyncImage(url: VeyraCollectionsStore.imageURL(for: entries[index])) { phase in
+                            VeyraAsyncImage(url: VeyraCollectionsStore.imageURL(for: entries[index])) { phase in
                                 if let image = phase.image { image.resizable().scaledToFill() } else { Color.clear }
                             }
                         }
@@ -1368,7 +1368,7 @@ struct VeyraCollectionEditorView: View {
                                     Color.white.opacity(0.08)
                                         .frame(width: 260, height: 260 / Self.bannerAspect)
                                         .overlay {
-                                            AsyncImage(url: url) { phase in
+                                            VeyraAsyncImage(url: url) { phase in
                                                 if let image = phase.image { image.resizable().scaledToFill() } else { Color.clear }
                                             }
                                         }

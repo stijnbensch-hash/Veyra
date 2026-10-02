@@ -137,7 +137,7 @@ struct TraktSeriesOverviewView: View {
     private func episodeCard(_ episode: TMDBEpisode) -> some View {
         let current = entry.episode?.season == episode.seasonNumber && entry.episode?.number == episode.episodeNumber
         return VStack(alignment: .leading, spacing: 12) {
-            AsyncImage(url: episode.stillPath.flatMap { URL(string: "https://image.tmdb.org/t/p/w500" + $0) }) { image in
+            VeyraAsyncImage(url: episode.stillPath.flatMap { URL(string: "https://image.tmdb.org/t/p/w500" + $0) }) { image in
                 image.resizable().scaledToFill()
             } placeholder: {
                 ZStack { VeyraColors.surface; Image(systemName: "play.tv").font(.system(size: 40)) }

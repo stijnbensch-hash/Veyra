@@ -119,7 +119,7 @@ struct VeyraStreamingSettingsView: View {
             // Terugval zolang het brede woordmerk nog niet is opgehaald (of onbekend is).
             let url = VeyraStreamingStore.logoURL(for: entry)
                 ?? entry.logoPath.flatMap { URL(string: "https://image.tmdb.org/t/p/w154\($0)") }
-            AsyncImage(url: url) { phase in
+            VeyraAsyncImage(url: url) { phase in
                 if let image = phase.image {
                     image.resizable().scaledToFill()
                 } else { Color.clear }
@@ -200,7 +200,7 @@ struct VeyraStreamingProviderPickerView: View {
                 ForEach(available) { option in
                     Button { add(option) } label: {
                         HStack {
-                            AsyncImage(url: option.logoPath.flatMap { URL(string: "https://image.tmdb.org/t/p/w92\($0)") }) { phase in
+                            VeyraAsyncImage(url: option.logoPath.flatMap { URL(string: "https://image.tmdb.org/t/p/w92\($0)") }) { phase in
                                 if let image = phase.image { image.resizable().scaledToFill() } else { Color.white.opacity(0.1) }
                             }
                             .frame(width: 40, height: 40)
@@ -392,7 +392,7 @@ struct VeyraStreamingEditorView: View {
             // Eigen logo via URL: vult meteen het volledige kader (bijsnijden i.p.v. passend
             // verkleinen), zodat elke verhouding -- vierkant, staand of liggend -- er goed uitziet
             // zonder dat de gebruiker de afbeelding vooraf op 16:9 moet bijsnijden.
-            AsyncImage(url: custom) { phase in
+            VeyraAsyncImage(url: custom) { phase in
                 if let image = phase.image {
                     image.resizable().scaledToFill()
                 } else { Text(entry.name).font(.title3.bold()) }
@@ -403,7 +403,7 @@ struct VeyraStreamingEditorView: View {
                                        brand: catalog.brand, customURL: nil)
         } else {
             let url = entry.logoPath.flatMap { URL(string: "https://image.tmdb.org/t/p/w154\($0)") }
-            AsyncImage(url: url) { phase in
+            VeyraAsyncImage(url: url) { phase in
                 if let image = phase.image {
                     image.resizable().scaledToFill()
                 } else { Text(entry.name).font(.title3.bold()) }

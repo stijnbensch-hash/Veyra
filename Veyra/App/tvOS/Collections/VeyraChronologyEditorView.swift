@@ -75,7 +75,7 @@ struct VeyraChronologyEditorView: View {
                 .foregroundStyle(VeyraColors.cyan)
                 .frame(width: 44, alignment: .leading)
 
-            AsyncImage(url: resolved.media.posterURL) { phase in
+            VeyraAsyncImage(url: resolved.media.posterURL) { phase in
                 if case .success(let image) = phase { image.resizable().scaledToFill() }
                 else { VeyraColors.surface }
             }

@@ -189,7 +189,7 @@ struct LiveTVFoldersListView: View {
     }
 
     private func folderLogo(_ folder: LiveTVFolder) -> some View {
-        AsyncImage(url: folder.effectiveLogoURL) { phase in
+        VeyraAsyncImage(url: folder.effectiveLogoURL) { phase in
             if case .success(let image) = phase {
                 image.resizable().scaledToFit()
             } else {

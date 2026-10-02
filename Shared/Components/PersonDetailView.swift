@@ -152,7 +152,7 @@ struct PersonDetailView: View {
     }
 
     private var portrait: some View {
-        AsyncImage(
+        VeyraAsyncImage(
             url: details?.profilePath.flatMap { URL(string: "https://image.tmdb.org/t/p/h632\($0)") }
         ) { phase in
             switch phase {
@@ -336,7 +336,7 @@ struct PersonDetailView: View {
 
     private func filmographyRow(_ credit: TMDBPersonCredit) -> some View {
         HStack(spacing: 14) {
-            AsyncImage(url: credit.mediaItem().posterURL) { phase in
+            VeyraAsyncImage(url: credit.mediaItem().posterURL) { phase in
                 switch phase {
                 case .success(let image):
                     image.resizable().scaledToFill()

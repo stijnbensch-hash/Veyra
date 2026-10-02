@@ -87,7 +87,7 @@ struct VeyraDiscoveryFlow: View {
     private func cardContent(_ item: HeroSpotlightItem, big: Bool) -> some View {
         ZStack(alignment: .bottomLeading) {
             GeometryReader { geo in
-                AsyncImage(url: item.backdropURL) { phase in
+                VeyraAsyncImage(url: item.backdropURL) { phase in
                     if case .success(let image) = phase {
                         image.resizable().scaledToFill()
                     } else {
@@ -132,7 +132,7 @@ struct VeyraDiscoveryFlow: View {
     private func info(_ item: HeroSpotlightItem) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             if let logoURL = item.logoURL {
-                AsyncImage(url: logoURL) { phase in
+                VeyraAsyncImage(url: logoURL) { phase in
                     if case .success(let image) = phase {
                         image.resizable().scaledToFit()
                     }
@@ -155,7 +155,7 @@ struct VeyraDiscoveryFlow: View {
     @ViewBuilder
     private func smallInfo(_ item: HeroSpotlightItem) -> some View {
         if let logoURL = item.logoURL {
-            AsyncImage(url: logoURL) { phase in
+            VeyraAsyncImage(url: logoURL) { phase in
                 if case .success(let image) = phase {
                     image.resizable().scaledToFit()
                 } else {

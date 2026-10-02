@@ -121,7 +121,7 @@ struct VeyraMosaicSection: View {
     private func tileContent(_ item: HeroSpotlightItem, width: CGFloat, height: CGFloat, showsTitle: Bool) -> some View {
         ZStack(alignment: .bottomLeading) {
             GeometryReader { geo in
-                AsyncImage(url: item.backdropURL ?? item.posterURL) { phase in
+                VeyraAsyncImage(url: item.backdropURL ?? item.posterURL) { phase in
                     if case .success(let image) = phase {
                         image.resizable().scaledToFill()
                     } else {
@@ -147,7 +147,7 @@ struct VeyraMosaicSection: View {
     @ViewBuilder
     private func logo(_ item: HeroSpotlightItem, big: Bool) -> some View {
         if let logoURL = item.logoURL {
-            AsyncImage(url: logoURL) { phase in
+            VeyraAsyncImage(url: logoURL) { phase in
                 if case .success(let image) = phase {
                     image.resizable().scaledToFit()
                 } else {

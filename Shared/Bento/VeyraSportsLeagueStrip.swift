@@ -79,7 +79,7 @@ private struct LeagueTileContent: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            AsyncImage(url: logoURL) { phase in
+            VeyraAsyncImage(url: logoURL) { phase in
                 if let image = phase.image {
                     image.resizable().scaledToFit()
                 } else {

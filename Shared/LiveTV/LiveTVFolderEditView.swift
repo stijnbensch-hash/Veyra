@@ -161,7 +161,7 @@ struct LiveTVFolderEditView: View {
     }
 
     private var logoPreview: some View {
-        AsyncImage(url: ChannelLogoOverrideStore.logoURL(forChannelID: logoOverrideKey) ?? channels.first?.logoURL) { phase in
+        VeyraAsyncImage(url: ChannelLogoOverrideStore.logoURL(forChannelID: logoOverrideKey) ?? channels.first?.logoURL) { phase in
             if case .success(let image) = phase {
                 image.resizable().scaledToFit()
             } else {

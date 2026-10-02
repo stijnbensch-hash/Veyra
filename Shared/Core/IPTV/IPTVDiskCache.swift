@@ -78,6 +78,20 @@ nonisolated enum IPTVDiskCache {
         return (envelope.value, envelope.savedAt)
     }
 
+    /// Serializes large disk decodes with writes, away from the UI thread. Pending
+    /// saves finish first, so a refresh never observes an older cache value.
+    static func readAsync<T: Codable & Sendable>(
+        _ type: T.Type, key: String
+    ) async -> (value: T, savedAt: Date)? {
+        guard !Task.isCancelled else { return nil }
+        let result = await withCheckedContinuation { continuation in
+            writeQueue.async {
+                continuation.resume(returning: read(type, key: key))
+            }
+        }
+        return Task.isCancelled ? nil : result
+    }
+
     private static let writeQueue = DispatchQueue(
         label: "veyra.iptv.diskcache.write",
         qos: .utility
@@ -134,6 +148,15 @@ nonisolated enum IPTVDiskCache {
         guard let directoryURL else { return }
         writeQueue.sync {
             try? FileManager.default.removeItem(at: directoryURL)
+        }
+    }
+
+    static func removeAllAsync() async {
+        await withCheckedContinuation { continuation in
+            writeQueue.async {
+                if let directoryURL { try? FileManager.default.removeItem(at: directoryURL) }
+                continuation.resume()
+            }
         }
     }
 

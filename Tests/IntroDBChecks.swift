@@ -1,5 +1,8 @@
 import Foundation
 
+// No access to real credentials in this isolated client test.
+nonisolated enum AppConfiguration { static let introDBAPIKey: String? = nil }
+
 private final class MockIntroDBProtocol: URLProtocol {
     static var requests: [URLRequest] = []
 

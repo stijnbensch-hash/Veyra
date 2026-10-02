@@ -9,8 +9,15 @@ final class AetherPlaybackEngine:
     PlaybackEngine
 {
     let engine: AetherEngine
+    private static weak var activeSession: AetherPlaybackEngine?
+    private var generation = UUID()
+    var isActiveSession: Bool { Self.activeSession === self }
+    static var activeSessionCount: Int { activeSession == nil ? 0 : 1 }
 
-    init() throws {
+    private let isPreview: Bool
+
+    init(isPreview: Bool = false) throws {
+        self.isPreview = isPreview
         engine =
             try AetherEngine()
     }
@@ -28,6 +35,11 @@ final class AetherPlaybackEngine:
         _ source: PlayableSource,
         resumeProgress: Double?
     ) async throws {
+        if isPreview, let active = Self.activeSession, !active.isPreview { throw CancellationError() }
+        Self.activeSession?.stop()
+        Self.activeSession = self
+        let session = UUID()
+        generation = session
         let options =
             makeLoadOptions(
                 for: source
@@ -40,8 +52,8 @@ final class AetherPlaybackEngine:
                     resumeProgress
             )
 
-        try Task
-            .checkCancellation()
+        try Task.checkCancellation()
+        guard generation == session, Self.activeSession === self else { throw CancellationError() }
 
         print(
             "[Veyra] Software video:",
@@ -75,8 +87,8 @@ final class AetherPlaybackEngine:
             )
         }
 
-        try Task
-            .checkCancellation()
+        try Task.checkCancellation()
+        guard generation == session, Self.activeSession === self else { throw CancellationError() }
 
         print(
             "[Veyra] State after load:",
@@ -105,6 +117,8 @@ final class AetherPlaybackEngine:
     }
 
     func stop() {
+        generation = UUID()
+        if Self.activeSession === self { Self.activeSession = nil }
         engine.stop()
     }
 

@@ -246,7 +246,7 @@ struct EpisodeView: View {
             let backdropURL =
                 seriesBackdropURL
         {
-            AsyncImage(
+            VeyraAsyncImage(
                 url: backdropURL
             ) { phase in
                 switch phase {

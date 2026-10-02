@@ -486,9 +486,9 @@ private struct MacPlayerSurface: View {
                             .overlay(alignment: .topLeading) {
                                 VeyraSkipSegmentMarkerLayer(
                                     segments: skipSegments, duration: engine.duration,
-                                    trackWidth: sliderGeometry.size.width,
+                                    trackWidth: sliderGeometry.size.width, trackHeight: 4,
                                     currentTime: isSeeking ? seekPosition : engine.currentTime
-                                ).offset(y: -8).allowsHitTesting(false)
+                                ).allowsHitTesting(false)
                             }
                         }
                         .frame(height: 20)

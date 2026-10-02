@@ -1,7 +1,7 @@
 
 import Foundation
 
-struct XtreamClient {
+nonisolated struct XtreamClient {
     private let configuration: XtreamConfiguration
     private let session: URLSession
 
@@ -45,6 +45,7 @@ struct XtreamClient {
     /// accountinfo ook het aantal actieve en maximale gelijktijdige
     /// verbindingen van deze provider terug -- gebruikt om in de speler en
     /// bij Mediaservers-instellingen te tonen hoe druk een provider bezet is.
+    @concurrent
     func connectionStatus() async throws -> XtreamConnectionStatus {
         let url = try apiURL(action: nil)
         let response: XtreamUserInfoResponse = try await request(url: url)
@@ -56,6 +57,7 @@ struct XtreamClient {
 
     // MARK: - Live TV
 
+    @concurrent
     func liveCategories() async throws -> [IPTVCategory] {
         let url = try apiURL(
             action: "get_live_categories"
@@ -73,6 +75,7 @@ struct XtreamClient {
         }
     }
 
+    @concurrent
     func liveChannels(
         categoryID: String? = nil
     ) async throws -> [IPTVChannel] {
@@ -110,6 +113,7 @@ struct XtreamClient {
 
     // MARK: - VOD movies
 
+    @concurrent
     func vodCategories() async throws -> [IPTVCategory] {
         let url = try apiURL(
             action: "get_vod_categories"
@@ -127,6 +131,7 @@ struct XtreamClient {
         }
     }
 
+    @concurrent
     func vodStreams(
         categoryID: String? = nil
     ) async throws -> [IPTVVODItem] {
@@ -170,6 +175,7 @@ struct XtreamClient {
 
     // MARK: - Series
 
+    @concurrent
     func seriesCategories() async throws -> [IPTVCategory] {
         let url = try apiURL(
             action: "get_series_categories"
@@ -187,6 +193,7 @@ struct XtreamClient {
         }
     }
 
+    @concurrent
     func series(
         categoryID: String? = nil
     ) async throws -> [XtreamSeriesItem] {
@@ -217,6 +224,7 @@ struct XtreamClient {
         }
     }
 
+    @concurrent
     func seriesInfo(
         seriesID: Int
     ) async throws -> XtreamSeriesInfo {
@@ -487,7 +495,8 @@ struct XtreamClient {
 
     // MARK: - Networking
 
-    private func request<Response: Decodable>(
+    @concurrent
+    private func request<Response: Decodable & Sendable>(
         url: URL
     ) async throws -> Response {
         var request =
@@ -531,6 +540,7 @@ struct XtreamClient {
             )
         }
 
+        try Task.checkCancellation()
         do {
             return try JSONDecoder()
                 .decode(
@@ -558,14 +568,14 @@ nonisolated struct XtreamConnectionStatus: Sendable, Equatable {
     var display: String { "\(active)/\(max)" }
 }
 
-private struct XtreamUserInfoResponse: Decodable {
+nonisolated private struct XtreamUserInfoResponse: Decodable, Sendable {
     let userInfo: UserInfo
 
     enum CodingKeys: String, CodingKey {
         case userInfo = "user_info"
     }
 
-    struct UserInfo: Decodable {
+    nonisolated struct UserInfo: Decodable, Sendable {
         let activeCons: Int?
         let maxConnections: Int?
 
@@ -697,8 +707,8 @@ nonisolated struct XtreamSeriesEpisode:
 
 // MARK: - Responses
 
-private struct XtreamCategoryResponse:
-    Decodable
+nonisolated private struct XtreamCategoryResponse:
+    Decodable, Sendable
 {
     let categoryID: String
     let categoryName: String
@@ -715,8 +725,8 @@ private struct XtreamCategoryResponse:
     }
 }
 
-private struct XtreamLiveStreamResponse:
-    Decodable
+nonisolated private struct XtreamLiveStreamResponse:
+    Decodable, Sendable
 {
     let streamID: Int
     let name: String
@@ -744,8 +754,8 @@ private struct XtreamLiveStreamResponse:
     }
 }
 
-private struct XtreamVODStreamResponse:
-    Decodable
+nonisolated private struct XtreamVODStreamResponse:
+    Decodable, Sendable
 {
     let streamID: Int
     let name: String
@@ -777,8 +787,8 @@ private struct XtreamVODStreamResponse:
     }
 }
 
-private struct XtreamSeriesResponse:
-    Decodable
+nonisolated private struct XtreamSeriesResponse:
+    Decodable, Sendable
 {
     let seriesID: Int
     let name: String
@@ -856,15 +866,15 @@ private struct XtreamSeriesResponse:
     }
 }
 
-private struct XtreamSeriesInfoResponse:
-    Decodable
+nonisolated private struct XtreamSeriesInfoResponse:
+    Decodable, Sendable
 {
     let episodes:
         [String: [XtreamEpisodeResponse]]
 }
 
-private struct XtreamEpisodeResponse:
-    Decodable
+nonisolated private struct XtreamEpisodeResponse:
+    Decodable, Sendable
 {
     let id: Int?
     let episodeNumber: Int?

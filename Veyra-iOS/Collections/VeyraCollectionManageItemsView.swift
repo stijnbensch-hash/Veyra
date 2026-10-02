@@ -36,7 +36,9 @@ struct VeyraCollectionManageItemsView: View {
                     .onMove(perform: moveItems)
                 }
                 .listStyle(.plain)
+            #if os(iOS)
                 .environment(\.editMode, .constant(.active))
+            #endif
             }
         }
         .navigationTitle("Beheer films")
@@ -59,7 +61,7 @@ struct VeyraCollectionManageItemsView: View {
     @ViewBuilder
     private func row(_ resolved: VeyraResolvedCollectionItem) -> some View {
         HStack(spacing: 12) {
-            AsyncImage(url: resolved.media.posterURL) { phase in
+            VeyraAsyncImage(url: resolved.media.posterURL) { phase in
                 if case .success(let image) = phase { image.resizable().scaledToFill() }
                 else { VeyraColors.surface }
             }

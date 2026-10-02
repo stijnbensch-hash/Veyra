@@ -126,7 +126,7 @@ struct VeyraArt: View {
             ZStack {
                 placeholder
                 if let url {
-                    AsyncImage(url: url) { phase in
+                    VeyraAsyncImage(url: url) { phase in
                         if case .success(let image) = phase {
                             image.resizable()
                                 .aspectRatio(contentMode: contentMode)
@@ -162,7 +162,7 @@ struct VeyraTitleLogo: View {
     var body: some View {
         Group {
             if let logoURL {
-                AsyncImage(url: logoURL) { phase in
+                VeyraAsyncImage(url: logoURL) { phase in
                     if case .success(let image) = phase {
                         image.resizable().scaledToFit()
                     } else {

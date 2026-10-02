@@ -65,7 +65,7 @@ struct VeyraLensSheet: View {
     private var titleContent: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .top, spacing: 14) {
-                AsyncImage(url: posterURL ?? item?.posterURL) { phase in
+                VeyraAsyncImage(url: posterURL ?? item?.posterURL) { phase in
                     if let image = phase.image {
                         image.resizable().scaledToFill()
                     } else {

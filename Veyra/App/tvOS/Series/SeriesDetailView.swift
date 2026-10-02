@@ -507,7 +507,7 @@ struct SeriesDetailView: View {
                     "w1280"
             )
         {
-            AsyncImage(
+            VeyraAsyncImage(
                 url:
                     backdropURL
             ) { phase in
@@ -611,7 +611,7 @@ private struct SeasonLandscapeArtwork: View {
     var body: some View {
         ZStack {
             if let artworkURL {
-                AsyncImage(
+                VeyraAsyncImage(
                     url: artworkURL
                 ) { phase in
                     switch phase {

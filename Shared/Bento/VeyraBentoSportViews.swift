@@ -57,12 +57,12 @@ struct VeyraSportBackdrop: View {
             ZStack {
                 pitch(size: geo.size)
                 if let url {
-                    AsyncImage(url: url) { phase in
+                    VeyraAsyncImage(url: url) { phase in
                         if case .success(let image) = phase { image.resizable().scaledToFill() }
                     }
                 }
                 if let leagueLogoURL {
-                    AsyncImage(url: leagueLogoURL) { phase in
+                    VeyraAsyncImage(url: leagueLogoURL) { phase in
                         if case .success(let image) = phase {
                             image.resizable().scaledToFit()
                                 .frame(width: geo.size.height * 0.95, height: geo.size.height * 0.95)
@@ -226,7 +226,7 @@ struct VeyraLiveMatchContent: View {
                     .font(.system(size: compact ? 20 : 44, weight: .heavy))
                     .tracking(compact ? 1 : 2)
                 if let logo {
-                    AsyncImage(url: logo) { phase in
+                    VeyraAsyncImage(url: logo) { phase in
                         if case .success(let image) = phase {
                             image.resizable().scaledToFit().padding(compact ? 5 : 10)
                         }
@@ -493,7 +493,7 @@ struct VeyraCompetitionContent: View {
         let size: CGFloat = compact ? 28 : 40
         Group {
             if let url = competition.logoURL {
-                AsyncImage(url: url) { phase in
+                VeyraAsyncImage(url: url) { phase in
                     switch phase {
                     case .success(let image):
                         image.resizable().scaledToFit()

@@ -45,7 +45,7 @@ struct VeyraSportsStage: View {
                 // omringende breedte-/hoogtebeperking (bv. in een vrij scrollende detailview,
                 // i.p.v. de Bento-grid op Home) de volledige beschikbare ruimte in -- de hele
                 // kaart blies daardoor op. Vaste max-maat houdt dit overal een zacht watermerk.
-                AsyncImage(url: leagueLogoURL) { phase in
+                VeyraAsyncImage(url: leagueLogoURL) { phase in
                     if let image = phase.image {
                         image.resizable().scaledToFit()
                             .opacity(0.08)
@@ -130,7 +130,7 @@ struct VeyraSportsStage: View {
 
     private func teamBadge(_ name: String?, logo: URL?) -> some View {
         VStack(spacing: 8) {
-            AsyncImage(url: logo) { phase in
+            VeyraAsyncImage(url: logo) { phase in
                 if let image = phase.image {
                     image.resizable().scaledToFit()
                 } else {

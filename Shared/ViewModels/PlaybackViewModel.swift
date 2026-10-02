@@ -23,6 +23,9 @@ final class PlaybackViewModel: ObservableObject {
     private var localTracker: VeyraLocalWatchTracker?
     private var recorderCleanupTracker: VeyraHubRecorderCleanupTracker?
     private var videoRecoveryTask: Task<Void, Never>?
+    private var startupTask: Task<Void, Never>?
+    private var sessionID: UUID?
+    private var startupCompleted = false
 
     private let source: PlayableSource
     private let item: MediaItem?
@@ -51,88 +54,93 @@ final class PlaybackViewModel: ObservableObject {
     }
 
     func startPlayback() async {
-        videoRecoveryTask?.cancel()
-        videoRecoveryTask = nil
+        // SwiftUI may enter .task more than once while retaining a player view.
+        guard startupTask == nil, playbackEngine == nil else { return }
+        let session = UUID()
+        sessionID = session
+        startupCompleted = false
+        playbackError = nil
+        let task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            await self.performStart(session: session)
+        }
+        startupTask = task
+        await withTaskCancellationHandler {
+            await task.value
+        } onCancel: { [self] in
+            task.cancel()
+            Task { @MainActor in
+                guard self.sessionID == session, !self.startupCompleted else { return }
+                self.stopForDisappear()
+            }
+        }
+        if sessionID == session { startupTask = nil }
+    }
+
+    private func performStart(session: UUID) async {
+        guard sessionID == session, !Task.isCancelled else { return }
         registerActivity()
         startIdleMonitor()
+        let playSource = activeSource!
+        // An independent deadline can stop the engine immediately, even when a
+        // dependency's load operation is slow to acknowledge cancellation.
+        let deadline = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(Self.playbackStartTimeout))
+            guard !Task.isCancelled, self?.sessionID == session else { return }
+            self?.stopForDisappear()
+            self?.playbackError = PlaybackTimeoutError(isLiveTV: playSource.kind == .liveTV).localizedDescription
+        }
+        defer { deadline.cancel() }
+        var startedEngine: AetherPlaybackEngine?
         do {
             SubtitleService.shared.reset()
-
             let engine = try AetherPlaybackEngine()
+            startedEngine = engine
             playbackEngine = engine
-
             if let item {
                 tracker = TraktPlaybackTracker(item: item, engine: engine.engine)
                 localTracker = VeyraLocalWatchTracker(item: item, engine: engine.engine)
             }
-
-            if let sync = activeSource.progressSync {
+            if let sync = playSource.progressSync {
                 veyraHubTracker = VeyraHubPlaybackTracker(sync: sync, engine: engine.engine)
             }
-
-            if let cleanup = activeSource.recorderCleanup {
+            if let cleanup = playSource.recorderCleanup {
                 recorderCleanupTracker = VeyraHubRecorderCleanupTracker(cleanup: cleanup, engine: engine.engine)
             }
-
-            let playSource = activeSource!
-            let playResumeProgress = await Self.resolveResumeProgress(
-                source: activeSource,
-                item: item,
-                fallback: resumeProgress
-            )
-
-            try await Self.withTimeout(seconds: Self.playbackStartTimeout, isLiveTV: activeSource.kind == .liveTV) {
-                try await engine.play(playSource, resumeProgress: playResumeProgress)
-            }
-
+            let progress = await Self.resolveResumeProgress(source: playSource, item: item, fallback: resumeProgress)
             try Task.checkCancellation()
-
-            #if os(iOS) || os(macOS) || os(tvOS)
-            // Een IPTV-sessie kan als 'playing' terugkomen terwijl AVPlayer
-            // nog geen enkel videoframe toont. Probeer dan Aethers softwarepad.
-            // Dit gold op tvOS net zo goed als op iOS/macOS (vandaar het
-            // zwarte scherm dat daar zonder deze tak nooit hersteld of
-            // gemeld werd) -- zie ook de tvOS-tak in `makeLoadOptions`
-            // hierboven, in AetherPlaybackEngine.swift.
-            if activeSource.kind == .liveTV || activeSource.kind == .iptvVOD {
+            guard sessionID == session else { throw CancellationError() }
+            try await engine.play(playSource, resumeProgress: progress)
+            try Task.checkCancellation()
+            guard sessionID == session, playbackEngine === engine else { throw CancellationError() }
+            deadline.cancel()
+            startupCompleted = true
+            if playSource.kind == .liveTV || playSource.kind == .iptvVOD {
                 monitorFirstVideoFrame(engine)
             }
-            #endif
-
-            // OpenSubtitles pas ná de hoofdstream
-            // toevoegen. Playback hoeft hier niet
-            // op te wachten om te starten.
             if let item {
                 await SubtitleService.shared.loadExternalSubtitles(for: item, into: engine.engine)
             }
-
-        } catch is CancellationError {
-            tracker?.finish()
-            veyraHubTracker?.finish()
-            localTracker?.finish()
-            recorderCleanupTracker?.finish()
-            playbackEngine?.stop()
-            SubtitleService.shared.reset()
-
         } catch {
-            tracker?.finish()
-            veyraHubTracker?.finish()
-            localTracker?.finish()
-            recorderCleanupTracker?.finish()
-            playbackEngine?.stop()
-            SubtitleService.shared.reset()
-
-            // Live-zender die niet start: eerst, éénmalig, dezelfde zender
-            // bij een andere ingestelde playlist proberen vóór de gewone
-            // foutmelding getoond wordt.
-            if activeSource.kind == .liveTV, !attemptedLiveFallback,
-               let fallback = await LiveChannelFallbackResolver.resolve(after: activeSource) {
-                attemptedLiveFallback = true
-                activeSource = fallback
-                await startPlayback()
+            deadline.cancel()
+            // A stale completion may clean up its own engine, never the new session.
+            startedEngine?.stop()
+            guard sessionID == session else { return }
+            if Task.isCancelled || error is CancellationError {
+                stopForDisappear()
                 return
             }
-
+            stopPlaybackResources()
+            if playSource.kind == .liveTV, !attemptedLiveFallback {
+                let fallback = await LiveChannelFallbackResolver.resolve(after: playSource)
+                guard sessionID == session, !Task.isCancelled else { return }
+                if let fallback {
+                    attemptedLiveFallback = true
+                    activeSource = fallback
+                    await performStart(session: session)
+                    return
+                }
+            }
             playbackError = error.localizedDescription
         }
     }
@@ -145,6 +153,13 @@ final class PlaybackViewModel: ObservableObject {
     }
 
     func stopForDisappear() {
+        sessionID = nil
+        startupTask?.cancel()
+        startupTask = nil
+        stopPlaybackResources()
+    }
+
+    private func stopPlaybackResources() {
         idleMonitorTask?.cancel()
         idleMonitorTask = nil
         videoRecoveryTask?.cancel()
@@ -153,8 +168,9 @@ final class PlaybackViewModel: ObservableObject {
         veyraHubTracker?.finish()
         localTracker?.finish()
         recorderCleanupTracker?.finish()
+        let ownedSubtitles = playbackEngine?.isActiveSession == true
         playbackEngine?.stop()
-        SubtitleService.shared.reset()
+        if ownedSubtitles { SubtitleService.shared.reset() }
 
         tracker = nil
         veyraHubTracker = nil
@@ -200,14 +216,7 @@ final class PlaybackViewModel: ObservableObject {
 
     func handleScenePhaseChange(_ phase: ScenePhase) {
         if phase != .active {
-            // Ook bij naar de achtergrond gaan (Home-knop, app wisselen)
-            // de kijkvoortgang meteen afronden/versturen, anders blijft
-            // de positie hangen op het laatst bekende afspeel-/pauze-event.
-            tracker?.finish()
-            veyraHubTracker?.finish()
-            localTracker?.finish()
-            recorderCleanupTracker?.finish()
-            playbackEngine?.stop()
+            stopForDisappear()
         }
     }
 
@@ -224,6 +233,7 @@ final class PlaybackViewModel: ObservableObject {
                     try await playback.engine.reloadAtCurrentPosition {
                         $0.preferredDecodePath = .software
                     }
+                    guard !Task.isCancelled, self.playbackEngine === playback else { return }
                     playback.engine.play()
                 } catch {
                     // De bestaande sessie blijft beschikbaar als omschakelen
@@ -235,6 +245,7 @@ final class PlaybackViewModel: ObservableObject {
             guard !Task.isCancelled,
                   self.playbackEngine === playback,
                   !playback.engine.hasFirstFrameReadyForDisplay else { return }
+            self.stopForDisappear()
             self.playbackError = "De stream start, maar geeft geen videobeeld. Probeer een andere zender of bron."
         }
     }
@@ -312,26 +323,4 @@ final class PlaybackViewModel: ObservableObject {
         }
     }
 
-    private static func withTimeout<T: Sendable>(
-        seconds: TimeInterval,
-        isLiveTV: Bool = false,
-        operation: @escaping @Sendable () async throws -> T
-    ) async throws -> T {
-        try await withThrowingTaskGroup(of: T.self) { group in
-            group.addTask {
-                try await operation()
-            }
-            group.addTask {
-                try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
-                throw PlaybackTimeoutError(isLiveTV: isLiveTV)
-            }
-
-            defer { group.cancelAll() }
-
-            guard let result = try await group.next() else {
-                throw PlaybackTimeoutError(isLiveTV: isLiveTV)
-            }
-            return result
-        }
-    }
 }

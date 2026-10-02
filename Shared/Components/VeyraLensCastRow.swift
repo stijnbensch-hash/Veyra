@@ -15,7 +15,7 @@ struct VeyraLensCastRow: View {
                 HStack(alignment: .top, spacing: 16) {
                     ForEach(cast.prefix(12)) { member in
                         VStack(spacing: 6) {
-                            AsyncImage(url: member.profileURL) { phase in
+                            VeyraAsyncImage(url: member.profileURL) { phase in
                                 if let image = phase.image {
                                     image.resizable().scaledToFill()
                                 } else {

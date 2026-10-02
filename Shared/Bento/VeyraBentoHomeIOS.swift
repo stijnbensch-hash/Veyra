@@ -160,6 +160,10 @@ struct VeyraBentoHomeView: View {
                             bentoTop(now: context.date, contentWidth: contentWidth)
                         }
 
+                        bentoMiddle(now: .now, contentWidth: contentWidth, tiles: [.streaming])
+                            .padding(.top, -14)
+                        VeyraYourCollectionsSection()
+
                         // "Nieuw van hier" (Regional Releases fase 4/10, spec §4/§30): op tvOS
                         // staat dit als eigen prominente rij met focus/kalender-modus
                         // (`VeyraRegionalReleasesRow`, tvOS-only i.v.m. focus-afhandeling) --
@@ -179,18 +183,14 @@ struct VeyraBentoHomeView: View {
                         // "Dynamic Mosaic": Voor Jou -- Stap 10, direct na Trending (spec §97).
                         VeyraMosaicSection(title: "Voor jou", items: voorJouItems)
 
-                        // "Jouw Collecties" -- zelfde sectie als op tvOS (Fase 10).
-                        VeyraYourCollectionsSection()
-
                         TimelineView(.periodic(from: .now, by: 30)) { context in
-                            bentoMiddle(now: context.date, contentWidth: contentWidth)
+                            bentoMiddle(now: context.date, contentWidth: contentWidth, tiles: [.live])
                         }
-                        .padding(.top, -14)
 
                         // "Binnenkort" teruggezet in "Verder kijken"-rij (zie bentoTop) -- geen
                         // losse Calendar Horizon-sectie meer.
 
-                        // "Live nu" teruggezet als vaste rasterrij (samen met Streaming), i.p.v.
+                        // "Live nu" als eigen rasterrij, i.p.v.
                         // de losse On Air-sectie van Stap 13 -- op uitdrukkelijk verzoek teruggedraaid.
                         // "Sports Stage": uitgelichte live wedstrijd, los van de rest van de
                         // Sport-sectie -- Stap 14, direct na Nu op tv, vóór Live Sport (spec §97).
@@ -271,6 +271,9 @@ struct VeyraBentoHomeView: View {
             // Aflevering/film afgekeken (Trakt-stop): "Verder kijken" meteen opnieuw ophalen.
             .onReceive(NotificationCenter.default.publisher(for: .veyraTraktHistoryDidChange)) { _ in
                 Task { await model.load(force: true) }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .veyraTraktSnapshotDidChange)) { _ in
+                Task { await model.home.refreshContinueOrder() }
             }
             .onAppear { askPreset = !VeyraHomeLayoutStore.hasChosen }
             .sheet(isPresented: $askPreset, onDismiss: { VeyraHomeLayoutStore.markChosen() }) {
@@ -669,60 +672,49 @@ struct VeyraBentoHomeView: View {
     }
 
     @ViewBuilder
-    private func bentoMiddle(now: Date, contentWidth: CGFloat) -> some View {
-        let live = model.liveRows(at: now, limit: 4, recentFirst: true, favoritesOnly: liveFavoritesOnly)
-        let present = middlePresentTiles(live: live)
+    private func bentoMiddle(now: Date, contentWidth: CGFloat, tiles: Set<BentoTile>) -> some View {
+        let live = tiles.contains(.live) ? model.liveRows(at: now, limit: 4, recentFirst: true, favoritesOnly: liveFavoritesOnly) : []
+        let present = middlePresentTiles(live: live).intersection(tiles)
         let order = layout.orderedTiles.filter { present.contains($0) }
-        let baseProfile = BentoProfile.make(regular ? .tablet : .phone, order: order)
-        #if os(iOS)
-        // Wanneer Streamingdiensten vóór Live nu staat, krijgt de ruimte
-        // eronder dezelfde maat als de ruimte erboven. De extra rijafstand
-        // vergroot ook het raster, zodat Sport en alle volgende secties
-        // netjes mee omlaag schuiven.
-        let rowSpacing: CGFloat = order == [.streaming, .live] ? 32 : baseProfile.spacing
-        #else
-        let rowSpacing = baseProfile.spacing
-        #endif
-        let profile = BentoProfile(columns: baseProfile.columns,
-                                   rowHeights: baseProfile.rowHeights,
-                                   spacing: rowSpacing,
-                                   cells: baseProfile.cells)
+        let profile = BentoProfile.make(regular ? .tablet : .phone, order: order)
 
-        VeyraBentoGrid(profile: profile) {
-            if present.contains(.live) {
-                VeyraBentoLiveList(compact: true) {
-                    ForEach(live) { row in
-                        Button { onPlayChannel(row.channelID) } label: {
-                            VeyraBentoLiveRowContent(row: row, compact: true)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .veyraHomeTileMenu(.live)
-                .bentoCell(profile.cell(.live))
-            }
-
-            if present.contains(.streaming) {
-                ScrollView(.horizontal) {
-                    LazyHStack(spacing: 10) {
-                        ForEach(model.providers) { provider in
-                            Button { onOpenCatalog(provider) } label: {
-                                VeyraLogoShelfTile(name: provider.name, iconURL: provider.imageURL,
-                                                   wideURL: provider.wideURL, brand: provider.brand, compact: true,
-                                                   customURL: provider.customLogoURL)
+        if !present.isEmpty {
+            VeyraBentoGrid(profile: profile) {
+                if present.contains(.live) {
+                    VeyraBentoLiveList(compact: true) {
+                        ForEach(live) { row in
+                            Button { onPlayChannel(row.channelID) } label: {
+                                VeyraBentoLiveRowContent(row: row, compact: true)
                             }
                             .buttonStyle(.plain)
-                            .frame(width: min(regular ? 190 : 150, contentWidth), height: regular ? 76 : 60)
                         }
                     }
-                    // minWidth: contentWidth + center -- als de logo's samen smaller zijn dan het blok
-                    // (weinig diensten) staan ze gecentreerd, net als de andere kaders; passen ze niet,
-                    // dan scrollt de rij gewoon zoals voorheen (geen kap op het aantal diensten).
-                    .frame(minWidth: contentWidth, maxHeight: .infinity, alignment: .center)
+                    .veyraHomeTileMenu(.live)
+                    .bentoCell(profile.cell(.live))
                 }
-                .scrollIndicators(.hidden)
-                .veyraHomeTileMenu(.streaming)
-                .bentoCell(profile.cell(.streaming))
+
+                if present.contains(.streaming) {
+                    ScrollView(.horizontal) {
+                        LazyHStack(spacing: 10) {
+                            ForEach(model.providers) { provider in
+                                Button { onOpenCatalog(provider) } label: {
+                                    VeyraLogoShelfTile(name: provider.name, iconURL: provider.imageURL,
+                                                       wideURL: provider.wideURL, brand: provider.brand, compact: true,
+                                                       customURL: provider.customLogoURL)
+                                }
+                                .buttonStyle(.plain)
+                                .frame(width: min(regular ? 190 : 150, contentWidth), height: regular ? 76 : 60)
+                            }
+                        }
+                        // minWidth: contentWidth + center -- als de logo's samen smaller zijn dan het blok
+                        // (weinig diensten) staan ze gecentreerd, net als de andere kaders; passen ze niet,
+                        // dan scrollt de rij gewoon zoals voorheen (geen kap op het aantal diensten).
+                        .frame(minWidth: contentWidth, maxHeight: .infinity, alignment: .center)
+                    }
+                    .scrollIndicators(.hidden)
+                    .veyraHomeTileMenu(.streaming)
+                    .bentoCell(profile.cell(.streaming))
+                }
             }
         }
     }
