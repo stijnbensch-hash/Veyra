@@ -68,7 +68,7 @@ enum HeroSpotlightLoader {
     }
 
     private static func makeSpotlightItem(_ item: MediaItem) async -> HeroSpotlightItem {
-        let logo = await ClearLogoService.logoURL(for: item)
+        let logo = await ArtworkResolver.shared.clearLogoURL(for: item)
         let year: String? = item.releaseDate.flatMap { $0.count >= 4 ? String($0.prefix(4)) : nil }
         return HeroSpotlightItem(
             id: item.id.uuidString,

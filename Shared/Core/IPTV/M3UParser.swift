@@ -1,6 +1,6 @@
 import Foundation
 
-struct M3UParser {
+nonisolated struct M3UParser {
     func parse(
         _ content: String
     ) -> [IPTVChannel] {

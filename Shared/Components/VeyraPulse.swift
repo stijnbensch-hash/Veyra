@@ -45,11 +45,15 @@ nonisolated struct VeyraPulseInfo: Sendable, Equatable {
 struct VeyraPulseBadge: View {
     let info: VeyraPulseInfo
     var compact = false
+    /// Overschrijft `fontSize` voor contexten die iets meer leesbaarheid nodig hebben dan de
+    /// standaard compacte maat (bv. "Live nu" op iPhone/iPad) -- zonder de compacte maat overal
+    /// elders (filmkaarten, series) mee te veranderen. `nil` = ongewijzigd bestaand gedrag.
+    var fontSizeOverride: CGFloat? = nil
 
     // Zit in een krappe onderschriftregel (tvOS: 42pt hoog, naast clearlogo) -- daarom bewust
     // weinig verticale opvulling: die ging voorheen ten koste van de leesbare teksthoogte,
     // waardoor de pil kleiner oogde dan de platte tekst die ze verving.
-    private var fontSize: CGFloat { compact ? 13 : 23 }
+    private var fontSize: CGFloat { fontSizeOverride ?? (compact ? 13 : 23) }
     private var iconFontSize: CGFloat { compact ? 12 : 20 }
     private var hPadding: CGFloat { compact ? 7 : 12 }
     private var vPadding: CGFloat { compact ? 2 : 3 }

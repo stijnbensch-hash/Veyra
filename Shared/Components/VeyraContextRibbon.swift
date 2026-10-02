@@ -93,6 +93,9 @@ private struct RibbonClearLogo<Fallback: View>: View {
     let fallback: () -> Fallback
 
     @State private var logoURL: URL?
+    // §66: zelfde herlaad-signaal als `VeyraClearLogo` -- ook deze rail kan een stale clearlogo
+    // tonen na een override-wijziging terwijl hij al in beeld staat.
+    @ObservedObject private var artworkRefresh = ArtworkRefreshSignal.shared
 
     init(tmdbID: Int, isMovie: Bool, maxWidth: CGFloat, maxHeight: CGFloat,
          @ViewBuilder fallback: @escaping () -> Fallback) {
@@ -119,8 +122,8 @@ private struct RibbonClearLogo<Fallback: View>: View {
                 fallback()
             }
         }
-        .task(id: tmdbID) {
-            logoURL = await ClearLogoService.logoURL(for: MediaItem(title: "", type: isMovie ? .movie : .series, tmdbID: tmdbID))
+        .task(id: "\(tmdbID):\(artworkRefresh.generation)") {
+            logoURL = await ArtworkResolver.shared.clearLogoURL(for: MediaItem(title: "", type: isMovie ? .movie : .series, tmdbID: tmdbID))
         }
     }
 }

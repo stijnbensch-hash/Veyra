@@ -160,6 +160,18 @@ struct VeyraBentoHomeView: View {
                             bentoTop(now: context.date, contentWidth: contentWidth)
                         }
 
+                        // "Nieuw van hier" (Regional Releases fase 4/10, spec §4/§30): op tvOS
+                        // staat dit als eigen prominente rij met focus/kalender-modus
+                        // (`VeyraRegionalReleasesRow`, tvOS-only i.v.m. focus-afhandeling) --
+                        // op iOS/iPadOS was deze sectie tot nu toe nergens aangesloten (de hele
+                        // tvOS Home-file is `#if os(tvOS)`), waardoor "Nieuw van hier" hier
+                        // volledig ontbrak. Dit is de iOS-tegenhanger: een gewone horizontale
+                        // plank (`VeyraBentoShelf`), geen eigen kalenderweergave/live-knop --
+                        // tikken opent dezelfde bestaande TMDB-titelroute als op tvOS.
+                        TimelineView(.periodic(from: .now, by: 30)) { context in
+                            bentoRegional(now: context.date)
+                        }
+
                         // "Discovery Flow": Trending, los van het bento-raster -- Stap 9 van het
                         // Home Visual System-spec, direct na "Verder kijken" (spec §97), net als op tvOS.
                         VeyraDiscoveryFlow(title: "Trending", items: trendingItems)
@@ -759,6 +771,75 @@ struct VeyraBentoHomeView: View {
                 .veyraHomeTileMenu(.iptvSeries)
                 .bentoCell(profile.cell(.iptvSeries))
             }
+        }
+    }
+
+    // MARK: Nieuw van hier (Regional Releases) — iOS/iPadOS
+
+    private static let regionalReleaseDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "nl_BE")
+        formatter.setLocalizedDateFormatFromTemplate("d MMM")
+        return formatter
+    }()
+
+    private func regionalReleaseLabel(_ event: RegionalReleaseEvent) -> String {
+        let date = Self.regionalReleaseDateFormatter.string(from: event.releaseDate)
+        switch event.releaseType {
+        case .newSeries: return "Nieuwe reeks • \(date)"
+        case .newSeason:
+            if let season = event.season { return "Seizoen \(season) • \(date)" }
+            return "Nieuw seizoen • \(date)"
+        case .premiere: return "Première • \(date)"
+        case .upcomingPremiere: return "Binnenkort • \(date)"
+        case .episode: return date
+        }
+    }
+
+    @ViewBuilder
+    private func bentoRegional(now: Date) -> some View {
+        let events = regionalReleasesForNieuwVanHier()
+        if layout.isVisible(.nieuwVanHier), !events.isEmpty {
+            VeyraBentoShelf(title: "Nieuw van hier", subtitle: "Regionale releases", compact: true) {
+                ForEach(events) { event in
+                    Button {
+                        // Spec §6/§33: Regional Releases levert enkel media-identiteit/discovery;
+                        // het openen gebeurt via dezelfde route als de bestaande TMDB-planken,
+                        // net als op tvOS (`bentoRegional` in VeyraBentoHome.swift).
+                        guard let tmdbID = event.tmdbID else { return }
+                        onOpenTMDBTitle(BentoTMDBTitle(id: tmdbID, kind: .episode, title: event.title, posterURL: nil))
+                    } label: {
+                        VeyraBentoPosterContent(
+                            title: event.title,
+                            url: TMDBImageURLBuilder.poster(event.posterPath),
+                            compact: true,
+                            kind: .episode,
+                            sourceLabel: regionalReleaseLabel(event)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .veyraHomeTileMenu(.nieuwVanHier)
+        }
+    }
+
+    /// Zelfde dedupe-regel als de tvOS-tegenhanger (`regionalReleasesForNieuwVanHier` in
+    /// VeyraBentoHome.swift) -- bewust hier opnieuw, niet gedeeld, omdat de hele tvOS-Home-file
+    /// achter `#if os(tvOS)` zit en dus niet beschikbaar is om vanuit deze iOS-file aan te roepen.
+    private func regionalReleasesForNieuwVanHier() -> [RegionalReleaseEvent] {
+        guard showContinueWatching || showUpcoming else { return model.regionalReleases }
+        var handledTMDBIDs: Set<Int> = []
+        if showContinueWatching {
+            handledTMDBIDs.formUnion(model.home.continueItems.compactMap(\.tmdbID))
+        }
+        if showUpcoming {
+            handledTMDBIDs.formUnion(model.home.upcoming.compactMap(\.tmdbID))
+        }
+        guard !handledTMDBIDs.isEmpty else { return model.regionalReleases }
+        return model.regionalReleases.filter { event in
+            guard let tmdbID = event.tmdbID else { return true }
+            return !handledTMDBIDs.contains(tmdbID)
         }
     }
 

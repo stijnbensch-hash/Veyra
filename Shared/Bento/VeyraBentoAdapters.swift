@@ -78,9 +78,17 @@ nonisolated struct VeyraTMDBArtwork: ArtworkProviding {
         let textless = images.backdrops.filter { $0.iso_639_1 == nil }
         let bestBackdrop = (textless.isEmpty ? images.backdrops : textless).max { $0.vote_average < $1.vote_average }
         let banner = await fanartBanner(kind: kind, tmdbID: tmdbID, token: token)
+        // Fase 3 stap 2 (artwork-engine-spec §29/§30/§44): logo via de centrale
+        // `ArtworkResolver` i.p.v. hier altijd rechtstreeks uit deze eigen `/images`-aanvraag te
+        // plukken -- respecteert zo ook een gekozen AIOMetadata-addon voor de Home-hero/Bento-
+        // tegels. De backdrop- en fanart.tv-banner-aanroepen blijven ongewijzigd (geen
+        // ClearLogo, geen dubbele logica elders).
+        let logo = await ArtworkResolver.shared.clearLogoURL(
+            for: MediaItem(title: "", type: kind == .movie ? .movie : .series, tmdbID: tmdbID)
+        )
         return Artwork(
             backdrop: bestBackdrop.flatMap { URL(string: "https://image.tmdb.org/t/p/w1280\($0.file_path)") },
-            logo: pickClearlogoURL(from: images.logos),
+            logo: logo,
             banner: banner)
     }
 
@@ -851,6 +859,10 @@ final class VeyraBentoServices {
                                     iptvSeries: { await iptv.series() },
                                     releasesFilms: { await VeyraTMDBReleases().movies() },
                                     releasesSeries: { await VeyraTMDBReleases().series() },
+                                    regionalReleases: {
+                                        await RegionalReleaseRepository.shared.refresh(
+                                            context: .defaultBelgiumFlanders())
+                                    },
                                     streaming: { await VeyraCatalogSource().providers() },
                                     collections: { await VeyraCatalogSource().collections() })
         sport = VeyraSportViewModel(provider: SportsStoreProvider(store: SportsStore()))

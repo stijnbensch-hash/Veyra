@@ -118,6 +118,13 @@ struct SeriesDetailView: View {
                             WatchedToggleButton(item: mediaItem(from: details))
                             FavoriteToggleButton(item: mediaItem(from: details), compact: true)
                             WatchlistToggleButton(item: mediaItem(from: details), compact: true)
+                            NavigationLink {
+                                VeyraArtworkPickerView(item: mediaItem(from: details))
+                            } label: {
+                                Label("Artwork", systemImage: "photo.on.rectangle.angled")
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(VeyraColors.cyan)
                         }
 
                         let seasons =

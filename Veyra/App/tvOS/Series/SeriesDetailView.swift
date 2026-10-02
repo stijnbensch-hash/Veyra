@@ -181,6 +181,12 @@ struct SeriesDetailView: View {
                             WatchedToggleButton(item: MediaItem(title: details.name, type: .series, tmdbID: details.id))
                             FavoriteToggleButton(item: MediaItem(title: details.name, type: .series, tmdbID: details.id))
                             WatchlistToggleButton(item: MediaItem(title: details.name, type: .series, tmdbID: details.id))
+                            NavigationLink {
+                                VeyraArtworkPickerView(item: MediaItem(title: details.name, type: .series, tmdbID: details.id))
+                            } label: {
+                                VeyraActionLabel(title: "ARTWORK", symbol: "photo.on.rectangle.angled", compact: true)
+                            }
+                            .buttonStyle(VeyraFocusButtonStyle())
                         }
 
                     }

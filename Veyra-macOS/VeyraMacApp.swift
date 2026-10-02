@@ -24,6 +24,14 @@ struct VeyraMacApp: App {
                 .preferredColorScheme(.dark)
                 .task {
                     VeyraHubSyncService.shared.start()
+
+                    // Fase 2 ("Regional Releases"): registreer de (tijdelijke) mock-provider,
+                    // zie `Veyra/VeyraApp.swift` voor de volledige toelichting.
+                    await RegionalReleaseProviderRegistry.shared.register(VRTRegionalReleaseProvider())
+                    await RegionalReleaseProviderRegistry.shared.register(IPTVVODRegionalReleaseProvider())
+                    VeyraHubWatchStateSyncService.shared.start()
+                    VeyraTraktWatchStateReconciler.shared.start()
+
                     await iptvStartupRefresh.beginRefresh {
                         await iptvStartupGuide.reload()
                         await IPTVDiskCache.flush()

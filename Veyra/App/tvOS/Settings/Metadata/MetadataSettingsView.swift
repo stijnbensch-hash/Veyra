@@ -21,8 +21,16 @@ struct MetadataSettingsView: View {
                         subtitle: "Poster, achtergrond en omschrijving"
                     )
                     categoryCard(
+                        .artwork, icon: "textformat", title: "Artwork",
+                        subtitle: "ClearLogo en titelweergave"
+                    )
+                    categoryCard(
                         .ratings, icon: "star.leadinghalf.filled", title: "Ratings",
                         subtitle: "Zichtbare beoordelingen op detailpagina's"
+                    )
+                    categoryCard(
+                        .diagnostics, icon: "stethoscope", title: "Diagnostics",
+                        subtitle: "Metadata-/artworkbron, cache, fallback, duur"
                     )
                 }
                 .frame(maxWidth: 1300, alignment: .leading)
@@ -37,7 +45,9 @@ struct MetadataSettingsView: View {
             switch destination {
             case .posterEnrichment: PosterEnrichmentSettingsView()
             case .source: MetadataSourceSettingsView()
+            case .artwork: ArtworkSettingsSettingsView()
             case .ratings: MetadataRatingsSettingsView()
+            case .diagnostics: MetadataDiagnosticsView()
             }
         }
     }
@@ -85,7 +95,7 @@ struct MetadataSettingsView: View {
 }
 
 private enum MetadataSettingsDestination: String, Identifiable, Hashable {
-    case posterEnrichment, source, ratings
+    case posterEnrichment, source, artwork, ratings, diagnostics
 
     var id: String { rawValue }
 }
@@ -165,6 +175,10 @@ private struct MetadataSourceSettingsView: View {
     @AppStorage("metadata.source.preference")
     private var metadataSourceRaw = MetadataSourceOption.tmdb.rawValue
 
+    // §74: enkel een compacte status als die betrouwbaar vast te stellen is -- geen addon
+    // geconfigureerd betekent hier gewoon "geen status", geen gok.
+    @State private var connectivity: AddonConnectivityStatus?
+
     var body: some View {
         Form {
             Section {
@@ -172,11 +186,86 @@ private struct MetadataSourceSettingsView: View {
             } footer: {
                 Text("Bepaalt waar poster, achtergrond en omschrijving vandaan komen voor titels zonder eigen afbeeldingen (bv. Trakt-lijsten). AIOMetadata vereist een addon bij Addons.")
             }
+
+            if let addon = MetadataSourcePreference.activeAddon() {
+                Section {
+                    AddonConnectivityRow(addon: addon, status: connectivity)
+                } header: {
+                    Text("Status")
+                }
+            }
         }
         .frame(maxWidth: 1000)
         .navigationTitle("Metadatabron")
+        .task(id: metadataSourceRaw) { await checkConnectivity() }
+    }
+
+    private func checkConnectivity() async {
+        guard let addon = MetadataSourcePreference.activeAddon() else {
+            connectivity = nil
+            return
+        }
+        connectivity = .checking
+        connectivity = await AddonConnectivityChecker.check(addon)
     }
 }
+
+// MARK: - Artwork (Fase 3 stap 4, artwork-engine-spec §38/§39)
+
+private struct ArtworkSettingsSettingsView: View {
+    @State private var settings = ArtworkSettingsStore().load()
+    private let store = ArtworkSettingsStore()
+
+    var body: some View {
+        Form {
+            Section {
+                VeyraSettingsChoiceRow<ArtworkTitleDisplayMode>(icon: "textformat", "Titelweergave", selection: titleDisplayBinding)
+                VeyraSettingsChoiceRow<ArtworkLanguageOption>(icon: "globe", "Taalvoorkeur", selection: languageBinding)
+                VeyraSettingsChoiceRow<ArtworkLanguageOption>(icon: "globe", "Fallbacktaal", selection: fallbackLanguageBinding)
+            } footer: {
+                Text("Bepaalt of Detail/Hero/Player een ClearLogo tonen i.p.v. titeltekst, en in welke taal. Geldt voor zowel TMDB als een gekozen AIOMetadata-addon.")
+            }
+        }
+        .frame(maxWidth: 1000)
+        .navigationTitle("Artwork")
+    }
+
+    private var titleDisplayBinding: Binding<String> {
+        Binding(
+            get: { settings.titleDisplay.rawValue },
+            set: { raw in
+                guard let value = ArtworkTitleDisplayMode(rawValue: raw) else { return }
+                settings.titleDisplay = value
+                store.save(settings)
+            }
+        )
+    }
+
+    private var languageBinding: Binding<String> {
+        Binding(
+            get: { settings.language.rawValue },
+            set: { raw in
+                guard let value = ArtworkLanguageOption(rawValue: raw) else { return }
+                settings.language = value
+                store.save(settings)
+            }
+        )
+    }
+
+    private var fallbackLanguageBinding: Binding<String> {
+        Binding(
+            get: { settings.fallbackLanguage.rawValue },
+            set: { raw in
+                guard let value = ArtworkLanguageOption(rawValue: raw) else { return }
+                settings.fallbackLanguage = value
+                store.save(settings)
+            }
+        )
+    }
+}
+
+extension ArtworkTitleDisplayMode: VeyraSettingsOption {}
+extension ArtworkLanguageOption: VeyraSettingsOption {}
 
 // MARK: - Ratings
 

@@ -58,6 +58,13 @@ struct Veyra_iOSApp: App {
                         // `Shared/Sync/VeyraHubSyncService.swift`.
                         VeyraHubSyncService.shared.start()
 
+                        // Fase 2 ("Regional Releases"): registreer de (tijdelijke) mock-provider,
+                        // zie `Veyra/VeyraApp.swift` voor de volledige toelichting.
+                        await RegionalReleaseProviderRegistry.shared.register(VRTRegionalReleaseProvider())
+                        await RegionalReleaseProviderRegistry.shared.register(IPTVVODRegionalReleaseProvider())
+                        VeyraHubWatchStateSyncService.shared.start()
+                        VeyraTraktWatchStateReconciler.shared.start()
+
                         // Vul de bestaande zender- en EPG-schijfcache al bij
                         // opstarten; de melding na afloop ververst open schermen.
                         await iptvStartupRefresh.beginRefresh {

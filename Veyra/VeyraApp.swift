@@ -77,6 +77,14 @@ struct VeyraApp: App {
                     // `Shared/Sync/VeyraHubSyncService.swift`.
                     VeyraHubSyncService.shared.start()
 
+                    // Fase 2 ("Regional Releases"): registreer de (tijdelijke) mock-provider zodat
+                    // de volledige pijplijn (adapter → registry → repository) end-to-end werkt
+                    // zonder een ongeverifieerde VRT/VTM/Play/Streamz-endpoint te gokken.
+                    await RegionalReleaseProviderRegistry.shared.register(VRTRegionalReleaseProvider())
+                    await RegionalReleaseProviderRegistry.shared.register(IPTVVODRegionalReleaseProvider())
+                    VeyraHubWatchStateSyncService.shared.start()
+                    VeyraTraktWatchStateReconciler.shared.start()
+
                     await TraktStore
                         .shared
                         .refreshIfNeeded()

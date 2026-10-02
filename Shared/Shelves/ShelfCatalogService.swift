@@ -116,12 +116,14 @@ enum ShelfCatalogService {
 
     private static func enrichWithArtwork(_ items: [MediaItem], kind: ShelfMediaKind) async -> [MediaItem] {
         guard !items.isEmpty else { return items }
-        let addon = MetadataSourcePreference.activeAddon()
 
         return await withTaskGroup(of: (Int, MediaItem).self) { group in
             for (index, item) in items.enumerated() {
                 group.addTask {
-                    (index, await enrich(item, kind: kind, addon: addon))
+                    // Fase 1 (metadata-policy-spec §14/§18/§19): bronkeuze en
+                    // TMDB/AIOMetadata-verrijking lopen nu via de centrale
+                    // `MetadataRepository`, i.p.v. hier losse addon-/TMDB-logica.
+                    (index, await MetadataRepository.shared.enrichedArtwork(for: item, kind: kind))
                 }
             }
 
@@ -131,94 +133,6 @@ enum ShelfCatalogService {
             }
             return results
         }
-    }
-
-    private static func enrich(_ item: MediaItem, kind: ShelfMediaKind, addon: AddonManifest?) async -> MediaItem {
-        if let addon, let imdbID = item.imdbID, !imdbID.isEmpty {
-            let client = AIOMetadataClient(baseURL: addon.baseURL)
-            if let meta = try? await client.meta(type: kind == .movie ? "movie" : "series", imdbID: imdbID) {
-                return MediaItem(
-                    id: item.id,
-                    title: item.title,
-                    type: item.type,
-                    imdbID: item.imdbID,
-                    tmdbID: item.tmdbID,
-                    overview: item.overview?.isEmpty == false ? item.overview : meta.description,
-                    releaseDate: item.releaseDate,
-                    posterURL: meta.posterURL ?? item.posterURL,
-                    backdropURL: meta.backdropURL ?? item.backdropURL,
-                    genre: item.genre,
-                    rating: item.rating,
-                    catalogItemID: item.catalogItemID
-                )
-            }
-        }
-
-        guard let tmdbID = item.tmdbID else { return item }
-
-        // Fase 6 (TMDB-spec, Home cache-first): dezelfde titel komt vaak op meerdere planken en
-        // op "Verder met je collecties" voor -- cache-first voorkomt dat elke plek die los
-        // opnieuw bevraagt. Alleen de poster/backdrop/genre/score (afgeleid van TMDB) komen uit
-        // de cache; `item`-specifieke velden (catalogItemID, lokale overview) blijven van dit
-        // exemplaar.
-        if let cached = await TMDBMetadataCache.shared.get(tmdbID: tmdbID, kind: kind) {
-            return MediaItem(
-                id: item.id,
-                title: item.title,
-                type: item.type,
-                imdbID: item.imdbID,
-                tmdbID: item.tmdbID,
-                overview: item.overview,
-                releaseDate: item.releaseDate,
-                posterURL: cached.posterURL,
-                backdropURL: cached.backdropURL,
-                genre: item.genre ?? cached.genre,
-                rating: cached.rating ?? item.rating,
-                catalogItemID: item.catalogItemID
-            )
-        }
-
-        if kind == .movie, let token = AppConfiguration.tmdbReadAccessToken {
-            if let details = try? await TMDBClient(readAccessToken: token).movieDetails(id: tmdbID) {
-                let enriched = MediaItem(
-                    id: item.id,
-                    title: item.title,
-                    type: item.type,
-                    imdbID: item.imdbID,
-                    tmdbID: item.tmdbID,
-                    overview: item.overview,
-                    releaseDate: item.releaseDate,
-                    posterURL: TMDBImageURLBuilder.poster(details.posterPath),
-                    backdropURL: TMDBImageURLBuilder.backdrop(details.backdropPath),
-                    genre: item.genre ?? details.genres?.first?.name,
-                    rating: details.voteAverage ?? item.rating,
-                    catalogItemID: item.catalogItemID
-                )
-                await TMDBMetadataCache.shared.set(tmdbID: tmdbID, kind: kind, enriched)
-                return enriched
-            }
-        } else if kind == .series, let service = SeriesService() {
-            if let details = try? await service.seriesDetails(id: tmdbID) {
-                let enriched = MediaItem(
-                    id: item.id,
-                    title: item.title,
-                    type: item.type,
-                    imdbID: item.imdbID,
-                    tmdbID: item.tmdbID,
-                    overview: item.overview,
-                    releaseDate: item.releaseDate,
-                    posterURL: TMDBImageURLBuilder.poster(details.posterPath),
-                    backdropURL: TMDBImageURLBuilder.backdrop(details.backdropPath),
-                    genre: item.genre ?? details.genres?.first?.name,
-                    rating: details.voteAverage ?? item.rating,
-                    catalogItemID: item.catalogItemID
-                )
-                await TMDBMetadataCache.shared.set(tmdbID: tmdbID, kind: kind, enriched)
-                return enriched
-            }
-        }
-
-        return item
     }
 
     // MARK: - TMDB

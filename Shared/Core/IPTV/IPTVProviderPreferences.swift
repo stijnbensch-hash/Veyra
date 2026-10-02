@@ -185,7 +185,7 @@ struct IPTVProviderPreferences: Codable, Hashable {
 
 // MARK: - Preferences Store
 
-struct IPTVProviderPreferencesStore {
+nonisolated struct IPTVProviderPreferencesStore {
     private let defaults: UserDefaults
     private let keyPrefix =
         "veyra.iptv.provider.preferences"

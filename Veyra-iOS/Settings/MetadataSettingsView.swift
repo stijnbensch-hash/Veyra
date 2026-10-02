@@ -3,6 +3,15 @@ import SwiftUI
 struct MetadataSettingsView: View {
     @AppStorage("metadata.source.preference") private var metadataSourceRaw = MetadataSourceOption.tmdb.rawValue
 
+    // §74: enkel een compacte status als die betrouwbaar vast te stellen is.
+    @State private var connectivity: AddonConnectivityStatus?
+
+    // Fase 3 stap 4 (artwork-engine-spec §38/§39): geen los `@AppStorage`-paar, want
+    // `ArtworkSettings` is één samengesteld, versioned record (net als `RegionalReleaseSettings`)
+    // i.p.v. drie losse sleutels.
+    @State private var artworkSettings = ArtworkSettingsStore().load()
+    private let artworkStore = ArtworkSettingsStore()
+
     @AppStorage(PosterEnrichmentDefaults.modeKey)
     private var posterEnrichmentSourceRaw = PosterEnrichmentMode.off.rawValue
     @AppStorage(PosterEnrichmentDefaults.showGenreKey)
@@ -90,6 +99,46 @@ struct MetadataSettingsView: View {
                     Text("Bepaalt waar poster, achtergrond en omschrijving vandaan komen voor titels zonder eigen afbeeldingen (bv. Trakt-lijsten). AIOMetadata vereist een addon bij Addons.")
                 }
 
+                if let addon = MetadataSourcePreference.activeAddon() {
+                    Section {
+                        AddonConnectivityRow(addon: addon, status: connectivity)
+                    } header: {
+                        Text("Status")
+                    }
+                }
+
+                Section {
+                    NavigationLink {
+                        MetadataDiagnosticsView()
+                    } label: {
+                        Label("Diagnostics", systemImage: "stethoscope")
+                    }
+                } footer: {
+                    Text("Metadata-/artworkbron, cache, fallback en duur van de laatste aanvragen deze sessie.")
+                }
+
+                Section {
+                    Picker("Titelweergave", selection: artworkBinding(\.titleDisplay)) {
+                        ForEach(ArtworkTitleDisplayMode.allCases) { option in
+                            Text(option.title).tag(option)
+                        }
+                    }
+                    Picker("Taalvoorkeur", selection: artworkBinding(\.language)) {
+                        ForEach(ArtworkLanguageOption.allCases) { option in
+                            Text(option.title).tag(option)
+                        }
+                    }
+                    Picker("Fallbacktaal", selection: artworkBinding(\.fallbackLanguage)) {
+                        ForEach(ArtworkLanguageOption.allCases) { option in
+                            Text(option.title).tag(option)
+                        }
+                    }
+                } header: {
+                    Text("Artwork")
+                } footer: {
+                    Text("Bepaalt of Detail/Hero/Player een ClearLogo tonen i.p.v. titeltekst, en in welke taal. Geldt voor zowel TMDB als een gekozen AIOMetadata-addon.")
+                }
+
                 Section {
                     toggleRow(.imdb, isOn: $imdb)
                     toggleRow(.tmdb, isOn: $tmdb)
@@ -113,6 +162,28 @@ struct MetadataSettingsView: View {
             .scrollContentBackground(.hidden)
         }
         .navigationTitle("Metadata")
+        .task(id: metadataSourceRaw) { await checkConnectivity() }
+    }
+
+    private func checkConnectivity() async {
+        guard let addon = MetadataSourcePreference.activeAddon() else {
+            connectivity = nil
+            return
+        }
+        connectivity = .checking
+        connectivity = await AddonConnectivityChecker.check(addon)
+    }
+
+    // MARK: - Artwork
+
+    private func artworkBinding<Value>(_ keyPath: WritableKeyPath<ArtworkSettings, Value>) -> Binding<Value> {
+        Binding(
+            get: { artworkSettings[keyPath: keyPath] },
+            set: { newValue in
+                artworkSettings[keyPath: keyPath] = newValue
+                artworkStore.save(artworkSettings)
+            }
+        )
     }
 
     // MARK: - Row

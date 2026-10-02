@@ -113,24 +113,18 @@ struct VeyraLensSheet: View {
             cast = credits.cast
         }
 
-        guard let tmdbID = item?.tmdbID, let token = AppConfiguration.tmdbReadAccessToken else { return }
-        let client = TMDBClient(readAccessToken: token)
+        guard let base = item, base.tmdbID != nil else { return }
 
-        if item?.type == .series {
-            if let service = SeriesService(), let details = try? await service.seriesDetails(id: tmdbID) {
-                posterURL = tmdbImageURL(path: details.posterPath)
-            }
-        } else {
-            if let movie = try? await client.movieDetails(id: tmdbID) {
-                posterURL = tmdbImageURL(path: movie.posterPath)
-                infoLine = tmdbYear(movie.releaseDate)
-            }
+        // Fase 1 (metadata-policy-spec §14/§18/§19): poster via de centrale
+        // `MetadataRepository` i.p.v. hier een eigen, ongecachete TMDB-detail-
+        // aanroep -- respecteert zo ook een gekozen AIOMetadata-addon, met
+        // dezelfde TMDB-terugval.
+        let kind: ShelfMediaKind = base.type == .series ? .series : .movie
+        let enriched = await MetadataRepository.shared.enrichedArtwork(for: base, kind: kind)
+        posterURL = enriched.posterURL
+        if base.type != .series {
+            infoLine = tmdbYear(enriched.releaseDate)
         }
-    }
-
-    private func tmdbImageURL(path: String?, size: String = "w500") -> URL? {
-        guard let path, !path.isEmpty else { return nil }
-        return URL(string: "https://image.tmdb.org/t/p/\(size)\(path)")
     }
 
     private func tmdbYear(_ dateString: String?) -> String? {

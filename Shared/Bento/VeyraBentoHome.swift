@@ -102,6 +102,14 @@ struct VeyraBentoHomeView: View {
                     bentoTop(now: context.date)
                 }
 
+                // "Nieuw van hier" (Regional Releases fase 4, spec §4/§30): volledig regionaal
+                // discovery-overzicht, meteen onder "Verder kijken"/"Binnenkort" -- zelfde
+                // prominentie als de rest van de Home-top, los van het bento-raster net als
+                // Trending/Voor jou hieronder.
+                TimelineView(.periodic(from: .now, by: 30)) { context in
+                    bentoRegional(now: context.date)
+                }
+
                 // "Discovery Flow": Trending, los van het bento-raster -- Stap 9 van het
                 // Home Visual System-spec, direct na "Verder kijken" (spec §97).
                 VeyraDiscoveryFlow(title: "Trending", items: trendingItems)
@@ -387,7 +395,66 @@ struct VeyraBentoHomeView: View {
             }
         }
 
+        // "Nieuw van hier" als extra Veyra Now-kandidaat (Regional Releases fase 5, spec §5/§6):
+        // regionale releases leveren hier enkel KANDIDATEN aan -- deze bestaande Veyra Now-rail
+        // beslist zelf (via dezelfde dismiss/snooze/prioriteit-mechanismen als elke andere bron
+        // hierboven) of zoiets nu getoond wordt. Spec §10: dit mag bewust tegelijk met "Nieuw van
+        // hier" verschijnen, dat is geen dedupe-fout.
+        // Eigen zichtbaarheidsvlag (`.nieuwVanHier`) i.p.v. `nowSettings.showReleases` hierboven
+        // hergebruiken -- dat is specifiek voor het TMDB-"Nieuw uitgebracht"-blok; spec §22 noemt
+        // dit bewust een eigen instelling ("Gebruik regionale content in Veyra Now"), die hier bij
+        // gebrek aan de Instellingen-UI (fase 22) voorlopig gelijk loopt met de sectie zelf.
+        if layout.isVisible(.nieuwVanHier) {
+            let candidates = model.regionalReleases
+                // Spec §8: "Bekijken" blijft primair op een Veyra Now-kaart -- zonder `tmdbID`
+                // (nog geen betrouwbare match, spec §62) is er niets om naartoe te openen, dus
+                // zo'n release blijft wél in "Nieuw van hier" staan maar wordt hier geen kandidaat.
+                .filter { $0.tmdbID != nil && !nowSettings.isHidden("ribbon-regional-\($0.id)", now: now) }
+                .compactMap { event -> (RegionalReleaseEvent, Double)? in
+                    guard let priority = RegionalReleaseNowPolicy.priority(for: event, now: now) else { return nil }
+                    return (event, priority)
+                }
+                .sorted { $0.1 > $1.1 }
+            if let (event, priority) = candidates.first {
+                let typeLabel = regionalReleaseTypeLabel(event.releaseType)
+                let dateText = VeyraHomeFormat.when(event.airDate ?? event.releaseDate, now: now,
+                                                     dateOnly: event.airDate == nil)
+                let regionalID = "ribbon-regional-\(event.id)"
+                items.append(VeyraRibbonItem(
+                    id: regionalID, icon: "mappin.and.ellipse", label: typeLabel.uppercased(),
+                    text: event.title, detail: "\(dateText) · \(event.providerID.uppercased())",
+                    contentKind: .release, priority: priority, time: event.airDate ?? event.releaseDate,
+                    backdropURL: TMDBImageURLBuilder.backdrop(event.backdropPath)
+                        ?? TMDBImageURLBuilder.poster(event.posterPath),
+                    tmdbID: event.tmdbID, isMovie: false,
+                    reason: .newRelease,
+                    titleBakedIntoArt: event.backdropPath == nil && event.posterPath != nil,
+                    onDismiss: { VeyraNowSettingsStore.dismiss(regionalID) },
+                    onSnooze: { VeyraNowSettingsStore.snoozeForToday(regionalID) },
+                    // Spec §33: Regional Releases levert enkel media-identiteit/discovery; openen
+                    // gaat via dezelfde route als de bestaande TMDB-planken, geen eigen scherm.
+                    // Zonder `tmdbID` (spec §62) is er nog geen detail om naartoe te gaan.
+                    action: {
+                        guard let tmdbID = event.tmdbID else { return }
+                        onOpenTMDBTitle(BentoTMDBTitle(id: tmdbID, kind: .episode, title: event.title, posterURL: nil))
+                    }))
+            }
+        }
+
         return items
+    }
+
+    /// Spec §72: korte, mensvriendelijke labels voor het Veyra Now-kaartje -- gedeeld met de
+    /// badge op de "Nieuw van hier"-kaart (`VeyraBentoRegionalCardContent.typeLabel`), hier als
+    /// losse functie omdat die kaart in een ander (tvOS-only) bestand zit.
+    private func regionalReleaseTypeLabel(_ type: RegionalReleaseType) -> String {
+        switch type {
+        case .newSeries: return "Nieuwe serie"
+        case .newSeason: return "Nieuw seizoen"
+        case .premiere: return "Première"
+        case .upcomingPremiere: return "Binnenkort"
+        case .episode: return "Nieuwe aflevering"
+        }
     }
 
     @ViewBuilder
@@ -516,6 +583,51 @@ struct VeyraBentoHomeView: View {
                     .bentoCell(profile.cell(.vandaag))
                 }
             }
+        }
+    }
+
+    // MARK: Nieuw van hier (Regional Releases)
+
+    @ViewBuilder
+    private func bentoRegional(now: Date) -> some View {
+        let events = regionalReleasesForNieuwVanHier()
+        if layout.isVisible(.nieuwVanHier), !events.isEmpty {
+            VeyraRegionalReleasesRow(events: events, now: now, focus: $focus, onOpen: { event in
+                // Spec §6/§33: Regional Releases levert enkel media-identiteit/discovery; het
+                // openen gebeurt via dezelfde route als de bestaande TMDB-planken
+                // (`BentoTMDBTitle` -> `VeyraBentoTitleDestination`), geen eigen detailscherm.
+                // `.episode` is hier (net als bij `VeyraTMDBReleases.series()`) de bestaande
+                // `MediaKind`-waarde voor "dit is een serie" -- er is geen apart `.series`-geval.
+                guard let tmdbID = event.tmdbID else { return }
+                onOpenTMDBTitle(BentoTMDBTitle(id: tmdbID, kind: .episode, title: event.title, posterURL: nil))
+            }, onPlayLive: onPlayChannel)
+            // Fase 11: "Kijk live" hergebruikt rechtstreeks dezelfde route als de bestaande
+            // Live-rij hierboven (`onPlayChannel`) -- geen nieuwe speler, geen tweede
+            // zichtbaarheids-/kanaalresolutie (spec §32/§58/§59).
+        }
+    }
+
+    /// Fase 10 (Home placement): zodra een titel al een eigen plek heeft in
+    /// "Verder kijken" of "Binnenkort" -- dus al door de normale,
+    /// Trakt-getrackte flow wordt beheerd -- hoeft "Nieuw van hier" diezelfde
+    /// titel niet nog eens als "nieuw"-ontdekking te tonen (spec §11/§53:
+    /// toegestaan is enkel de Veyra Now-overlap, niet deze). Een
+    /// Trakt-onbekende (local-only) regionale serie heeft per definitie geen
+    /// entry in deze twee bronnen en blijft dus gewoon zichtbaar, inclusief
+    /// haar eigen voortgang (spec §44) -- geen enkel geval verliest toegang.
+    private func regionalReleasesForNieuwVanHier() -> [RegionalReleaseEvent] {
+        guard showContinueWatching || showUpcoming else { return model.regionalReleases }
+        var handledTMDBIDs: Set<Int> = []
+        if showContinueWatching {
+            handledTMDBIDs.formUnion(model.home.continueItems.compactMap(\.tmdbID))
+        }
+        if showUpcoming {
+            handledTMDBIDs.formUnion(model.home.upcoming.compactMap(\.tmdbID))
+        }
+        guard !handledTMDBIDs.isEmpty else { return model.regionalReleases }
+        return model.regionalReleases.filter { event in
+            guard let tmdbID = event.tmdbID else { return true }
+            return !handledTMDBIDs.contains(tmdbID)
         }
     }
 

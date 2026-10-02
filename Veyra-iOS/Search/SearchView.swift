@@ -3,16 +3,21 @@ import SwiftUI
 struct SearchView: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
 
-    // Navigatie via de centrale `openMediaDetail`/`playMediaItem`-omgevingsacties
-    // (MediaNavigation.swift) i.p.v. een eigen `@State` + `.navigationDestination(item:)`
-    // voor `MediaItem`.
-    @Environment(\.openMediaDetail) private var openMediaDetail
+    // `playMediaItem` (meteen afspelen, zie `openMovieForPlay`) via de centrale omgevingsactie
+    // (MediaNavigation.swift) -- films/series OPENEN gaat via lokale state hieronder, want
+    // `SearchView` is hier zelf de root van zijn eigen `NavigationStack` (zie `detailItem`).
     @Environment(\.playMediaItem) private var playMediaItem
 
     @State private var query = ""
     @State private var movies: [TMDBMovie] = []
     @State private var series: [TMDBSeries] = []
     @State private var selectedSeries: TMDBSeries?
+    // Bugfix (zoeken opent niets): `openMediaDetail` was hier zelf de root van zijn eigen
+    // `NavigationStack` (`.mediaNavigationRoot()` hieronder), dus een `@Environment`-lezing op
+    // zichzelf kreeg altijd de stille no-op default van de OUDER -- zie `MediaNavigation.swift`
+    // ("Films"/"Kijklijst" hadden exact dit probleem). Films openen daarom, net als series
+    // hierboven, via een lokale destination i.p.v. de omgevingsactie.
+    @State private var detailItem: MediaItem?
     @State private var isSearching = false
     @State private var isOpeningMovie = false
     @State private var errorMessage: String?
@@ -102,6 +107,7 @@ struct SearchView: View {
             .searchable(text: $query, prompt: "Zoek films en series")
             .task(id: query) { await search() }
             .navigationDestination(item: $selectedSeries) { SeriesDetailView(series: $0) }
+            .navigationDestination(item: $detailItem) { ShelfItemDestination(item: $0) }
             .overlay {
                 if isOpeningMovie {
                     ProgressView("Film openen…")
@@ -218,7 +224,7 @@ struct SearchView: View {
         }
         do {
             let item = try await service.mediaItem(for: movie)
-            openMediaDetail(item)
+            detailItem = item
         } catch {
             errorMessage = error.localizedDescription
         }

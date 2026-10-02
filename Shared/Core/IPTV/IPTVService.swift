@@ -1,6 +1,6 @@
 import Foundation
 
-struct IPTVService {
+nonisolated struct IPTVService {
     private let session: URLSession
     private let m3uParser: M3UParser
 

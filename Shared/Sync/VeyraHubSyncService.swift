@@ -7,7 +7,14 @@ import Foundation
 @MainActor
 final class VeyraHubSyncService {
     static let shared = VeyraHubSyncService()
-    private(set) var isActive = false
+
+    /// `nonisolated(unsafe)`: een eenvoudige statusvlag die ook synchroon gelezen wordt vanuit
+    /// bewust `nonisolated` opslagstructs (bv. `IPTVConfigurationStore`) om te kiezen tussen een
+    /// gesynchroniseerd of niet-gesynchroniseerd Keychain-item. Enkel geschreven vanuit deze
+    /// @MainActor-klasse zelf (regel ~213/~219); een race op deze ene `Bool` heeft in het ergste
+    /// geval een Keychain-item in de verkeerde sync-modus tot de volgende update, geen
+    /// dataverlies of crash -- geen volwaardige actor-hop nodig voor dit heuristische vlagje.
+    nonisolated(unsafe) private(set) var isActive = false
 
     // MARK: - Synced keys
     //
@@ -122,9 +129,18 @@ final class VeyraHubSyncService {
         "veyra.collections.v1",
     ]
 
+    private static let artworkDataKeys: [String] = [
+        // Artwork-engine-spec §61/§62: "GlobalArtworkPreferences" (`ArtworkSettingsStore`) en
+        // "ItemArtworkOverrides" (`VeyraArtworkOverrideStore`) — beide al JSON-gecodeerde `Data`
+        // onder één sleutel, zonder image bytes (enkel canonical ID + type/bron/providerpad/
+        // taal, §60/§62), dus dezelfde whole-value-aanpak als `veyra.collections.v1` hierboven.
+        // Geen apart Hub-document of eigen sync-stack nodig (§7's "geen aparte sync bouwen").
+        "veyra.artwork.settings.v1", "veyra.artwork.overrides.v1",
+    ]
+
     private static var settingsDataKeys: [String] {
         shelfHeroDataKeys + liveTVFolderDataKeys + sourceOrderDataKeys + addonDataKeys + sourceBadgeDataKeys +
-            recorderDataKeys + sportsDataKeys + collectionsDataKeys
+            recorderDataKeys + sportsDataKeys + collectionsDataKeys + artworkDataKeys
     }
 
     private static let metadataPrefix = "metadata.rating."

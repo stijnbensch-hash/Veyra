@@ -333,7 +333,8 @@ struct VeyraBentoLiveList<Rows: View>: View {
         VeyraBentoPanel(compact: compact) {
             VStack(alignment: .leading, spacing: compact ? 4 : 8) {
                 VeyraBentoLabel(title: "Live nu", liveDot: true, compact: compact)
-                VStack(spacing: compact ? 2 : 4) { rows }
+                // Iets meer ruimte tussen de zenders dan voorheen (was te krap op iPhone/iPad).
+                VStack(spacing: compact ? 7 : 8) { rows }
                 Spacer(minLength: 0)
             }
         }
@@ -361,13 +362,15 @@ struct VeyraBentoLiveRowContent: View {
                     // Veyra Pulse: huidig programma + resterende tijd, zelfde icoon+pil-taal als
                     // de film/serie-Pulse elders -- i.p.v. de vroegere kale tekst hier.
                     if showPulseBadges, let pulse = VeyraPulseInfo(kind: .live, text: "\(row.title) · nog \(row.remainingMinutes) min") {
-                        VeyraPulseBadge(info: pulse, compact: compact)
+                        // Iets groter dan de standaard compacte Pulse-maat -- enkel hier in
+                        // "Live nu", niet voor film-/serie-Pulse elders.
+                        VeyraPulseBadge(info: pulse, compact: compact, fontSizeOverride: compact ? 15 : nil)
                     } else {
                         (
                             Text("\(row.title) · ")
-                                .font(compact ? .caption : .system(size: 23, weight: .semibold))
+                                .font(compact ? .system(size: 15, weight: .semibold) : .system(size: 23, weight: .semibold))
                             + Text("nog \(row.remainingMinutes) min")
-                                .font(compact ? .caption2 : .system(size: 18))
+                                .font(compact ? .system(size: 13) : .system(size: 18))
                         )
                             .foregroundStyle(VeyraHomeStyle.dim)
                             .lineLimit(1)
@@ -376,7 +379,7 @@ struct VeyraBentoLiveRowContent: View {
                 // Het volgende programma blijft visueel ondergeschikt aan wat nu speelt.
                 if let nextTitle = row.nextTitle {
                     Text("Straks: \(nextTitle)")
-                        .font(compact ? .caption : .system(size: 18, weight: .medium))
+                        .font(compact ? .system(size: 13, weight: .medium) : .system(size: 18, weight: .medium))
                         .foregroundStyle(VeyraHomeStyle.dim)
                         .lineLimit(1)
                 }
@@ -389,7 +392,7 @@ struct VeyraBentoLiveRowContent: View {
             Circle().fill(row.health.sportTint).frame(width: compact ? 8 : 12, height: compact ? 8 : 12)
                 .accessibilityHidden(true)
         }
-        .padding(.vertical, compact ? 6 : 9)
+        .padding(.vertical, compact ? 9 : 9)
         .padding(.horizontal, compact ? 6 : 14)
         .foregroundStyle(.white)
         .contentShape(Rectangle())

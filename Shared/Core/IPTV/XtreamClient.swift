@@ -22,6 +22,23 @@ struct XtreamClient {
         return Date(timeIntervalSince1970: seconds)
     }
 
+    // Xtream "release_date" (series-niveau) komt als kale "yyyy-MM-dd"-string,
+    // zonder tijdzone -- gebruikt door `IPTVVODRegionalReleaseProvider` als
+    // (indicatieve) premieredatum van een serie, los van de "added"-timestamp
+    // die aangeeft wanneer DEZE reseller de serie toevoegde.
+    private static let dateOnlyFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        return formatter
+    }()
+
+    static func date(fromDateOnlyString value: String?) -> Date? {
+        guard let value, !value.isEmpty else { return nil }
+        return dateOnlyFormatter.date(from: value)
+    }
+
     // MARK: - Account / verbindingen
 
     /// Xtream's basis-endpoint (`player_api.php` zonder `action`) geeft naast
@@ -193,7 +210,9 @@ struct XtreamClient {
                 coverURL: URL(
                     string: value.cover ?? ""
                 ),
-                added: XtreamClient.date(fromUnixString: value.added)
+                added: XtreamClient.date(fromUnixString: value.added),
+                tmdbID: value.tmdb.flatMap { Int($0) }.flatMap { $0 > 0 ? $0 : nil },
+                releaseDate: XtreamClient.date(fromDateOnlyString: value.releaseDate)
             )
         }
     }
@@ -267,7 +286,11 @@ struct XtreamClient {
                         containerExtension:
                             fileExtension,
                         streamURL:
-                            streamURL
+                            streamURL,
+                        added:
+                            XtreamClient.date(
+                                fromUnixString: episode.added
+                            )
                     )
                 )
             }
@@ -587,6 +610,33 @@ nonisolated struct XtreamSeriesItem:
     // Wanneer de provider deze serie heeft toegevoegd (Xtream "added") —
     // voor het sorteren van vers toegevoegde VOD-planken op nieuwste eerst.
     let added: Date?
+    // TMDB-ID zoals de Xtream-reseller die zelf al oploste (vaak aanwezig bij
+    // providerspecifieke VOD-categorieen, bv. een "VRT MAX"/"VTMGO+"-rubriek) --
+    // `nil` als de reseller dit veld niet invult. `IPTVVODRegionalReleaseProvider`
+    // gebruikt dit om `TMDBExternalLookup`-matching over te slaan wanneer de ID
+    // al bekend is.
+    let tmdbID: Int?
+    // Xtream "release_date" -- meestal de officiele premieredatum van de serie,
+    // NIET wanneer deze reseller ze aan zijn catalogus toevoegde (zie `added`).
+    let releaseDate: Date?
+
+    init(
+        id: Int,
+        name: String,
+        categoryID: String?,
+        coverURL: URL?,
+        added: Date?,
+        tmdbID: Int? = nil,
+        releaseDate: Date? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.categoryID = categoryID
+        self.coverURL = coverURL
+        self.added = added
+        self.tmdbID = tmdbID
+        self.releaseDate = releaseDate
+    }
 }
 
 struct XtreamSeriesInfo:
@@ -618,7 +668,32 @@ nonisolated struct XtreamSeriesEpisode:
 
     let streamURL:
         URL
+
+    // Wanneer de provider deze aflevering aan de catalogus toevoegde (Xtream
+    // "added" op episode-niveau) -- gebruikt door `IPTVVODRegionalReleaseProvider`
+    // als "nieuw beschikbaar"-signaal. Default `nil` houdt bestaande (gecachte)
+    // call-sites werkend.
+    let added: Date?
+
+    init(
+        id: Int,
+        seasonNumber: Int,
+        episodeNumber: Int,
+        title: String,
+        containerExtension: String,
+        streamURL: URL,
+        added: Date? = nil
+    ) {
+        self.id = id
+        self.seasonNumber = seasonNumber
+        self.episodeNumber = episodeNumber
+        self.title = title
+        self.containerExtension = containerExtension
+        self.streamURL = streamURL
+        self.added = added
+    }
 }
+
 
 // MARK: - Responses
 
@@ -711,6 +786,11 @@ private struct XtreamSeriesResponse:
     let categoryID: String?
     // Unix-timestamp als string, zoals Xtream "added" teruggeeft.
     let added: String?
+    // Xtream geeft dit soms als Int, soms als String terug -- flexibel gedecodeerd
+    // (zie `decodeFlexibleString` hieronder). "0" of leeg betekent "geen TMDB-ID".
+    let tmdb: String?
+    // Kale "yyyy-MM-dd"-string, geen tijdzone.
+    let releaseDate: String?
 
     enum CodingKeys:
         String,
@@ -729,6 +809,10 @@ private struct XtreamSeriesResponse:
             "category_ids"
 
         case added
+        case tmdb
+
+        case releaseDate =
+            "release_date"
     }
 
     // Sommige Xtream-panelen geven series een `category_ids`-array (meerdere
@@ -743,6 +827,8 @@ private struct XtreamSeriesResponse:
         name = try container.decode(String.self, forKey: .name)
         cover = try container.decodeIfPresent(String.self, forKey: .cover)
         added = try container.decodeIfPresent(String.self, forKey: .added)
+        releaseDate = try container.decodeIfPresent(String.self, forKey: .releaseDate)
+        tmdb = Self.decodeFlexibleString(container, key: .tmdb)
 
         if let single = try container.decodeIfPresent(String.self, forKey: .categoryID) {
             categoryID = single
@@ -752,6 +838,21 @@ private struct XtreamSeriesResponse:
         } else {
             categoryID = nil
         }
+    }
+
+    // Zelfde reden als `XtreamEpisodeResponse.decodeInt` hieronder: sommige
+    // Xtream-panelen leveren numerieke velden als JSON-getal, andere als string.
+    private static func decodeFlexibleString(
+        _ container: KeyedDecodingContainer<CodingKeys>,
+        key: CodingKeys
+    ) -> String? {
+        if let value = try? container.decodeIfPresent(String.self, forKey: key), !value.isEmpty {
+            return value
+        }
+        if let value = try? container.decodeIfPresent(Int.self, forKey: key) {
+            return String(value)
+        }
+        return nil
     }
 }
 
@@ -770,6 +871,9 @@ private struct XtreamEpisodeResponse:
     let season: Int?
     let title: String?
     let containerExtension: String?
+    // Unix-timestamp als string, zoals Xtream "added" teruggeeft -- op
+    // episode-niveau (los van het series-niveau `added` in `XtreamSeriesResponse`).
+    let added: String?
 
     enum CodingKeys:
         String,
@@ -785,6 +889,8 @@ private struct XtreamEpisodeResponse:
 
         case containerExtension =
             "container_extension"
+
+        case added
     }
 
     init(
@@ -827,6 +933,13 @@ private struct XtreamEpisodeResponse:
                     String.self,
                     forKey:
                         .containerExtension
+                )
+
+        added =
+            try container
+                .decodeIfPresent(
+                    String.self,
+                    forKey: .added
                 )
     }
 

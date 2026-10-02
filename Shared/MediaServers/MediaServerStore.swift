@@ -1,7 +1,7 @@
 import Foundation
 import Security
 
-struct MediaServerStore {
+nonisolated struct MediaServerStore {
     private let service: String
 
     private let account =

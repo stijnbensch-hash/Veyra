@@ -4,7 +4,14 @@ extension View {
     @ViewBuilder
     func veyraHideNavigationBar() -> some View {
         #if os(iOS)
+        // Bugfix (dubbele terugpijl in Zoeken): `.toolbar(.hidden, for: .navigationBar)` alleen
+        // onderdrukt de balk/titel, maar niet altijd de systeem-terugknop zelf -- die blijft dan
+        // als los element bestaan. Normaal valt dat onzichtbaar samen met de eigen
+        // `BackButtonCircle()`-overlay (zelfde positie bij een gewone push), maar binnen een
+        // `.sheet` (bv. Zoeken op iPhone) ligt de safe-area net anders, waardoor beide zichtbaar
+        // naast/onder elkaar verschenen. `navigationBarBackButtonHidden` onderdrukt 'm expliciet.
         toolbar(.hidden, for: .navigationBar)
+            .navigationBarBackButtonHidden(true)
         #else
         self
         #endif

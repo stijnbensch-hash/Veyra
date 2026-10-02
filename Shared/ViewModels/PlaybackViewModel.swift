@@ -20,6 +20,7 @@ final class PlaybackViewModel: ObservableObject {
 
     private var tracker: TraktPlaybackTracker?
     private var veyraHubTracker: VeyraHubPlaybackTracker?
+    private var localTracker: VeyraLocalWatchTracker?
     private var recorderCleanupTracker: VeyraHubRecorderCleanupTracker?
     private var videoRecoveryTask: Task<Void, Never>?
 
@@ -62,6 +63,7 @@ final class PlaybackViewModel: ObservableObject {
 
             if let item {
                 tracker = TraktPlaybackTracker(item: item, engine: engine.engine)
+                localTracker = VeyraLocalWatchTracker(item: item, engine: engine.engine)
             }
 
             if let sync = activeSource.progressSync {
@@ -107,6 +109,7 @@ final class PlaybackViewModel: ObservableObject {
         } catch is CancellationError {
             tracker?.finish()
             veyraHubTracker?.finish()
+            localTracker?.finish()
             recorderCleanupTracker?.finish()
             playbackEngine?.stop()
             SubtitleService.shared.reset()
@@ -114,6 +117,7 @@ final class PlaybackViewModel: ObservableObject {
         } catch {
             tracker?.finish()
             veyraHubTracker?.finish()
+            localTracker?.finish()
             recorderCleanupTracker?.finish()
             playbackEngine?.stop()
             SubtitleService.shared.reset()
@@ -147,12 +151,14 @@ final class PlaybackViewModel: ObservableObject {
         videoRecoveryTask = nil
         tracker?.finish()
         veyraHubTracker?.finish()
+        localTracker?.finish()
         recorderCleanupTracker?.finish()
         playbackEngine?.stop()
         SubtitleService.shared.reset()
 
         tracker = nil
         veyraHubTracker = nil
+        localTracker = nil
         recorderCleanupTracker = nil
         playbackEngine = nil
     }
@@ -199,6 +205,7 @@ final class PlaybackViewModel: ObservableObject {
             // de positie hangen op het laatst bekende afspeel-/pauze-event.
             tracker?.finish()
             veyraHubTracker?.finish()
+            localTracker?.finish()
             recorderCleanupTracker?.finish()
             playbackEngine?.stop()
         }

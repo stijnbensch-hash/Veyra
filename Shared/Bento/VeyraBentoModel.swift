@@ -118,6 +118,11 @@ final class VeyraBentoViewModel {
     private(set) var iptvSeries: [IPTVHomeSeries] = []
     private(set) var releaseFilms: [BentoTMDBTitle] = []
     private(set) var releaseSeries: [BentoTMDBTitle] = []
+    /// Fase 4 (Regional Releases, spec §4/§14): "Nieuw van hier" -- expliciet GEEN TMDB-discover
+    /// zoals `releaseFilms`/`releaseSeries` hierboven, maar de regionale bronnen-waarheid via
+    /// `RegionalReleaseRepository` (spec §13/§93: "TMDB Trending gebruiken als waarheid voor
+    /// regionaal nieuw" is verboden).
+    private(set) var regionalReleases: [RegionalReleaseEvent] = []
     private(set) var providers: [BentoCatalog] = []
     private(set) var collections: [BentoCatalog] = []
     /// Hoeveel tijd de kijker heeft. Standaard 40 min; koppel aan een pickertje of aan de agenda.
@@ -130,6 +135,7 @@ final class VeyraBentoViewModel {
     @ObservationIgnored private let seriesSource: (@Sendable () async -> [IPTVHomeSeries])?
     @ObservationIgnored private let releaseFilmsSource: (@Sendable () async -> [BentoTMDBTitle])?
     @ObservationIgnored private let releaseSeriesSource: (@Sendable () async -> [BentoTMDBTitle])?
+    @ObservationIgnored private let regionalReleasesSource: (@Sendable () async -> [RegionalReleaseEvent])?
     @ObservationIgnored private let providersSource: (@Sendable () async -> [BentoCatalog])?
     @ObservationIgnored private let collectionsSource: (@Sendable () async -> [BentoCatalog])?
 
@@ -141,6 +147,7 @@ final class VeyraBentoViewModel {
          iptvSeries: (@Sendable () async -> [IPTVHomeSeries])? = nil,
          releasesFilms: (@Sendable () async -> [BentoTMDBTitle])? = nil,
          releasesSeries: (@Sendable () async -> [BentoTMDBTitle])? = nil,
+         regionalReleases: (@Sendable () async -> [RegionalReleaseEvent])? = nil,
          streaming: (@Sendable () async -> [BentoCatalog])? = nil,
          collections: (@Sendable () async -> [BentoCatalog])? = nil,
          availableMinutes: Int = 40) {
@@ -152,12 +159,17 @@ final class VeyraBentoViewModel {
         self.seriesSource = iptvSeries
         self.releaseFilmsSource = releasesFilms
         self.releaseSeriesSource = releasesSeries
+        self.regionalReleasesSource = regionalReleases
         self.providersSource = streaming
         self.collectionsSource = collections
         self.availableMinutes = availableMinutes
         // "Live nu" meteen tonen met de laatst bekende zenders, i.p.v. leeg te wachten tot de
         // eerste EPG-fetch klaar is; hieronder ververst load()/refreshLive() dit stilletjes verder.
         self.channels = IPTVDiskCache.read([EPGChannel].self, key: Self.liveChannelsCacheKey)?.value ?? []
+        // Spec §60 ("Home cache-first"): meteen de laatst gecachte regionale releases tonen,
+        // net als bij "Live nu" hierboven -- `cachedEvents` is een synchrone schijf-lezing,
+        // geen netwerk, dus hier zonder `await` op te roepen.
+        self.regionalReleases = RegionalReleaseRepository.shared.cachedEvents(region: RegionalReleaseContext.defaultRegion)
     }
 
     private static let liveChannelsCacheKey = "bento.liveChannels"
@@ -202,6 +214,7 @@ final class VeyraBentoViewModel {
         let epg = self.epg, added = self.added, status = self.status
         let filmsSource = self.filmsSource, seriesSource = self.seriesSource
         let releaseFilmsSource = self.releaseFilmsSource, releaseSeriesSource = self.releaseSeriesSource
+        let regionalReleasesSource = self.regionalReleasesSource
         let providersSource = self.providersSource, collectionsSource = self.collectionsSource
         // Elke bron vult zijn eigen tegel zodra hij klaar is; een trage EPG houdt Verder kijken niet tegen.
         await withTaskGroup(of: Void.self) { group in
@@ -237,6 +250,16 @@ final class VeyraBentoViewModel {
                 group.addTask { @MainActor in
                     let items = await releaseSeriesSource()
                     self.releaseSeries = items
+                }
+            }
+            if let regionalReleasesSource {
+                group.addTask { @MainActor in
+                    let items = await regionalReleasesSource()
+                    // Spec §61: een provider-outage/lege ophaal mag de bestaande (gecachte) lijst
+                    // niet wissen -- `RegionalReleaseRepository.refresh(context:)` geeft bij een
+                    // mislukking zelf al de laatst gecachte events terug (nooit `[]` door een fout),
+                    // dus hier gewoon altijd overnemen.
+                    self.regionalReleases = items
                 }
             }
             if let providersSource {

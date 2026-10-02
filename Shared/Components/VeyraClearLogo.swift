@@ -13,19 +13,32 @@ struct VeyraClearLogo: View {
     var alignment: HorizontalAlignment = .leading
 
     @State private var logoURL: URL?
+    // Fase 3 stap 4 (artwork-engine-spec §40): "ClearLogo + tekst" toont, anders dan de overige
+    // modi, de titeltekst ALTIJD mee onder het logo -- alleen relevant hier (Detail/Hero/Player-
+    // contextbalk/Collection-logokeuze); de compacte Bento-/"Nieuw van hier"-kaarten (`VeyraTitleLogo`)
+    // hebben geen ruimte voor logo + tekst samen en blijven bij logo-of-tekst.
+    @State private var showTextAlongsideLogo = false
+    // §66: herlaadt wanneer een artwork-instelling of per-titel override wijzigt terwijl dit
+    // scherm al open staat (bv. na de picker, of een VeyraHub-sync vanaf een ander apparaat).
+    @ObservedObject private var artworkRefresh = ArtworkRefreshSignal.shared
 
     var body: some View {
         Group {
             if let logoURL {
-                AsyncImage(url: logoURL) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxWidth: maxWidth, maxHeight: maxHeight)
-                            .frame(maxWidth: .infinity, alignment: Alignment(horizontal: alignment, vertical: .center))
-                    default:
+                VStack(alignment: alignment, spacing: 6) {
+                    AsyncImage(url: logoURL) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFit()
+                                .frame(maxWidth: maxWidth, maxHeight: maxHeight)
+                                .frame(maxWidth: .infinity, alignment: Alignment(horizontal: alignment, vertical: .center))
+                        default:
+                            fallbackText
+                        }
+                    }
+                    if showTextAlongsideLogo {
                         fallbackText
                     }
                 }
@@ -33,8 +46,13 @@ struct VeyraClearLogo: View {
                 fallbackText
             }
         }
-        .task(id: item.tmdbID) {
-            logoURL = await ClearLogoService.logoURL(for: item)
+        .task(id: "\(item.tmdbID ?? -1):\(artworkRefresh.generation)") {
+            // Fase 3 (artwork-engine-spec §29/§30): via de centrale `ArtworkResolver`
+            // i.p.v. hier altijd rechtstreeks TMDB te bevragen — respecteert zo ook een
+            // gekozen AIOMetadata-addon, met dezelfde TMDB-terugval. "Altijd tekst" (§40)
+            // levert hier al `nil` op via de resolver zelf, dus geen extra check nodig.
+            showTextAlongsideLogo = ArtworkSettingsStore().load().titleDisplay == .clearLogoPlusText
+            logoURL = await ArtworkResolver.shared.clearLogoURL(for: item)
         }
     }
 

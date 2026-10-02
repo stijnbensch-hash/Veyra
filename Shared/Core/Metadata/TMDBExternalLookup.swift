@@ -12,7 +12,10 @@ enum TMDBExternalLookup {
     /// het resultaat (ook een "niet gevonden") teruggeschreven wordt naar de cache. Vervangt de
     /// losse IMDb-/titel-aanroepen + eigen cache-logica die voorheen in `ShelfCatalogService`
     /// zaten.
-    static func tmdbID(forIMDbID imdbID: String?, title: String, year: Int?, kind: ShelfMediaKind) async -> Int? {
+    static func tmdbID(
+        forIMDbID imdbID: String?, title: String, year: Int?, kind: ShelfMediaKind,
+        preferredOriginalLanguage: String? = nil
+    ) async -> Int? {
         if case .some(let cached) = await IPTVTMDBMappingCache.shared.cachedTMDBID(
             imdbID: imdbID, title: title, year: year, kind: kind
         ) {
@@ -24,7 +27,7 @@ enum TMDBExternalLookup {
             found = await tmdbID(forIMDbID: imdbID, kind: kind)
         }
         if found == nil {
-            found = await tmdbID(forTitle: title, year: year, kind: kind)
+            found = await tmdbID(forTitle: title, year: year, kind: kind, preferredOriginalLanguage: preferredOriginalLanguage)
         }
 
         await IPTVTMDBMappingCache.shared.store(tmdbID: found, imdbID: imdbID, title: title, year: year, kind: kind)
@@ -81,16 +84,25 @@ enum TMDBExternalLookup {
     /// dan een item dat helemaal niet naar TMDB gelinkt is — vooral nodig
     /// voor mediaserver-bronnen (VeyraHub) die vooralsnog geen `ProviderIds`
     /// meesturen voor al hun bibliotheken.
-    static func tmdbID(forTitle title: String, year: Int? = nil, kind: ShelfMediaKind) async -> Int? {
+    static func tmdbID(
+        forTitle title: String, year: Int? = nil, kind: ShelfMediaKind,
+        preferredOriginalLanguage: String? = nil
+    ) async -> Int? {
         guard let token = AppConfiguration.tmdbReadAccessToken else { return nil }
 
         do {
             if kind == .movie {
                 let page = try await TMDBClient(readAccessToken: token).searchMovies(query: title)
-                return bestMatch(page.results.map { ($0.id, $0.releaseDate) }, year: year)
+                return bestMatch(
+                    page.results.map { ($0.id, $0.releaseDate, $0.originalLanguage) },
+                    year: year, preferredOriginalLanguage: preferredOriginalLanguage
+                )
             } else if let service = SeriesService() {
                 let page = try await service.searchSeries(query: title)
-                return bestMatch(page.results.map { ($0.id, $0.firstAirDate) }, year: year)
+                return bestMatch(
+                    page.results.map { ($0.id, $0.firstAirDate, $0.originalLanguage) },
+                    year: year, preferredOriginalLanguage: preferredOriginalLanguage
+                )
             }
             return nil
         } catch {
@@ -102,15 +114,32 @@ enum TMDBExternalLookup {
     /// waarvan het release-/uitzendjaar overeenkomt — zonder dit kon een
     /// titel-zoekopdracht een compleet andere, gelijknamige of populairdere
     /// titel als eerste resultaat teruggeven en dus de verkeerde titel
-    /// linken. Zonder jaartal (of geen match erop) gewoon het eerste
+    /// linken. Als er GEEN jaartal-match is (bv. een regionale release van een
+    /// NIEUW SEIZOEN van een al langer lopende reeks -- de uitzenddatum van dat
+    /// seizoen is geen betrouwbare schatting van TMDB's `firstAirDate`, dus
+    /// bewust geen jaartal meegegeven door de aanroeper) valt dit terug op een
+    /// `preferredOriginalLanguage`-voorkeur (bv. "nl" voor een Vlaamse bron) vóór
+    /// de blinde TMDB-relevantievolgorde -- vermindert het risico dat een
+    /// generieke titel (bv. "Switch") een compleet andere, populairdere
+    /// buitenlandse titel linkt. Zonder jaartal/taal-match gewoon het eerste
     /// resultaat, zoals TMDB ze op relevantie sorteert.
-    private static func bestMatch(_ candidates: [(Int, String?)], year: Int?) -> Int? {
+    private static func bestMatch(
+        _ candidates: [(Int, String?, String?)], year: Int?, preferredOriginalLanguage: String? = nil
+    ) -> Int? {
         guard !candidates.isEmpty else { return nil }
 
         if let year {
-            if let matched = candidates.first(where: { _, date in
+            if let matched = candidates.first(where: { _, date, _ in
                 guard let date, date.count >= 4 else { return false }
                 return Int(date.prefix(4)) == year
+            }) {
+                return matched.0
+            }
+        }
+
+        if let preferredOriginalLanguage {
+            if let matched = candidates.first(where: { _, _, language in
+                language?.caseInsensitiveCompare(preferredOriginalLanguage) == .orderedSame
             }) {
                 return matched.0
             }

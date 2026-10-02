@@ -29,12 +29,13 @@ nonisolated enum BentoTile: String, CaseIterable, Hashable, Sendable {
     case releasesSeries  // Nieuw uitgebrachte series (TMDB)
     case streaming   // Streamingdiensten (logo's)
     case collecties  // Filmcollecties (franchises)
+    case nieuwVanHier  // Regionale releases (VRT, VTM, Play, Streamz, ...) -- Regional Releases fase 4
 }
 
 extension BentoTile {
     /// De blokken die de gebruiker kan aan- of uitzetten en herschikken.
     static let configurable: [BentoTile] = [
-        .volgende, .releasesFilms, .releasesSeries, .live, .vandaag,
+        .volgende, .nieuwVanHier, .releasesFilms, .releasesSeries, .live, .vandaag,
         .iptvFilms, .iptvSeries, .streaming, .collecties
     ]
 
@@ -50,6 +51,7 @@ extension BentoTile {
         case .iptvSeries: return "IPTV series"
         case .streaming: return "Streamingdiensten"
         case .collecties: return "Filmcollecties"
+        case .nieuwVanHier: return "Nieuw van hier"
         case .tijd, .nieuw, .bronnen: return rawValue
         }
     }
@@ -66,6 +68,7 @@ extension BentoTile {
         case .iptvSeries: return "Nieuw toegevoegde series van je IPTV-providers"
         case .streaming: return "Netflix, Disney+ en andere diensten"
         case .collecties: return "Franchises en eigen lijsten"
+        case .nieuwVanHier: return "Nieuwe regionale series en seizoenen (VRT, VTM, Play, Streamz, ...)"
         case .tijd, .nieuw, .bronnen: return ""
         }
     }
@@ -81,6 +84,7 @@ extension BentoTile {
         case .iptvSeries: return "rectangle.stack"
         case .streaming: return "play.rectangle.on.rectangle"
         case .collecties: return "square.stack"
+        case .nieuwVanHier: return "mappin.and.ellipse"
         case .tijd, .nieuw, .bronnen: return "square"
         }
     }
@@ -173,9 +177,9 @@ extension BentoTile {
     /// Natuurlijke breedte in kolommen (van 12; op de telefoon altijd de volle 2).
     fileprivate func span(_ device: BentoDevice) -> Int {
         if device == .phone { return 2 }
-        // "Binnenkort" als losse kaartenrij: volle breedte, eigen rij, net als "Verder kijken"
-        // (phone is hierboven al altijd volle breedte).
-        if self == .vandaag { return 12 }
+        // "Binnenkort"/"Nieuw van hier" als losse kaartenrij: volle breedte, eigen rij, net als
+        // "Verder kijken" (phone is hierboven al altijd volle breedte).
+        if self == .vandaag || self == .nieuwVanHier { return 12 }
         // "IPTV films"/"IPTV series" op tv als 2 aparte rijen onder elkaar i.p.v. naast elkaar.
         if device == .tv, self == .iptvFilms || self == .iptvSeries { return 12 }
         switch self {
@@ -201,6 +205,9 @@ extension BentoTile {
             // sectie heen lopen -- vandaar dat dit hier ook echt moet kloppen.
             case .volgende: return 352
             case .vandaag: return 352
+            // Meerdere datum-emmers (Vandaag/Morgen/Deze week/Later) onder elkaar, i.p.v. "Binnenkort"s
+            // ene rij -- heeft daardoor meer hoogte nodig.
+            case .nieuwVanHier: return 760
             case .live: return 520
             case .iptvFilms, .iptvSeries: return 450
             case .streaming: return 220
@@ -220,6 +227,7 @@ extension BentoTile {
             case .volgende: return 205
             case .live: return 300
             case .vandaag: return 205
+            case .nieuwVanHier: return 460
             case .iptvFilms, .iptvSeries: return 280
             case .streaming: return 76
             // Zie toelichting bij `.tv` hierboven -- zelfde tekort, andere maten.
@@ -230,6 +238,7 @@ extension BentoTile {
             switch self {
             case .live: return 300
             case .volgende: return 165
+            case .nieuwVanHier: return 420
             case .releasesFilms, .releasesSeries: return 300
             case .iptvFilms, .iptvSeries: return 270
             case .streaming: return 60

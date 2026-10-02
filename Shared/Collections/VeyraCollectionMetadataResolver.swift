@@ -38,26 +38,12 @@ enum VeyraCollectionMetadataResolver {
 
         if let tmdbID = item.tmdbID {
             // Fase 6 (TMDB-spec, §44/§53): gedeelde cache met Home/Shelves i.p.v. een eigen los
-            // Collections-systeem -- Home ("Jouw Collecties", "Verder met je collecties") en de
-            // Collections-browser bevroegen voorheen onafhankelijk van elkaar vaak dezelfde
-            // films tegelijk op het startscherm. Collections is vooralsnog films-only (spec §41).
-            if let cached = await TMDBMetadataCache.shared.get(tmdbID: tmdbID, kind: .movie) {
-                media = cached
-            } else if let token = AppConfiguration.tmdbReadAccessToken,
-                      let details = try? await TMDBClient(readAccessToken: token).movieDetails(id: tmdbID) {
-                media = MediaItem(
-                    title: details.title,
-                    type: item.mediaType,
-                    imdbID: item.imdbID,
-                    tmdbID: item.tmdbID,
-                    overview: details.overview,
-                    releaseDate: details.releaseDate,
-                    posterURL: TMDBImageURLBuilder.poster(details.posterPath),
-                    backdropURL: TMDBImageURLBuilder.backdrop(details.backdropPath),
-                    genre: details.genres?.first?.name,
-                    rating: details.voteAverage
-                )
-                await TMDBMetadataCache.shared.set(tmdbID: tmdbID, kind: .movie, media)
+            // Collections-systeem. Fase 1 (metadata-policy-spec §14/§18/§19): de resolutie zelf
+            // loopt nu via de centrale `MetadataRepository`, die ook een gekozen AIOMetadata-
+            // addon raadpleegt (met TMDB-terugval) i.p.v. hier altijd rechtstreeks TMDB te
+            // bevragen. Collections is vooralsnog films-only (spec §41).
+            if let resolved = await MetadataRepository.shared.resolvedMovie(tmdbID: tmdbID, imdbID: item.imdbID) {
+                media = resolved
             }
         }
 

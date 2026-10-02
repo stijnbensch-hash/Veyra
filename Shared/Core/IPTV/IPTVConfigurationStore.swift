@@ -37,7 +37,7 @@ struct IPTVStoredProvider: Identifiable, Hashable, Sendable {
 
 // MARK: - Configuration Store
 
-struct IPTVConfigurationStore {
+nonisolated struct IPTVConfigurationStore {
     private let service: String
 
     private let providersAccount =
@@ -734,7 +734,7 @@ struct IPTVConfigurationStore {
 
 // MARK: - Providers Payload
 
-private struct StoredProvidersPayload:
+private nonisolated struct StoredProvidersPayload:
     Codable
 {
     let version: Int
@@ -783,7 +783,7 @@ private struct StoredProvidersPayload:
 
 // MARK: - Provider Payload
 
-private struct StoredProviderPayload:
+private nonisolated struct StoredProviderPayload:
     Codable
 {
     let id: UUID
@@ -794,7 +794,7 @@ private struct StoredProviderPayload:
 
 // MARK: - Stored Configuration Payload
 
-private struct StoredConfigurationPayload:
+private nonisolated struct StoredConfigurationPayload:
     Codable
 {
     enum Kind: String, Codable {

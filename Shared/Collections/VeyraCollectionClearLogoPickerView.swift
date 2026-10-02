@@ -208,7 +208,7 @@ struct VeyraCollectionClearLogoPickerView: View {
         var urls: [URL] = []
         await withTaskGroup(of: URL?.self) { group in
             for resolved in resolvedItems {
-                group.addTask { await ClearLogoService.logoURL(for: resolved.media) }
+                group.addTask { await ArtworkResolver.shared.clearLogoURL(for: resolved.media) }
             }
             for await url in group { if let url { urls.append(url) } }
         }

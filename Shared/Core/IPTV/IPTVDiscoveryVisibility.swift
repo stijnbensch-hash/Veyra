@@ -17,7 +17,7 @@
 
 import Foundation
 
-struct IPTVDiscoveryVisibility {
+nonisolated struct IPTVDiscoveryVisibility {
     static let shared = IPTVDiscoveryVisibility()
 
     private let configurationStore: IPTVConfigurationStore

@@ -73,6 +73,13 @@ struct MovieDetailView: View {
                         FavoriteToggleButton(item: movie, compact: true)
                         WatchlistToggleButton(item: movie, compact: true)
                         AddToCollectionButton(item: movie, compact: true)
+                        NavigationLink {
+                            VeyraArtworkPickerView(item: movie)
+                        } label: {
+                            Label("Artwork", systemImage: "photo.on.rectangle.angled")
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(VeyraColors.cyan)
                         if let belongsToCollection {
                             NavigationLink {
                                 VeyraCollectionDetailView(source: .official(tmdbCollectionID: belongsToCollection.id, name: belongsToCollection.name))
