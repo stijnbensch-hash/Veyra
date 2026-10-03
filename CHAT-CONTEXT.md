@@ -76,3 +76,62 @@ De gebruiker meldt dat de vorige begrenzing de hero als een ingesprongen kaart t
 Controle: native SwiftUI met de echte hero/clearlogo/achtergrondcode en lokale vervangers voor netwerkdata is gecontroleerd op 390, 1024, 1440 en 1920pt. Positie en grootte van actieknop en raster blijven exact gelijk bij korte/lange titels, ontbrekende metadata, later geladen logo's en scores en titelrotatie. De iPhone 17/iOS 27-layout in een echte simulator toont artwork tot beide zijranden en onder de statusbalk, begrensd boven Films/raster. Dit zijn component/layoutcontroles met testdata, geen fysieke screenshots van het gehele product. De drie platformtargets zijn succesvol gebouwd. Automatische updaters blijven gepauzeerd.
 
 Woonkamer en de fysieke iPhone zijn met deze versie handmatig bijgewerkt en succesvol opnieuw gestart.
+
+## Collectiedetail tvOS — afbeelding en menuknop, 3 oktober 2026
+
+De gebruiker vraagt specifiek op tvOS de collectieafbeelding volledig binnen het kader te tonen en het gefocuste symbool rechtsboven te verwijderen. De gebruiker verduidelijkt "geen vrije ruimtes" en "kader ook zo laten": de bestaande bannerhoogte/breedte blijft behouden. Op tvOS wordt het volledige beeld naar beide kaderafmetingen geschaald, zonder uitsnede, zoom of lege zijstroken (de verhouding volgt dus het kader). De opgeslagen uitsnede blijft beschikbaar voor de collectiekaarten. De ellipsis-menuknop is alleen in de tvOS-detailweergave verwijderd. Bewerken, films beheren en verwijderen blijven beschikbaar via het contextmenu op de collectiekaart in de collectiebrowser.
+
+Controle: de tvOS-, iOS/iPad- en macOS-targets zijn met de definitieve kaderwijziging succesvol gebouwd; diff-controle geslaagd. De tvOS-app is bevestigd geïnstalleerd op Woonkamer. Automatisch opnieuw starten is niet bevestigd: devicectl kon de remoteService/XPC-verbinding niet maken; de herhaling werd geweigerd wegens de device usage assertion (4016). Geen fysieke visuele controle uitgevoerd. Automatische updaters blijven gepauzeerd.
+
+De gebruiker vraagt daarna de afbeeldingwijziging ongedaan te maken: de oorspronkelijke aspect-fill met bewaarde zoom/positie is hersteld. Het verwijderen van het tvOS-symbool rechtsboven blijft behouden.
+
+## Aflevering afgelopen — terug naar lijst, 3 oktober 2026
+
+De gebruiker meldt een achterblijvend "Veyra Player starten"-scherm na een aflevering, met automatisch doorgaan uit. De spelers hadden wel een credits-aftelling maar geen navigatieactie bij de echte `.ended`-status. `VeyraEpisodeCompletion` handelt nu op alle platformen een episode-einde één keer af: autoplay uit of geannuleerde aftelling retourneert direct, onafhankelijk van nog lopende metadata; autoplay aan opent de gevonden volgende aflevering ook zonder aftelling; geen vervolg retourneert na de lookup. Films en Live TV worden niet door deze episode-handler gesloten. De bestaande trackers kunnen het einde verwerken voordat de sessie wordt gestopt.
+
+De oorspronkelijke bronnenkiezer geeft een return-actie door aan alle opeenvolgende spelers en bronkeuzes, zodat afronden de hele spelerbranch sluit en de afleveringenlijst terugkomt. iPhone/iPad/Mac sluiten nu net als tvOS ook de bronkeuze na terugkeer uit een aflevering. Per speler voorkomen guards dubbele vooruit-/terugacties. PiP/fullscreen worden bij afgeronde afleveringen expliciet gestopt; IPTV-plankafleveringen krijgen de ontbrekende seizoen/aflevering-identiteit mee. De oorspronkelijke collectieafbeelding is hersteld op het aanvullende verzoek; de eerder verwijderde tvOS-menuknop blijft verwijderd.
+
+Native SwiftUI-componenttests met gesimuleerde engine-events slagen voor autoplay uit (ook met onopgeloste metadata), werkelijk EOF versus pause/idle, dubbel EOF, later gevonden volgende aflevering, autoplay aan, laatste aflevering, geannuleerde aftelling en uitsluiting van films/Live TV. Deze tests gebruiken de productie-handler; echte streamafloop en volledige navigatie op het toestel zijn nog niet fysiek geverifieerd.
+
+Verificatie: tvOS-, iPhone/iPad- en macOS-targets succesvol gebouwd met de playerfix en herstelde collectieafbeelding. Woonkamer en iPhone zijn bevestigd handmatig geïnstalleerd en succesvol opnieuw gestart. Automatische updaters blijven gepauzeerd. Een echte aflevering volledig laten uitspelen op het toestel blijft de praktische vervolgcontrole.
+
+## Collectiedetail — clearlogo onder menubalk, 3 oktober 2026
+
+De gebruiker meldt dat de collectie-inhoud op tvOS te hoog staat: het clearlogo overlapt de hoofdnavigatie. De negatieve bovenmarge (-24pt) is vervangen door 36pt, zodat de hele inhoud 60pt lager begint en ook een smal clearlogo onder de menubalk blijft. De bestaande afbeeldinguitsnede, bannermaat en verwijderde menuknop blijven behouden. iPhone/iPad/Mac hebben al een positieve bovenmarge en houden hun passende layout.
+
+De gebruiker verduidelijkt vervolgens "ik build zelf": voortaan alleen de gevraagde bronwijzigingen opslaan en aan de gebruiker overlaten om te bouwen/installeren, totdat die expliciet anders vraagt. De nog lopende builds voor deze bovenmargewijziging zijn gestopt; geen nieuwe versie geïnstalleerd. Updaters blijven gepauzeerd.
+
+
+## Addons — alleen rechtstreeks toevoegen verwijderen, 3 oktober 2026
+
+Na het afbreken van de brede verwijderopdracht verduidelijkt de gebruiker: alles via VeyraHub behouden, inclusief addonmetadata; alleen rechtstreeks addons toevoegen in Veyra verwijderen. De te brede verwijdering is hersteld voordat deze afgebakende wijziging is gemaakt. De lokale toevoegknop, manifest-invoer voor nieuwe addons en toevoegroute zijn verwijderd op tvOS en in de gedeelde iPhone/iPad/macOS-instellingen. De oude automatische AIOStreams-migratie wordt niet meer aangeroepen vanuit instellingen. Bestaande koppelingen blijven beschikbaar en bewerkbaar; stores, registry, metadata/artwork, catalogi, bronresolutie en VeyraHub-synchronisatie zijn behouden, net als mediaserver en IPTV. De lege addonlijst verwijst voor toevoegen naar VeyraHub.
+
+Controle: Swift-syntaxis en diff gecontroleerd, zonder appbuild of installatie conform "ik build zelf". Functionele controle in de app na de eigen build blijft open.
+
+
+## Addonwijzigingen volledig teruggezet, 3 oktober 2026
+
+De gebruiker vraagt "zet alles terug voor verwijderen addons". De drie gewijzigde addoninstellingen-/viewmodelbestanden zijn teruggezet naar de toestand vóór de verwijderopdracht: toevoegen, manifest-invoer en oude migratie zijn weer aanwezig op alle platformen. VeyraHub, metadata, addonproviders, mediaserver en IPTV zijn behouden. De eerdere playerfix en collectiemarge blijven ongewijzigd. Aan de gevraagde versnelling van Hub-bronnen waren nog geen codewijzigingen gemaakt. De gemelde startproblemen op Apple TV zijn met deze bronrollback nog niet als opgelost bevestigd. Geen build of installatie uitgevoerd; de gebruiker bouwt zelf.
+
+
+## Rechtstreekse addonbronnen verwijderd; VeyraHub behouden, 3 oktober 2026
+
+Nieuwe, expliciete opdracht: rechtstreekse addons verwijderen, alles via VeyraHub laten staan, mediaserver en IPTV behouden. De lokale addoninstellingen (toevoegen/bewerken) en navigatie daarnaartoe zijn verwijderd uit tvOS en de gedeelde iPhone/iPad/macOS-instellingen. Oude opgeslagen "addons"-categorieën worden bij laden overgeslagen zonder de opgeslagen volgorde te wissen. AddonRegistry registreert geen rechtstreekse streamproviders meer, ook niet vanuit oude opgeslagen addonrecords; daarmee doen de bestaande bronzoekers geen rechtstreekse addon-streamaanvragen meer. De lokale AIOStreams-statusprobe en automatische instellingsmigratie worden niet meer aangeroepen.
+
+AddonStore, metadata-/artworkresolutie, AIOMetadata-client, addon-/Hub-catalogi, VeyraHub-synchronisatie, native streams/ondertitels/voortgang en Jellyfin/IPTV-bronresolutie zijn behouden. Metadata-uitleg verwijst naar VeyraHub in plaats van het verdwenen lokale addoninstelscherm. Geen opgeslagen providerconfiguratie gewist. De eerdere player- en collectiefixes blijven behouden.
+
+Controle: gerichte geïsoleerde controles met productie-store/registry/Hub-client en een lokale netwerkfixture slagen voor oude addonrecords zonder rechtstreekse providers, behoud van metadata/configuratie, oude categorievolgordes met mediaserver/IPTV, en Hub-streams/addonidentiteit/volgorde/ondertitels/voortgang. De kernbestanden voor Hub, metadata/artwork, catalogi, mediaserver en IPTV zijn byte-voor-byte behouden. Swift-syntaxis en diff gecontroleerd. Geen appbuild of installatie uitgevoerd conform "ik build zelf". Opstarten van de tvOS-app op het fysieke toestel is hiermee nog niet als hersteld bevestigd.
+
+De gebruiker bevestigt vervolgens dat Veyra op Apple TV opnieuw start na het herstarten van de Apple TV. De precieze oorzaak van het eerdere startprobleem is niet vastgesteld.
+
+## Nieuw uitgebracht — passende backdrops, 3 oktober 2026
+
+De gebruiker vraagt de backdrops in Nieuw uitgebracht passend te maken zoals bij Verder kijken. De gedeelde release-decoder leest nu ook backdrop_path uit de bestaande TMDB-respons en gebruikt een begrensde w780-landschapafbeelding. Voorheen werd die waarde niet ingelezen en viel de kaart altijd terug op een staande poster. Release-kaarten gebruiken nu dezelfde VeyraArt-weergave met aspect-fit als de kleine Verder kijken-kaarten; ook de posterterugval wordt niet meer ingezoomd afgesneden. De bestaande kaartafmetingen blijven behouden. Dit geldt voor tvOS en de gedeelde iPhone/iPad/macOS-weergave.
+
+Swift-syntaxis en diff-controle geslaagd. Geen appbuild of installatie uitgevoerd; de gebruiker bouwt zelf. Visuele controle op het toestel volgt na die build.
+
+## Collectiebrowser — kop en nieuwe collectie, 3 oktober 2026
+
+De gebruiker meldt dat op iPhone Collecties en de telling (52 collecties) worden opgesplitst door de naastgelegen toevoegknop. De pijl bij de kop is verwijderd op alle platformen; titel en telling hebben één tekstregel. De gedeelde iPhone/iPad/macOS-browser kiest met ViewThatFits een horizontale indeling wanneer alles past en anders een indeling met Nieuwe collectie onder de kop. tvOS houdt de ruime horizontale indeling en reserveert voldoende breedte voor de kop. De macOS-target gebruikt bevestigd dezelfde browser als iPhone/iPad.
+
+Swift-syntaxis en diff-controle geslaagd. Geen appbuild, installatie of nieuwe visuele toestelcontrole uitgevoerd conform de voorkeur dat de gebruiker zelf bouwt.

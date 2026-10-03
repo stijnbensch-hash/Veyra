@@ -16,3 +16,5 @@
 - Op 18 september 2026 heeft de gebruiker automatisch installeren op Woonkamer uitgezet. De LaunchAgent is gestopt en uit LaunchAgents verplaatst; PAUSED blijft aanwezig. Niet hervatten of automatisch naar Woonkamer installeren zonder een nieuwe opdracht van de gebruiker.
 
 - De gebruiker verduidelijkt op 18 september 2026 dat hij de automatische updater zelf opnieuw had aangezet. Automatisch bouwen/installeren/starten op Woonkamer is opnieuw gewenst en geautoriseerd. Alleen tijdelijk pauzeren tijdens meerdelige wijzigingen en daarna hervatten.
+
+- Laatste gebruikersvoorkeur, 3 oktober 2026: "ik build zelf". Bewaar gevraagde codewijzigingen; laat bouwen en installeren aan de gebruiker over totdat die opnieuw expliciet vraagt dit uit te voeren. Deze voorkeur vervangt eerdere automatische build/install-afspraken. Updaters blijven gepauzeerd.

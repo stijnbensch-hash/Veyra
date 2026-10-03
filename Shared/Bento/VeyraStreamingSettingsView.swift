@@ -276,7 +276,7 @@ struct VeyraStreamingAddonPickerView: View {
                 Section { ProgressView() }
             } else if groups.isEmpty {
                 Section {
-                    Text("Geen addons met catalogi gevonden. Installeer een metadata-addon (bv. AIOMetadata) onder Addons.")
+                    Text("Geen addons met catalogi gevonden. Stel de metadata-addon (bv. AIOMetadata) in via VeyraHub.")
                         .foregroundStyle(.secondary)
                 }
             }

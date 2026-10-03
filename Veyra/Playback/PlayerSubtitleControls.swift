@@ -25,6 +25,7 @@ struct PlayerSubtitleControls: View {
     var sportEvent: SportEvent? = nil
     var onSelectLiveChannel: (VeyraGuideChannel) -> Void = { _ in }
 
+    var onEpisodeFinished: () -> Void = {}
     var onRequestExit: () -> Void = {}
     var onUserActivity: () -> Void = {}
     var onPlayNextEpisode: (MediaItem) -> Void = { _ in }
@@ -52,6 +53,7 @@ struct PlayerSubtitleControls: View {
 
     @State private var presentation = VeyraPlayerPresentation()
     @State private var nextEpisode: MediaItem?
+    @State private var nextEpisodeResolved = false
 
     // "Omdat je X keek" -- aanbeveling bij het einde zonder vervolgaflevering
     // (film, of laatste aflevering van een serie). Zie `BecauseYouWatchedOverlay`.
@@ -335,7 +337,13 @@ struct PlayerSubtitleControls: View {
                 .padding(.bottom, controlsVisible ? 190 : 48)
             }
 
-        }.onChange(of: isNearEndOfEpisode) { _, isNear in
+        }.veyraEpisodeCompletion(
+            engine: engine, item: item, isLive: source?.kind == .liveTV,
+            nextEpisode: nextEpisode, nextEpisodeResolved: nextEpisodeResolved,
+            autoAdvanceCancelled: countdownCancelled,
+            onNext: { next in countdownTask?.cancel(); onPlayNextEpisode(next) },
+            onReturn: { countdownTask?.cancel(); onEpisodeFinished() }
+        ).onChange(of: isNearEndOfEpisode) { _, isNear in
             guard isNear, showNextEpisodeOverlay else { return }
             focused = .nextEpisode
         }.onAppear {
@@ -414,9 +422,11 @@ struct PlayerSubtitleControls: View {
             countdownRemaining = nil
             countdownCancelled = false
             nextEpisode = nil
+            nextEpisodeResolved = false
             let resolved = await NextEpisodeResolver.resolve(after: item)
             guard !Task.isCancelled else { return }
             nextEpisode = resolved
+            nextEpisodeResolved = true
             recommendedItem = nil
             recommendationDismissed = false
             if resolved == nil, let item {

@@ -1,8 +1,8 @@
 import Foundation
 import Combine
 
-/// Shared data/logic for the addons settings screen, used by both the
-/// tvOS `VeyraAddonsSettingsView` and the iOS `AddonsSettingsView`.
+/// Bewerken van bestaande addonconfiguratie. De stores blijven nodig voor
+/// metadata/catalogi en synchronisatie; er is geen lokale toevoegroute.
 @MainActor
 final class AddonsViewModel: ObservableObject {
     @Published private(set) var addons: [AddonManifest] = []
@@ -12,10 +12,6 @@ final class AddonsViewModel: ObservableObject {
 
     nonisolated init(store: AddonStore = AddonStore()) {
         self.store = store
-    }
-
-    func runMigrationIfNeeded() {
-        AddonMigration().runIfNeeded()
     }
 
     func reload() {
@@ -31,12 +27,6 @@ final class AddonsViewModel: ObservableObject {
         } catch {
             errorMessage = error.localizedDescription
         }
-    }
-
-    func add(_ addon: AddonManifest) throws {
-        try store.add(addon)
-        notifyAddonChange()
-        reload()
     }
 
     func update(_ addon: AddonManifest) throws {

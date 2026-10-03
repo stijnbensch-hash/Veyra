@@ -68,6 +68,9 @@ private struct LiveTVPlayerRoot: View {
 }
 
 private struct PlayerSessionView: View {
+    @Environment(\.veyraEpisodeReturn) private var returnToEpisodes
+    @State private var finishingEpisode = false
+
     @Environment(\.veyraPlayerVisibility)
     private var setPlayerVisible
 
@@ -197,6 +200,7 @@ private struct PlayerSessionView: View {
                     liveGuide: liveGuide,
                     sportEvent: sportEvent,
                     onSelectLiveChannel: onSelectLiveChannel,
+                    onEpisodeFinished: finishEpisode,
                     onRequestExit: {
                         dismiss()
                     },
@@ -204,6 +208,8 @@ private struct PlayerSessionView: View {
                         viewModel.registerActivity()
                     },
                     onPlayNextEpisode: { next in
+                        guard !finishingEpisode, !isResolvingNextEpisode,
+                              nextEpisodeRequest == nil else { return }
                         // Stop de tracker/engine van de HUIDIGE aflevering
                         // hier expliciet, i.p.v. te wachten op onDisappear
                         // (dat bij een push naar de volgende afspeler niet
@@ -305,13 +311,27 @@ private struct PlayerSessionView: View {
             viewModel.handleScenePhaseChange(phase)
         }
         .navigationDestination(item: $nextEpisodeRequest) { request in
-            if let matchedSource = request.source {
-                PlayerView(source: matchedSource, item: request.item)
-            } else {
-                SourceSelectionView(item: request.item)
+            Group {
+                if let matchedSource = request.source {
+                    PlayerView(source: matchedSource, item: request.item)
+                } else {
+                    SourceSelectionView(item: request.item)
+                }
             }
+            .environment(\.veyraEpisodeReturn, returnToEpisodes ?? { dismiss() })
         }
     }
+
+    private func finishEpisode() {
+        guard !finishingEpisode, !isResolvingNextEpisode,
+              nextEpisodeRequest == nil else { return }
+        finishingEpisode = true
+        viewModel.stopForDisappear()
+        if let returnToEpisodes { returnToEpisodes() }
+        else { dismiss() }
+    }
+
+
 }
 
 /// Draagt zowel de volgende aflevering als (indien gevonden) de daarbij

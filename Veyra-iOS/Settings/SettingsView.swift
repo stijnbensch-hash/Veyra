@@ -4,7 +4,6 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
     case iptv
     case liveTVSettings
     case sourceAppearance
-    case addons
     case mediaServers
     case general
     case subtitles
@@ -22,7 +21,6 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
         case .iptv: return "IPTV"
         case .liveTVSettings: return "Live TV instellingen"
         case .sourceAppearance: return "Bronverschijning"
-        case .addons: return "Addons"
         case .mediaServers: return "Mediaservers"
         case .general: return "Algemeen"
         case .subtitles: return "Ondertitels"
@@ -40,7 +38,6 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
         case .iptv: return "Live TV en VOD via Xtream of M3U"
         case .liveTVSettings: return "Gids, player, buffer en kanaalcache"
         case .sourceAppearance: return "Badges in het bronkeuzescherm"
-        case .addons: return "Streams via gekoppelde addons"
         case .mediaServers: return "Jellyfin en andere eigen servers"
         case .general: return "Startscherm, sport en kaartweergave"
         case .subtitles: return "Taal en OpenSubtitles"
@@ -58,7 +55,6 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
         case .iptv: return "antenna.radiowaves.left.and.right"
         case .liveTVSettings: return "slider.horizontal.3"
         case .sourceAppearance: return "tag"
-        case .addons: return "puzzlepiece.extension.fill"
         case .mediaServers: return "server.rack"
         case .general: return "slider.horizontal.3"
         case .subtitles: return "captions.bubble"
@@ -76,14 +72,12 @@ struct SettingsView: View {
     @ObservedObject private var trakt = TraktStore.shared
 
     @State private var iptvProviderCount = 0
-    @State private var addonCount = 0
     @State private var mediaServerCount = 0
     @State private var iptvErrored = false
     @State private var settingsPath = NavigationPath()
     @State private var categoryOrder: [SourceCategory] = SourceOrderDefaults.loadCategoryOrder()
 
     private let iptvStore = IPTVConfigurationStore()
-    private let addonStore = AddonStore()
     private let mediaServerStore = MediaServerStore()
 
     var body: some View {
@@ -95,7 +89,6 @@ struct SettingsView: View {
         }
         .onAppear { reload() }
         .onReceive(NotificationCenter.default.publisher(for: .iptvConfigurationDidChange)) { _ in reload() }
-        .onReceive(NotificationCenter.default.publisher(for: .veyraAddonConfigurationDidChange)) { _ in reload() }
         .onReceive(NotificationCenter.default.publisher(for: .veyraMediaServerConfigurationDidChange)) { _ in reload() }
         .task { await trakt.refreshIfNeeded() }
     }
@@ -287,13 +280,7 @@ struct SettingsView: View {
                 settingsCard(.iptv, status: iptvStatus, statusColor: iptvStatusColor)
             }
         case .addons:
-            reorderableRow(category) {
-                settingsCard(
-                    .addons,
-                    status: addonCount == 0 ? "Niet ingesteld" : "\(addonCount) actief",
-                    statusColor: VeyraColors.cyan
-                )
-            }
+            EmptyView() // Alleen voor opgeslagen categorievolgordes uit oudere builds.
         }
     }
 
@@ -351,7 +338,6 @@ struct SettingsView: View {
         case .iptv: IPTVAccountsView()
         case .liveTVSettings: IPTVPlaybackSettingsView()
         case .sourceAppearance: SourceAppearanceView()
-        case .addons: AddonsSettingsView()
         case .mediaServers: MediaServersSettingsView()
         case .general: GeneralSettingsView()
         case .subtitles: SubtitlePreferencesView()
@@ -400,7 +386,6 @@ struct SettingsView: View {
             iptvProviderCount = 0
             iptvErrored = true
         }
-        addonCount = addonStore.load().count
         mediaServerCount = mediaServerStore.load().count
     }
 

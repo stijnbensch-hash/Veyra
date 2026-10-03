@@ -19,7 +19,7 @@ enum MetadataSourceOption: String, Codable, CaseIterable, Identifiable {
     var subtitle: String {
         switch self {
         case .tmdb: return "Standaard, geen addon nodig"
-        case .aioMetadataAddon: return "Vereist een AIOMetadata-addon bij Addons"
+        case .aioMetadataAddon: return "Metadata-addon ingesteld via VeyraHub"
         }
     }
 }
@@ -39,7 +39,7 @@ enum MetadataSourcePreference {
     }
 
     /// De actief ingeschakelde AIOMetadata-addon, indien de voorkeur daarop
-    /// staat én er eentje geconfigureerd is bij Addons.
+    /// staat én er eentje in de gesynchroniseerde configuratie staat.
     static func activeAddon() -> AddonManifest? {
         guard current == .aioMetadataAddon else { return nil }
         return AddonStore().enabledAddons().first { $0.kind == .aioMetadata }

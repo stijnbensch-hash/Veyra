@@ -40,7 +40,7 @@ enum SourceOrderDefaults {
     static let categoryOrderKey = "sourceOrder.categoryOrder"
     static let iptvProviderOrderKey = "sourceOrder.iptvProviderOrder"
 
-    static let defaultCategoryOrder: [SourceCategory] = [.mediaServers, .iptv, .addons]
+    static let defaultCategoryOrder: [SourceCategory] = [.mediaServers, .iptv]
 
     // MARK: - Categorievolgorde
 
@@ -50,7 +50,10 @@ enum SourceOrderDefaults {
             return defaultCategoryOrder
         }
 
+        // De oude "addons"-waarde blijft decodeerbaar, maar maakt geen
+        // rechtstreeks addoninstellingenscherm meer zichtbaar.
         let stored = rawValues.compactMap(SourceCategory.init(rawValue:))
+            .filter { defaultCategoryOrder.contains($0) }
         // Categorieën die (nog) niet in de opgeslagen volgorde zitten (bv. na
         // een appupdate) komen achteraan, in de standaardvolgorde.
         let missing = defaultCategoryOrder.filter { !stored.contains($0) }

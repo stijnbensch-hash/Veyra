@@ -52,7 +52,10 @@ struct ShelfIPTVSeriesEpisodesView: View {
                     url: episode.streamURL,
                     kind: .iptvVOD,
                     providerName: providerName
-                )
+                ),
+                item: MediaItem(title: title, type: .series,
+                                seasonNumber: episode.seasonNumber,
+                                episodeNumber: episode.episodeNumber)
             )
         } label: {
             VStack(alignment: .leading, spacing: 4) {

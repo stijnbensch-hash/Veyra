@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Instellingenscherm om de volgorde van addons/mediaservers in "Selecteer
+/// Instellingenscherm om de volgorde van mediaservers in "Selecteer
 /// bron" te bepalen — zowel voor "Alle" als voor de losse filterknoppen
 /// (die worden uit dezelfde, herschikte lijst afgeleid, zie
 /// `SourceSelectionView.applyOriginOrder`).
@@ -26,7 +26,7 @@ struct SourceOrderView: View {
                 } header: {
                     Text("Bronvolgorde")
                 } footer: {
-                    Text("Bepaalt in welke volgorde addons en mediaservers verschijnen bij \"Selecteer bron\" — zowel bij \"Alle\" als bij de losse knoppen. Bronnen via VeyraHub staan hier niet tussen: hun volgorde stel je in op VeyraHub zelf (addons verplaatsen), en die volgorde wordt altijd gevolgd.")
+                    Text("Bepaalt in welke volgorde mediaservers verschijnen bij \"Selecteer bron\" — zowel bij \"Alle\" als bij de losse knoppen. Bronnen via VeyraHub staan hier niet tussen: hun volgorde stel je in op VeyraHub zelf (addons verplaatsen), en die volgorde wordt altijd gevolgd.")
                 }
             }
             .frame(maxWidth: 1000)

@@ -96,7 +96,7 @@ struct MetadataSettingsView: View {
                 } header: {
                     Text("Metadatabron")
                 } footer: {
-                    Text("Bepaalt waar poster, achtergrond en omschrijving vandaan komen voor titels zonder eigen afbeeldingen (bv. Trakt-lijsten). AIOMetadata vereist een addon bij Addons.")
+                    Text("Bepaalt waar poster, achtergrond en omschrijving vandaan komen voor titels zonder eigen afbeeldingen (bv. Trakt-lijsten). AIOMetadata gebruikt de addonconfiguratie via VeyraHub.")
                 }
 
                 if let addon = MetadataSourcePreference.activeAddon() {

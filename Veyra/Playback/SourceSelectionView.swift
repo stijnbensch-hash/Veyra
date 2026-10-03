@@ -3,6 +3,7 @@ import SwiftUI
 @MainActor
 struct SourceSelectionView: View {
     let item: MediaItem
+    @Environment(\.veyraEpisodeReturn) private var inheritedEpisodeReturn
 
     @Environment(\.dismiss)
     private var dismiss
@@ -101,6 +102,7 @@ struct SourceSelectionView: View {
                         for: item
                     )
             )
+            .environment(\.veyraEpisodeReturn, inheritedEpisodeReturn ?? { selectedSource = nil })
         }
         .onChange(of: selectedSource) { previous, current in
             guard previous != nil, current == nil,

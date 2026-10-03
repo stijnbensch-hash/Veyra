@@ -70,6 +70,13 @@ final class AetherPictureInPictureController: NSObject, ObservableObject {
         }
     }
 
+    func stop() {
+        controller?.stopPictureInPicture()
+        engine?.pictureInPictureActive = false
+        isStarting = false
+        isActive = false
+    }
+
     func toggle() {
         guard let controller else { return }
         if controller.isPictureInPictureActive {

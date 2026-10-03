@@ -4,6 +4,9 @@ import AVFoundation
 import UIKit
 
 struct PlayerView: View {
+    @Environment(\.veyraEpisodeReturn) private var returnToEpisodes
+    @State private var finishingEpisode = false
+
     @Environment(\.dismiss)
     private var dismiss
 
@@ -91,7 +94,10 @@ struct PlayerView: View {
                     source: source,
                     pip: pip,
                     onClose: { dismiss() },
+                    onEpisodeFinished: finishEpisode,
                     onPlayNextEpisode: { next in
+                        guard !finishingEpisode, !isResolvingNextEpisode,
+                              nextEpisodeRequest == nil else { return }
                         // Zie de zelfde fix + toelichting in de tvOS
                         // PlayerView: zonder dit werd de net afgelopen
                         // aflevering niet als "bekeken" geregistreerd bij
@@ -175,12 +181,26 @@ struct PlayerView: View {
             if phase == .background { scheduleBackgroundStop() }
         }
         .navigationDestination(item: $nextEpisodeRequest) { request in
-            if let matchedSource = request.source {
-                PlayerView(source: matchedSource, item: request.item)
-            } else {
-                SourceSelectionView(item: request.item)
+            Group {
+                if let matchedSource = request.source {
+                    PlayerView(source: matchedSource, item: request.item)
+                } else {
+                    SourceSelectionView(item: request.item)
+                }
             }
+            .environment(\.veyraEpisodeReturn, returnToEpisodes ?? { dismiss() })
         }
+    }
+
+    private func finishEpisode() {
+        guard !finishingEpisode, !isResolvingNextEpisode,
+              nextEpisodeRequest == nil else { return }
+        finishingEpisode = true
+        backgroundStopTask?.cancel()
+        pip.stop()
+        viewModel.stopForDisappear()
+        if let returnToEpisodes { returnToEpisodes() }
+        else { dismiss() }
     }
 
     private func scheduleBackgroundStop() {
@@ -217,6 +237,7 @@ private struct iOSPlayerSurface: View {
     let source: PlayableSource
     @ObservedObject var pip: AetherPictureInPictureController
     let onClose: () -> Void
+    var onEpisodeFinished: () -> Void = {}
     var onPlayNextEpisode: (MediaItem) -> Void = { _ in }
     var onUserActivity: () -> Void = {}
     /// Zie de tvOS `PlayerView` -- gezet wanneer deze speelsessie een
@@ -249,6 +270,7 @@ private struct iOSPlayerSurface: View {
     @State private var hideTask: Task<Void, Never>?
     @State private var activePanel: IOSPlayerPanel?
     @State private var nextEpisode: MediaItem?
+    @State private var nextEpisodeResolved = false
     @State private var isLandscape = false
 
     // "Omdat je X keek" -- aanbeveling bij het einde zonder vervolgaflevering
@@ -500,6 +522,13 @@ private struct iOSPlayerSurface: View {
                     }
             }
         }
+        .veyraEpisodeCompletion(
+            engine: engine, item: item, isLive: source.kind == .liveTV,
+            nextEpisode: nextEpisode, nextEpisodeResolved: nextEpisodeResolved,
+            autoAdvanceCancelled: countdownCancelled,
+            onNext: { next in countdownTask?.cancel(); onPlayNextEpisode(next) },
+            onReturn: { countdownTask?.cancel(); onEpisodeFinished() }
+        )
         .onAppear {
             scheduleAutoHide()
             pip.attach(engine: engine)
@@ -519,7 +548,11 @@ private struct iOSPlayerSurface: View {
             countdownCancelled = false
             autoSkippedSegmentIDs = []
             skipSegments = []
-            nextEpisode = await NextEpisodeResolver.resolve(after: item)
+            nextEpisodeResolved = false
+            let resolved = await NextEpisodeResolver.resolve(after: item)
+            guard !Task.isCancelled else { return }
+            nextEpisode = resolved
+            nextEpisodeResolved = true
             recommendedItem = nil
             recommendationDismissed = false
             if nextEpisode == nil, let item {

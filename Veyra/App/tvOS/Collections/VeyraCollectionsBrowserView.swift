@@ -24,7 +24,9 @@ struct VeyraCollectionsBrowserView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
                     HStack(alignment: .firstTextBaseline) {
-                        VeyraSectionHeader(title: "Collecties", subtitle: collectionsSubtitle)
+                        VeyraSectionHeader(title: "Collecties", subtitle: collectionsSubtitle, showChevron: false)
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
                         Spacer()
                         Button {
                             showCreate = true

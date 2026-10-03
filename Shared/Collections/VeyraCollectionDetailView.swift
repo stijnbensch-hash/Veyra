@@ -124,6 +124,7 @@ struct VeyraCollectionDetailView: View {
                     }
                 }
             } else {
+                #if !os(tvOS)
                 ToolbarItem {
                     Menu {
                         Button {
@@ -153,6 +154,7 @@ struct VeyraCollectionDetailView: View {
                         Image(systemName: "ellipsis.circle")
                     }
                 }
+                #endif
             }
         }
         .sheet(isPresented: $showEdit) {
@@ -617,7 +619,7 @@ struct VeyraCollectionDetailView: View {
     #if os(tvOS)
     private let horizontalPadding: CGFloat = 48
     private let verticalPadding: CGFloat = 36
-    private let verticalPaddingTop: CGFloat = -24
+    private let verticalPaddingTop: CGFloat = 36
     private let sectionSpacing: CGFloat = 32
     private let stageHeight: CGFloat = 340
     private let stagePadding: CGFloat = 32

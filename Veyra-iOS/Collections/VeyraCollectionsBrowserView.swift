@@ -32,16 +32,18 @@ struct VeyraCollectionsBrowserView: View {
             VeyraColors.background.ignoresSafeArea()
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    HStack(alignment: .firstTextBaseline) {
-                        VeyraSectionHeader(title: "Collecties", subtitle: collectionsSubtitle)
-                        Spacer()
-                        Button {
-                            showCreate = true
-                        } label: {
-                            Label("Nieuwe collectie", systemImage: "plus")
+                    ViewThatFits(in: .horizontal) {
+                        HStack(alignment: .firstTextBaseline, spacing: 16) {
+                            collectionsHeader
+                                .fixedSize(horizontal: true, vertical: false)
+                            Spacer(minLength: 0)
+                            createCollectionButton
+                                .fixedSize(horizontal: true, vertical: false)
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(VeyraColors.cyan)
+                        VStack(alignment: .leading, spacing: 12) {
+                            collectionsHeader
+                            createCollectionButton
+                        }
                     }
                     .padding(.horizontal)
 
@@ -97,6 +99,23 @@ struct VeyraCollectionsBrowserView: View {
         } message: {
             Text("\"\(deletingCollection?.name ?? "")\" wordt verwijderd. De films zelf blijven beschikbaar in Veyra.")
         }
+    }
+
+    private var collectionsHeader: some View {
+        VeyraSectionHeader(title: "Collecties", subtitle: collectionsSubtitle, showChevron: false)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+    }
+
+    private var createCollectionButton: some View {
+        Button {
+            showCreate = true
+        } label: {
+            Label("Nieuwe collectie", systemImage: "plus")
+                .lineLimit(1)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(VeyraColors.cyan)
     }
 
     // Spec §22: contextmenu per collectie-kaart (long-press op iOS).

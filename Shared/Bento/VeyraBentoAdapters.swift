@@ -486,9 +486,6 @@ nonisolated struct VeyraSourceStatus: SourceStatusProviding {
             if let hub = MediaServerStore().load().first(where: { $0.isVeyraHub }) {
                 out.append(("hub", "Veyra Hub", hub.serverURL))
             }
-            if let aio = AddonStore().load().first(where: { $0.kind == .aioStreams && $0.isEnabled }) {
-                out.append(("aio", "AIOStreams", aio.baseURL))
-            }
             if let configuration = try? IPTVConfigurationStore().load(), case .xtream(let xtream) = configuration {
                 out.append(("iptv", "IPTV", xtream.serverURL))
             }
@@ -543,6 +540,7 @@ nonisolated struct VeyraTMDBReleases: Sendable {
             let title: String?
             let name: String?
             let poster_path: String?
+            let backdrop_path: String?
             let genre_ids: [Int]?
             let vote_average: Double?
             let original_language: String?
@@ -593,6 +591,10 @@ nonisolated struct VeyraTMDBReleases: Sendable {
             let releaseDate = dateString.flatMap { formatter.date(from: $0) }
             return BentoTMDBTitle(id: item.id, kind: kind, title: title,
                                   posterURL: URL(string: "https://image.tmdb.org/t/p/w342\(poster)"),
+                                  backdropURL: item.backdrop_path.flatMap { path in
+                                      guard !path.isEmpty else { return nil }
+                                      return URL(string: "https://image.tmdb.org/t/p/w780\(path)")
+                                  },
                                   releaseDate: releaseDate,
                                   genreIDs: item.genre_ids ?? [],
                                   voteAverage: item.vote_average)

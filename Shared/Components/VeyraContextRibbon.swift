@@ -355,21 +355,18 @@ struct VeyraContextRibbon: View {
         // icoon+tekst-kaart van hiervoor gewoon bestaan.
         if let backdrop = item.backdropURL {
             posterNode(item, kind: kind) {
-                // Eén consistente stijl voor élke kaart met een backdrop -- ook de
-                // "NIEUW UITGEBRACHT"-terugval zonder échte landschap-backdrop (enkel een
-                // staande poster, zie `VeyraBentoHome.swift`) vult de kaart nu met `.fill`
-                // net als de rest, i.p.v. de vorige losstaande fit+blur-compositie die
-                // tussen de andere, altijd volledig gevulde kaarten opviel als "anders".
-                VeyraAsyncImage(url: backdrop) { phase in
-                    if case .success(let image) = phase {
-                        image.resizable().aspectRatio(contentMode: .fill)
-                            // "Live nu": achtergrond van het getoonde programma, bewust
-                            // iets transparanter dan de andere poster-kaarten (die altijd
-                            // volledig dekkend zijn) zodat de kaart zachter oogt en het
-                            // "LIVE NU"-label duidelijk de nadruk houdt.
-                            .opacity(item.contentKind == .live ? 0.55 : 1)
-                    } else {
-                        Rectangle().fill(typeColor(item).opacity(0.16))
+                if item.contentKind == .release {
+                    // Dezelfde begrensde artworkweergave als de Verder kijken-kaarten.
+                    VeyraArt(url: backdrop, seed: item.text, contentMode: .fit)
+                } else {
+                    VeyraAsyncImage(url: backdrop) { phase in
+                        if case .success(let image) = phase {
+                            image.resizable().aspectRatio(contentMode: .fill)
+                                // Live-artwork is zachter zodat het label de nadruk houdt.
+                                .opacity(item.contentKind == .live ? 0.55 : 1)
+                        } else {
+                            Rectangle().fill(typeColor(item).opacity(0.16))
+                        }
                     }
                 }
             }

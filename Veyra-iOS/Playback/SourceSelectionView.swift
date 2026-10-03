@@ -3,7 +3,9 @@ import SwiftUI
 @MainActor
 struct SourceSelectionView: View {
     let item: MediaItem
+    @Environment(\.veyraEpisodeReturn) private var inheritedEpisodeReturn
 
+    @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel: SourceSelectionViewModel
     @ObservedObject private var traktStore = TraktStore.shared
     @ObservedObject private var badgeStore = SourceBadgeStore.shared
@@ -65,6 +67,16 @@ struct SourceSelectionView: View {
                 item: item,
                 resumeProgress: traktStore.progress(for: item)
             )
+            .environment(\.veyraEpisodeReturn, inheritedEpisodeReturn ?? { selectedSource = nil })
+        }
+        .onChange(of: selectedSource) { previous, current in
+            guard previous != nil, current == nil,
+                  item.type == .series, item.seasonNumber != nil,
+                  item.episodeNumber != nil else { return }
+            Task { @MainActor in
+                await Task.yield()
+                dismiss()
+            }
         }
     }
 

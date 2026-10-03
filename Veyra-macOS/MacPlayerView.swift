@@ -8,6 +8,10 @@ struct PlayerView: View {
     var resumeProgress: Double? = nil
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.veyraEpisodeReturn) private var returnToEpisodes
+    @State private var finishingEpisode = false
+    @State private var nextEpisodeResolved = false
+    @State private var nextCountdownCancelled = false
     @StateObject private var viewModel: PlaybackViewModel
     @StateObject private var pip = MacPictureInPictureController()
     @StateObject private var fullscreen = MacPlayerWindowController()
@@ -47,6 +51,9 @@ struct PlayerView: View {
                     item: item,
                     source: source,
                     nextEpisode: nextEpisode,
+                    nextEpisodeResolved: nextEpisodeResolved,
+                    countdownCancelled: $nextCountdownCancelled,
+                    onEpisodeFinished: finishEpisode,
                     resolvingNextEpisode: resolvingNextEpisode,
                     onPlayNextEpisode: playNextEpisode,
                     pip: pip,
@@ -73,7 +80,11 @@ struct PlayerView: View {
         }
         .task { await viewModel.startPlayback() }
         .task(id: item?.id) {
-            nextEpisode = await NextEpisodeResolver.resolve(after: item)
+            nextEpisodeResolved = false
+            let resolved = await NextEpisodeResolver.resolve(after: item)
+            guard !Task.isCancelled else { return }
+            nextEpisode = resolved
+            nextEpisodeResolved = true
             // Spec §41: alvast de skip-markers van de volgende aflevering
             // ophalen zodat de skip-knop meteen klaarstaat bij autoplay.
             if let nextEpisode {
@@ -100,17 +111,30 @@ struct PlayerView: View {
             }
         }
         .navigationDestination(item: $nextRequest) { request in
-            if let source = request.source {
-                PlayerView(source: source, item: request.item)
-            } else {
-                SourceSelectionView(item: request.item)
+            Group {
+                if let source = request.source {
+                    PlayerView(source: source, item: request.item)
+                } else {
+                    SourceSelectionView(item: request.item)
+                }
             }
+            .environment(\.veyraEpisodeReturn, returnToEpisodes ?? { dismiss() })
         }
         .frame(minWidth: 680, minHeight: 440)
     }
 
+    private func finishEpisode() {
+        guard !finishingEpisode, !resolvingNextEpisode, nextRequest == nil else { return }
+        finishingEpisode = true
+        fullscreen.close()
+        pip.stop()
+        viewModel.stopForDisappear()
+        if let returnToEpisodes { returnToEpisodes() }
+        else { dismiss() }
+    }
+
     private func playNextEpisode(_ next: MediaItem) {
-        guard !resolvingNextEpisode else { return }
+        guard !finishingEpisode, !resolvingNextEpisode, nextRequest == nil else { return }
         fullscreen.close()
         pip.stop()
         // Finish the previous episode's tracking before opening its successor.
@@ -357,6 +381,9 @@ private struct MacPlayerSurface: View {
     let item: MediaItem?
     let source: PlayableSource
     let nextEpisode: MediaItem?
+    let nextEpisodeResolved: Bool
+    @Binding var countdownCancelled: Bool
+    let onEpisodeFinished: () -> Void
     let resolvingNextEpisode: Bool
     let onPlayNextEpisode: (MediaItem) -> Void
     @ObservedObject var pip: MacPictureInPictureController
@@ -393,7 +420,6 @@ private struct MacPlayerSurface: View {
     @State private var autoSkippedSegmentIDs: Set<String> = []
     @State private var countdownRemaining: Int?
     @State private var countdownTask: Task<Void, Never>?
-    @State private var countdownCancelled = false
     @State private var playbackRate: Float = 1
 
     @AppStorage(PlaybackSettingsDefaults.showSkipIntroButtonKey) private var showSkipIntro = true
@@ -659,6 +685,13 @@ private struct MacPlayerSurface: View {
             handleAutoSkip(at: time)
             startCountdownIfNeeded()
         }
+        .veyraEpisodeCompletion(
+            engine: engine, item: item, isLive: source.kind == .liveTV || isFullscreenPresentation,
+            nextEpisode: nextEpisode, nextEpisodeResolved: nextEpisodeResolved,
+            autoAdvanceCancelled: countdownCancelled,
+            onNext: { next in countdownTask?.cancel(); onPlayNextEpisode(next) },
+            onReturn: { countdownTask?.cancel(); onEpisodeFinished() }
+        )
         .onDisappear { countdownTask?.cancel() }
         .onAppear { pip.attach(engine: engine) }
         .task { await loadConnectionStatus() }
@@ -671,6 +704,7 @@ private struct MacPlayerSurface: View {
             }
         }
         .onChange(of: nextEpisode) { _, _ in updateFullscreen() }
+        .onChange(of: nextEpisodeResolved) { _, _ in updateFullscreen() }
         .onChange(of: resolvingNextEpisode) { _, _ in updateFullscreen() }
     }
 
@@ -703,6 +737,9 @@ private struct MacPlayerSurface: View {
             item: item,
             source: source,
             nextEpisode: nextEpisode,
+            nextEpisodeResolved: nextEpisodeResolved,
+            countdownCancelled: $countdownCancelled,
+            onEpisodeFinished: onEpisodeFinished,
             resolvingNextEpisode: resolvingNextEpisode,
             onPlayNextEpisode: onPlayNextEpisode,
             pip: pip,
