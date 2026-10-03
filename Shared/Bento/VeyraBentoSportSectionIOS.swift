@@ -72,6 +72,9 @@ struct SportSection: View {
 
     private func matchSection(title: String, events: [SportEvent], now: Date) -> some View {
         VStack(alignment: .leading, spacing: 10) {
+            // Geen lijn hier -- dit is een subtitel BINNEN "Sport" ("Favorieten",
+            // "College football", ...), de lijn staat al bij de sectiekop zelf
+            // (`VeyraHomeSectionHeader`).
             Text(title)
                 .font(.system(size: 12, weight: .bold))
                 .tracking(1.5)

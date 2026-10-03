@@ -485,6 +485,9 @@ nonisolated struct VeyraCatalogSource: Sendable {
             for (index, entry) in entries.enumerated() {
                 guard let providerID = entry.providerID, result[index].customLogoURL == nil else { continue }
                 let name = entry.name
+                // Known wordmarks are immediately available in the shared asset
+                // catalogue; don't delay Home with company/network logo lookups.
+                guard VeyraStreamingBrand.named(name) == nil else { continue }
                 group.addTask {
                     if let cached = await VeyraCatalogCache.shared.cachedWide(providerID) {
                         return (index, cached.isEmpty ? nil : URL(string: cached))
@@ -774,20 +777,28 @@ struct VeyraBentoCatalogView: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     #endif
 
+    private var wideLayout: Bool {
+        #if os(iOS)
+        sizeClass == .regular
+        #else
+        true
+        #endif
+    }
+
     // Zelfde postermaat en rasterindeling als "Films"/"Series" in het hoofdmenu
     // (`VeyraPosterMetrics` op iOS, `gridPosterWidth`/`railSpacing` op tvOS).
     #if os(tvOS)
     private let posterWidth: CGFloat = 240
     private let railSpacing: CGFloat = 32
     #else
-    private var posterWidth: CGFloat { sizeClass == .regular ? 192 : 124 }
+    private var posterWidth: CGFloat { wideLayout ? 192 : 124 }
     #endif
 
     private var gridColumns: [GridItem] {
         #if os(tvOS)
         return [GridItem(.adaptive(minimum: posterWidth, maximum: posterWidth + 40), spacing: railSpacing, alignment: .top)]
         #else
-        return [GridItem(.adaptive(minimum: posterWidth), spacing: sizeClass == .regular ? 26 : 16, alignment: .top)]
+        return [GridItem(.adaptive(minimum: posterWidth), spacing: wideLayout ? 26 : 16, alignment: .top)]
         #endif
     }
 
@@ -796,7 +807,7 @@ struct VeyraBentoCatalogView: View {
         #if os(tvOS)
         return 40
         #else
-        return sizeClass == .regular ? 28 : 18
+        return wideLayout ? 28 : 18
         #endif
     }
 
@@ -806,25 +817,24 @@ struct VeyraBentoCatalogView: View {
 
     var body: some View {
         ZStack {
-            #if os(tvOS)
             if catalog.isService {
-                // Schermvullende, automatisch wisselende hero -- zelfde
-                // opzet als de Films/Series-hoofdschermen: de achtergrond
-                // loopt onderaan over in `VeyraBackground`'s eigen gradient
-                // i.p.v. een effen kleur.
-                VeyraArtworkBackground(url: heroSpotlight.focused?.backdropURL ?? featuredBackdropURL)
-                    .id(heroSpotlight.focused?.id ?? "catalog-hero:\(catalog.id):\(heroRotationIndex)")
-                    .animation(.easeInOut(duration: 0.35), value: heroSpotlight.focused?.id)
-                    .animation(.easeInOut(duration: 0.35), value: featuredBackdropURL)
+                ZStack(alignment: .top) {
+                    VeyraBackground()
+                    VeyraArtworkBackground(url: focusedServiceBackdrop ?? featuredBackdropURL,
+                                           maxPixelSize: compact ? (wideLayout ? 1440 : 1024) : 1920)
+                        .id(focusedServiceHeroID ?? "catalog-hero:\(catalog.id):\(heroRotationIndex)")
+                        .frame(height: serviceArtworkHeight)
+                        .clipped()
+                        .animation(.easeInOut(duration: 0.35), value: focusedServiceHeroID)
+                        .animation(.easeInOut(duration: 0.35), value: featuredBackdropURL)
+                }
+                .ignoresSafeArea()
             } else {
                 VeyraHomeStyle.ink.ignoresSafeArea()
             }
-            #else
-            VeyraHomeStyle.ink.ignoresSafeArea()
-            #endif
 
             ScrollView {
-                VStack(alignment: .leading, spacing: compact ? 16 : 30) {
+                VStack(alignment: .leading, spacing: catalog.isService ? (compact ? 12 : 24) : (compact ? 16 : 30)) {
                     hero
 
                     if sections.count > 1 {
@@ -863,7 +873,8 @@ struct VeyraBentoCatalogView: View {
                 // VStack-marge + 6pt grid-marge hierboven) -- stond hiervoor op 60pt,
                 // waardoor het raster merkbaar smaller en meer naar binnen begon.
                 .padding(.horizontal, compact ? 16 : 28)
-                .padding(.vertical, compact ? 16 : 60)
+                .padding(.top, catalog.isService ? (compact ? 8 : 24) : (compact ? 16 : 60))
+                .padding(.bottom, compact ? 16 : 60)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
@@ -885,16 +896,33 @@ struct VeyraBentoCatalogView: View {
             if catalog.isService { await TraktStore.shared.refreshIfNeeded() }
         }
         #endif
-        #if os(tvOS)
         .task(id: heroPool.map(\.id)) {
-            await rotateHeroAutomatically()
+            if catalog.isService { await rotateHeroAutomatically() }
         }
-        #endif
     }
 
     // MARK: Hero-rotatie (streamingdiensten)
 
-    #if os(tvOS)
+    private var focusedServiceBackdrop: URL? {
+        #if os(tvOS)
+        heroSpotlight.focused?.backdropURL
+        #else
+        nil
+        #endif
+    }
+
+    private var focusedServiceHeroID: String? {
+        #if os(tvOS)
+        heroSpotlight.focused?.id
+        #else
+        nil
+        #endif
+    }
+
+    private var serviceArtworkHeight: CGFloat {
+        compact ? (wideLayout ? 360 : 240) : 680
+    }
+
     private var heroPool: [BentoTMDBTitle] {
         Array((current?.titles ?? []).filter { $0.backdropURL != nil }.prefix(10))
     }
@@ -913,14 +941,11 @@ struct VeyraBentoCatalogView: View {
             heroRotationIndex = (heroRotationIndex + 1) % heroPool.count
         }
     }
-    #endif
 
     // MARK: Grote afbeelding
 
     private static func heroImage(catalog: BentoCatalog, sections: [BentoCatalogSection]) -> URL? {
-        // Diensten krijgen geen grote achtergrond-hero meer (zie `hero`
-        // hieronder) -- alleen het logo, dus hier ook niet meer de moeite
-        // nemen om er een willekeurige backdrop bij te zoeken.
+        // Services use the current title pool for their compact background.
         guard !catalog.isService else { return nil }
         if let url = catalog.imageURL {
             return URL(string: url.absoluteString.replacingOccurrences(of: "/w780/", with: "/w1280/")) ?? url
@@ -933,18 +958,16 @@ struct VeyraBentoCatalogView: View {
     private var hero: some View {
         if catalog.isService {
             #if os(tvOS)
-            // Transparant blok boven op de schermvullende achtergrond-hero
-            // (zie `body`) -- alleen het logo onderaan, net als bij
-            // Films/Series op het hoofdmenu.
+            // Smaller header keeps the logo, tabs and first posters higher.
             Color.clear
                 .overlay(alignment: .bottomLeading) {
-                    heroTitle.padding(compact ? 16 : 40)
+                    heroTitle.padding(24)
                 }
                 .frame(maxWidth: .infinity)
-                .frame(height: compact ? 220 : 460)
+                .frame(height: 300)
             #else
             heroTitle
-                .padding(.top, compact ? 4 : 12)
+                .padding(.top, 0)
             #endif
         } else {
             // Kleur bepaalt de maat; het (brede) beeld ligt er als overlay op, anders rekt
@@ -986,24 +1009,37 @@ struct VeyraBentoCatalogView: View {
                 default: Color.clear
                 }
             }
-            .frame(width: compact ? 200 : 460, height: compact ? 56 : 130, alignment: .leading)
+            .frame(width: heroLogoWidth, height: heroLogoHeight, alignment: .leading)
             .shadow(color: .black.opacity(0.5), radius: 10)
+        } else if catalog.isService, let brand = VeyraStreamingBrand.named(catalog.name) {
+            VeyraStreamingWordmark(brand: brand)
+                .frame(width: heroLogoWidth, height: heroLogoHeight, alignment: .leading)
+                .shadow(color: .black.opacity(0.65), radius: 10)
         } else if let wide = catalog.wideURL {
             VeyraAsyncImage(url: wide) { phase in
                 switch phase {
                 case .success(let image):
-                    image.renderingMode(.template).resizable().scaledToFit().foregroundStyle(.white)
+                    image.renderingMode(.template).resizable().scaledToFit().foregroundStyle(serviceLogoTint)
                 case .failure:
                     iconAndName
                 default:
                     Color.clear
                 }
             }
-            .frame(width: compact ? 200 : 460, height: compact ? 56 : 130, alignment: .leading)
+            .frame(width: heroLogoWidth, height: heroLogoHeight, alignment: .leading)
             .shadow(color: .black.opacity(0.5), radius: 10)
         } else {
             iconAndName
         }
+    }
+
+    private var heroLogoWidth: CGFloat { catalog.isService ? (compact ? 176 : 360) : (compact ? 200 : 460) }
+    private var heroLogoHeight: CGFloat { catalog.isService ? (compact ? 48 : 100) : (compact ? 56 : 130) }
+    private var serviceLogoTint: Color {
+        guard catalog.isService, let value = catalog.brand else { return .white }
+        return Color(red: Double((value >> 16) & 0xFF) / 255,
+                     green: Double((value >> 8) & 0xFF) / 255,
+                     blue: Double(value & 0xFF) / 255)
     }
 
     @ViewBuilder

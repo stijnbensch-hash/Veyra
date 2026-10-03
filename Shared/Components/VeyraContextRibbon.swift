@@ -51,6 +51,9 @@ nonisolated struct VeyraRibbonItem: Identifiable {
     /// er dan al op). Bij sport: het thuisteam-logo, met `secondaryLogoURL` als uitteam.
     var logoURL: URL? = nil
     var secondaryLogoURL: URL? = nil
+    /// Live tussenstand bij sport, bv. "1–0" -- `nil` zolang de wedstrijd nog niet begonnen is
+    /// of er (nog) geen stand bekend is (zie `SportEvent.score` in `VeyraBentoSportModel.swift`).
+    var scoreText: String? = nil
     /// Achtergrondfoto (backdrop/still) die de hele kaart vult, met de tekst er via een
     /// donkere scrim overheen -- als dit er is, wordt de kaart een "poster"-kaart i.p.v.
     /// de compacte icoon+tekst-kaart (zie `node(_:kind:)`). `nil` = geen foto beschikbaar,
@@ -178,12 +181,12 @@ struct VeyraContextRibbon: View {
         if isCompactPhone {
             Metrics(tagSize: 14, titleSize: 19, nowTitleSize: 22, metaSize: 15,
                     iconCircle: 46, iconSize: 19,
-                    cardPaddingH: 18, cardPaddingV: 15, hPadding: 20, vPadding: 16, headerSize: 13, cardGap: 14,
+                cardPaddingH: 18, cardPaddingV: 15, hPadding: 8, vPadding: 16, headerSize: 13, cardGap: 14,
                     cardWidth: 235, nowCardWidth: 310)
         } else {
             Metrics(tagSize: 11, titleSize: 15, nowTitleSize: 17, metaSize: 12,
                     iconCircle: 36, iconSize: 15,
-                    cardPaddingH: 14, cardPaddingV: 12, hPadding: 20, vPadding: 16, headerSize: 12, cardGap: 12,
+                    cardPaddingH: 14, cardPaddingV: 12, hPadding: 8, vPadding: 16, headerSize: 12, cardGap: 12,
                     cardWidth: 190, nowCardWidth: 252)
         }
         #endif
@@ -200,8 +203,10 @@ struct VeyraContextRibbon: View {
         guard let t = item.time else {
             // "Nieuw uitgebracht" heeft geen zinvol tijdstip (releasedatum ligt allang
             // achter ons) maar is juist een aanmoediging vooruit te kijken, niet iets
-            // dat al voorbij is -- dus geen dimstijl zoals "verder kijken".
-            return item.contentKind == .release ? .future : .past
+            // dat al voorbij is -- dus geen dimstijl. "Verder kijken" is om dezelfde reden
+            // geen "verleden": dat is net iets dat NU nog relevant is om op te pakken, niet
+            // iets afgelopens -- dus ook die kreeg hier al die dimstijl ten onrechte.
+            return (item.contentKind == .release || item.contentKind == .continueWatching) ? .future : .past
         }
         let delta = t.timeIntervalSince(now)
         if abs(delta) <= 150 { return .now }
@@ -246,6 +251,7 @@ struct VeyraContextRibbon: View {
                         .font(.system(size: metrics.headerSize, weight: .bold))
                         .tracking(1.5)
                         .foregroundStyle(VeyraHomeStyle.cyan)
+                    VeyraSectionTitleLine()
                 }
 
                 ScrollViewReader { proxy in
@@ -284,7 +290,12 @@ struct VeyraContextRibbon: View {
                     }
                 }
             }
+            #if os(tvOS)
+            .padding(.leading, 12)
+            .padding(.trailing, metrics.hPadding)
+            #else
             .padding(.horizontal, metrics.hPadding)
+            #endif
             .padding(.vertical, metrics.vPadding)
         }
     }
@@ -344,9 +355,19 @@ struct VeyraContextRibbon: View {
         // icoon+tekst-kaart van hiervoor gewoon bestaan.
         if let backdrop = item.backdropURL {
             posterNode(item, kind: kind) {
+                // Eén consistente stijl voor élke kaart met een backdrop -- ook de
+                // "NIEUW UITGEBRACHT"-terugval zonder échte landschap-backdrop (enkel een
+                // staande poster, zie `VeyraBentoHome.swift`) vult de kaart nu met `.fill`
+                // net als de rest, i.p.v. de vorige losstaande fit+blur-compositie die
+                // tussen de andere, altijd volledig gevulde kaarten opviel als "anders".
                 VeyraAsyncImage(url: backdrop) { phase in
                     if case .success(let image) = phase {
                         image.resizable().aspectRatio(contentMode: .fill)
+                            // "Live nu": achtergrond van het getoonde programma, bewust
+                            // iets transparanter dan de andere poster-kaarten (die altijd
+                            // volledig dekkend zijn) zodat de kaart zachter oogt en het
+                            // "LIVE NU"-label duidelijk de nadruk houdt.
+                            .opacity(item.contentKind == .live ? 0.55 : 1)
                     } else {
                         Rectangle().fill(typeColor(item).opacity(0.16))
                     }
@@ -377,6 +398,13 @@ struct VeyraContextRibbon: View {
             // scrim) plus tekstschaduw, zodat de leesbaarheid niet meer afhangt van hoe
             // licht/donker de foto daar toevallig is.
             ZStack(alignment: .bottomLeading) {
+                // "Live nu": de rode tint blijft onder de (deels doorzichtige) backdrop
+                // doorschemeren i.p.v. dat de foto rechtstreeks op de donkere paginakleur
+                // staat -- zo blijft "live" ook met een echte foto meteen herkenbaar.
+                if item.contentKind == .live {
+                    tint.opacity(0.35)
+                }
+
                 background()
                     .frame(width: width, height: height)
                     .clipped()
@@ -417,13 +445,26 @@ struct VeyraContextRibbon: View {
             // Sport: thuis- vs uitploeg naast elkaar i.p.v. één "clearlogo" -- een los teamlogo
             // zou anders ten onrechte als hét logo van de wedstrijd ogen.
             if item.contentKind == .sport, let home = item.logoURL, let away = item.secondaryLogoURL {
-                HStack(spacing: 14) {
-                    logoImage(home, maxWidth: 56, maxHeight: 56) { EmptyView() }
-                    Text("–")
-                        .font(.system(size: metrics.titleSize, weight: .bold))
-                        .foregroundStyle(.white.opacity(0.5))
-                    logoImage(away, maxWidth: 56, maxHeight: 56) { EmptyView() }
+                // Groter dan voorheen (56 -> 84) en gecentreerd over de volle kaartbreedte
+                // i.p.v. links uitgelijnd -- de teamlogo's zijn hier het belangrijkste
+                // beeldelement van de kaart, niet een bijschrift. Bij een live stand komt die
+                // in de plaats van het streepje tussen de logo's.
+                HStack(spacing: 18) {
+                    logoImage(home, maxWidth: 84, maxHeight: 84) { EmptyView() }
+                    if let scoreText = item.scoreText {
+                        Text(scoreText)
+                            .font(.system(size: metrics.titleSize, weight: .heavy))
+                            .foregroundStyle(.white)
+                            .shadow(color: .black.opacity(0.6), radius: 3, y: 1)
+                            .monospacedDigit()
+                    } else {
+                        Text("–")
+                            .font(.system(size: metrics.titleSize, weight: .bold))
+                            .foregroundStyle(.white.opacity(0.5))
+                    }
+                    logoImage(away, maxWidth: 84, maxHeight: 84) { EmptyView() }
                 }
+                .frame(maxWidth: .infinity, alignment: .center)
             } else if item.titleBakedIntoArt {
                 // Titel staat al op de afbeelding zelf (posterfallback) -- geen tweede
                 // logo/titel erover heen zetten, dat gaf een dubbele titel.

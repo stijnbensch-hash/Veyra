@@ -276,13 +276,27 @@ struct VeyraCollectionDetailView: View {
     // als Movie/Series Detail), met de collectienaam als tekst-fallback zolang er geen logo is.
     @ViewBuilder
     private var stageTitleView: some View {
-        // Expliciet gekozen clearlogo gaat voor de automatische per-film TMDB-lookup.
+        // Expliciet gekozen clearlogo gaat voor de automatische per-film TMDB-lookup -- zelfde
+        // voorrang als een per-titel artwork-override bij Movie/Series Detail (ArtworkResolver):
+        // een bewuste keuze voor DEZE collectie wint ook van de globale "Altijd tekst"-instelling.
+        // "ClearLogo + tekst" liet dat tweede deel van die instelling hier tot nu toe nog niet
+        // meedoen (de titel verscheen dan nooit mee onder een eigen gekozen logo) -- nu wel,
+        // zelfde gedrag als `VeyraClearLogo` bij Movie/Series Detail.
         if let collection, let customLogoURL = VeyraCollectionClearLogoResolver.resolvedURL(for: collection) {
-            VeyraAsyncImage(url: customLogoURL) { phase in
-                if case .success(let image) = phase {
-                    image.resizable().scaledToFit()
-                        .frame(maxWidth: stageLogoMaxWidth, maxHeight: stageLogoMaxHeight)
-                } else {
+            let showTextAlongsideLogo = ArtworkSettingsStore().load().titleDisplay == .clearLogoPlusText
+            VStack(spacing: 6) {
+                VeyraAsyncImage(url: customLogoURL) { phase in
+                    if case .success(let image) = phase {
+                        image.resizable().scaledToFit()
+                            .frame(maxWidth: stageLogoMaxWidth, maxHeight: stageLogoMaxHeight)
+                    } else {
+                        Text(displayName)
+                            .font(.system(size: stageTitleSize, weight: .bold))
+                            .foregroundStyle(.white)
+                            .multilineTextAlignment(.center)
+                    }
+                }
+                if showTextAlongsideLogo {
                     Text(displayName)
                         .font(.system(size: stageTitleSize, weight: .bold))
                         .foregroundStyle(.white)
@@ -304,7 +318,10 @@ struct VeyraCollectionDetailView: View {
     // Spec §7: zelfde artwork-identiteit als de browser/Home-kaarten, via de centrale resolver
     // i.p.v. hier zelf opnieuw een backdrop te kiezen.
     private var stageArtworkURL: URL? {
-        guard let collection else { return nil }
+        // Was eerder: geeft voor een nog niet-bewaarde officiële TMDB-collectie altijd `nil`
+        // terug (`collection` is dan `nil`), zelfs als er wel een backdrop van het meest
+        // prominente deel beschikbaar is -- die backdrop (de `fallback`) werd dus nooit gebruikt.
+        guard let collection else { return orderedResolved.first?.media.backdropURL }
         return VeyraCollectionArtworkResolver.resolvedURL(for: collection, fallback: orderedResolved.first?.media.backdropURL)
     }
 
@@ -315,13 +332,22 @@ struct VeyraCollectionDetailView: View {
                 VeyraAsyncImage(url: url) { phase in
                     if case .success(let image) = phase {
                         let position = collection?.artworkPosition ?? VeyraArtworkPosition()
+                        // Expliciet op `geo.size` geframed VOOR de zoom/offset (i.p.v. enkel
+                        // erna, op de hele `VeyraAsyncImage`) -- zo vult de afbeelding altijd
+                        // gegarandeerd het volledige kader, ook al stuurt `VeyraAsyncImage`'s
+                        // eigen `ZStack`-wrapper de size-proposal niet altijd betrouwbaar door
+                        // naar deze closure heen.
                         image.resizable().scaledToFill()
-                            .scaleEffect(position.zoom)
+                            .frame(width: geo.size.width, height: geo.size.height)
+                            .scaleEffect(max(position.zoom, 1))
                             .offset(x: (0.5 - position.x) * geo.size.width, y: (0.5 - position.y) * geo.size.height)
-                    } else { placeholderGradient }
+                            .frame(width: geo.size.width, height: geo.size.height)
+                            .clipped()
+                    } else {
+                        placeholderGradient
+                            .frame(width: geo.size.width, height: geo.size.height)
+                    }
                 }
-                .frame(width: geo.size.width, height: geo.size.height)
-                .clipped()
             }
         } else {
             placeholderGradient
@@ -434,7 +460,12 @@ struct VeyraCollectionDetailView: View {
                     journeyCard(resolved, index: index)
                 }
             }
+            // Zonder deze padding + `.scrollClipDisabled()` knipt de ScrollView de
+            // focus-schaal/-ring van de eerste (en laatste) kaart af aan de rand --
+            // zelfde terugkerend probleem als bij `VeyraArtworkPickerView`.
+            .padding(.horizontal, 6)
         }
+        .scrollClipDisabled()
     }
 
     private var numberedList: some View {
@@ -598,7 +629,7 @@ struct VeyraCollectionDetailView: View {
     private let progressBarMaxWidth: CGFloat = 420
     private let journeyHeaderSize: CGFloat = 20
     private let journeyGap: CGFloat = 24
-    private let journeyYearSize: CGFloat = 16
+    private let journeyYearSize: CGFloat = 20
     private let journeyTitleSize: CGFloat = 18
     private let journeyStatusSize: CGFloat = 13
     private let journeyCardWidth: CGFloat = 195

@@ -33,18 +33,7 @@ struct MoviesView: View {
 
     var body: some View {
         ZStack {
-            VeyraArtworkBackground(
-                url: heroSpotlight.focused?.backdropURL ?? featured?.backdropPath.flatMap {
-                    URL(
-                        string:
-                            "https://image.tmdb.org/t/p/w1280"
-                            + $0
-                    )
-                }
-            )
-            .id(heroSpotlight.focused?.id ?? "movie-background:\(featured?.id ?? -1)")
-            .animation(.easeInOut(duration: 0.35), value: heroSpotlight.focused?.id)
-            .animation(.easeInOut(duration: 0.35), value: featured?.id)
+            VeyraBackground()
 
             ScrollView(
                 .vertical,
@@ -55,33 +44,25 @@ struct MoviesView: View {
                     spacing: 28
                 ) {
                     if let featured {
-                        Group {
-                            if let focused = heroSpotlight.focused {
-                                VeyraSpotlightHero(content: focused)
-                            } else {
-                                VeyraMovieHero(movie: featured)
+                        VeyraCatalogHero(
+                            url: heroSpotlight.focused?.backdropURL ?? featured.backdropPath.flatMap {
+                                URL(string: "https://image.tmdb.org/t/p/w1280" + $0)
+                            },
+                            topInset: VeyraTopNavigation.barHeight
+                        ) {
+                            Group {
+                                if let focused = heroSpotlight.focused {
+                                    VeyraSpotlightHero(content: focused)
+                                } else {
+                                    VeyraMovieHero(movie: featured)
+                                }
                             }
+                            .id(heroSpotlight.focused?.id ?? "movie:\(featured.id)")
                         }
-                        .id(heroSpotlight.focused?.id ?? "movie:\(featured.id)")
-                        .frame(
-                            minHeight: 390,
-                            alignment: .center
-                        )
-                        .animation(.easeInOut(duration: 0.35), value: heroSpotlight.focused?.id)
-                        .animation(.easeInOut(duration: 0.35), value: featured.id)
                     }
 
                     VStack(alignment: .leading, spacing: 6) {
                         header
-
-                        HStack(spacing: 20) {
-                            NavigationLink {
-                                VeyraCollectionsBrowserView()
-                            } label: {
-                                VeyraActionLabel(title: "COLLECTIES", symbol: "rectangle.stack.fill", compact: true)
-                            }
-                            .buttonStyle(VeyraFocusButtonStyle())
-                        }
 
                         MediaFiltersRow(
                             kind: .movie,
@@ -89,17 +70,20 @@ struct MoviesView: View {
                             selectedDecade: $selectedDecade,
                             selectedRating: $selectedRating,
                             selectedSort: $selectedSort
-                        )
+                        ) {
+                            collectiesButton
+                        }
                     }
+                    .padding(.top, 24)
+                    .padding(.horizontal, 80)
 
                     content
+                        .padding(.horizontal, 80)
                 }
                 .frame(
                     maxWidth: .infinity,
                     alignment: .leading
                 )
-                .padding(.horizontal, 28)
-                .padding(.top, 36)
                 .padding(.bottom, 50)
             }
             .contentMargins(
@@ -110,6 +94,7 @@ struct MoviesView: View {
             .scrollClipDisabled()
 
         }
+        .ignoresSafeArea(.container, edges: [.horizontal, .top])
         .task {
             await TraktStore.shared
                 .refreshIfNeeded()
@@ -155,8 +140,44 @@ struct MoviesView: View {
     private var header: some View {
         VeyraSectionHeader(
             title: "Films",
-            subtitle: filterSummary
+            subtitle: filterSummary,
+            showChevron: false
         )
+    }
+
+    /// Zelfde formaat/stijl als de menuknoppen in `MediaFiltersRow`, maar
+    /// een gewone link i.p.v. een menu -- staat vooraan die rij, i.p.v. in
+    /// zijn eigen rij erboven.
+    private var collectiesButton: some View {
+        NavigationLink {
+            VeyraCollectionsBrowserView()
+        } label: {
+            HStack(spacing: 14) {
+                Image(systemName: "rectangle.stack.fill")
+                    .font(.system(size: 22, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.8))
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Bladeren")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(VeyraColors.secondary)
+
+                    Text("Collecties")
+                        .font(.system(size: 26, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 6)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.55))
+            }
+            .padding(.horizontal, 20)
+            .frame(width: 270, height: 92)
+        }
+        .buttonStyle(VeyraFocusButtonStyle(radius: 28))
     }
 
     private var filterSummary: String {

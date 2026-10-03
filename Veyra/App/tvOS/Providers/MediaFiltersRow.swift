@@ -3,13 +3,36 @@ import SwiftUI
 /// tvOS-tegenhanger van `MediaFiltersRowIOS`: uitklapbare filterknoppen voor
 /// Genre, Decennium en Beoordeling, in dezelfde stijl als de regiokiezer in
 /// `WatchProviderRow` (menu-knop met pictogram, label en waarde).
-struct MediaFiltersRow: View {
+struct MediaFiltersRow<Leading: View>: View {
     let kind: ProviderMediaKind
 
     @Binding var selectedGenreID: Int?
     @Binding var selectedDecade: VeyraDecadeFilter?
     @Binding var selectedRating: VeyraRatingFilter?
     @Binding var selectedSort: VeyraSortOption
+    /// Optionele knop vooraan de rij (vóór "Sorteren"), in dezelfde
+    /// maat als de filterknoppen -- bv. "Collecties" op het Films-scherm.
+    /// `@ViewBuilder` kan niet rechtstreeks op een stored property met een
+    /// default staan (vereist een getter) -- de default zit daarom op de
+    /// init-parameter hieronder i.p.v. hier, zodat bestaande aanroepen
+    /// (Series) zonder `leading` gewoon blijven compileren.
+    let leading: () -> Leading
+
+    init(
+        kind: ProviderMediaKind,
+        selectedGenreID: Binding<Int?>,
+        selectedDecade: Binding<VeyraDecadeFilter?>,
+        selectedRating: Binding<VeyraRatingFilter?>,
+        selectedSort: Binding<VeyraSortOption>,
+        @ViewBuilder leading: @escaping () -> Leading = { EmptyView() }
+    ) {
+        self.kind = kind
+        self._selectedGenreID = selectedGenreID
+        self._selectedDecade = selectedDecade
+        self._selectedRating = selectedRating
+        self._selectedSort = selectedSort
+        self.leading = leading
+    }
 
     private var genreOptions: [(id: Int, name: String)] {
         let source = kind == .movie ? TMDBGenreNames.movie : TMDBGenreNames.tv
@@ -26,6 +49,8 @@ struct MediaFiltersRow: View {
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 22) {
+                leading()
+
                 // Sorteren staat vooraan (i.p.v. na de andere filters), anders dan
                 // de andere filters hieronder heeft het altijd een actieve waarde
                 // (default "Populair") — dus geen resetButton naar "geen sortering".

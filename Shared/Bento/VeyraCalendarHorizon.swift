@@ -56,11 +56,14 @@ struct VeyraCalendarHorizon<ItemCard: View>: View {
     var body: some View {
         if !items.isEmpty {
             VStack(alignment: .leading, spacing: 24) {
-                Text(title)
-                    .font(.system(size: headerSize, weight: .bold))
-                    .tracking(2)
-                    .textCase(.uppercase)
-                    .foregroundStyle(VeyraHomeStyle.cyan.opacity(0.85))
+                HStack(spacing: 12) {
+                    Text(title)
+                        .font(.system(size: headerSize, weight: .bold))
+                        .tracking(2)
+                        .textCase(.uppercase)
+                        .foregroundStyle(VeyraHomeStyle.cyan.opacity(0.85))
+                    VeyraSectionTitleLine()
+                }
 
                 ForEach(groups, id: \.0.rawValue) { bucket, list in
                     VStack(alignment: .leading, spacing: 8) {

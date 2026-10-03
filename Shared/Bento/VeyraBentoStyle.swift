@@ -199,6 +199,22 @@ struct VeyraTitleLogo: View {
 
 // MARK: - Kop en status
 
+/// De cyaan lijn die achter ELKE sectietitel op Home hoort te staan (naast "Verder
+/// kijken", "Sport", "Trending", "Jouw collecties", "Veyra Now", ...) -- één gedeeld
+/// bouwblokje i.p.v. telkens dezelfde `Capsule` losstaand te herhalen, zodat een nieuw
+/// toegevoegde sectie dit automatisch meekrijgt zodra de titel dit in een `HStack` zet.
+/// Geen eigen breedte: vult gewoon de resterende ruimte in die `HStack` (net als de
+/// tijdlijn onder de "Veyra Now"-kaarten, `VeyraContextRibbon.timelineMarker`).
+/// Uitdrukkelijk NIET voor subtitels BINNEN een sectie (bv. "Favorieten"/"College
+/// football" onder "Sport") -- enkel voor de sectietitel zelf.
+struct VeyraSectionTitleLine: View {
+    var height: CGFloat = 2
+
+    var body: some View {
+        Capsule().fill(VeyraHomeStyle.cyan.opacity(0.35)).frame(height: height)
+    }
+}
+
 struct VeyraHomeSectionHeader: View {
     let title: String
     var trailing: String? = nil
@@ -216,7 +232,7 @@ struct VeyraHomeSectionHeader: View {
                 .textCase(.uppercase)
                 .foregroundStyle(.white)
                 .accessibilityAddTraits(.isHeader)
-            Rectangle().fill(Color.white.opacity(0.14)).frame(height: 1)
+            VeyraSectionTitleLine()
             if let trailing {
                 Text(trailing)
                     .font(compact ? .caption2 : .callout)

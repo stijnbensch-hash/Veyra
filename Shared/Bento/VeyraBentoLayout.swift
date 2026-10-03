@@ -28,7 +28,6 @@ nonisolated enum BentoTile: String, CaseIterable, Hashable, Sendable {
     case releasesFilms   // Nieuw uitgebrachte films (TMDB)
     case releasesSeries  // Nieuw uitgebrachte series (TMDB)
     case streaming   // Streamingdiensten (logo's)
-    case collecties  // Filmcollecties (franchises)
     case nieuwVanHier  // Regionale releases (VRT, VTM, Play, Streamz, ...) -- Regional Releases fase 4
 }
 
@@ -36,7 +35,7 @@ extension BentoTile {
     /// De blokken die de gebruiker kan aan- of uitzetten en herschikken.
     static let configurable: [BentoTile] = [
         .volgende, .nieuwVanHier, .releasesFilms, .releasesSeries, .live, .vandaag,
-        .iptvFilms, .iptvSeries, .streaming, .collecties
+        .iptvFilms, .iptvSeries, .streaming
     ]
 
     var title: String {
@@ -50,7 +49,6 @@ extension BentoTile {
         case .iptvFilms: return "IPTV films"
         case .iptvSeries: return "IPTV series"
         case .streaming: return "Streamingdiensten"
-        case .collecties: return "Filmcollecties"
         case .nieuwVanHier: return "Nieuw van hier"
         case .tijd, .nieuw, .bronnen: return rawValue
         }
@@ -67,7 +65,6 @@ extension BentoTile {
         case .iptvFilms: return "Nieuw toegevoegde films van je IPTV-providers"
         case .iptvSeries: return "Nieuw toegevoegde series van je IPTV-providers"
         case .streaming: return "Netflix, Disney+ en andere diensten"
-        case .collecties: return "Franchises en eigen lijsten"
         case .nieuwVanHier: return "Nieuwe regionale series en seizoenen (VRT, VTM, Play, Streamz, ...)"
         case .tijd, .nieuw, .bronnen: return ""
         }
@@ -83,7 +80,6 @@ extension BentoTile {
         case .iptvFilms: return "film.stack"
         case .iptvSeries: return "rectangle.stack"
         case .streaming: return "play.rectangle.on.rectangle"
-        case .collecties: return "square.stack"
         case .nieuwVanHier: return "mappin.and.ellipse"
         case .tijd, .nieuw, .bronnen: return "square"
         }
@@ -133,7 +129,6 @@ struct BentoProfile {
             .iptvFilms:      BentoCell(column: 0, row: 4, columns: 6, rows: 1),
             .iptvSeries:     BentoCell(column: 6, row: 4, columns: 6, rows: 1),
             .streaming:      BentoCell(column: 0, row: 5, columns: 12, rows: 1),
-            .collecties:     BentoCell(column: 0, row: 6, columns: 12, rows: 1),
         ])
 
     /// iPad (regular): zelfde opbouw als tvOS, kleiner.
@@ -149,7 +144,6 @@ struct BentoProfile {
             .iptvFilms:      BentoCell(column: 0, row: 4, columns: 6, rows: 1),
             .iptvSeries:     BentoCell(column: 6, row: 4, columns: 6, rows: 1),
             .streaming:      BentoCell(column: 0, row: 5, columns: 12, rows: 1),
-            .collecties:     BentoCell(column: 0, row: 6, columns: 12, rows: 1),
         ])
 
     /// iPhone (compact): 2 kolommen.
@@ -164,8 +158,7 @@ struct BentoProfile {
             .iptvFilms:      BentoCell(column: 0, row: 7, columns: 2, rows: 1),
             .iptvSeries:     BentoCell(column: 0, row: 8, columns: 2, rows: 1),
             .streaming:      BentoCell(column: 0, row: 9, columns: 2, rows: 1),
-            .collecties:     BentoCell(column: 0, row: 10, columns: 2, rows: 1),
-            .vandaag:        BentoCell(column: 0, row: 11, columns: 2, rows: 1),
+            .vandaag:        BentoCell(column: 0, row: 10, columns: 2, rows: 1),
         ])
 }
 
@@ -191,8 +184,6 @@ extension BentoTile {
     /// Hoogte van het blok in punten. Rijen sluiten aan op hun inhoud, zodat de afstand tussen alle blokken
     /// overal gelijk is (het raster-`spacing`) en er geen lege stroken tussen blokken vallen.
     fileprivate func height(_ device: BentoDevice) -> CGFloat {
-        // Naam onder de collectiebanners (Instellingen → Home → Filmcollecties) kost een extra regel.
-        let names = (UserDefaults.standard.object(forKey: "veyra.bento.collectionNames") as? Bool) ?? true
         switch device {
         case .tv:
             switch self {
@@ -211,14 +202,6 @@ extension BentoTile {
             case .live: return 520
             case .iptvFilms, .iptvSeries: return 450
             case .streaming: return 220
-            // Was 306/272 -- te krap voor de kop + z'n `spacing` + de eigen
-            // verticale padding van de banner-ScrollView (24pt) erboven op de
-            // bannerhoogte zelf. `VeyraBentoGrid` geeft de rij precies deze
-            // hoogte door (niet de werkelijk benodigde inhoudshoogte), dus
-            // met te weinig ruimte klipte de horizontale ScrollView de
-            // banners verticaal middenin hun ronde hoeken -- rechte randen
-            // boven/onder, alleen de zijkanten van de rand nog zichtbaar.
-            case .collecties: return names ? 334 : 300
             default: return 300
             }
         case .tablet:
@@ -230,8 +213,6 @@ extension BentoTile {
             case .nieuwVanHier: return 460
             case .iptvFilms, .iptvSeries: return 280
             case .streaming: return 76
-            // Zie toelichting bij `.tv` hierboven -- zelfde tekort, andere maten.
-            case .collecties: return names ? 244 : 222
             default: return 200
             }
         case .phone:
@@ -242,8 +223,6 @@ extension BentoTile {
             case .releasesFilms, .releasesSeries: return 300
             case .iptvFilms, .iptvSeries: return 270
             case .streaming: return 60
-            // Zie toelichting bij `.tv` hierboven -- zelfde tekort, andere maten.
-            case .collecties: return names ? 205 : 183
             case .vandaag: return 165
             default: return 200
             }

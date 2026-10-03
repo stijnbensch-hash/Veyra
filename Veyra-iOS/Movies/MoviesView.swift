@@ -33,17 +33,7 @@ struct MoviesView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                VeyraArtworkBackground(
-                    url: featured?.backdropPath.flatMap {
-                        URL(
-                            string:
-                                "https://image.tmdb.org/t/p/w1280"
-                                + $0
-                        )
-                    }
-                )
-                .id(featured?.id ?? -1)
-                .animation(.easeInOut(duration: 0.35), value: featured?.id)
+                VeyraBackground()
 
                 ScrollView(
                     .vertical,
@@ -54,37 +44,44 @@ struct MoviesView: View {
                         spacing: 24
                     ) {
                         if let featured {
-                            VeyraHero(
-                                title: featured.title,
-                                eyebrow: "Uitgelicht",
-                                overview: featured.overview,
-                                metadata:
-                                    featured.releaseDate.map {
-                                        [
-                                            String(
-                                                $0.prefix(4)
-                                            )
-                                        ]
-                                    }
-                                    ?? [],
-                                item: MediaItem(title: featured.title, type: .movie,
-                                                tmdbID: featured.id, rating: featured.voteAverage)
+                            VeyraCatalogHero(
+                                url: featured.backdropPath.flatMap {
+                                    URL(string: "https://image.tmdb.org/t/p/w1280" + $0)
+                                }, topInset: VeyraSafeArea.top
                             ) {
-                                NavigationLink {
-                                    MovieDetailView(movie: mediaItem(for: featured))
-                                } label: {
-                                    VeyraActionLabel(
-                                        title:
-                                            "Meer informatie",
-                                        symbol:
-                                            "info.circle"
+                                VeyraHero(
+                                    title: featured.title,
+                                    eyebrow: "Uitgelicht",
+                                    overview: featured.overview,
+                                    metadata:
+                                        featured.releaseDate.map {
+                                            [
+                                                String(
+                                                    $0.prefix(4)
+                                                )
+                                            ]
+                                        }
+                                        ?? [],
+                                    item: MediaItem(title: featured.title, type: .movie,
+                                                    tmdbID: featured.id, rating: featured.voteAverage)
+                                ) {
+                                    NavigationLink {
+                                        MovieDetailView(movie: mediaItem(for: featured))
+                                    } label: {
+                                        VeyraActionLabel(
+                                            title:
+                                                "Meer informatie",
+                                            symbol:
+                                                "info.circle"
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                    .background(
+                                        .white.opacity(0.14),
+                                        in: Capsule()
                                     )
                                 }
-                                .buttonStyle(.plain)
-                                .background(
-                                    .white.opacity(0.14),
-                                    in: Capsule()
-                                )
+
                             }
                         }
 
@@ -116,14 +113,18 @@ struct MoviesView: View {
                             )
                         }
 
+                        .padding(.horizontal, 16)
+
                         content
+                            .padding(.horizontal, 16)
                     }
-                    .padding(.horizontal)
-                    .padding(.top, 8)
                     .padding(.bottom, 40)
                 }
 
             }
+            #if os(iOS)
+            .ignoresSafeArea(.container, edges: .top)
+            #endif
             .veyraHideNavigationBar()
             .onChange(
                 of: watchRegion

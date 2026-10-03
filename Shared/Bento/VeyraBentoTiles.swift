@@ -262,7 +262,7 @@ struct VeyraBentoContinueMiniContent: View {
                         #if os(tvOS)
                         .font(.system(size: compact ? 10 : 20, weight: .bold, design: .rounded))
                         #else
-                        .font(.system(size: compact ? 10 : 16, weight: .bold, design: .rounded))
+                        .font(.system(size: compact ? 12 : 18, weight: .bold, design: .rounded))
                         #endif
                         .foregroundStyle(.white)
                         .padding(.horizontal, compact ? 7 : 12)
@@ -373,8 +373,11 @@ struct VeyraBentoLiveRowContent: View {
                 }
                 // Het volgende programma blijft visueel ondergeschikt aan wat nu speelt.
                 if let nextTitle = row.nextTitle {
+                    // Op uitdrukkelijk verzoek groter (was 13/18) -- blijft met gewicht
+                    // `.medium` en `VeyraHomeStyle.dim` nog altijd duidelijk ondergeschikt aan
+                    // wat nu speelt (titel hierboven: 15/23, semibold).
                     Text("Straks: \(nextTitle)")
-                        .font(compact ? .system(size: 13, weight: .medium) : .system(size: 18, weight: .medium))
+                        .font(compact ? .system(size: 15, weight: .medium) : .system(size: 21, weight: .medium))
                         .foregroundStyle(VeyraHomeStyle.dim)
                         .lineLimit(1)
                 }

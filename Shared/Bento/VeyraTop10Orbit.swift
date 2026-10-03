@@ -36,11 +36,14 @@ struct VeyraTop10Orbit: View {
     var body: some View {
         if !items.isEmpty {
             VStack(alignment: .leading, spacing: 14) {
-                Text(title)
-                    .font(.system(size: headerSize, weight: .heavy, design: .rounded))
-                    .tracking(2)
-                    .textCase(.uppercase)
-                    .foregroundStyle(VeyraHomeStyle.cyan.opacity(0.85))
+                HStack(spacing: 12) {
+                    Text(title)
+                        .font(.system(size: headerSize, weight: .heavy, design: .rounded))
+                        .tracking(2)
+                        .textCase(.uppercase)
+                        .foregroundStyle(VeyraHomeStyle.cyan.opacity(0.85))
+                    VeyraSectionTitleLine()
+                }
 
                 ScrollViewReader { proxy in
                     ScrollView(.horizontal, showsIndicators: false) {

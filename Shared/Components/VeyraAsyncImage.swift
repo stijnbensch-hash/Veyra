@@ -36,8 +36,18 @@ struct VeyraAsyncImage<Content: View>: View {
         // the image view leaving the screen.
         ZStack { content(phase) }
             .task(id: ArtworkRequest(url: url, pixels: maxPixelSize)) {
-                phase = .empty
-                guard let url else { return }
+                guard let url else { phase = .empty; return }
+                // Al gedecodeerd in de gedeelde cache (bv. terugkeren naar Home na een
+                // detailscherm, waar `.task` hier opnieuw doorloopt omdat de view opnieuw
+                // verschijnt): meteen tonen i.p.v. eerst naar `.empty` te springen -- dat
+                // was de zichtbare "backdrop laadt steeds opnieuw"-flits bij elke terugkeer,
+                // ook al kwam de herlaad zelf (hieronder) alweer vrijwel ogenblikkelijk uit
+                // diezelfde cache.
+                if let cached = VeyraArtworkLoader.shared.cachedResult(url, pixels: maxPixelSize) {
+                    phase = .success(Image(decorative: cached.image, scale: scale))
+                } else {
+                    phase = .empty
+                }
                 do {
                     let decoded = try await VeyraArtworkLoader.shared.load(url, pixels: maxPixelSize)
                     try Task.checkCancellation()
@@ -51,7 +61,6 @@ struct VeyraAsyncImage<Content: View>: View {
                     phase = .failure(error)
                 }
             }
-            .onDisappear { phase = .empty }
     }
 }
 
@@ -146,6 +155,15 @@ nonisolated final class VeyraArtworkLoader: @unchecked Sendable {
         clearMemory()
         session.configuration.urlCache?.removeAllCachedResponses()
         decodeQueue.async { self.diskCache.clear() }
+    }
+
+    /// Synchrone cache-check, puur om een al-gedecodeerde afbeelding meteen te kunnen tonen
+    /// (zie `VeyraAsyncImage`) zonder eerst even leeg te flitsen -- bv. bij terugkeren naar
+    /// Home na een detailscherm, waar de backdrop al in deze cache zit maar de view opnieuw
+    /// verschijnt (en dus opnieuw door `.task` loopt).
+    func cachedResult(_ url: URL, pixels: Int) -> VeyraDecodedArtwork? {
+        let pixels = min(1920, max(64, pixels))
+        return cache.value(for: "\(pixels)|\(url.absoluteString)")
     }
 
     func load(_ url: URL, pixels: Int) async throws -> VeyraDecodedArtwork {

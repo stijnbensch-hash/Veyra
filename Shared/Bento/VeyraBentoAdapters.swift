@@ -466,7 +466,11 @@ final class VeyraLiveGuideSource {
                 programs: programmes.map { p in
                     EPGProgram(id: p.id, title: p.title, subtitle: p.subtitle.isEmpty ? nil : p.subtitle,
                                description: p.summary.isEmpty ? nil : p.summary, start: p.start, end: p.end,
-                               backdropURL: nil, isSports: isSportsChannel, isInWatchlist: false, canCatchUp: false)
+                               // Nog geen TMDB-match hier (zie `EPGProgram.backdropURL`), maar de
+                               // XMLTV-feed levert voor veel providers wel een eigen `<icon>` per
+                               // programma -- die als achtergrond gebruiken op de "Live nu"-kaart
+                               // i.p.v. altijd de kale rode kaart te tonen.
+                               backdropURL: p.iconURL, isSports: isSportsChannel, isInWatchlist: false, canCatchUp: false)
                 })
         }
     }

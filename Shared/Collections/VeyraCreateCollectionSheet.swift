@@ -77,19 +77,11 @@ struct VeyraCreateCollectionSheet: View {
             // zinvolle keuzes ("Uit collectie") kan tonen.
             if let editing {
                 Section {
-                    NavigationLink("Wijzig fanart") {
-                        VeyraCollectionFanartPickerView(collectionID: editing.id)
+                    NavigationLink("Wijzig artwork") {
+                        VeyraCollectionArtworkPickerView(collectionID: editing.id)
                     }
                 } header: {
-                    Text("Fanart")
-                }
-
-                Section {
-                    NavigationLink("Wijzig clearlogo") {
-                        VeyraCollectionClearLogoPickerView(collectionID: editing.id)
-                    }
-                } header: {
-                    Text("Clearlogo")
+                    Text("Artwork")
                 }
             }
         }

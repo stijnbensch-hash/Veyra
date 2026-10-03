@@ -58,7 +58,7 @@ struct SettingsView: View {
                         settingsCard(destination: .metadata, icon: "star.leadinghalf.filled", title: "Metadata",
                                      subtitle: "Ratings op film- en seriepagina's", status: "", statusColor: VeyraColors.secondary)
                         settingsCard(destination: .home, icon: "house", title: "Home",
-                                     subtitle: "Filmcollecties en planken op het hoofdmenu", status: "", statusColor: VeyraColors.secondary)
+                                     subtitle: "Planken op het hoofdmenu", status: "", statusColor: VeyraColors.secondary)
                     }
 
                     settingsSection(title: "Data") {
@@ -78,6 +78,7 @@ struct SettingsView: View {
                     }
 
                     versionInformation
+                    VeyraStreamingLogoAttribution()
                 }
                 .frame(maxWidth: 1300, alignment: .leading)
                 .padding(.horizontal, VeyraSpacing.page)
@@ -148,8 +149,6 @@ struct SettingsView: View {
                 MetadataSettingsView()
             case .shelves:
                 ShelvesSettingsView()
-            case .collections:
-                VeyraCollectionsSettingsView()
             case .home:
                 VeyraHomeSettingsView()
             case .data:
@@ -467,7 +466,6 @@ private enum SettingsDestination:
     case playback
     case metadata
     case shelves
-    case collections
     case home
     case data
 

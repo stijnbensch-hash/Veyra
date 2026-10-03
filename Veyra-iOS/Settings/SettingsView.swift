@@ -11,7 +11,6 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
     case metadata
     case playback
     case shelves
-    case collections
     case home
     case data
     case account
@@ -30,7 +29,6 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
         case .metadata: return "Metadata"
         case .playback: return "Afspelen"
         case .shelves: return "Planken"
-        case .collections: return "Filmcollecties"
         case .home: return "Home"
         case .data: return "Data"
         case .account: return "Account"
@@ -49,8 +47,7 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
         case .metadata: return "Ratings op film- en seriepagina's"
         case .playback: return "Resolutie, taal en oversla-segmenten"
         case .shelves: return "Eigen rijen op het hoofdmenu"
-        case .collections: return "Collecties op Home toevoegen of verwijderen"
-        case .home: return "Filmcollecties en planken op het hoofdmenu"
+        case .home: return "Planken op het hoofdmenu"
         case .data: return "Cache legen, automatisch verversen, VeyraHub Recorder"
         case .account: return "Trakt, TMDB en API-sleutels"
         }
@@ -68,7 +65,6 @@ enum SettingsDestination: String, Identifiable, CaseIterable, Hashable {
         case .metadata: return "star.leadinghalf.filled"
         case .playback: return "play.circle"
         case .shelves: return "rectangle.grid.1x2"
-        case .collections: return "film.stack"
         case .home: return "house"
         case .data: return "internaldrive"
         case .account: return "person.crop.circle"
@@ -180,6 +176,7 @@ struct SettingsView: View {
                     }
 
                     versionInformation
+                    VeyraStreamingLogoAttribution()
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 12)
@@ -361,7 +358,6 @@ struct SettingsView: View {
         case .metadata: MetadataSettingsView()
         case .playback: PlaybackSettingsView()
         case .shelves: ShelvesSettingsView()
-        case .collections: VeyraCollectionsSettingsView()
         case .home: VeyraHomeSettingsView()
         case .data: DataSettingsView()
         case .account: AccountView()

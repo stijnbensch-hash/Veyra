@@ -51,32 +51,36 @@ struct VeyraHero<Actions: View>: View {
     var metadata: [String] = []
     var item: MediaItem? = nil
     @State private var ratings = MetadataRatings()
+    @Environment(\.veyraCatalogHeroLayout) private var catalogLayout
     @ViewBuilder let actions: () -> Actions
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: catalogLayout == nil ? 16 : 12) {
             if !eyebrow.isEmpty {
                 HStack(spacing: 10) {
                     Capsule().fill(VeyraColors.red).frame(width: 28, height: 5)
                     Text(eyebrow.uppercased()).font(.system(size: 18, weight: .medium)).tracking(4).foregroundStyle(VeyraColors.ice)
                 }
             }
-            if let item {
-                VeyraClearLogo(
-                    item: item,
-                    fallbackTitle: title,
-                    maxWidth: logoWidth,
-                    maxHeight: logoHeight,
-                    font: .system(size: titleFontSize, weight: .bold, design: .rounded)
-                )
-                .shadow(color: .black.opacity(0.6), radius: 18, y: 8)
-            } else {
-                Text(title)
-                    .font(.system(size: titleFontSize, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .lineLimit(2)
+            Group {
+                if let item {
+                    VeyraClearLogo(
+                        item: item,
+                        fallbackTitle: title,
+                        maxWidth: logoWidth,
+                        maxHeight: logoHeight,
+                        font: .system(size: titleFontSize, weight: .bold, design: .rounded)
+                    )
                     .shadow(color: .black.opacity(0.6), radius: 18, y: 8)
+                } else {
+                    Text(title)
+                        .font(.system(size: titleFontSize, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
+                        .shadow(color: .black.opacity(0.6), radius: 18, y: 8)
+                }
             }
-            if !metadata.isEmpty {
+            .frame(height: catalogLayout?.titleHeight, alignment: .leading)
+            if !metadata.isEmpty || catalogLayout != nil {
                 HStack(spacing: 12) {
                     ForEach(metadata, id: \.self) { value in
                         Text(value).font(.system(size: 19, weight: .medium)).padding(.horizontal, 13).padding(.vertical, 7)
@@ -84,20 +88,38 @@ struct VeyraHero<Actions: View>: View {
                             .overlay(RoundedRectangle(cornerRadius: 10).stroke(.white.opacity(0.10)))
                     }
                 }
+                .frame(height: catalogLayout == nil ? nil : 40, alignment: .leading)
             }
             if let item {
-                MetadataRatingsView(ratings: heroRatings(for: item),
-                                    maxItems: heroRatingLimit, compact: true)
+                ZStack(alignment: .leading) {
+                    // Een lege ratings-view is EmptyView; alleen .frame reserveert
+                    // daarvoor geen rij in de VStack. De transparante rij doet dat wel.
+                    if let catalogLayout {
+                        Color.clear.frame(height: catalogLayout.ratingsHeight)
+                    }
+                    MetadataRatingsView(ratings: heroRatings(for: item),
+                                        maxItems: heroRatingLimit, compact: true)
+                }
+                .frame(height: catalogLayout?.ratingsHeight, alignment: .leading)
             }
-            if let overview, !overview.isEmpty {
-                Text(overview).font(VeyraTypography.body).foregroundStyle(.white.opacity(0.78))
+            if catalogLayout != nil || !(overview ?? "").isEmpty {
+                Text(overview ?? "").font(VeyraTypography.body).foregroundStyle(.white.opacity(0.78))
                     .lineSpacing(4).lineLimit(3)
+                    .frame(height: catalogLayout?.overviewHeight, alignment: .topLeading)
             }
             HStack(spacing: 22, content: actions).padding(.top, 8)
+                .frame(height: catalogLayout?.actionsHeight, alignment: .leading)
         }
         .frame(maxWidth: 860, alignment: .leading)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 28)
+        .padding(.vertical, catalogLayout == nil ? 28 : 20)
+        #if os(iOS)
+        // Op de Films/Series-hero (catalogLayout != nil) zat "Meer
+        // informatie" te dicht tegen de onderrand -- extra lucht eronder
+        // duwt het hele blok (bij het centreren in VeyraCatalogHero) iets
+        // omhoog. Alleen iOS: tvOS/macOS stonden al goed.
+        .padding(.bottom, catalogLayout != nil ? 14 : 0)
+        #endif
         #if os(tvOS)
         .focusSection()
         #endif
@@ -166,5 +188,89 @@ struct VeyraHero<Actions: View>: View {
         #else
         80
         #endif
+    }
+}
+
+/// Een stabiele hero-band voor Films/Series. De maten hangen niet af van de titel
+/// of van laat geladen logo's/scores; alleen de artwork wisselt binnen deze band.
+struct VeyraCatalogHeroLayout: Equatable {
+    let plusText: Bool
+    private var extraTitleHeight: CGFloat {
+        guard plusText else { return 0 }
+        #if os(tvOS)
+        return 148
+        #else
+        return 88
+        #endif
+    }
+    var titleHeight: CGFloat {
+        #if os(tvOS)
+        142 + extraTitleHeight
+        #else
+        84 + extraTitleHeight
+        #endif
+    }
+    var height: CGFloat {
+        #if os(tvOS)
+        420 + extraTitleHeight
+        #else
+        340 + extraTitleHeight
+        #endif
+    }
+    var ratingsHeight: CGFloat {
+        #if os(tvOS)
+        36
+        #else
+        27
+        #endif
+    }
+    var actionsHeight: CGFloat {
+        #if os(tvOS)
+        76
+        #else
+        48
+        #endif
+    }
+    var overviewHeight: CGFloat {
+        #if os(tvOS)
+        92
+        #else
+        66
+        #endif
+    }
+    var horizontalPadding: CGFloat {
+        #if os(tvOS)
+        80
+        #else
+        16
+        #endif
+    }
+}
+
+private struct VeyraCatalogHeroLayoutKey: EnvironmentKey {
+    static let defaultValue: VeyraCatalogHeroLayout? = nil
+}
+extension EnvironmentValues {
+    var veyraCatalogHeroLayout: VeyraCatalogHeroLayout? {
+        get { self[VeyraCatalogHeroLayoutKey.self] }
+        set { self[VeyraCatalogHeroLayoutKey.self] = newValue }
+    }
+}
+
+struct VeyraCatalogHero<Content: View>: View {
+    let url: URL?
+    var topInset: CGFloat = 0
+    @ViewBuilder let content: () -> Content
+    @ObservedObject private var artworkRefresh = ArtworkRefreshSignal.shared
+
+    var body: some View {
+        let layout = VeyraCatalogHeroLayout(plusText: ArtworkSettingsStore().load().titleDisplay == .clearLogoPlusText)
+        content()
+            .environment(\.veyraCatalogHeroLayout, layout)
+            .padding(.horizontal, layout.horizontalPadding)
+            .padding(.top, topInset)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: layout.height + topInset, alignment: .center)
+            .background { VeyraHeroArtworkBackground(url: url) }
     }
 }

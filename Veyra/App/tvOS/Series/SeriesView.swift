@@ -34,18 +34,7 @@ struct SeriesView: View {
 
     var body: some View {
         ZStack {
-            VeyraArtworkBackground(
-                url: heroSpotlight.focused?.backdropURL ?? featured?.backdropPath.flatMap {
-                    URL(
-                        string:
-                            "https://image.tmdb.org/t/p/w1280"
-                            + $0
-                    )
-                }
-            )
-            .id(heroSpotlight.focused?.id ?? "series-background:\(featured?.id ?? -1)")
-            .animation(.easeInOut(duration: 0.35), value: heroSpotlight.focused?.id)
-            .animation(.easeInOut(duration: 0.35), value: featured?.id)
+            VeyraBackground()
 
             ScrollView(
                 .vertical,
@@ -56,20 +45,21 @@ struct SeriesView: View {
                     spacing: 28
                 ) {
                     if let featured {
-                        Group {
-                            if let focused = heroSpotlight.focused {
-                                VeyraSpotlightHero(content: focused)
-                            } else {
-                                VeyraSeriesHero(series: featured)
+                        VeyraCatalogHero(
+                            url: heroSpotlight.focused?.backdropURL ?? featured.backdropPath.flatMap {
+                                URL(string: "https://image.tmdb.org/t/p/w1280" + $0)
+                            },
+                            topInset: VeyraTopNavigation.barHeight
+                        ) {
+                            Group {
+                                if let focused = heroSpotlight.focused {
+                                    VeyraSpotlightHero(content: focused)
+                                } else {
+                                    VeyraSeriesHero(series: featured)
+                                }
                             }
+                            .id(heroSpotlight.focused?.id ?? "series:\(featured.id)")
                         }
-                        .id(heroSpotlight.focused?.id ?? "series:\(featured.id)")
-                        .frame(
-                            minHeight: 390,
-                            alignment: .center
-                        )
-                        .animation(.easeInOut(duration: 0.35), value: heroSpotlight.focused?.id)
-                        .animation(.easeInOut(duration: 0.35), value: featured.id)
                     }
 
                     VStack(alignment: .leading, spacing: 6) {
@@ -84,14 +74,15 @@ struct SeriesView: View {
                         )
                     }
 
+                    .padding(.horizontal, 80)
+
                     content
+                        .padding(.horizontal, 80)
                 }
                 .frame(
                     maxWidth: .infinity,
                     alignment: .leading
                 )
-                .padding(.horizontal, 28)
-                .padding(.top, 36)
                 .padding(.bottom, 50)
             }
             .contentMargins(
@@ -101,6 +92,7 @@ struct SeriesView: View {
             )
             .scrollClipDisabled()
         }
+        .ignoresSafeArea(.container, edges: [.horizontal, .top])
         .task {
             await TraktStore.shared
                 .refreshIfNeeded()

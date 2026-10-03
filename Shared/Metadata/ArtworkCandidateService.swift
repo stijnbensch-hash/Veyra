@@ -73,4 +73,50 @@ enum ArtworkCandidateService {
             + mapped(decoded.posters, type: .poster)
             + mapped(decoded.backdrops, type: .backdrop)
     }
+
+    /// Zelfde als `candidates(for:)`, maar voor een TMDB-COLLECTIE i.p.v. een film/serie (spec
+    /// voor de Collections-fanart-integratie): `/collection/{id}/images` geeft alleen
+    /// `backdrops`/`posters` terug, geen `logos` -- TMDB heeft geen doorzoekbare clearlogo-bron
+    /// per collectie (zie ook de doc-comment in `VeyraCollectionClearLogoPickerView`).
+    private struct CollectionImages: Decodable {
+        let backdrops: [Image]
+        let posters: [Image]
+    }
+
+    static func candidates(forTMDBCollectionID collectionID: Int) async -> [ArtworkCandidate] {
+        guard let token = AppConfiguration.tmdbReadAccessToken else { return [] }
+
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = "api.themoviedb.org"
+        components.path = "/3/collection/\(collectionID)/images"
+        guard let url = components.url else { return [] }
+
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode),
+              let decoded = try? JSONDecoder().decode(CollectionImages.self, from: data)
+        else { return [] }
+
+        func mapped(_ images: [Image], type: VeyraArtworkType) -> [ArtworkCandidate] {
+            images.sorted { $0.vote_average > $1.vote_average }.compactMap { image in
+                let builtURL: URL?
+                switch type {
+                case .clearLogo: builtURL = TMDBImageURLBuilder.logo(image.file_path)
+                case .poster: builtURL = TMDBImageURLBuilder.poster(image.file_path)
+                case .backdrop: builtURL = TMDBImageURLBuilder.backdrop(image.file_path)
+                }
+                guard let builtURL else { return nil }
+                return ArtworkCandidate(
+                    type: type, providerPath: image.file_path, language: image.iso_639_1,
+                    voteAverage: image.vote_average, url: builtURL
+                )
+            }
+        }
+
+        return mapped(decoded.posters, type: .poster) + mapped(decoded.backdrops, type: .backdrop)
+    }
 }

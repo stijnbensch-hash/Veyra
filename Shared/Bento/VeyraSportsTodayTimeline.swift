@@ -14,11 +14,14 @@ struct VeyraSportsTodayTimeline: View {
     var body: some View {
         if !events.isEmpty {
             VStack(alignment: .leading, spacing: 14) {
-                Text("Vandaag")
-                    .font(.system(size: headerSize, weight: .heavy, design: .rounded))
-                    .tracking(2)
-                    .textCase(.uppercase)
-                    .foregroundStyle(VeyraHomeStyle.cyan.opacity(0.85))
+                HStack(spacing: 12) {
+                    Text("Vandaag")
+                        .font(.system(size: headerSize, weight: .heavy, design: .rounded))
+                        .tracking(2)
+                        .textCase(.uppercase)
+                        .foregroundStyle(VeyraHomeStyle.cyan.opacity(0.85))
+                    VeyraSectionTitleLine()
+                }
 
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(events.enumerated()), id: \.element.id) { index, event in

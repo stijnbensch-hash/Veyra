@@ -9,9 +9,7 @@ import PhotosUI
 struct VeyraStreamingSettingsView: View {
     @State private var entries: [BentoStreamingEntry] = []
     @State private var loading = true
-    // Zelfde breed woordmerk + merkkleur als Home (VeyraBentoStreamingContent), zodat het logo
-    // hier niet meer het kale/vierkante TMDB-providericoon toont maar de herkenbare bannerversie --
-    // opgezocht via VeyraCatalogSource().providers() en per dienst-id bijgehouden.
+    // Bundled full wordmarks are immediate; remote metadata is used for other services.
     @State private var catalogs: [String: BentoCatalog] = [:]
 
     var body: some View {
@@ -91,6 +89,7 @@ struct VeyraStreamingSettingsView: View {
         HStack(spacing: 14) {
             logo(entry)
                 .frame(width: 84, height: 48)
+                .background(VeyraColors.surface)
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.name)
@@ -112,7 +111,14 @@ struct VeyraStreamingSettingsView: View {
 
     @ViewBuilder
     private func logo(_ entry: BentoStreamingEntry) -> some View {
-        if let catalog = catalogs[entry.id] {
+        if let custom = VeyraStreamingStore.logoURL(for: entry) {
+            VeyraAsyncImage(url: custom, maxPixelSize: 320) { phase in
+                if let image = phase.image { image.resizable().scaledToFit() }
+            }
+        } else if let brand = VeyraStreamingBrand.named(entry.name) {
+            VeyraStreamingWordmark(brand: brand)
+                .padding(.horizontal, 4)
+        } else if let catalog = catalogs[entry.id] {
             VeyraBentoStreamingContent(name: catalog.name, iconURL: catalog.imageURL, wideURL: catalog.wideURL,
                                        brand: catalog.brand, compact: true, customURL: catalog.customLogoURL)
         } else {
@@ -200,11 +206,16 @@ struct VeyraStreamingProviderPickerView: View {
                 ForEach(available) { option in
                     Button { add(option) } label: {
                         HStack {
-                            VeyraAsyncImage(url: option.logoPath.flatMap { URL(string: "https://image.tmdb.org/t/p/w92\($0)") }) { phase in
-                                if let image = phase.image { image.resizable().scaledToFill() } else { Color.white.opacity(0.1) }
+                            if let brand = VeyraStreamingBrand.named(option.name) {
+                                VeyraStreamingWordmark(brand: brand)
+                                    .frame(width: 84, height: 40)
+                            } else {
+                                VeyraAsyncImage(url: option.logoPath.flatMap { URL(string: "https://image.tmdb.org/t/p/w92\($0)") }) { phase in
+                                    if let image = phase.image { image.resizable().scaledToFill() } else { Color.white.opacity(0.1) }
+                                }
+                                .frame(width: 40, height: 40)
+                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                             }
-                            .frame(width: 40, height: 40)
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                             Text(option.name)
                             Spacer()
                             Image(systemName: "plus.circle").foregroundStyle(.secondary)
@@ -398,6 +409,10 @@ struct VeyraStreamingEditorView: View {
                 } else { Text(entry.name).font(.title3.bold()) }
             }
             .clipped()
+        } else if let brand = VeyraStreamingBrand.named(entry.name) {
+            VeyraStreamingWordmark(brand: brand)
+                .frame(maxWidth: 260, maxHeight: 82)
+                .padding(12)
         } else if let catalog = catalogs[entry.id] {
             VeyraBentoStreamingContent(name: catalog.name, iconURL: catalog.imageURL, wideURL: catalog.wideURL,
                                        brand: catalog.brand, customURL: nil)

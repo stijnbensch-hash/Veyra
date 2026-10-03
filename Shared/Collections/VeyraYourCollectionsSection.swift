@@ -25,12 +25,12 @@ struct VeyraYourCollectionsSection: View {
         if !store.collections.isEmpty {
             // Zelfde titelstijl + afstand tot kaarten als "Voor jou" (VeyraMosaicSection).
             VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .firstTextBaseline) {
+                HStack(alignment: .center) {
                     Text("JOUW COLLECTIES")
                         .font(.system(size: headerSize, weight: .bold))
                         .tracking(1.5)
                         .foregroundStyle(VeyraColors.cyan.opacity(0.85))
-                    Spacer()
+                    VeyraSectionTitleLine()
                     Button("Bekijk alles") { showBrowser = true }
                         .font(.system(size: headerSize, weight: .semibold))
                         .foregroundStyle(.secondary)

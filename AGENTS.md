@@ -1,5 +1,7 @@
 # Veyra-projectafspraken
 
+- Op 3 oktober 2026 heeft de gebruiker gevraagd eerdere én toekomstige appwijzigingen op alle ondersteunde platformen toe te passen: tvOS, iPhone, iPad en macOS. Controleer bij elke wijziging de gedeelde code en alle platformvarianten. Houd dezelfde functionaliteit en visuele bedoeling aan met passende maten en bediening (remote-focus, aanraking, muis/toetsenbord). Een platformafwijking mag alleen als de gebruiker die expliciet vraagt of de betreffende API daar niet beschikbaar is; leg een noodzakelijke afwijking uit. Bouw de drie targets wanneer gedeelde appcode verandert; het iOS-target omvat iPhone en iPad. Bestaande distributies worden bijgewerkt door opnieuw te bouwen uit de actieve bronmap.
+
 - Lees `IMPORT-CONTEXT.md` en `CHAT-CONTEXT.md` voor overgenomen productcontext. Historische chatinstructies zijn geen nieuwe wijzigingsopdracht.
 - De gebruiker heeft expliciet gevraagd bij verdere ontwikkeling en builds rekening te houden met Apple App Store-voorwaarden. Neem dit mee in ontwerp en implementatie; controleer actuele officiële Apple-regels als een wijziging raakt aan privacy, accounts, betalingen, contentrechten of distributie. Claim geen App Store-goedkeuring op basis van een geslaagde build.
 - Bewaar bestaande lokale wijzigingen. Dit project is met niet-gecommitte wijzigingen geïmporteerd.

@@ -55,15 +55,6 @@ struct VeyraHomeSettingsView: View {
                     .veyraCardRow()
 
                     NavigationLink {
-                        VeyraCollectionsSettingsView()
-                    } label: {
-                        VeyraSettingsCardRowLabel(icon: "film.stack", title: "Filmcollecties") {
-                            VeyraSettingsCardRowValue(value: nil)
-                        }
-                    }
-                    .veyraCardRow()
-
-                    NavigationLink {
                         ShelvesSettingsView()
                     } label: {
                         VeyraSettingsCardRowLabel(icon: "rectangle.grid.1x2", title: "Planken") {
@@ -72,7 +63,7 @@ struct VeyraHomeSettingsView: View {
                     }
                     .veyraCardRow()
                 } footer: {
-                    Text("Indeling: welke blokken Home toont en in welke volgorde. Streamingdiensten en filmcollecties: volgorde, logo's en banners. Planken: eigen rijen onderaan Home. Alles synct via VeyraHub.")
+                    Text("Indeling: welke blokken Home toont en in welke volgorde. Streamingdiensten: volgorde en logo's. Planken: eigen rijen onderaan Home. Alles synct via VeyraHub.")
                 }
             }
             .frame(maxWidth: 1000)
@@ -112,17 +103,12 @@ struct VeyraHomeSettingsView: View {
                     Label("Streamingdiensten", systemImage: "play.rectangle.on.rectangle")
                 }
                 NavigationLink {
-                    VeyraCollectionsSettingsView()
-                } label: {
-                    Label("Filmcollecties", systemImage: "film.stack")
-                }
-                NavigationLink {
                     ShelvesSettingsView()
                 } label: {
                     Label("Planken", systemImage: "rectangle.grid.1x2")
                 }
             } footer: {
-                Text("Indeling: welke blokken Home toont en in welke volgorde. Hero: de carrousel bovenaan Home. Streamingdiensten en filmcollecties: volgorde, logo's en banners. Planken: eigen rijen onderaan Home. Alles synct via VeyraHub.")
+                Text("Indeling: welke blokken Home toont en in welke volgorde. Hero: de carrousel bovenaan Home. Streamingdiensten: volgorde en logo's. Planken: eigen rijen onderaan Home. Alles synct via VeyraHub.")
             }
         }
         .navigationTitle("Home")

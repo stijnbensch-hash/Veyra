@@ -3,6 +3,15 @@ import SwiftUI
 struct VeyraTopNavigation: View {
     let selected: MenuDestination
     let navigate: (MenuDestination) -> Void
+
+    /// Totale gereserveerde hoogte van deze balk (rij-knophoogte 56 + top-
+    /// en bottom-padding 12/18), zodat schermen die hun hero-achtergrond
+    /// via `.ignoresSafeArea(..., edges: .top)` eronder laten doorlopen hun
+    /// eigen inhoud (titel/tekst) met evenveel ruimte weer naar beneden
+    /// kunnen duwen -- één bron van waarheid i.p.v. dat getal los ergens
+    /// anders te laten overtypen.
+    static let barHeight: CGFloat = 86
+
     var body: some View {
         HStack(spacing: 12) {
             HStack(spacing: 6) {

@@ -47,11 +47,14 @@ struct VeyraSportsUpcomingSection: View {
     var body: some View {
         if !events.isEmpty {
             VStack(alignment: .leading, spacing: 24) {
-                Text("Binnenkort")
-                    .font(.system(size: headerSize, weight: .heavy, design: .rounded))
-                    .tracking(2)
-                    .textCase(.uppercase)
-                    .foregroundStyle(VeyraHomeStyle.cyan.opacity(0.85))
+                HStack(spacing: 12) {
+                    Text("Binnenkort")
+                        .font(.system(size: headerSize, weight: .heavy, design: .rounded))
+                        .tracking(2)
+                        .textCase(.uppercase)
+                        .foregroundStyle(VeyraHomeStyle.cyan.opacity(0.85))
+                    VeyraSectionTitleLine()
+                }
 
                 ForEach(groups, id: \.0.rawValue) { bucket, list in
                     VStack(alignment: .leading, spacing: 10) {

@@ -23,6 +23,10 @@ nonisolated struct BentoLiveRow: Identifiable, Equatable {
     let isSports: Bool
     let health: SourceHealth
     var logoURL: URL? = nil
+    /// Achtergrond van het huidige programma (alleen gevuld bij een TMDB-match, zie
+    /// `EPGProgram.backdropURL`) -- gebruikt op de "Live nu"-kaart van Veyra Now, ietwat
+    /// transparant zodat de kanaalkleur/gradient er nog doorheen blijft schemeren.
+    var backdropURL: URL? = nil
     /// Titel van het eerstvolgende programma op deze zender, indien bekend.
     var nextTitle: String? = nil
 }
@@ -347,6 +351,7 @@ final class VeyraBentoViewModel {
                 remainingMinutes: max(1, Int((program.end.timeIntervalSince(now) / 60).rounded(.up))),
                 progress: program.progress(at: now) ?? 0,
                 isSports: program.isSports, health: channel.health, logoURL: channel.logoURL,
+                backdropURL: program.backdropURL,
                 nextTitle: channel.nextProgram(after: program.end)?.title)
         }
     }

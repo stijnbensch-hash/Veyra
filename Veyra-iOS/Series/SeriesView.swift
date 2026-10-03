@@ -35,17 +35,7 @@ struct SeriesView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                VeyraArtworkBackground(
-                    url: featured?.backdropPath.flatMap {
-                        URL(
-                            string:
-                                "https://image.tmdb.org/t/p/w1280"
-                                + $0
-                        )
-                    }
-                )
-                .id(featured?.id ?? -1)
-                .animation(.easeInOut(duration: 0.35), value: featured?.id)
+                VeyraBackground()
 
                 ScrollView(
                     .vertical,
@@ -56,37 +46,44 @@ struct SeriesView: View {
                         spacing: 24
                     ) {
                         if let featured {
-                            VeyraHero(
-                                title: featured.name,
-                                eyebrow: "Serie uitgelicht",
-                                overview: featured.overview,
-                                metadata:
-                                    featured.firstAirDate.map {
-                                        [
-                                            String(
-                                                $0.prefix(4)
-                                            )
-                                        ]
-                                    }
-                                    ?? [],
-                                item: MediaItem(title: featured.name, type: .series,
-                                                tmdbID: featured.id, rating: featured.voteAverage)
+                            VeyraCatalogHero(
+                                url: featured.backdropPath.flatMap {
+                                    URL(string: "https://image.tmdb.org/t/p/w1280" + $0)
+                                }, topInset: VeyraSafeArea.top
                             ) {
-                                Button {
-                                    selectedSeries = featured
-                                } label: {
-                                    VeyraActionLabel(
-                                        title:
-                                            "Afleveringen bekijken",
-                                        symbol:
-                                            "play.rectangle"
+                                VeyraHero(
+                                    title: featured.name,
+                                    eyebrow: "Serie uitgelicht",
+                                    overview: featured.overview,
+                                    metadata:
+                                        featured.firstAirDate.map {
+                                            [
+                                                String(
+                                                    $0.prefix(4)
+                                                )
+                                            ]
+                                        }
+                                        ?? [],
+                                    item: MediaItem(title: featured.name, type: .series,
+                                                    tmdbID: featured.id, rating: featured.voteAverage)
+                                ) {
+                                    Button {
+                                        selectedSeries = featured
+                                    } label: {
+                                        VeyraActionLabel(
+                                            title:
+                                                "Afleveringen bekijken",
+                                            symbol:
+                                                "play.rectangle"
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                    .background(
+                                        .white.opacity(0.14),
+                                        in: Capsule()
                                     )
                                 }
-                                .buttonStyle(.plain)
-                                .background(
-                                    .white.opacity(0.14),
-                                    in: Capsule()
-                                )
+
                             }
                         }
 
@@ -109,13 +106,17 @@ struct SeriesView: View {
                             )
                         }
 
+                        .padding(.horizontal, 16)
+
                         content
+                            .padding(.horizontal, 16)
                     }
-                    .padding(.horizontal)
-                    .padding(.top, 8)
                     .padding(.bottom, 40)
                 }
             }
+            #if os(iOS)
+            .ignoresSafeArea(.container, edges: .top)
+            #endif
             .veyraHideNavigationBar()
             .onChange(
                 of: watchRegion

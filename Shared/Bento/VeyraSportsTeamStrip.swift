@@ -17,11 +17,14 @@ struct VeyraSportsTeamStrip: View {
     var body: some View {
         if !teams.isEmpty {
             VStack(alignment: .leading, spacing: 14) {
-                Text("Jouw teams")
-                    .font(.system(size: headerSize, weight: .heavy, design: .rounded))
-                    .tracking(2)
-                    .textCase(.uppercase)
-                    .foregroundStyle(VeyraHomeStyle.cyan.opacity(0.85))
+                HStack(spacing: 12) {
+                    Text("Jouw teams")
+                        .font(.system(size: headerSize, weight: .heavy, design: .rounded))
+                        .tracking(2)
+                        .textCase(.uppercase)
+                        .foregroundStyle(VeyraHomeStyle.cyan.opacity(0.85))
+                    VeyraSectionTitleLine()
+                }
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(alignment: .top, spacing: cardGap) {

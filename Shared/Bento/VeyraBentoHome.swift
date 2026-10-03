@@ -44,7 +44,6 @@ struct VeyraBentoHomeView: View {
     @State private var trendingItems: [HeroSpotlightItem] = []
     @State private var voorJouItems: [HeroSpotlightItem] = []
     @State private var top10Items: [HeroSpotlightItem] = []
-    @AppStorage(VeyraCollectionNames.key) private var showCollectionNames = true
     @State private var askPreset = false
 
     @FocusState private var focus: VeyraHomeFocus?
@@ -85,94 +84,90 @@ struct VeyraBentoHomeView: View {
 
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 48) {
-                // "Context Ribbon": tvOS heeft geen grote hero bovenaan Home, dus dit is
-                // hier meteen het eerste wat je ziet -- precies de plek die de brainstorm
-                // bedoelde ("de home voelt direct anders zonder de hele layout te wijzigen").
-                TimelineView(.periodic(from: .now, by: 5)) { context in
-                    VeyraContextRibbon(items: contextRibbonItems(now: context.date), now: context.date)
-                }
-
-                if let message = model.home.notice {
-                    VeyraStatusMessage(text: message) { Task { await model.load(force: true) } }
-                }
-
-                // "Verder kijken" en "Binnenkort" helemaal bovenaan, los van de rest van het raster.
-                TimelineView(.periodic(from: .now, by: 30)) { context in
-                    bentoTop(now: context.date)
-                }
-
-                bentoMiddle(now: .now, tiles: [.streaming])
-                VeyraYourCollectionsSection()
-
-                // "Nieuw van hier" (Regional Releases fase 4, spec §4/§30): volledig regionaal
-                // discovery-overzicht, meteen onder "Verder kijken"/"Binnenkort" -- zelfde
-                // prominentie als de rest van de Home-top, los van het bento-raster net als
-                // Trending/Voor jou hieronder.
-                TimelineView(.periodic(from: .now, by: 30)) { context in
-                    bentoRegional(now: context.date)
-                }
-
-                // "Discovery Flow": Trending, los van het bento-raster -- Stap 9 van het
-                // Home Visual System-spec, direct na "Verder kijken" (spec §97).
-                VeyraDiscoveryFlow(title: "Trending", items: trendingItems)
-
-                // "Dynamic Mosaic": Voor Jou -- Stap 10, direct na Trending (spec §97).
-                VeyraMosaicSection(title: "Voor jou", items: voorJouItems)
-
-                // Collections: "Verder met je collecties" -- toont zichzelf enkel wanneer er
-                // effectief iets te hervatten valt (zie VeyraContinueCollectionsSection).
-                VeyraContinueCollectionsSection()
-
-                TimelineView(.periodic(from: .now, by: 30)) { context in
-                    bentoMiddle(now: context.date, tiles: [.live])
-                }
-
-                // "Binnenkort" teruggezet in "Verder kijken"-rij (zie bentoTop) -- geen
-                // losse Calendar Horizon-sectie meer.
-
-                // "Live nu" als eigen rasterrij, i.p.v.
-                // de losse On Air-sectie van Stap 13 -- op uitdrukkelijk verzoek teruggedraaid.
-                // "Sports Stage": uitgelichte live wedstrijd, los van de rest van de
-                // Sport-sectie -- Stap 14, direct na Nu op tv, vóór Live Sport (spec §97).
-                TimelineView(.periodic(from: .now, by: 30)) { context in
-                    bentoSportsStage(now: context.date)
-                }
-
-                // Sport onder "Streamingdiensten".
-                if layout.showSport, let sportModel, !sportModel.events.isEmpty {
-                    SportSection(
-                        model: sportModel,
-                        focus: $focus,
-                        onPlay: onPlaySport,
-                        onToggleReminder: onToggleSportReminder,
-                        onOpenCompetition: onOpenCompetition)
-                } else if layout.showSport, let sportModel, sportModel.phase != .idle, sportModel.phase != .loading {
-                    Button { onOpenCompetition(SportCompetition(name: "Sport", liveCount: 0, eventCount: 0, nextStart: nil)) } label: {
-                        VeyraStatusMessage(text: "Sport: geen wedstrijden gevonden. Open het Sport-menu.")
+            VStack(alignment: .leading, spacing: 0) {
+                streamingRibbon
+                VStack(alignment: .leading, spacing: 48) {
+                    // Context en aanbevelingen onder de mee scrollende dienstenrij.
+                    TimelineView(.periodic(from: .now, by: 5)) { context in
+                        VeyraContextRibbon(items: contextRibbonItems(now: context.date), now: context.date)
                     }
-                    .buttonStyle(VeyraTileStyle())
-                    .focused($focus, equals: .competition("Sport"))
-                }
 
-                TimelineView(.periodic(from: .now, by: 30)) { context in
-                    bentoBottom(now: context.date)
-                }
+                    if let message = model.home.notice {
+                        VeyraStatusMessage(text: message) { Task { await model.load(force: true) } }
+                    }
 
-                // "IPTV films"/"IPTV series" pas na Sport & Filmcollecties.
-                TimelineView(.periodic(from: .now, by: 30)) { context in
-                    bentoIPTV(now: context.date)
-                }
+                    // "Verder kijken" en "Binnenkort" helemaal bovenaan, los van de rest van het raster.
+                    TimelineView(.periodic(from: .now, by: 30)) { context in
+                        bentoTop(now: context.date)
+                    }
 
-                if layout.showShelves { VeyraBentoUserShelves(onOpen: onOpenTMDBTitle) }
+                    VeyraYourCollectionsSection()
+
+                    // "Live nu" hier vlak onder "Jouw collecties" (op uitdrukkelijk verzoek
+                    // verplaatst, stond voorheen na "Verder met je collecties" hieronder).
+                    TimelineView(.periodic(from: .now, by: 30)) { context in
+                        bentoLive(now: context.date)
+                    }
+
+                    // "Nieuw van hier" (Regional Releases fase 4, spec §4/§30): volledig regionaal
+                    // discovery-overzicht, meteen onder "Verder kijken"/"Binnenkort" -- zelfde
+                    // prominentie als de rest van de Home-top, los van het bento-raster net als
+                    // Trending/Voor jou hieronder.
+                    TimelineView(.periodic(from: .now, by: 30)) { context in
+                        bentoRegional(now: context.date)
+                    }
+
+                    // "Discovery Flow": Trending, los van het bento-raster -- Stap 9 van het
+                    // Home Visual System-spec, direct na "Verder kijken" (spec §97).
+                    VeyraDiscoveryFlow(title: "Trending", items: trendingItems)
+
+                    // "Dynamic Mosaic": Voor Jou -- Stap 10, direct na Trending (spec §97).
+                    VeyraMosaicSection(title: "Voor jou", items: voorJouItems)
+
+                    // Collections: "Verder met je collecties" -- toont zichzelf enkel wanneer er
+                    // effectief iets te hervatten valt (zie VeyraContinueCollectionsSection).
+                    VeyraContinueCollectionsSection()
+
+                    // "Binnenkort" teruggezet in "Verder kijken"-rij (zie bentoTop) -- geen
+                    // losse Calendar Horizon-sectie meer.
+
+                    // "Sports Stage": uitgelichte live wedstrijd, los van de rest van de
+                    // Sport-sectie -- Stap 14, direct na Nu op tv, vóór Live Sport (spec §97).
+                    TimelineView(.periodic(from: .now, by: 30)) { context in
+                        bentoSportsStage(now: context.date)
+                    }
+
+                    // Sport onder "Streamingdiensten".
+                    if layout.showSport, let sportModel, !sportModel.events.isEmpty {
+                        SportSection(
+                            model: sportModel,
+                            focus: $focus,
+                            onPlay: onPlaySport,
+                            onToggleReminder: onToggleSportReminder,
+                            onOpenCompetition: onOpenCompetition)
+                    } else if layout.showSport, let sportModel, sportModel.phase != .idle, sportModel.phase != .loading {
+                        Button { onOpenCompetition(SportCompetition(name: "Sport", liveCount: 0, eventCount: 0, nextStart: nil)) } label: {
+                            VeyraStatusMessage(text: "Sport: geen wedstrijden gevonden. Open het Sport-menu.")
+                        }
+                        .buttonStyle(VeyraTileStyle())
+                        .focused($focus, equals: .competition("Sport"))
+                    }
+
+                    // "IPTV films"/"IPTV series" pas na Sport.
+                    TimelineView(.periodic(from: .now, by: 30)) { context in
+                        bentoIPTV(now: context.date)
+                    }
+
+                    if layout.showShelves { VeyraBentoUserShelves(onOpen: onOpenTMDBTitle) }
+                }
+                .padding(.leading, 40)
+                .padding(.trailing, 80)
+                .padding(.top, 16)
+                .padding(.bottom, 80)
             }
-            .padding(.horizontal, 80)
-            .padding(.top, 24)
-            .padding(.bottom, 80)
+            .background(VeyraScrollPositionReader())
         }
-        // Overal de effen grijze achtergrond (geen cyaan/rood) -- geen groot
-        // team-logo meer als achtergrond bij een gefocuste wedstrijd.
-        .background(VeyraBackground())
+        .veyraScrollingBackground()
         .ignoresSafeArea(edges: [.horizontal, .bottom])
         .task { await model.load() }
         // Trending/Voor jou/Top 10 NA ELKAAR laden (niet gelijktijdig): elke
@@ -326,6 +321,7 @@ struct VeyraBentoHomeView: View {
                 id: liveID, icon: "dot.radiowaves.left.and.right", label: "LIVE NU",
                 text: row.title, detail: "nog \(row.remainingMinutes) min", isLive: true, contentKind: .live,
                 priority: justStarted ? 85 : (row.isSports ? 65 : 55), time: now, logoURL: row.logoURL,
+                backdropURL: row.backdropURL,
                 reason: .live, reasonText: "Nu live",
                 onDismiss: { VeyraNowSettingsStore.dismiss(liveID) },
                 onSnooze: { VeyraNowSettingsStore.snoozeForToday(liveID) },
@@ -354,7 +350,7 @@ struct VeyraBentoHomeView: View {
                     detail: live ? "Live op \(event.channelName)" : "\(startText) · \(event.channelName)",
                     isLive: live, contentKind: .sport,
                     priority: nearEnd ? 100 : (live ? 90 : 60), time: live ? now : event.start,
-                    logoURL: event.homeLogoURL, secondaryLogoURL: event.awayLogoURL,
+                    logoURL: event.homeLogoURL, secondaryLogoURL: event.awayLogoURL, scoreText: live ? event.score?.text : nil,
                     backdropURL: event.backdropURL, leagueLogoURL: SportsLeague.logo(forCompetition: event.competition, fallback: event.leagueLogoURL),
                     reason: live ? .live : (startsSoon ? .startsSoon : .upcoming),
                     reasonText: live ? "Nu live" : (startsSoon ? "Begint over \(Int(minutesUntilStart)) min" : nil),
@@ -368,15 +364,23 @@ struct VeyraBentoHomeView: View {
         // volgen is -- de meest recente, nog niet weggetikte film of serie, als de gebruiker
         // dit blok niet uitzette.
         if nowSettings.showReleases {
-            let releases = (model.releaseFilms.map { ($0, "Film") } + model.releaseSeries.map { ($0, "Serie") })
-                .sorted { ($0.0.releaseDate ?? .distantPast) > ($1.0.releaseDate ?? .distantPast) }
-            // Niet altijd dezelfde titel: roteert dagelijks door de meest recente, nog niet
-            // weggetikte releases (i.p.v. permanent de allerlaatste te tonen), zodat dit blok
-            // ook bij herladen/scrollen dezelfde dag stabiel blijft maar van dag tot dag wisselt.
-            let pool = Array(releases.filter { !nowSettings.isHidden("ribbon-release-\($0.0.id)", now: now) }.prefix(10))
+            // Films en series om-en-om ingevlochten (i.p.v. simpelweg samen op releasedatum
+            // gesorteerd) zodat de rotatie hieronder niet kan verzanden in louter films als
+            // die toevallig vaker/recenter uitkomen -- series blijven zo altijd aan bod komen.
+            let sortedFilms = model.releaseFilms.sorted { ($0.releaseDate ?? .distantPast) > ($1.releaseDate ?? .distantPast) }
+            let sortedSeries = model.releaseSeries.sorted { ($0.releaseDate ?? .distantPast) > ($1.releaseDate ?? .distantPast) }
+            var releases: [(BentoTMDBTitle, String)] = []
+            for index in 0..<max(sortedFilms.count, sortedSeries.count) {
+                if index < sortedFilms.count { releases.append((sortedFilms[index], "Film")) }
+                if index < sortedSeries.count { releases.append((sortedSeries[index], "Serie")) }
+            }
+            // Niet altijd dezelfde titel: roteert nu om de paar minuten door de meest recente,
+            // nog niet weggetikte releases (was: 1x per dag) zodat je bij normaal scrollen/
+            // terugkeren merkbaar meer variatie ziet, films en series inbegrepen.
+            let pool = Array(releases.filter { !nowSettings.isHidden("ribbon-release-\($0.0.id)", now: now) }.prefix(16))
             if !pool.isEmpty {
-                let dayOfYear = Calendar.current.ordinality(of: .day, in: .year, for: now) ?? 0
-                let (title, kindLabel) = pool[dayOfYear % pool.count]
+                let rotationBucket = Int(now.timeIntervalSinceReferenceDate / (4 * 60))
+                let (title, kindLabel) = pool[((rotationBucket % pool.count) + pool.count) % pool.count]
                 let releaseID = "ribbon-release-\(title.id)"
                 items.append(VeyraRibbonItem(
                     id: releaseID, icon: "sparkles", label: "NIEUW UITGEBRACHT",
@@ -492,13 +496,18 @@ struct VeyraBentoHomeView: View {
             VeyraBentoGrid(profile: profile) {
                 if showVolgende {
                     VStack(alignment: .leading, spacing: 4) {
-                        // Subtiele titel boven de rij, i.p.v. los per tegel.
-                        Text("Verder kijken (\(items.count))")
-                            .font(.system(size: 20, weight: .bold))
-                            .tracking(2)
-                            .textCase(.uppercase)
-                            .foregroundStyle(VeyraHomeStyle.cyan.opacity(0.85))
-                            .padding(.horizontal, 12)
+                        // Subtiele titel boven de rij, i.p.v. los per tegel. Zelfde cyaan
+                        // lijnstijl achter de titel als `VeyraHomeSectionHeader`/de tijdlijn
+                        // onder "Veyra Now", voor een consistent beeld over heel Home.
+                        HStack(spacing: 12) {
+                            Text("Verder kijken (\(items.count))")
+                                .font(.system(size: 20, weight: .bold))
+                                .tracking(2)
+                                .textCase(.uppercase)
+                                .foregroundStyle(VeyraHomeStyle.cyan.opacity(0.85))
+                            VeyraSectionTitleLine()
+                        }
+                        .padding(.horizontal, 12)
 
                         ScrollView(.horizontal, showsIndicators: false) {
                             LazyHStack(spacing: 24) {
@@ -547,12 +556,15 @@ struct VeyraBentoHomeView: View {
 
                 if showVandaag, let today {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Binnenkort")
-                            .font(.system(size: 20, weight: .bold))
-                            .tracking(2)
-                            .textCase(.uppercase)
-                            .foregroundStyle(VeyraHomeStyle.cyan.opacity(0.85))
-                            .padding(.horizontal, 12)
+                        HStack(spacing: 12) {
+                            Text("Binnenkort")
+                                .font(.system(size: 20, weight: .bold))
+                                .tracking(2)
+                                .textCase(.uppercase)
+                                .foregroundStyle(VeyraHomeStyle.cyan.opacity(0.85))
+                            VeyraSectionTitleLine()
+                        }
+                        .padding(.horizontal, 12)
 
                         // Losse kaarten op een horizontale rij, zonder groot kader eromheen.
                         ScrollView(.horizontal, showsIndicators: false) {
@@ -643,60 +655,54 @@ struct VeyraBentoHomeView: View {
         }
     }
 
-    // MARK: Raster — Streamingdiensten
-
-    /// Losstaand van de @ViewBuilder-functie hieronder: `Set.insert` retourneert een tuple, wat de
-    /// ViewBuilder in de war brengt als het als een `if`-conditie binnenin een view-body staat.
-    private func middlePresentTiles(live: [BentoLiveRow]) -> Set<BentoTile> {
-        var present = Set<BentoTile>()
-        if layout.isVisible(.live), !live.isEmpty { present.insert(.live) }
-        if layout.isVisible(.streaming), !model.providers.isEmpty { present.insert(.streaming) }
-        return present
-    }
+    // MARK: Streamingdiensten onder de menubalk
 
     @ViewBuilder
-    private func bentoMiddle(now: Date, tiles: Set<BentoTile>) -> some View {
-        let live = tiles.contains(.live) ? model.liveRows(at: now, limit: 8, recentFirst: true, favoritesOnly: liveFavoritesOnly) : []
-        let present = middlePresentTiles(live: live).intersection(tiles)
-        let order = layout.orderedTiles.filter { present.contains($0) }
-        let profile = BentoProfile.make(.tv, order: order)
+    private var streamingRibbon: some View {
+        if layout.isVisible(.streaming), !model.providers.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 14) {
+                    ForEach(model.providers) { provider in
+                        Button { onOpenCatalog(provider) } label: {
+                            VeyraLogoShelfTile(name: provider.name, iconURL: provider.imageURL,
+                                               wideURL: provider.wideURL, brand: provider.brand,
+                                               customURL: provider.customLogoURL, ribbon: true)
+                                .frame(width: 168, height: 70)
+                        }
+                        .buttonStyle(VeyraStreamingTileStyle())
+                        .focused($focus, equals: .shelf("prov-\(provider.id)"))
+                    }
+                }
+                .padding(8)
+            }
+            // Vaste compacte hoogte binnen de verticale pagina.
+            .frame(height: 86)
+            .scrollClipDisabled()
+            // Alleen de zichtbare rij verplaatsen; de gereserveerde hoogte blijft gelijk.
+            .offset(y: 12)
+            .padding(.top, 12)
+            .padding(.leading, 34)
+            .padding(.trailing, 80)
+            .accessibilityLabel("Streamingdiensten")
+        }
+    }
 
-        if !present.isEmpty {
+    // MARK: Raster — Live TV
+
+    @ViewBuilder
+    private func bentoLive(now: Date) -> some View {
+        let live = model.liveRows(at: now, limit: 8, recentFirst: true, favoritesOnly: liveFavoritesOnly)
+        if layout.isVisible(.live), !live.isEmpty {
+            let profile = BentoProfile.make(.tv, order: [.live])
             VeyraBentoGrid(profile: profile) {
-                if present.contains(.live) {
-                    // De 8 laatst bekeken zenders in twee kolommen van 4, zodat het blok op zijn vaste hoogte blijft.
-                    VeyraBentoLiveList {
-                        HStack(alignment: .top, spacing: 24) {
-                            liveColumn(Array(live.prefix(4)))
-                            liveColumn(Array(live.dropFirst(4).prefix(4)))
-                        }
+                VeyraBentoLiveList {
+                    HStack(alignment: .top, spacing: 24) {
+                        liveColumn(Array(live.prefix(4)))
+                        liveColumn(Array(live.dropFirst(4).prefix(4)))
                     }
-                    .frame(maxHeight: .infinity, alignment: .center)
-                    .bentoCell(profile.cell(.live))
                 }
-
-                if present.contains(.streaming) {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        LazyHStack(spacing: 24) {
-                            ForEach(model.providers) { provider in
-                                Button { onOpenCatalog(provider) } label: {
-                                    VeyraLogoShelfTile(name: provider.name, iconURL: provider.imageURL,
-                                                       wideURL: provider.wideURL, brand: provider.brand,
-                                                       customURL: provider.customLogoURL)
-                                }
-                                .buttonStyle(VeyraStreamingTileStyle())
-                                .focused($focus, equals: .shelf("prov-\(provider.id)"))
-                                .frame(width: 300, height: 132)
-                            }
-                        }
-                        .padding(12)
-                    }
-                    .scrollClipDisabled()
-                    // Gecentreerd tussen de kaders, net als de andere rijen -- extra ruimte boven/onder
-                    // via de grotere tegelhoogte (zie BentoTile.height(.streaming) in VeyraBentoLayout.swift).
-                    .frame(maxHeight: .infinity, alignment: .center)
-                    .bentoCell(profile.cell(.streaming))
-                }
+                .frame(maxHeight: .infinity, alignment: .center)
+                .bentoCell(profile.cell(.live))
             }
         }
     }
@@ -746,45 +752,6 @@ struct VeyraBentoHomeView: View {
                 }
                 .frame(maxHeight: .infinity, alignment: .center)
                 .bentoCell(profile.cell(.iptvSeries))
-            }
-        }
-    }
-
-    // MARK: Raster — onder: Filmcollecties (na Sport)
-
-    @ViewBuilder
-    private func bentoBottom(now: Date) -> some View {
-        if layout.isVisible(.collecties), !model.collections.isEmpty {
-            let profile = BentoProfile.make(.tv, order: [.collecties])
-
-            VeyraBentoGrid(profile: profile) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Filmcollecties")
-                        .font(.system(size: 20, weight: .bold))
-                        .tracking(2)
-                        .textCase(.uppercase)
-                        .foregroundStyle(VeyraHomeStyle.cyan.opacity(0.85))
-                        .padding(.horizontal, 12)
-
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        LazyHStack(spacing: 24) {
-                            ForEach(model.collections) { collection in
-                                Button { onOpenCatalog(collection) } label: {
-                                    VeyraBentoCollectionMiniContent(title: collection.name, url: collection.imageURL, showName: showCollectionNames)
-                                }
-                                .buttonStyle(VeyraBannerFocusStyle())
-                                .focused($focus, equals: .shelf("col-\(collection.id)"))
-                                .frame(width: 550, height: 248 + (showCollectionNames ? 34 : 0))
-                            }
-                        }
-                        .padding(.vertical, 12)
-                        .padding(.horizontal, 12)
-                    }
-                    .scrollClipDisabled()
-                }
-                // Even veel ruimte boven en onder de rij, zodat ze gecentreerd tussen de kaders staat.
-                .frame(maxHeight: .infinity, alignment: .center)
-                .bentoCell(profile.cell(.collecties))
             }
         }
     }

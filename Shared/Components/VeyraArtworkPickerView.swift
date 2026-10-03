@@ -13,6 +13,12 @@ struct VeyraArtworkPickerView: View {
     @State private var candidates: [ArtworkCandidate] = []
     @State private var loading = true
     @State private var currentOverrides: [VeyraArtworkType: VeyraArtworkOverride] = [:]
+    // Op tvOS zet het systeem bij focus standaard een eigen (lichte/witte) "platter"-
+    // achtergrond achter een Button met transparante inhoud (bv. een clearlogo-PNG) --
+    // hetzelfde terugkerende euvel als elders in de app. Met `.focusEffectDisabled()`
+    // uitgezet en hier zelf, via deze FocusState, een eigen cyaan focusrand/-schaal
+    // getekend (zie `thumbnail(_:)`).
+    @FocusState private var focusedCandidateID: String?
     // §66: als de override voor deze titel elders wijzigt (ander scherm, of een VeyraHub-sync
     // vanaf een ander apparaat, §64) terwijl deze picker al open staat, moet de selectiering
     // meeveranderen -- zonder de candidates (duur, TMDB-netwerk) opnieuw op te halen.
@@ -92,8 +98,18 @@ struct VeyraArtworkPickerView: View {
                             thumbnail(candidate)
                         }
                     }
+                    // Horizontale ruimte voor de focus-gloed/-schaal (`scaleEffect` in
+                    // `thumbnail(_:)`) aan weerszijden -- anders snijdt de ScrollView de
+                    // linkerrand van de eerste (gefocuste) kaart gewoon af.
+                    .padding(.horizontal, 6)
                     .padding(.vertical, 4)
                 }
+                .scrollClipDisabled()
+                // Zonder dit krijgt deze rij op tvOS het standaard (lichte) Form-rijvlak
+                // van het systeem erachter -- dat is het "wit" dat je tussen/achter de
+                // poster- en achtergrond-thumbnails ziet, los van de afbeeldingen zelf.
+                // Zelfde fix als elders in de app (bv. `SourceAppearanceView`).
+                .listRowBackground(Color.clear)
             }
         } header: {
             Text(type.title)
@@ -104,28 +120,58 @@ struct VeyraArtworkPickerView: View {
     private func thumbnail(_ candidate: ArtworkCandidate) -> some View {
         let isSelected = currentOverrides[candidate.type]?.providerPath == candidate.providerPath
 
-        Button {
-            select(candidate)
-        } label: {
-            ZStack {
-                Color.white.opacity(0.08)
-                VeyraAsyncImage(url: candidate.url) { phase in
-                    if case .success(let image) = phase {
-                        image.resizable().aspectRatio(contentMode: candidate.type == .clearLogo ? .fit : .fill)
-                            .padding(candidate.type == .clearLogo ? 8 : 0)
-                    } else {
-                        Color.clear
-                    }
-                }
+        // Groter dan voorheen (was 110-220 breed) zodat je de candidates écht kan
+        // beoordelen, en per type zijn eigen, kloppende beeldverhouding i.p.v. voor poster
+        // en clearlogo dezelfde landschap-doos als achtergrond: poster staand (2:3),
+        // clearlogo en achtergrond breed (16:9-achtig).
+        let size: CGSize = {
+            switch candidate.type {
+            case .backdrop: return CGSize(width: 320, height: 180)
+            case .poster: return CGSize(width: 150, height: 225)
+            case .clearLogo: return CGSize(width: 220, height: 130)
             }
-            .frame(width: candidate.type == .backdrop ? 220 : 110, height: 90)
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(isSelected ? VeyraColors.cyan : .clear, lineWidth: 3)
-            )
+        }()
+
+        let isFocused = focusedCandidateID == candidate.id
+
+        // Geen `Button` hier -- op tvOS blijft die, zelfs met `.buttonStyle(.plain)`, bij
+        // focus zijn eigen systeem-"platter" (een lichte/witte achtergrond) achter de
+        // inhoud tekenen; `.focusEffectDisabled()` onderdrukt dat niet betrouwbaar voor
+        // een `Button`. Zelfde terugkerend euvel als elders in de app -- de bestaande,
+        // bewezen oplossing is een gewone `View` met handmatige focus (zie bv.
+        // `IPTVVODManagementView.swift`): `.focusable` + `.focused` + `.focusEffectDisabled`
+        // + `.onTapGesture`, zonder dat Apple daar zelf nog een achtergrond achter zet.
+        VeyraAsyncImage(url: candidate.url) { phase in
+            // Geen enkele vulkleur meer achter de thumbnail -- op uitdrukkelijk verzoek
+            // puur de afbeelding zelf, ook bij een (deels) transparante clearlogo-PNG.
+            if case .success(let image) = phase {
+                image.resizable().aspectRatio(contentMode: candidate.type == .clearLogo ? .fit : .fill)
+                    .padding(candidate.type == .clearLogo ? 14 : 0)
+            } else {
+                Color.clear
+            }
         }
-        .buttonStyle(.plain)
+        .frame(width: size.width, height: size.height)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(
+                    isSelected ? VeyraColors.cyan : (isFocused ? VeyraColors.cyan.opacity(0.7) : .clear),
+                    lineWidth: 3
+                )
+        )
+        .scaleEffect(isFocused ? 1.06 : 1)
+        .animation(.easeOut(duration: 0.2), value: isFocused)
+        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        #if os(tvOS)
+        .focusable(true)
+        .focused($focusedCandidateID, equals: candidate.id)
+        .focusEffectDisabled()
+        #endif
+        .onTapGesture {
+            select(candidate)
+        }
+        .accessibilityAddTraits(.isButton)
     }
 
     private func select(_ candidate: ArtworkCandidate) {
@@ -144,6 +190,11 @@ struct VeyraArtworkPickerView: View {
     private func load() async {
         defer { loading = false }
         refreshOverrides()
+        // Geen "witte rand"-filtercontrole meer op de TMDB-candidates: dat loste niets
+        // echt op (het witte vlak kwam van de focusweergave van dit scherm zelf, zie
+        // `thumbnail(_:)`, hetzelfde terugkerende euvel als bij knoppen elders in de app)
+        // en kostte wel tijd -- elke candidate moest eerst gedownload/gedecodeerd worden
+        // vóór er iets te zien was. Candidates nu meteen tonen zodra ze binnenkomen.
         candidates = await ArtworkCandidateService.candidates(for: item)
     }
 

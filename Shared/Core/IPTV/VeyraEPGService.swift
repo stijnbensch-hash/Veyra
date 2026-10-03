@@ -16,6 +16,10 @@ nonisolated struct VeyraEPGProgramme: Identifiable, Hashable, Sendable, Codable 
     let start: Date
     let end: Date
     let estimatedEnd: Bool
+    /// Per-programma-afbeelding uit de XMLTV-feed (`<icon src="…">` binnen
+    /// `<programme>`), indien de provider die meelevert -- gebruikt als achtergrond
+    /// op de "Live nu"-kaart van Veyra Now wanneer er geen TMDB-match is.
+    var iconURL: URL? = nil
 
     var id: String {
         "\(channelID)|\(start.timeIntervalSince1970)|\(title)"
@@ -311,6 +315,7 @@ nonisolated private final class VeyraXMLTVReader:
         var title = ""
         var subtitle = ""
         var summary = ""
+        var iconURL: URL? = nil
         var ranks: [String: Int] = [:]
     }
 
@@ -510,6 +515,15 @@ nonisolated private final class VeyraXMLTVReader:
                     : lang.hasPrefix("en")
                         ? 2
                         : 3
+        } else if depth == 3,
+                  var draft = current,
+                  elementName == "icon",
+                  draft.iconURL == nil,
+                  let src = attributes["src"],
+                  let url = URL(string: src.trimmingCharacters(in: .whitespacesAndNewlines)),
+                  let scheme = url.scheme, scheme == "http" || scheme == "https" {
+            draft.iconURL = url
+            current = draft
         }
     }
 
@@ -701,7 +715,8 @@ nonisolated private final class VeyraXMLTVReader:
                     summary: draft.summary,
                     start: draft.start,
                     end: end,
-                    estimatedEnd: draft.end == nil
+                    estimatedEnd: draft.end == nil,
+                    iconURL: draft.iconURL
                 )
 
                 if seen.insert(programme.id).inserted {

@@ -54,11 +54,16 @@ struct VeyraMosaicSection: View {
         if !groups.isEmpty {
             // Zelfde titelstijl + afstand tot kader als "Binnenkort"/"Verder kijken" (bentoTop).
             VStack(alignment: .leading, spacing: 10) {
-                Text(title)
-                    .font(.system(size: headerSize, weight: .bold))
-                    .tracking(1.5)
-                    .textCase(.uppercase)
-                    .foregroundStyle(VeyraHomeStyle.cyan.opacity(0.85))
+                // Zelfde cyaan lijnstijl achter de titel als elders op Home
+                // (`VeyraHomeSectionHeader`/de tijdlijn onder "Veyra Now").
+                HStack(spacing: 12) {
+                    Text(title)
+                        .font(.system(size: headerSize, weight: .bold))
+                        .tracking(1.5)
+                        .textCase(.uppercase)
+                        .foregroundStyle(VeyraHomeStyle.cyan.opacity(0.85))
+                    VeyraSectionTitleLine()
+                }
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(alignment: .top, spacing: groupGap) {

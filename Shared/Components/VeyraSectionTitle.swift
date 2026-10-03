@@ -3,6 +3,12 @@ import SwiftUI
 struct VeyraSectionHeader: View {
     let title: String
     var subtitle: String? = nil
+    /// De meeste koppen staan boven een rij/grid die je verder kan
+    /// doorbladeren (vandaar het pijltje) -- maar sommige (bv. de "Films"-
+    /// kop boven de catalogus zelf) verwijzen nergens naartoe en kregen dat
+    /// pijltje dus onterecht. Default `true` houdt alle bestaande koppen
+    /// ongewijzigd.
+    var showChevron: Bool = true
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 14) {
@@ -30,9 +36,11 @@ struct VeyraSectionHeader: View {
 
             Spacer()
 
-            Image(systemName: "chevron.right")
-                .font(.system(size: chevronSize, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.38))
+            if showChevron {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: chevronSize, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.38))
+            }
         }
     }
 
