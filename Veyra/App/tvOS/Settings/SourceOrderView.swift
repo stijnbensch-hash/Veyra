@@ -27,7 +27,7 @@ struct SourceOrderView: View {
                     } header: {
                         Text("Bronvolgorde")
                     } footer: {
-                        Text("Bepaalt in welke volgorde mediaservers verschijnen bij \"Selecteer bron\" — zowel bij \"Alle\" als bij de losse knoppen. Bronnen via VeyraHub staan hier niet tussen: hun volgorde stel je in op VeyraHub zelf (addons verplaatsen), en die volgorde wordt altijd gevolgd.")
+                        Text("Bepaalt in welke volgorde mediaservers en VeyraHub-addons (bv. Torrent, Usenet) verschijnen bij \"Selecteer bron\" — zowel bij \"Alle\" als bij de losse knoppen. VeyraHub-addons verschijnen hier pas zodra je ze een keer als bron bent tegengekomen; sleep ze naar de volgorde die ze ook op VeyraHub zelf hebben, mocht die er niet automatisch mee overeenkomen.")
                     }
                 }
                 .frame(maxWidth: 1000)
@@ -123,13 +123,14 @@ struct SourceOrderView: View {
     /// een verwijderde addon) vallen weg.
     static func knownOriginNames(savedOrder: [String]) -> [String] {
         let addonNames = AddonRegistry().streamProviderNames()
+        let hubAddonNames = SourceOrderDefaults.loadKnownHubAddonNames()
         let mediaServerNames = MediaServerStore().load()
             .filter { $0.kind == .jellyfin }
             .map(\.name)
 
         var available: [String] = []
         var availableSeen = Set<String>()
-        for name in addonNames + mediaServerNames {
+        for name in addonNames + hubAddonNames + mediaServerNames {
             let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { continue }
             let key = trimmed.lowercased()

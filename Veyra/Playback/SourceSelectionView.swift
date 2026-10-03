@@ -220,18 +220,12 @@ struct SourceSelectionView: View {
             )
         }
 
-        combos.sort {
-            let nameOrder =
-                $0.name.localizedStandardCompare($1.name)
-
-            if nameOrder != .orderedSame {
-                return nameOrder == .orderedAscending
-            }
-
-            // Bij gelijke naam komt de gewone addon-knop eerst, de
-            // VeyraHub-variant erna.
-            return !$0.isHub && $1.isHub
-        }
+        // GEEN alfabetische sortering: `combos` staat door de iteratie
+        // hierboven al in dezelfde volgorde als `sources` zelf (eerste
+        // keer gezien = positie), en die volgorde komt al uit
+        // `SourceOrderDefaults.sortedByOriginOrder` (Bronvolgorde).
+        // Alfabetisch hersorteren zou die instelling hier onzichtbaar
+        // maken.
 
         for combo in combos {
             result.append(
