@@ -10,60 +10,63 @@ struct TVGeneralSettingsView: View {
     private var showReviews = true
 
     var body: some View {
-        ZStack {
-            VeyraBackground().ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            List {
-                Section {
-                    Picker("Oorspronkelijke taal", selection: $catalogLanguages) {
-                        Text("Nederlands en Engels").tag("nl-en")
-                        Text("Alle talen").tag("all")
-                    }
-                } header: {
-                    Text("TMDB-lijsten")
-                } footer: {
-                    Text("Filtert automatisch samengestelde lijsten, ook op Home. Zoeken en eigen lijsten blijven volledig beschikbaar.")
-                }
-
-                Section {
-                    VeyraSettingsToggleRow(icon: "text.bubble", title: "Recensies tonen",
-                                           subtitle: "Door kijkers geschreven TMDB-recensies op film- en seriepagina's",
-                                           isOn: $showReviews)
-                } header: {
-                    Text("Recensies")
-                }
-
-                Section {
-                    VeyraSettingsToggleRow(icon: "eye.slash", title: "Uitslag verbergen tot tik",
-                                           subtitle: "Vervaagt de stand op live en afgelopen wedstrijden",
-                                           isOn: $hideScoreSpoilers)
-
-                    NavigationLink {
-                        TVFavoriteTeamsSettingsView()
-                    } label: {
-                        VeyraSettingsCardRowLabel(icon: "star", title: "Favoriete teams",
-                                                  subtitle: "Zoek teams en beheer je favorieten") {
-                            VeyraSettingsCardRowValue(value: nil)
+                VeyraList {
+                    Section {
+                        Picker("Oorspronkelijke taal", selection: $catalogLanguages) {
+                            Text("Nederlands en Engels").tag("nl-en")
+                            Text("Alle talen").tag("all")
                         }
+                    } header: {
+                        Text("TMDB-lijsten")
+                    } footer: {
+                        Text("Filtert automatisch samengestelde lijsten, ook op Home. Zoeken en eigen lijsten blijven volledig beschikbaar.")
                     }
-                    .veyraCardRow()
 
-                    NavigationLink {
-                        SportsDisplaySettingsView()
-                    } label: {
-                        VeyraSettingsCardRowLabel(icon: "sportscourt", title: "Getoonde sporten",
-                                                  subtitle: "Kies welke sporten en competities getoond worden") {
-                            VeyraSettingsCardRowValue(value: nil)
-                        }
+                    Section {
+                        VeyraSettingsToggleRow(icon: "text.bubble", title: "Recensies tonen",
+                                               subtitle: "Door kijkers geschreven TMDB-recensies op film- en seriepagina's",
+                                               isOn: $showReviews)
+                    } header: {
+                        Text("Recensies")
                     }
-                    .veyraCardRow()
-                } header: {
-                    Text("Sport")
+
+                    Section {
+                        VeyraSettingsToggleRow(icon: "eye.slash", title: "Uitslag verbergen tot tik",
+                                               subtitle: "Vervaagt de stand op live en afgelopen wedstrijden",
+                                               isOn: $hideScoreSpoilers)
+
+                        NavigationLink {
+                            TVFavoriteTeamsSettingsView()
+                        } label: {
+                            VeyraSettingsCardRowLabel(icon: "star", title: "Favoriete teams",
+                                                      subtitle: "Zoek teams en beheer je favorieten") {
+                                VeyraSettingsCardRowValue(value: nil)
+                            }
+                        }
+                        .veyraCardRow()
+
+                        NavigationLink {
+                            SportsDisplaySettingsView()
+                        } label: {
+                            VeyraSettingsCardRowLabel(icon: "sportscourt", title: "Getoonde sporten",
+                                                      subtitle: "Kies welke sporten en competities getoond worden") {
+                                VeyraSettingsCardRowValue(value: nil)
+                            }
+                        }
+                        .veyraCardRow()
+                    } header: {
+                        Text("Sport")
+                    }
                 }
+                .frame(maxWidth: 1000)
             }
-            .frame(maxWidth: 1000)
+            .navigationTitle("Algemeen")
+
         }
-        .navigationTitle("Algemeen")
     }
 }
 
@@ -78,18 +81,21 @@ struct TVFavoriteTeamsSettingsView: View {
     private var isSearching: Bool { !query.trimmingCharacters(in: .whitespaces).isEmpty }
 
     var body: some View {
-        ZStack {
-            VeyraBackground().ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            List {
-                if isSearching { searchSection } else { favoritesSection }
+                VeyraList {
+                    if isSearching { searchSection } else { favoritesSection }
+                }
+                .frame(maxWidth: 1000)
             }
-            .frame(maxWidth: 1000)
+            .navigationTitle("Favoriete teams")
+            .searchable(text: $query, prompt: "Zoek een team")
+            .task { await directory.load() }
+            .onChange(of: directory.teams.count) { _, _ in backfill() }
+
         }
-        .navigationTitle("Favoriete teams")
-        .searchable(text: $query, prompt: "Zoek een team")
-        .task { await directory.load() }
-        .onChange(of: directory.teams.count) { _, _ in backfill() }
     }
 
     @ViewBuilder

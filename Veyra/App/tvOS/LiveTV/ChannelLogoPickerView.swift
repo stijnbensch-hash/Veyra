@@ -46,24 +46,27 @@ struct ChannelLogoPickerView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                VeyraBackground().ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            NavigationStack {
+                ZStack {
+                    VeyraBackground().ignoresSafeArea()
 
-                List {
-                    nameSection
-                    logoSection
-                    searchSection
-                    customURLSection
+                    VeyraList {
+                        nameSection
+                        logoSection
+                        searchSection
+                        customURLSection
+                    }
+                    .frame(maxWidth: 1000)
                 }
-                .frame(maxWidth: 1000)
-            }
-            .navigationTitle(currentNameOverride ?? channelName)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Sluiten") { dismiss() }
+                .navigationTitle(currentNameOverride ?? channelName)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Sluiten") { dismiss() }
+                    }
                 }
             }
+
         }
     }
 

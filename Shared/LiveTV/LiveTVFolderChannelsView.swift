@@ -36,52 +36,63 @@ struct LiveTVFolderChannelsView: View {
     @State private var playingSource: PlayableSource?
 
     var body: some View {
-        List(folder.channels) { channel in
-            rowContent(for: channel)
-                .contextMenu {
-                    Button {
-                        editingChannel = channel
-                    } label: {
-                        Label("Naam/logo aanpassen…", systemImage: "photo.badge.plus")
-                    }
-
-                    if let now = epgLoader.currentProgramme(for: channel), channel.streamURL != nil {
+        VeyraDynamicBackgroundScope {
+            List(folder.channels) { channel in
+                rowContent(for: channel)
+                    .contextMenu {
                         Button {
-                            Task { await scheduleRecording(for: channel, programme: now) }
+                            editingChannel = channel
                         } label: {
-                            Label("Opnemen: \(now.title)", systemImage: "record.circle")
+                            Label("Naam/logo aanpassen…", systemImage: "photo.badge.plus")
+                        }
+
+                        if let now = epgLoader.currentProgramme(for: channel), channel.streamURL != nil {
+                            Button {
+                                Task { await scheduleRecording(for: channel, programme: now) }
+                            } label: {
+                                Label("Opnemen: \(now.title)", systemImage: "record.circle")
+                            }
                         }
                     }
+            }
+            // `.scrollContentBackground(.hidden)` bestaat niet op tvOS --
+            // op tvOS wordt de achtergrond al transparant gemaakt via
+            // `UITableView.appearance().backgroundColor = .clear` in
+            // `VeyraApp.swift`'s `init()`.
+            #if os(iOS)
+            .scrollContentBackground(.hidden)
+            #endif
+            .veyraScrollingBackground(legacyList: true)
+            .navigationTitle(folder.title)
+            .task { await epgLoader.load(channels: folder.channels) }
+            .sheet(item: $editingChannel) { channel in
+                ChannelLogoPickerView(
+                    channelID: channel.channelID,
+                    channelName: channel.name,
+                    currentOverrideURL: ChannelLogoOverrideStore.logoURL(forChannelID: channel.channelID),
+                    currentNameOverride: ChannelNameOverrideStore.name(forChannelID: channel.channelID)
+                ) {
+                    overrideVersion += 1
                 }
-        }
-        .navigationTitle(folder.title)
-        .task { await epgLoader.load(channels: folder.channels) }
-        .sheet(item: $editingChannel) { channel in
-            ChannelLogoPickerView(
-                channelID: channel.channelID,
-                channelName: channel.name,
-                currentOverrideURL: ChannelLogoOverrideStore.logoURL(forChannelID: channel.channelID),
-                currentNameOverride: ChannelNameOverrideStore.name(forChannelID: channel.channelID)
-            ) {
+            }
+            #if os(macOS)
+            .sheet(item: $playingSource) { source in
+                PlayerView(source: source)
+            }
+            #else
+            .fullScreenCover(item: $playingSource) { source in
+                PlayerView(source: source)
+            }
+            #endif
+            .onReceive(NotificationCenter.default.publisher(for: .channelOverrideChanged)) { _ in
                 overrideVersion += 1
             }
-        }
-        #if os(macOS)
-        .sheet(item: $playingSource) { source in
-            PlayerView(source: source)
-        }
-        #else
-        .fullScreenCover(item: $playingSource) { source in
-            PlayerView(source: source)
-        }
-        #endif
-        .onReceive(NotificationCenter.default.publisher(for: .channelOverrideChanged)) { _ in
-            overrideVersion += 1
-        }
-        .alert("VeyraHub Recorder", isPresented: $showRecorderAlert) {
-            Button("OK") {}
-        } message: {
-            Text(recorderMessage ?? "")
+            .alert("VeyraHub Recorder", isPresented: $showRecorderAlert) {
+                Button("OK") {}
+            } message: {
+                Text(recorderMessage ?? "")
+            }
+
         }
     }
 

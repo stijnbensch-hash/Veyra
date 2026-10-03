@@ -24,59 +24,62 @@ struct SourceSelectionView: View {
     }
 
     var body: some View {
-        GeometryReader { geometry in
-            let isWide = geometry.size.width >= 720
+        VeyraDynamicBackgroundScope {
+            GeometryReader { geometry in
+                let isWide = geometry.size.width >= 720
 
-            ZStack {
-                VeyraBackground()
+                ZStack {
+                    VeyraBackground()
 
-                VStack(alignment: .leading, spacing: isWide ? 22 : 16) {
-                    sourceHeader(isWide: isWide)
-                    filterBar(isWide: isWide)
-                    sourceContent(isWide: isWide)
+                    VStack(alignment: .leading, spacing: isWide ? 22 : 16) {
+                        sourceHeader(isWide: isWide)
+                        filterBar(isWide: isWide)
+                        sourceContent(isWide: isWide)
+                    }
+                    .padding(.horizontal, isWide ? 32 : 16)
+                    .padding(.top, isWide ? 26 : 14)
+                    .padding(.bottom, 12)
+                    .frame(maxWidth: 1280)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 }
-                .padding(.horizontal, isWide ? 32 : 16)
-                .padding(.top, isWide ? 26 : 14)
-                .padding(.bottom, 12)
-                .frame(maxWidth: 1280)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
-        }
-        .navigationTitle("Selecteer bron")
-        .sourceSelectionInlineTitle()
-        .task { await viewModel.loadSources() }
-        .onReceive(NotificationCenter.default.publisher(for: .iptvConfigurationDidChange)) { _ in
-            Task { await viewModel.loadSources() }
-        }
-        .onChange(of: viewModel.hasLoaded) { _, hasLoaded in
-            guard hasLoaded, autoSelectFirstSource, selectedSource == nil,
-                  let first = viewModel.sources.first
-            else { return }
-            selectedSource = first.source
-        }
-        .onChange(of: viewModel.sources) { _, _ in
-            // Als het huidige filter geen bronnen meer oplevert (bv. na een
-            // herlaadbeurt) val terug op "Alle" in plaats van een lege lijst
-            // te tonen voor een filter dat niet meer bestaat.
-            guard !filters.contains(selectedFilter) else { return }
-            selectedFilter = .all
-        }
-        .navigationDestination(item: $selectedSource) { source in
-            PlayerView(
-                source: source,
-                item: item,
-                resumeProgress: traktStore.progress(for: item)
-            )
-            .environment(\.veyraEpisodeReturn, inheritedEpisodeReturn ?? { selectedSource = nil })
-        }
-        .onChange(of: selectedSource) { previous, current in
-            guard previous != nil, current == nil,
-                  item.type == .series, item.seasonNumber != nil,
-                  item.episodeNumber != nil else { return }
-            Task { @MainActor in
-                await Task.yield()
-                dismiss()
+            .navigationTitle("Selecteer bron")
+            .sourceSelectionInlineTitle()
+            .task { await viewModel.loadSources() }
+            .onReceive(NotificationCenter.default.publisher(for: .iptvConfigurationDidChange)) { _ in
+                Task { await viewModel.loadSources() }
             }
+            .onChange(of: viewModel.hasLoaded) { _, hasLoaded in
+                guard hasLoaded, autoSelectFirstSource, selectedSource == nil,
+                      let first = viewModel.sources.first
+                else { return }
+                selectedSource = first.source
+            }
+            .onChange(of: viewModel.sources) { _, _ in
+                // Als het huidige filter geen bronnen meer oplevert (bv. na een
+                // herlaadbeurt) val terug op "Alle" in plaats van een lege lijst
+                // te tonen voor een filter dat niet meer bestaat.
+                guard !filters.contains(selectedFilter) else { return }
+                selectedFilter = .all
+            }
+            .navigationDestination(item: $selectedSource) { source in
+                PlayerView(
+                    source: source,
+                    item: item,
+                    resumeProgress: traktStore.progress(for: item)
+                )
+                .environment(\.veyraEpisodeReturn, inheritedEpisodeReturn ?? { selectedSource = nil })
+            }
+            .onChange(of: selectedSource) { previous, current in
+                guard previous != nil, current == nil,
+                      item.type == .series, item.seasonNumber != nil,
+                      item.episodeNumber != nil else { return }
+                Task { @MainActor in
+                    await Task.yield()
+                    dismiss()
+                }
+            }
+
         }
     }
 
@@ -345,7 +348,7 @@ struct SourceSelectionView: View {
             .padding(.top, 12)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         } else {
-            ScrollView(.vertical, showsIndicators: false) {
+            VeyraScrollView(.vertical, showsIndicators: false) {
                 LazyVStack(alignment: .leading, spacing: isWide ? 16 : 12) {
                     ForEach(filteredSources) { resolved in
                         sourceRow(resolved, isWide: isWide)

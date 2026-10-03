@@ -24,38 +24,45 @@ struct SeasonEpisodesView: View {
     private let imageBaseURL = URL(string: "https://image.tmdb.org/t/p/w500")!
 
     var body: some View {
-        ZStack {
-            VeyraColors.background.ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            Group {
-            if isLoading {
-                ProgressView("Afleveringen laden…")
-            } else if let errorMessage {
-                errorView(errorMessage)
-            } else if episodes.isEmpty {
-                ContentUnavailableView(
-                    "Geen afleveringen gevonden",
-                    systemImage: "tv"
-                )
-            } else {
-                VStack(spacing: 0) {
-                    if chunks.count > 1 {
-                        chunkPicker
+                Group {
+                if isLoading {
+                    ProgressView("Afleveringen laden…")
+                } else if let errorMessage {
+                    errorView(errorMessage)
+                } else if episodes.isEmpty {
+                    ContentUnavailableView(
+                        "Geen afleveringen gevonden",
+                        systemImage: "tv"
+                    )
+                } else {
+                    VStack(spacing: 0) {
+                        if chunks.count > 1 {
+                            chunkPicker
+                        }
+                        List(episodesInSelectedChunk) { episode in
+                            episodeRow(episode)
+                        }
+                        .scrollContentBackground(.hidden)
+                        .veyraScrollingBackground(legacyList: true)
+                        .listStyle(.plain)
+                        .scrollContentBackground(.hidden)
                     }
-                    List(episodesInSelectedChunk) { episode in
-                        episodeRow(episode)
-                    }
-                    .listStyle(.plain)
-                    .scrollContentBackground(.hidden)
+                    // Op uitdrukkelijk verzoek GEEN `.veyraReadableWidth()` hier meer: op
+                    // iPad moet dit scherm de volle breedte gebruiken i.p.v. een gecentreerde,
+                    // smallere kolom.
                 }
-                .veyraReadableWidth(860)
+                }
             }
+            .navigationTitle(season.name)
+            .navigationBarTitleDisplayMode(.inline)
+            .task {
+                await loadSeason()
             }
-        }
-        .navigationTitle(season.name)
-        .navigationBarTitleDisplayMode(.inline)
-        .task {
-            await loadSeason()
+
         }
     }
 

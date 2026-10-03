@@ -28,76 +28,79 @@ struct VeyraCollectionsBrowserView: View {
     }
 
     var body: some View {
-        ZStack {
-            VeyraColors.background.ignoresSafeArea()
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    ViewThatFits(in: .horizontal) {
-                        HStack(alignment: .firstTextBaseline, spacing: 16) {
-                            collectionsHeader
-                                .fixedSize(horizontal: true, vertical: false)
-                            Spacer(minLength: 0)
-                            createCollectionButton
-                                .fixedSize(horizontal: true, vertical: false)
-                        }
-                        VStack(alignment: .leading, spacing: 12) {
-                            collectionsHeader
-                            createCollectionButton
-                        }
-                    }
-                    .padding(.horizontal)
-
-                    VeyraContinueCollectionsSection()
-                        .padding(.horizontal)
-
-                    if store.collections.isEmpty {
-                        emptyState.padding(.horizontal)
-                    } else {
-                        LazyVGrid(columns: columns, spacing: 16) {
-                            ForEach(store.collections) { collection in
-                                NavigationLink {
-                                    VeyraCollectionDetailView(source: .own(collection.id))
-                                } label: {
-                                    VeyraCollectionCard(title: collection.name, subtitle: subtitle(for: collection),
-                                                        artworkURL: artworkURL(for: collection),
-                                                        artworkPosition: collection.artworkPosition,
-                                                        clearLogoURL: VeyraCollectionClearLogoResolver.resolvedURL(for: collection))
-                                }
-                                .buttonStyle(.plain)
-                                .contextMenu { cardContextMenu(collection) }
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
+                VeyraScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        ViewThatFits(in: .horizontal) {
+                            HStack(alignment: .firstTextBaseline, spacing: 16) {
+                                collectionsHeader
+                                    .fixedSize(horizontal: true, vertical: false)
+                                Spacer(minLength: 0)
+                                createCollectionButton
+                                    .fixedSize(horizontal: true, vertical: false)
+                            }
+                            VStack(alignment: .leading, spacing: 12) {
+                                collectionsHeader
+                                createCollectionButton
                             }
                         }
                         .padding(.horizontal)
+
+                        VeyraContinueCollectionsSection()
+                            .padding(.horizontal)
+
+                        if store.collections.isEmpty {
+                            emptyState.padding(.horizontal)
+                        } else {
+                            LazyVGrid(columns: columns, spacing: 16) {
+                                ForEach(store.collections) { collection in
+                                    NavigationLink {
+                                        VeyraCollectionDetailView(source: .own(collection.id))
+                                    } label: {
+                                        VeyraCollectionCard(title: collection.name, subtitle: subtitle(for: collection),
+                                                            artworkURL: artworkURL(for: collection),
+                                                            artworkPosition: collection.artworkPosition,
+                                                            clearLogoURL: VeyraCollectionClearLogoResolver.resolvedURL(for: collection))
+                                    }
+                                    .buttonStyle(.plain)
+                                    .contextMenu { cardContextMenu(collection) }
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
                     }
+                    .padding(.vertical, 20)
                 }
-                .padding(.vertical, 20)
             }
-        }
-        .navigationTitle("Collecties")
-        .task(id: store.collections) { await loadFallbackArtwork() }
-        .navigationDestination(item: $managingCollection) { collection in
-            VeyraCollectionManageItemsView(collectionID: collection.id)
-        }
-        .sheet(isPresented: $showCreate) {
-            NavigationStack { VeyraCreateCollectionSheet() }
-        }
-        .sheet(item: $editingCollection) { collection in
-            NavigationStack { VeyraCreateCollectionSheet(editing: collection) }
-        }
-        // Spec §23: verwijderen van een eigen collectie vraagt altijd bevestiging; de films
-        // zelf blijven gewoon beschikbaar in Veyra.
-        .confirmationDialog(
-            "Collectie verwijderen?",
-            isPresented: Binding(get: { deletingCollection != nil }, set: { if !$0 { deletingCollection = nil } }),
-            titleVisibility: .visible
-        ) {
-            Button("Verwijderen", role: .destructive) {
-                if let deletingCollection { store.delete(deletingCollection.id) }
-                deletingCollection = nil
+            .navigationTitle("Collecties")
+            .task(id: store.collections) { await loadFallbackArtwork() }
+            .navigationDestination(item: $managingCollection) { collection in
+                VeyraCollectionManageItemsView(collectionID: collection.id)
             }
-            Button("Annuleren", role: .cancel) { deletingCollection = nil }
-        } message: {
-            Text("\"\(deletingCollection?.name ?? "")\" wordt verwijderd. De films zelf blijven beschikbaar in Veyra.")
+            .sheet(isPresented: $showCreate) {
+                NavigationStack { VeyraCreateCollectionSheet() }
+            }
+            .sheet(item: $editingCollection) { collection in
+                NavigationStack { VeyraCreateCollectionSheet(editing: collection) }
+            }
+            // Spec §23: verwijderen van een eigen collectie vraagt altijd bevestiging; de films
+            // zelf blijven gewoon beschikbaar in Veyra.
+            .confirmationDialog(
+                "Collectie verwijderen?",
+                isPresented: Binding(get: { deletingCollection != nil }, set: { if !$0 { deletingCollection = nil } }),
+                titleVisibility: .visible
+            ) {
+                Button("Verwijderen", role: .destructive) {
+                    if let deletingCollection { store.delete(deletingCollection.id) }
+                    deletingCollection = nil
+                }
+                Button("Annuleren", role: .cancel) { deletingCollection = nil }
+            } message: {
+                Text("\"\(deletingCollection?.name ?? "")\" wordt verwijderd. De films zelf blijven beschikbaar in Veyra.")
+            }
+
         }
     }
 

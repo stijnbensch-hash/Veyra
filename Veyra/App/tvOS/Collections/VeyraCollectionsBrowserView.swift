@@ -19,79 +19,82 @@ struct VeyraCollectionsBrowserView: View {
     private let columns = [GridItem(.adaptive(minimum: 340, maximum: 380), spacing: 32)]
 
     var body: some View {
-        ZStack {
-            VeyraHomeStyle.ink.ignoresSafeArea()
-            ScrollView {
-                VStack(alignment: .leading, spacing: 28) {
-                    HStack(alignment: .firstTextBaseline) {
-                        VeyraSectionHeader(title: "Collecties", subtitle: collectionsSubtitle, showChevron: false)
-                            .lineLimit(1)
-                            .fixedSize(horizontal: true, vertical: false)
-                        Spacer()
-                        Button {
-                            showCreate = true
-                        } label: {
-                            VeyraActionLabel(title: "Nieuwe collectie", symbol: "plus", compact: true)
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
+                VeyraScrollView {
+                    VStack(alignment: .leading, spacing: 28) {
+                        HStack(alignment: .firstTextBaseline) {
+                            VeyraSectionHeader(title: "Collecties", subtitle: collectionsSubtitle, showChevron: false)
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
+                            Spacer()
+                            Button {
+                                showCreate = true
+                            } label: {
+                                VeyraActionLabel(title: "Nieuwe collectie", symbol: "plus", compact: true)
+                            }
+                            .buttonStyle(VeyraFocusButtonStyle(primary: true))
                         }
-                        .buttonStyle(VeyraFocusButtonStyle(primary: true))
-                    }
 
-                    VeyraContinueCollectionsSection()
+                        VeyraContinueCollectionsSection()
 
-                    if store.collections.isEmpty {
-                        emptyState
-                    } else {
-                        LazyVGrid(columns: columns, spacing: 28) {
-                            ForEach(store.collections) { collection in
-                                Button {
-                                    selectedCollection = collection
-                                } label: {
-                                    VeyraCollectionCard(title: collection.name, subtitle: subtitle(for: collection),
-                                                        artworkURL: artworkURL(for: collection),
-                                                        artworkPosition: collection.artworkPosition,
-                                                        clearLogoURL: VeyraCollectionClearLogoResolver.resolvedURL(for: collection))
+                        if store.collections.isEmpty {
+                            emptyState
+                        } else {
+                            LazyVGrid(columns: columns, spacing: 28) {
+                                ForEach(store.collections) { collection in
+                                    Button {
+                                        selectedCollection = collection
+                                    } label: {
+                                        VeyraCollectionCard(title: collection.name, subtitle: subtitle(for: collection),
+                                                            artworkURL: artworkURL(for: collection),
+                                                            artworkPosition: collection.artworkPosition,
+                                                            clearLogoURL: VeyraCollectionClearLogoResolver.resolvedURL(for: collection))
+                                    }
+                                    // `.plain` alleen schakelt tvOS' standaard witte focus-kaart niet uit --
+                                    // `VeyraStreamingTileStyle()` (= plain + `.focusEffectDisabled()`) wel,
+                                    // zodat alleen VeyraCollectionCard's eigen cyaan focus-kader zichtbaar is.
+                                    .buttonStyle(VeyraStreamingTileStyle())
+                                    .contextMenu { cardContextMenu(collection) }
                                 }
-                                // `.plain` alleen schakelt tvOS' standaard witte focus-kaart niet uit --
-                                // `VeyraStreamingTileStyle()` (= plain + `.focusEffectDisabled()`) wel,
-                                // zodat alleen VeyraCollectionCard's eigen cyaan focus-kader zichtbaar is.
-                                .buttonStyle(VeyraStreamingTileStyle())
-                                .contextMenu { cardContextMenu(collection) }
                             }
                         }
                     }
+                    .padding(.horizontal, 48)
+                    .padding(.vertical, 40)
                 }
-                .padding(.horizontal, 48)
-                .padding(.vertical, 40)
             }
-        }
-        .navigationTitle("")
-        .task(id: store.collections) { await loadFallbackArtwork() }
-        .navigationDestination(item: $selectedCollection) { collection in
-            VeyraCollectionDetailView(source: .own(collection.id))
-        }
-        .navigationDestination(item: $managingCollection) { collection in
-            VeyraCollectionManageItemsView(collectionID: collection.id)
-        }
-        .sheet(isPresented: $showCreate) {
-            NavigationStack { VeyraCreateCollectionSheet() }
-        }
-        .sheet(item: $editingCollection) { collection in
-            NavigationStack { VeyraCreateCollectionSheet(editing: collection) }
-        }
-        // Spec §23: verwijderen van een eigen collectie vraagt altijd bevestiging; de films
-        // zelf blijven gewoon beschikbaar in Veyra.
-        .confirmationDialog(
-            "Collectie verwijderen?",
-            isPresented: Binding(get: { deletingCollection != nil }, set: { if !$0 { deletingCollection = nil } }),
-            titleVisibility: .visible
-        ) {
-            Button("Verwijderen", role: .destructive) {
-                if let deletingCollection { store.delete(deletingCollection.id) }
-                deletingCollection = nil
+            .navigationTitle("")
+            .task(id: store.collections) { await loadFallbackArtwork() }
+            .navigationDestination(item: $selectedCollection) { collection in
+                VeyraCollectionDetailView(source: .own(collection.id))
             }
-            Button("Annuleren", role: .cancel) { deletingCollection = nil }
-        } message: {
-            Text("\"\(deletingCollection?.name ?? "")\" wordt verwijderd. De films zelf blijven beschikbaar in Veyra.")
+            .navigationDestination(item: $managingCollection) { collection in
+                VeyraCollectionManageItemsView(collectionID: collection.id)
+            }
+            .sheet(isPresented: $showCreate) {
+                NavigationStack { VeyraCreateCollectionSheet() }
+            }
+            .sheet(item: $editingCollection) { collection in
+                NavigationStack { VeyraCreateCollectionSheet(editing: collection) }
+            }
+            // Spec §23: verwijderen van een eigen collectie vraagt altijd bevestiging; de films
+            // zelf blijven gewoon beschikbaar in Veyra.
+            .confirmationDialog(
+                "Collectie verwijderen?",
+                isPresented: Binding(get: { deletingCollection != nil }, set: { if !$0 { deletingCollection = nil } }),
+                titleVisibility: .visible
+            ) {
+                Button("Verwijderen", role: .destructive) {
+                    if let deletingCollection { store.delete(deletingCollection.id) }
+                    deletingCollection = nil
+                }
+                Button("Annuleren", role: .cancel) { deletingCollection = nil }
+            } message: {
+                Text("\"\(deletingCollection?.name ?? "")\" wordt verwijderd. De films zelf blijven beschikbaar in Veyra.")
+            }
+
         }
     }
 

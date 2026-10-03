@@ -135,3 +135,35 @@ Swift-syntaxis en diff-controle geslaagd. Geen appbuild of installatie uitgevoer
 De gebruiker meldt dat op iPhone Collecties en de telling (52 collecties) worden opgesplitst door de naastgelegen toevoegknop. De pijl bij de kop is verwijderd op alle platformen; titel en telling hebben één tekstregel. De gedeelde iPhone/iPad/macOS-browser kiest met ViewThatFits een horizontale indeling wanneer alles past en anders een indeling met Nieuwe collectie onder de kop. tvOS houdt de ruime horizontale indeling en reserveert voldoende breedte voor de kop. De macOS-target gebruikt bevestigd dezelfde browser als iPhone/iPad.
 
 Swift-syntaxis en diff-controle geslaagd. Geen appbuild, installatie of nieuwe visuele toestelcontrole uitgevoerd conform de voorkeur dat de gebruiker zelf bouwt.
+
+## Home-hero — vloeiende transparante overgang, 3 oktober 2026
+
+De gebruiker vraagt de overgang van de Home-hero naar de achtergrond zoals in de Strand-voorbeelden, zonder de zwarte balk uit het Veyra-screenshot. De gedeelde schermvullende hero gebruikt nu één doorlopende beeldlaag met een geleidelijk transparant masker. De donkere leesbaarheidslaag is binnen hetzelfde masker geplaatst, zodat ook die onderaan verdwijnt in plaats van op zwart te eindigen. De iPhone/iPad/macOS-backdrop loopt visueel 220pt voorbij de hero door onder de stippen/het begin van de eerste rij, met behoud van de bestaande layoutmaat. De tvOS-variant gebruikt dezelfde gedeelde achtergrond. De gekozen Nachtgloed-achtergrond en scrollkleuren blijven zichtbaar onder de vervaging; geen extra afbeelding, blur of netwerkverzoek toegevoegd. De kaartstijl houdt zijn bestaande donkere tekstoverlay.
+
+Swift-syntaxis en diff-controle geslaagd. Geen appbuild of installatie uitgevoerd; de gebruiker bouwt zelf. Het definitieve uiterlijk op het toestel moet na die build worden gecontroleerd.
+
+## Hero-inhoud lager; Films/Series dezelfde overgang, 3 oktober 2026
+
+De gebruiker toont dat logo en tekst op Home na de vorige achtergrondwijziging te hoog/midden in de hero staan. Zonder de oude beeldvullende gradient centreerde het buitenste frame de intrinsieke inhoud. Het frame lijnt nu expliciet bottomLeading uit: clearlogo, scores en tekst staan samen onderaan de bestaande hero-band, met de bestaande 22pt onderruimte. Herohoogte en positie van stippen/rijen blijven gelijk.
+
+De Films- en Series-heroes in het hoofdmenu gebruiken nu via VeyraHeroArtworkBackground dezelfde gedeelde transparante backdrop/leesbaarheidslaag als Home. De overgang loopt in de bestaande 160pt-band onder de catalogus-hero door en eindigt transparant boven de pagina-achtergrond. De vaste catalogus-layout en veilige bovenruimte blijven behouden. De tvOS- en iPhone/iPad-varianten zijn gecontroleerd op gebruik van deze gedeelde component; macOS gebruikt dezelfde iOS-catalogusviews. Swift-syntaxis en diff-controle geslaagd. Geen appbuild of installatie uitgevoerd; de gebruiker bouwt zelf. Visuele toestelcontrole volgt na de eigen build.
+
+## Film-/seriedetail — dezelfde achtergrondovergang, 3 oktober 2026
+
+De gebruiker vraagt de hero-overgang ook bij het openen van film/serie toe te passen. De transparante overgang en leesbaarheidslaag zijn samengebracht in veyraHeroBackdropBlend, gebruikt door Home, catalogus en nu beide detailpagina's. Op iPhone/iPad/macOS loopt de beeld-/trailerlaag visueel 120pt onder de oorspronkelijke backdrop door en vervaagt boven de Nachtgloed-pagina-achtergrond; titel, acties en lijsten houden hun layoutpositie. De details volgen nu dezelfde bestaande scrollkleuren als Home. Op tvOS vervaagt de bestaande schermvullende detailbackdrop (inclusief filmtrailer en donkere overlays) naar de Nachtgloed-basislaag. Trailerselectie, timing en lifecycle zijn ongewijzigd.
+
+De vier platformdetailbestanden en beide gedeelde componenten zijn op Swift-syntaxis gecontroleerd; diff-controle geslaagd. macOS gebruikt dezelfde detailviews als iPhone/iPad. Geen appbuild of installatie uitgevoerd; visuele controle volgt na de eigen build van de gebruiker.
+
+## iPhone-catalogus — drie posters per rij, 3 oktober 2026
+
+De gebruiker vraagt op iPhone drie posters naast elkaar in plaats van twee, met behoud van de postermaat. Films en Series meten nu de werkelijke beschikbare breedte en gebruiken op iPhone drie vaste kolommen. De bestaande 124pt posterbreedte blijft bij 390pt/402pt schermbreedte behouden; de tussenruimte is 8pt en de zijmarges worden respectievelijk 1pt/7pt. Alleen bij minder dan 380pt beschikbare breedte wordt de poster minimaal verkleind om drie kolommen met minstens 4pt tussenruimte binnen het scherm te houden. Titels, badges en beeldverhouding gebruiken de bestaande postercomponent. De filter-/headermarges blijven 16pt. iPad en macOS houden hun adaptieve raster; tvOS is voor dit specifiek iPhone-verzoek ongewijzigd.
+
+Swift-syntaxis van de twee catalogusviews en iOS/macOS-layoutvarianten gecontroleerd; diff-controle geslaagd. Geen appbuild of installatie uitgevoerd. Visuele toestelcontrole volgt na de eigen build van de gebruiker.
+
+## Dynamische achtergrond in de hele app, 3 oktober 2026
+
+De gebruiker vraagt dezelfde scrollkleur als Home bij Films en Series en alle overige appachtergronden, op alle platformen. VeyraBackground leest nu de verticale scrollpositie uit een lokale paginaomgeving. VeyraDynamicBackgroundScope is aangesloten op catalogi, details, collecties, instellingen, sport, zoeken, kijklijst, Trakt, mediaserver- en IPTV-pagina's en losse navigatiesheets. macOS deelt de iOS-pagina's en heeft dezelfde achtergrond in de eigen navigatie. De oude Home/Plain-achtergrondnamen verwijzen ook naar Nachtgloed. Artwork-overgangen vervagen naar deze dynamische basis. De TV-guide behoudt gekozen kleur/grijs/donker-thema's boven dezelfde scrollgestuurde basis.
+
+VeyraScrollView, VeyraList en VeyraForm meten elke verticale container afzonderlijk. Horizontale rijen blijven native en beïnvloeden de kleur niet. De paginaomgeving houdt detailpagina's/sheets gescheiden van hun vorige pagina. Er zijn geen achtergrondtimers, extra afbeeldingen of netwerkverzoeken. Verminder beweging houdt de kleur stil. De videoachtergrond en player-controls blijven hun bestaande zwarte/transparante weergave gebruiken; zelfstandige iOS-audio/ondertitelsheets gebruiken de dynamische paginaachtergrond. Nieuwe scrollpagina's gebruiken dezelfde gedeelde wrappers en paginaomgeving.
+
+Controle: Tests/run-dynamic-background-checks.sh compileert uitsluitend de actuele gedeelde component in een geïsoleerde SwiftUI-harness. Native scrolltests slagen voor kleurverandering bij verticale scroll, terugscrollen naar de oorspronkelijke kleur, horizontale uitsluiting, List/Form en isolatie van geneste pagina's. Het publieke AppKit-notificatiepad voor macOS 14-lijsten is apart met een native clipview getest, inclusief het verwijderen van de observer. De macOS-14-compatibiliteit van de component is getypecheckt; geen werkelijk macOS-14-toestel getest. Swift-syntaxis en diff zijn gecontroleerd. Geen Veyra-appbuild, installatie of visuele toestelcontrole uitgevoerd conform "ik build zelf".

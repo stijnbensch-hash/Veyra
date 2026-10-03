@@ -91,28 +91,31 @@ struct VeyraMovieDestination: View {
     @State private var error: String?
     @State private var retry = 0
     var body: some View {
-        Group {
-            if let item {
-                if play { SourceSelectionView(item: item) }
-                else { MovieDetailView(movie: item) }
-            } else if let error {
-                VStack(spacing: 24) {
-                    Text(error)
-                    Button("Opnieuw proberen") { retry += 1 }
-                }.frame(maxWidth: .infinity, maxHeight: .infinity).background(VeyraBackground())
-            } else { ProgressView("Film laden…").frame(maxWidth: .infinity, maxHeight: .infinity).background(VeyraBackground()) }
-        }
-        .task(id: retry) {
-            guard item == nil else { return }
-            error = nil
-            guard let service = TMDBService() else { error = "De metadataservice is niet geconfigureerd."; return }
-            do {
-                let result = try await service.mediaItem(for: movie)
-                try Task.checkCancellation()
-                item = result
-            } catch {
-                if !Task.isCancelled { self.error = "Deze film kon niet worden geladen." }
+        VeyraDynamicBackgroundScope {
+            Group {
+                if let item {
+                    if play { SourceSelectionView(item: item) }
+                    else { MovieDetailView(movie: item) }
+                } else if let error {
+                    VStack(spacing: 24) {
+                        Text(error)
+                        Button("Opnieuw proberen") { retry += 1 }
+                    }.frame(maxWidth: .infinity, maxHeight: .infinity).background(VeyraBackground())
+                } else { ProgressView("Film laden…").frame(maxWidth: .infinity, maxHeight: .infinity).background(VeyraBackground()) }
             }
+            .task(id: retry) {
+                guard item == nil else { return }
+                error = nil
+                guard let service = TMDBService() else { error = "De metadataservice is niet geconfigureerd."; return }
+                do {
+                    let result = try await service.mediaItem(for: movie)
+                    try Task.checkCancellation()
+                    item = result
+                } catch {
+                    if !Task.isCancelled { self.error = "Deze film kon niet worden geladen." }
+                }
+            }
+
         }
     }
 }

@@ -224,43 +224,48 @@ struct IPTVSeriesEpisodesView: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        ZStack {
-            VeyraColors.background.ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            Group {
-            if isLoading {
-                ProgressView("Afleveringen laden…")
-            } else if let errorMessage {
-                VStack(spacing: 12) {
-                    Text("Afleveringen konden niet worden geladen").font(.headline)
-                    Text(errorMessage).font(.subheadline).foregroundStyle(.secondary)
-                    Button("Opnieuw proberen") { Task { await load() } }
-                }
-                .padding()
-            } else if episodes.isEmpty {
-                ContentUnavailableView("Geen afleveringen gevonden", systemImage: "tv")
-            } else {
-                List(groupedBySeason, id: \.season) { group in
-                    Section("Seizoen \(group.season)") {
-                        ForEach(group.episodes) { episode in
-                            NavigationLink {
-                                PlayerView(
-                                    source: episodeSource(episode)
-                                )
-                            } label: {
-                                Text("Afl. \(episode.episodeNumber) · \(episode.title)")
+                Group {
+                if isLoading {
+                    ProgressView("Afleveringen laden…")
+                } else if let errorMessage {
+                    VStack(spacing: 12) {
+                        Text("Afleveringen konden niet worden geladen").font(.headline)
+                        Text(errorMessage).font(.subheadline).foregroundStyle(.secondary)
+                        Button("Opnieuw proberen") { Task { await load() } }
+                    }
+                    .padding()
+                } else if episodes.isEmpty {
+                    ContentUnavailableView("Geen afleveringen gevonden", systemImage: "tv")
+                } else {
+                    List(groupedBySeason, id: \.season) { group in
+                        Section("Seizoen \(group.season)") {
+                            ForEach(group.episodes) { episode in
+                                NavigationLink {
+                                    PlayerView(
+                                        source: episodeSource(episode)
+                                    )
+                                } label: {
+                                    Text("Afl. \(episode.episodeNumber) · \(episode.title)")
+                                }
                             }
                         }
                     }
+                    .scrollContentBackground(.hidden)
+                    .veyraScrollingBackground(legacyList: true)
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
+                }
             }
-            }
+            .navigationTitle(series.name)
+            .navigationBarTitleDisplayMode(.inline)
+            .task { await load() }
+
         }
-        .navigationTitle(series.name)
-        .navigationBarTitleDisplayMode(.inline)
-        .task { await load() }
     }
 
     private var groupedBySeason: [(season: Int, episodes: [XtreamSeriesEpisode])] {

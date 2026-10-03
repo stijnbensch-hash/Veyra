@@ -81,35 +81,42 @@ struct SettingsView: View {
     private let mediaServerStore = MediaServerStore()
 
     var body: some View {
-        NavigationStack(path: $settingsPath) {
-            settingsList
-                .navigationDestination(for: SettingsDestination.self) { destination in
-                    destinationView(destination)
-                }
+        VeyraDynamicBackgroundScope {
+            NavigationStack(path: $settingsPath) {
+                settingsList
+                    .navigationDestination(for: SettingsDestination.self) { destination in
+                        destinationView(destination)
+                    }
+            }
+            .onAppear { reload() }
+            .onReceive(NotificationCenter.default.publisher(for: .iptvConfigurationDidChange)) { _ in reload() }
+            .onReceive(NotificationCenter.default.publisher(for: .veyraMediaServerConfigurationDidChange)) { _ in reload() }
+            .task { await trakt.refreshIfNeeded() }
+
         }
-        .onAppear { reload() }
-        .onReceive(NotificationCenter.default.publisher(for: .iptvConfigurationDidChange)) { _ in reload() }
-        .onReceive(NotificationCenter.default.publisher(for: .veyraMediaServerConfigurationDidChange)) { _ in reload() }
-        .task { await trakt.refreshIfNeeded() }
     }
 
     // MARK: - Settings list
 
     private var settingsList: some View {
         ZStack {
-            VeyraColors.background.ignoresSafeArea()
+            VeyraBackground().ignoresSafeArea()
 
-            ScrollView(.vertical, showsIndicators: false) {
+            VeyraScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 32) {
                     header
 
                     VStack(alignment: .leading, spacing: 14) {
-                        Text("LIVE TV")
+                        Text("WEERGAVE")
                             .font(.system(size: 15, weight: .semibold))
                             .tracking(2)
                             .foregroundStyle(VeyraColors.secondary)
 
-                        settingsCard(.liveTVSettings, status: "", statusColor: VeyraColors.cyan)
+                        settingsCard(.home, status: "", statusColor: VeyraColors.cyan)
+                        settingsCard(.general, status: "", statusColor: VeyraColors.cyan)
+                        settingsCard(.subtitles, status: "", statusColor: VeyraColors.cyan)
+                        settingsCard(.metadata, status: "", statusColor: VeyraColors.cyan)
+                        settingsCard(.playback, status: "", statusColor: VeyraColors.cyan)
                     }
 
                     VStack(alignment: .leading, spacing: 14) {
@@ -130,25 +137,12 @@ struct SettingsView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 14) {
-                        Text("WEERGAVE")
+                        Text("LIVE TV")
                             .font(.system(size: 15, weight: .semibold))
                             .tracking(2)
                             .foregroundStyle(VeyraColors.secondary)
 
-                        settingsCard(.general, status: "", statusColor: VeyraColors.cyan)
-                        settingsCard(.subtitles, status: "", statusColor: VeyraColors.cyan)
-                        settingsCard(.metadata, status: "", statusColor: VeyraColors.cyan)
-                        settingsCard(.playback, status: "", statusColor: VeyraColors.cyan)
-                        settingsCard(.home, status: "", statusColor: VeyraColors.cyan)
-                    }
-
-                    VStack(alignment: .leading, spacing: 14) {
-                        Text("DATA")
-                            .font(.system(size: 15, weight: .semibold))
-                            .tracking(2)
-                            .foregroundStyle(VeyraColors.secondary)
-
-                        settingsCard(.data, status: "", statusColor: VeyraColors.secondary)
+                        settingsCard(.liveTVSettings, status: "", statusColor: VeyraColors.cyan)
                     }
 
                     VStack(alignment: .leading, spacing: 14) {
@@ -166,6 +160,15 @@ struct SettingsView: View {
                             status: trakt.isConnected ? "Trakt verbonden" : "Trakt niet gekoppeld",
                             statusColor: trakt.isConnected ? VeyraColors.cyan : VeyraColors.secondary
                         )
+                    }
+
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("DATA")
+                            .font(.system(size: 15, weight: .semibold))
+                            .tracking(2)
+                            .foregroundStyle(VeyraColors.secondary)
+
+                        settingsCard(.data, status: "", statusColor: VeyraColors.secondary)
                     }
 
                     versionInformation

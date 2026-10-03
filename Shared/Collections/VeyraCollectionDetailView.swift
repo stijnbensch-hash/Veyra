@@ -85,116 +85,119 @@ struct VeyraCollectionDetailView: View {
     private var nextItem: VeyraResolvedCollectionItem? { orderedResolved.first { !traktStore.isWatched($0.media) } }
 
     var body: some View {
-        ZStack {
-            VeyraColors.background.ignoresSafeArea()
-            ScrollView {
-                VStack(alignment: .leading, spacing: sectionSpacing) {
-                    stage()
-                    if isLoading {
-                        ProgressView()
-                    } else if orderedResolved.isEmpty {
-                        emptyState
-                    } else {
-                        journey()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
+                VeyraScrollView {
+                    VStack(alignment: .leading, spacing: sectionSpacing) {
+                        stage()
+                        if isLoading {
+                            ProgressView()
+                        } else if orderedResolved.isEmpty {
+                            emptyState
+                        } else {
+                            journey()
+                        }
                     }
+                    .padding(.horizontal, horizontalPadding)
+                    .padding(.top, verticalPaddingTop)
+                    .padding(.bottom, verticalPadding)
                 }
-                .padding(.horizontal, horizontalPadding)
-                .padding(.top, verticalPaddingTop)
-                .padding(.bottom, verticalPadding)
             }
-        }
-        .task(id: source) { await load() }
-        .navigationDestination(item: $playItem) { item in
-            SourceSelectionView(item: item)
-        }
-        .navigationDestination(item: $detailItem) { item in
-            MovieDetailView(movie: item)
-        }
-        .navigationDestination(item: $savedOwnCollection) { saved in
-            VeyraCollectionDetailView(source: .own(saved.id))
-        }
-        .toolbar {
-            if isOfficial {
-                // Spec §35/§36: officiële collectie -> persoonlijke kopie, origineel blijft onaangetast.
-                ToolbarItem {
-                    Button {
-                        saveAsOwnCollection()
-                    } label: {
-                        Label("Bewaar als eigen collectie", systemImage: "square.and.arrow.down")
+            .task(id: source) { await load() }
+            .navigationDestination(item: $playItem) { item in
+                SourceSelectionView(item: item)
+            }
+            .navigationDestination(item: $detailItem) { item in
+                MovieDetailView(movie: item)
+            }
+            .navigationDestination(item: $savedOwnCollection) { saved in
+                VeyraCollectionDetailView(source: .own(saved.id))
+            }
+            .toolbar {
+                if isOfficial {
+                    // Spec §35/§36: officiële collectie -> persoonlijke kopie, origineel blijft onaangetast.
+                    ToolbarItem {
+                        Button {
+                            saveAsOwnCollection()
+                        } label: {
+                            Label("Bewaar als eigen collectie", systemImage: "square.and.arrow.down")
+                        }
                     }
-                }
-            } else {
-                #if !os(tvOS)
-                ToolbarItem {
-                    Menu {
-                        Button {
-                            showEdit = true
-                        } label: {
-                            Label("Bewerk collectie", systemImage: "pencil")
-                        }
-                        Button {
-                            showManageItems = true
-                        } label: {
-                            Label("Beheer films", systemImage: "list.bullet")
-                        }
-                        if sortMode == .chronological, let ownCollectionID {
+                } else {
+                    #if !os(tvOS)
+                    ToolbarItem {
+                        Menu {
                             Button {
-                                store.seedChronologyIfNeeded(ownCollectionID)
-                                showChronologyEditor = true
+                                showEdit = true
                             } label: {
-                                Label("Chronologie instellen", systemImage: "list.number")
+                                Label("Bewerk collectie", systemImage: "pencil")
                             }
-                        }
-                        Button(role: .destructive) {
-                            showDeleteConfirm = true
+                            Button {
+                                showManageItems = true
+                            } label: {
+                                Label("Beheer films", systemImage: "list.bullet")
+                            }
+                            if sortMode == .chronological, let ownCollectionID {
+                                Button {
+                                    store.seedChronologyIfNeeded(ownCollectionID)
+                                    showChronologyEditor = true
+                                } label: {
+                                    Label("Chronologie instellen", systemImage: "list.number")
+                                }
+                            }
+                            Button(role: .destructive) {
+                                showDeleteConfirm = true
+                            } label: {
+                                Label("Verwijder collectie", systemImage: "trash")
+                            }
                         } label: {
-                            Label("Verwijder collectie", systemImage: "trash")
+                            Image(systemName: "ellipsis.circle")
                         }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
                     }
+                    #endif
                 }
-                #endif
             }
-        }
-        .sheet(isPresented: $showEdit) {
-            if let collection {
-                NavigationStack { VeyraCreateCollectionSheet(editing: collection) }
+            .sheet(isPresented: $showEdit) {
+                if let collection {
+                    NavigationStack { VeyraCreateCollectionSheet(editing: collection) }
+                }
             }
-        }
-        #if os(tvOS)
-        .navigationDestination(isPresented: $showManageItems) {
-            if let ownCollectionID { VeyraCollectionManageItemsView(collectionID: ownCollectionID) }
-        }
-        .navigationDestination(isPresented: $showChronologyEditor) {
-            if let ownCollectionID { VeyraChronologyEditorView(collectionID: ownCollectionID) }
-        }
-        #else
-        .sheet(isPresented: $showManageItems) {
-            if let ownCollectionID {
-                NavigationStack { VeyraCollectionManageItemsView(collectionID: ownCollectionID) }
+            #if os(tvOS)
+            .navigationDestination(isPresented: $showManageItems) {
+                if let ownCollectionID { VeyraCollectionManageItemsView(collectionID: ownCollectionID) }
             }
-        }
-        .sheet(isPresented: $showChronologyEditor) {
-            if let ownCollectionID {
-                NavigationStack { VeyraChronologyEditorView(collectionID: ownCollectionID) }
+            .navigationDestination(isPresented: $showChronologyEditor) {
+                if let ownCollectionID { VeyraChronologyEditorView(collectionID: ownCollectionID) }
             }
-        }
-        #endif
-        // Spec §23: verwijderen van een eigen collectie vraagt altijd bevestiging; de films
-        // zelf blijven gewoon beschikbaar in Veyra (enkel de collectie-membership verdwijnt).
-        .confirmationDialog(
-            "Collectie verwijderen?",
-            isPresented: $showDeleteConfirm,
-            titleVisibility: .visible
-        ) {
-            Button("Verwijderen", role: .destructive) {
-                if let ownCollectionID { store.delete(ownCollectionID) }
-                dismiss()
+            #else
+            .sheet(isPresented: $showManageItems) {
+                if let ownCollectionID {
+                    NavigationStack { VeyraCollectionManageItemsView(collectionID: ownCollectionID) }
+                }
             }
-            Button("Annuleren", role: .cancel) {}
-        } message: {
-            Text("\"\(displayName)\" wordt verwijderd. De films zelf blijven beschikbaar in Veyra.")
+            .sheet(isPresented: $showChronologyEditor) {
+                if let ownCollectionID {
+                    NavigationStack { VeyraChronologyEditorView(collectionID: ownCollectionID) }
+                }
+            }
+            #endif
+            // Spec §23: verwijderen van een eigen collectie vraagt altijd bevestiging; de films
+            // zelf blijven gewoon beschikbaar in Veyra (enkel de collectie-membership verdwijnt).
+            .confirmationDialog(
+                "Collectie verwijderen?",
+                isPresented: $showDeleteConfirm,
+                titleVisibility: .visible
+            ) {
+                Button("Verwijderen", role: .destructive) {
+                    if let ownCollectionID { store.delete(ownCollectionID) }
+                    dismiss()
+                }
+                Button("Annuleren", role: .cancel) {}
+            } message: {
+                Text("\"\(displayName)\" wordt verwijderd. De films zelf blijven beschikbaar in Veyra.")
+            }
+
         }
     }
 

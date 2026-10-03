@@ -133,7 +133,7 @@ struct SportSection: View {
 
 #if DEBUG
 #Preview("Sport iPhone") {
-    ScrollView {
+    VeyraScrollView {
         SportSection(model: VeyraSportViewModel(provider: MockSportProvider()), regular: false,
                      onPlay: { _, _ in }, onToggleReminder: { _, _ in }, onOpenCompetition: { _ in })
             .padding(16)

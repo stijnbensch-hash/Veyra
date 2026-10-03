@@ -33,7 +33,7 @@ struct VeyraAddToCollectionSheet: View {
     }
 
     private var form: some View {
-        Form {
+        VeyraForm {
             Section {
                 if store.collections.isEmpty {
                     Text("Nog geen collecties.").foregroundStyle(.secondary)
@@ -63,17 +63,19 @@ struct VeyraAddToCollectionSheet: View {
     }
 
     var body: some View {
-        content
-        .navigationTitle("Toevoegen aan collectie")
-        #if os(iOS)
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) { Button("Gereed") { dismiss() } }
+        VeyraDynamicBackgroundScope {
+            content
+            .navigationTitle("Toevoegen aan collectie")
+            #if os(iOS)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Gereed") { dismiss() } }
+            }
+            #else
+            .toolbar {
+                Button("Gereed") { dismiss() }
+            }
+            #endif
         }
-        #else
-        .toolbar {
-            Button("Gereed") { dismiss() }
-        }
-        #endif
     }
 
     private func row(_ collection: VeyraCollection) -> some View {

@@ -32,13 +32,15 @@ struct LiveTVFolderEditView: View {
     private var logoOverrideKey: String { "folder:\(workingID.uuidString)" }
 
     var body: some View {
-        platformBody
-            .navigationTitle(folder == nil ? "Map toevoegen" : "Map bewerken")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Annuleren") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) { Button("Opslaan") { save() } }
-            }
-            .onAppear(perform: setupFromExisting)
+        VeyraDynamicBackgroundScope {
+            platformBody
+                .navigationTitle(folder == nil ? "Map toevoegen" : "Map bewerken")
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) { Button("Annuleren") { dismiss() } }
+                    ToolbarItem(placement: .confirmationAction) { Button("Opslaan") { save() } }
+                }
+                .onAppear(perform: setupFromExisting)
+        }
     }
 
     // Zelfde reden/patroon als `LiveTVFoldersListView`: op tvOS wordt dit
@@ -73,13 +75,13 @@ struct LiveTVFolderEditView: View {
             // expliciete maat sizet macOS z'n `.sheet` te krap naar de
             // inhoud toe.
             .frame(minWidth: 520, minHeight: 480)
-            .background(VeyraColors.background)
+            .background(VeyraBackground())
             #endif
         #endif
     }
 
     private var form: some View {
-        Form {
+        VeyraForm {
             Section("Naam") {
                 TextField("bv. Sport", text: $title)
             }

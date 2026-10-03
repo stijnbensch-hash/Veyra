@@ -27,38 +27,41 @@ struct VeyraLensSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    if let sportEvent {
-                        VeyraMatchCenterOverlay(event: sportEvent, now: .now)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    } else if source.kind == .liveTV {
-                        LivePlayerEPGTimeline(source: source)
-                            .padding(16)
-                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    } else {
-                        titleContent
+        VeyraDynamicBackgroundScope {
+            NavigationStack {
+                VeyraScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        if let sportEvent {
+                            VeyraMatchCenterOverlay(event: sportEvent, now: .now)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        } else if source.kind == .liveTV {
+                            LivePlayerEPGTimeline(source: source)
+                                .padding(16)
+                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        } else {
+                            titleContent
+                        }
+                    }
+                    .padding(20)
+                }
+                .background(VeyraBackground().ignoresSafeArea())
+                .navigationTitle("Info")
+                #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Sluit") { dismiss() }
                     }
                 }
-                .padding(20)
+                #endif
             }
-            .background(VeyraColors.background.ignoresSafeArea())
-            .navigationTitle("Info")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Sluit") { dismiss() }
-                }
+            .preferredColorScheme(.dark)
+            .task {
+                guard !loaded, sportEvent == nil, source.kind != .liveTV else { return }
+                loaded = true
+                await load()
             }
-            #endif
-        }
-        .preferredColorScheme(.dark)
-        .task {
-            guard !loaded, sportEvent == nil, source.kind != .liveTV else { return }
-            loaded = true
-            await load()
+
         }
     }
 

@@ -52,43 +52,46 @@ struct IPTVSetupView: View {
     }
 
     var body: some View {
-        ZStack {
-            VeyraBackground()
-            .ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground()
+                .ignoresSafeArea()
 
-            ScrollView {
-                VStack(
-                    alignment: .leading,
-                    spacing: 32
-                ) {
-                    header
+                VeyraScrollView {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 32
+                    ) {
+                        header
 
-                    sourcePicker
+                        sourcePicker
 
-                    nameField
+                        nameField
 
-                    if setupType == .xtream {
-                        xtreamFields
-                    } else {
-                        m3uFields
+                        if setupType == .xtream {
+                            xtreamFields
+                        } else {
+                            m3uFields
+                        }
+
+                        if let errorMessage {
+                            Text(errorMessage)
+                                .font(.body)
+                                .foregroundStyle(.red)
+                        }
+
+                        saveButton
                     }
-
-                    if let errorMessage {
-                        Text(errorMessage)
-                            .font(.body)
-                            .foregroundStyle(.red)
-                    }
-
-                    saveButton
+                    .frame(maxWidth: 900)
+                    .padding(.horizontal, VeyraSpacing.page)
+                    .padding(.top, 36)
+                    .padding(.bottom, 50)
                 }
-                .frame(maxWidth: 900)
-                .padding(.horizontal, VeyraSpacing.page)
-                .padding(.top, 36)
-                .padding(.bottom, 50)
             }
-        }
-        .onAppear {
-            loadExistingConfiguration()
+            .onAppear {
+                loadExistingConfiguration()
+            }
+
         }
     }
 

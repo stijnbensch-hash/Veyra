@@ -26,129 +26,133 @@ struct SeriesView: View {
 
     @Environment(\.horizontalSizeClass) private var sizeClass
 
-    private var metrics: VeyraPosterMetrics { VeyraPosterMetrics(regular: sizeClass == .regular) }
-    private var columns: [GridItem] { metrics.columns }
-
     private let posterBaseURL =
         URL(string: "https://image.tmdb.org/t/p/w500")!
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                VeyraBackground()
+        VeyraDynamicBackgroundScope {
+            NavigationStack {
+                GeometryReader { geometry in
+                    let metrics = VeyraCatalogPosterGridLayout(availableWidth: geometry.size.width,
+                                                             regular: sizeClass == .regular)
+                    ZStack {
+                        VeyraBackground()
 
-                ScrollView(
-                    .vertical,
-                    showsIndicators: false
-                ) {
-                    VStack(
-                        alignment: .leading,
-                        spacing: 24
-                    ) {
-                        if let featured {
-                            VeyraCatalogHero(
-                                url: featured.backdropPath.flatMap {
-                                    URL(string: "https://image.tmdb.org/t/p/w1280" + $0)
-                                }, topInset: VeyraSafeArea.top
+                        VeyraScrollView(
+                            .vertical,
+                            showsIndicators: false
+                        ) {
+                            VStack(
+                                alignment: .leading,
+                                spacing: 24
                             ) {
-                                VeyraHero(
-                                    title: featured.name,
-                                    eyebrow: "Serie uitgelicht",
-                                    overview: featured.overview,
-                                    metadata:
-                                        featured.firstAirDate.map {
-                                            [
-                                                String(
-                                                    $0.prefix(4)
+                                if let featured {
+                                    VeyraCatalogHero(
+                                        url: featured.backdropPath.flatMap {
+                                            URL(string: "https://image.tmdb.org/t/p/w1280" + $0)
+                                        }, topInset: VeyraSafeArea.top
+                                    ) {
+                                        VeyraHero(
+                                            title: featured.name,
+                                            eyebrow: "Serie uitgelicht",
+                                            overview: featured.overview,
+                                            metadata:
+                                                featured.firstAirDate.map {
+                                                    [
+                                                        String(
+                                                            $0.prefix(4)
+                                                        )
+                                                    ]
+                                                }
+                                                ?? [],
+                                            item: MediaItem(title: featured.name, type: .series,
+                                                            tmdbID: featured.id, rating: featured.voteAverage)
+                                        ) {
+                                            Button {
+                                                selectedSeries = featured
+                                            } label: {
+                                                VeyraActionLabel(
+                                                    title:
+                                                        "Afleveringen bekijken",
+                                                    symbol:
+                                                        "play.rectangle"
                                                 )
-                                            ]
+                                            }
+                                            .buttonStyle(.plain)
+                                            .background(
+                                                .white.opacity(0.14),
+                                                in: Capsule()
+                                            )
                                         }
-                                        ?? [],
-                                    item: MediaItem(title: featured.name, type: .series,
-                                                    tmdbID: featured.id, rating: featured.voteAverage)
-                                ) {
-                                    Button {
-                                        selectedSeries = featured
-                                    } label: {
-                                        VeyraActionLabel(
-                                            title:
-                                                "Afleveringen bekijken",
-                                            symbol:
-                                                "play.rectangle"
-                                        )
+
                                     }
-                                    .buttonStyle(.plain)
-                                    .background(
-                                        .white.opacity(0.14),
-                                        in: Capsule()
+                                }
+
+                                VStack(
+                                    alignment: .leading,
+                                    spacing: 6
+                                ) {
+                                    header
+
+                                    MediaFiltersRowIOS(
+                                        kind: .tv,
+                                        selectedGenreID:
+                                            $selectedGenreID,
+                                        selectedDecade:
+                                            $selectedDecade,
+                                        selectedRating:
+                                            $selectedRating,
+                                        selectedSort:
+                                            $selectedSort
                                     )
                                 }
 
+                                .padding(.horizontal, 16)
+
+                                content(metrics: metrics)
+                                    .padding(.horizontal, metrics.horizontalPadding)
                             }
+                            .padding(.bottom, 40)
                         }
-
-                        VStack(
-                            alignment: .leading,
-                            spacing: 6
-                        ) {
-                            header
-
-                            MediaFiltersRowIOS(
-                                kind: .tv,
-                                selectedGenreID:
-                                    $selectedGenreID,
-                                selectedDecade:
-                                    $selectedDecade,
-                                selectedRating:
-                                    $selectedRating,
-                                selectedSort:
-                                    $selectedSort
-                            )
-                        }
-
-                        .padding(.horizontal, 16)
-
-                        content
-                            .padding(.horizontal, 16)
                     }
-                    .padding(.bottom, 40)
+                }
+                #if os(iOS)
+                .ignoresSafeArea(.container, edges: .top)
+                #endif
+                .veyraHideNavigationBar()
+                .onChange(
+                    of: watchRegion
+                ) { _, _ in
+                    selectedProvider = nil
+                }
+                .task(
+                    id: catalogTaskID
+                ) {
+                    async let catalogTask: Void =
+                        loadSeries()
+
+                    async let traktTask: Void =
+                        refreshTrakt()
+
+                    _ = await (
+                        catalogTask,
+                        traktTask
+                    )
+                }
+                .task(id: heroPool.map(\.id)) {
+                    await rotateHeroAutomatically()
+                }
+                .navigationDestination(
+                    item: $selectedSeries
+                ) { series in
+                    SeriesDetailView(
+                        series: series
+                    )
                 }
             }
-            #if os(iOS)
-            .ignoresSafeArea(.container, edges: .top)
-            #endif
-            .veyraHideNavigationBar()
-            .onChange(
-                of: watchRegion
-            ) { _, _ in
-                selectedProvider = nil
-            }
-            .task(
-                id: catalogTaskID
-            ) {
-                async let catalogTask: Void =
-                    loadSeries()
+            .mediaNavigationRoot()
 
-                async let traktTask: Void =
-                    refreshTrakt()
-
-                _ = await (
-                    catalogTask,
-                    traktTask
-                )
-            }
-            .task(id: heroPool.map(\.id)) {
-                await rotateHeroAutomatically()
-            }
-            .navigationDestination(
-                item: $selectedSeries
-            ) { series in
-                SeriesDetailView(
-                    series: series
-                )
-            }
         }
-        .mediaNavigationRoot()
     }
 
     // MARK: - Hero rotatie
@@ -246,7 +250,7 @@ struct SeriesView: View {
     // MARK: - Content
 
     @ViewBuilder
-    private var content: some View {
+    private func content(metrics: VeyraCatalogPosterGridLayout) -> some View {
         if isLoading
             && series.isEmpty
         {
@@ -276,7 +280,7 @@ struct SeriesView: View {
 
         } else {
             LazyVGrid(
-                columns: columns,
+                columns: metrics.columns,
                 spacing: metrics.rowSpacing
             ) {
                 ForEach(series) {

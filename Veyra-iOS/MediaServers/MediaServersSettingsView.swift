@@ -6,89 +6,92 @@ struct MediaServersSettingsView: View {
     @State private var editingServer: MediaServerAccount?
 
     var body: some View {
-        ZStack {
-            VeyraColors.background.ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            List {
-            Section("VeyraHub-synchronisatie") {
-                if viewModel.servers.contains(where: \.isVeyraHub) {
-                    Label("VeyraHub toegevoegd", systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(VeyraColors.cyan)
-                    Text("Veyra synchroniseert instellingen, brongegevens en API-sleutels automatisch via deze server.")
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text("Verbind VeyraHub op dit toestel met hetzelfde serveradres en account als op je andere Veyra-toestellen. Daarna start de synchronisatie automatisch.")
-                        .foregroundStyle(.secondary)
-                    Button("VeyraHub verbinden") { showAddSheet = true }
+                VeyraList {
+                Section("VeyraHub-synchronisatie") {
+                    if viewModel.servers.contains(where: \.isVeyraHub) {
+                        Label("VeyraHub toegevoegd", systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(VeyraColors.cyan)
+                        Text("Veyra synchroniseert instellingen, brongegevens en API-sleutels automatisch via deze server.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("Verbind VeyraHub op dit toestel met hetzelfde serveradres en account als op je andere Veyra-toestellen. Daarna start de synchronisatie automatisch.")
+                            .foregroundStyle(.secondary)
+                        Button("VeyraHub verbinden") { showAddSheet = true }
+                    }
                 }
-            }
 
-            if viewModel.servers.isEmpty {
-                ContentUnavailableView(
-                    "Geen mediaservers",
-                    systemImage: "play.tv",
-                    description: Text("Voeg VeyraHub of een Jellyfin-server toe.")
-                )
-            } else {
-                Section {
-                    ForEach(viewModel.servers) { server in
-                        Button {
-                            editingServer = server
-                        } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    HStack(spacing: 6) {
-                                        statusDot(for: server.id)
-                                        Text(server.name).foregroundStyle(.primary)
+                if viewModel.servers.isEmpty {
+                    ContentUnavailableView(
+                        "Geen mediaservers",
+                        systemImage: "play.tv",
+                        description: Text("Voeg VeyraHub of een Jellyfin-server toe.")
+                    )
+                } else {
+                    Section {
+                        ForEach(viewModel.servers) { server in
+                            Button {
+                                editingServer = server
+                            } label: {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        HStack(spacing: 6) {
+                                            statusDot(for: server.id)
+                                            Text(server.name).foregroundStyle(.primary)
+                                        }
+                                        Text("\(server.kind.displayName) · \(server.host)")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
                                     }
-                                    Text("\(server.kind.displayName) · \(server.host)")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                    Spacer()
                                 }
-                                Spacer()
                             }
-                        }
-                        .swipeActions {
-                            Button("Verwijderen", role: .destructive) {
-                                viewModel.remove(id: server.id)
+                            .swipeActions {
+                                Button("Verwijderen", role: .destructive) {
+                                    viewModel.remove(id: server.id)
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            if let errorMessage = viewModel.errorMessage {
-                Section {
-                    Text(errorMessage).foregroundStyle(.red)
+                if let errorMessage = viewModel.errorMessage {
+                    Section {
+                        Text(errorMessage).foregroundStyle(.red)
+                    }
+                }
+                }
+                .scrollContentBackground(.hidden)
+            }
+            .navigationTitle("Mediaservers")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button { showAddSheet = true } label: { Image(systemName: "plus") }
                 }
             }
+            .sheet(isPresented: $showAddSheet, onDismiss: viewModel.reload) {
+                NavigationStack { MediaServerAddView(viewModel: viewModel) }
             }
-            .scrollContentBackground(.hidden)
-        }
-        .navigationTitle("Mediaservers")
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button { showAddSheet = true } label: { Image(systemName: "plus") }
+            .sheet(item: $editingServer, onDismiss: viewModel.reload) { server in
+                NavigationStack { MediaServerEditView(server: server, viewModel: viewModel) }
             }
-        }
-        .sheet(isPresented: $showAddSheet, onDismiss: viewModel.reload) {
-            NavigationStack { MediaServerAddView(viewModel: viewModel) }
-        }
-        .sheet(item: $editingServer, onDismiss: viewModel.reload) { server in
-            NavigationStack { MediaServerEditView(server: server, viewModel: viewModel) }
-        }
-        .onAppear(perform: viewModel.reload)
-        .onReceive(NotificationCenter.default.publisher(for: .veyraMediaServerConfigurationDidChange)) { _ in viewModel.reload() }
-        .task {
-            // Periodiek herchecken zolang dit scherm open staat, zodat het
-            // online/offline-bolletje bijblijft zonder dat de gebruiker
-            // handmatig hoeft te verversen. Stopt vanzelf zodra het scherm
-            // verdwijnt (SwiftUI annuleert `.task` dan).
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(15))
-                guard !Task.isCancelled else { return }
-                viewModel.refreshStatus()
+            .onAppear(perform: viewModel.reload)
+            .onReceive(NotificationCenter.default.publisher(for: .veyraMediaServerConfigurationDidChange)) { _ in viewModel.reload() }
+            .task {
+                // Periodiek herchecken zolang dit scherm open staat, zodat het
+                // online/offline-bolletje bijblijft zonder dat de gebruiker
+                // handmatig hoeft te verversen. Stopt vanzelf zodra het scherm
+                // verdwijnt (SwiftUI annuleert `.task` dan).
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(15))
+                    guard !Task.isCancelled else { return }
+                    viewModel.refreshStatus()
+                }
             }
+
         }
     }
 
@@ -124,74 +127,77 @@ private struct MediaServerAddView: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        ZStack {
-            VeyraColors.background.ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            Form {
-            Section("Type") {
-                Picker("Server", selection: $selectedKind) {
-                    ForEach(MediaServerKind.allCases, id: \.self) { kind in
-                        HStack {
-                            Text(kind.displayName)
+                VeyraForm {
+                Section("Type") {
+                    Picker("Server", selection: $selectedKind) {
+                        ForEach(MediaServerKind.allCases, id: \.self) { kind in
+                            HStack {
+                                Text(kind.displayName)
 
-                            if !kind.isAvailable {
-                                Spacer()
-                                Text("BINNENKORT")
-                                    .font(.system(size: 12, weight: .bold))
-                                    .tracking(1)
-                                    .foregroundStyle(.secondary)
+                                if !kind.isAvailable {
+                                    Spacer()
+                                    Text("BINNENKORT")
+                                        .font(.system(size: 12, weight: .bold))
+                                        .tracking(1)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
+                            .tag(kind)
+                            .disabled(!kind.isAvailable)
                         }
-                        .tag(kind)
-                        .disabled(!kind.isAvailable)
                     }
-                }
-                .pickerStyle(.inline)
-                .labelsHidden()
-                Text("Voor VeyraHub kies je Jellyfin en gebruik je het serveradres en account waarmee je op je andere Veyra-toestellen bent ingelogd.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-
-            if selectedKind.isAvailable {
-                Section("Server") {
-                    TextField("Naam (bijv. Thuis Jellyfin)", text: $name)
-                        .textInputAutocapitalization(.words)
-                    TextField("https://server.example.com:8096", text: $serverAddress)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .keyboardType(.URL)
-                    TextField("Gebruikersnaam", text: $username)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                    SecureField("Wachtwoord", text: $password)
-                }
-            } else {
-                Section {
-                    Text("\(selectedKind.displayName)-ondersteuning komt binnenkort.")
+                    .pickerStyle(.inline)
+                    .labelsHidden()
+                    Text("Voor VeyraHub kies je Jellyfin en gebruik je het serveradres en account waarmee je op je andere Veyra-toestellen bent ingelogd.")
+                        .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
-            }
 
-            if let errorMessage {
-                Section { Text(errorMessage).foregroundStyle(.red) }
-            }
-            }
-            .scrollContentBackground(.hidden)
-        }
-        .navigationTitle("Server toevoegen")
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Annuleren") { dismiss() }
-            }
-            ToolbarItem(placement: .confirmationAction) {
-                if isConnecting {
-                    ProgressView()
+                if selectedKind.isAvailable {
+                    Section("Server") {
+                        TextField("Naam (bijv. Thuis Jellyfin)", text: $name)
+                            .textInputAutocapitalization(.words)
+                        TextField("https://server.example.com:8096", text: $serverAddress)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .keyboardType(.URL)
+                        TextField("Gebruikersnaam", text: $username)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                        SecureField("Wachtwoord", text: $password)
+                    }
                 } else {
-                    Button("Verbinden") { connect() }
-                        .disabled(!selectedKind.isAvailable)
+                    Section {
+                        Text("\(selectedKind.displayName)-ondersteuning komt binnenkort.")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                if let errorMessage {
+                    Section { Text(errorMessage).foregroundStyle(.red) }
+                }
+                }
+                .scrollContentBackground(.hidden)
+            }
+            .navigationTitle("Server toevoegen")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Annuleren") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    if isConnecting {
+                        ProgressView()
+                    } else {
+                        Button("Verbinden") { connect() }
+                            .disabled(!selectedKind.isAvailable)
+                    }
                 }
             }
+
         }
     }
 
@@ -262,33 +268,36 @@ private struct MediaServerEditView: View {
     }
 
     var body: some View {
-        ZStack {
-            VeyraColors.background.ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            Form {
-            Section("Server") {
-                TextField("Naam", text: $name)
-                    .textInputAutocapitalization(.words)
+                VeyraForm {
+                Section("Server") {
+                    TextField("Naam", text: $name)
+                        .textInputAutocapitalization(.words)
 
-                LabeledContent("Type", value: server.kind.displayName)
-                LabeledContent("Adres", value: server.host)
-                LabeledContent("Gebruiker", value: server.username)
+                    LabeledContent("Type", value: server.kind.displayName)
+                    LabeledContent("Adres", value: server.host)
+                    LabeledContent("Gebruiker", value: server.username)
+                }
+
+                if let errorMessage {
+                    Section { Text(errorMessage).foregroundStyle(.red) }
+                }
+                }
+                .scrollContentBackground(.hidden)
+            }
+            .navigationTitle("Server bewerken")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Annuleren") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Opslaan") { save() }
+                }
             }
 
-            if let errorMessage {
-                Section { Text(errorMessage).foregroundStyle(.red) }
-            }
-            }
-            .scrollContentBackground(.hidden)
-        }
-        .navigationTitle("Server bewerken")
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Annuleren") { dismiss() }
-            }
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Opslaan") { save() }
-            }
         }
     }
 

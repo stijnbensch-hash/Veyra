@@ -468,7 +468,7 @@ struct AllSeriesListView: View {
     ]
 
     var body: some View {
-        ScrollView {
+        VeyraScrollView {
             VStack(
                 alignment: .leading,
                 spacing: 22
@@ -710,7 +710,7 @@ struct IPTVSeriesDetailView: View {
         CGFloat = 220
 
     var body: some View {
-        ScrollView(
+        VeyraScrollView(
             .vertical,
             showsIndicators: false
         ) {

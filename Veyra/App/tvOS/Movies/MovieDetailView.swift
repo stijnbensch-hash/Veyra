@@ -28,105 +28,110 @@ struct MovieDetailView: View {
     @State private var dwellGeneration = UUID()
 
     var body: some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .topLeading) {
-                background
+        VeyraDynamicBackgroundScope {
+            GeometryReader { geometry in
+                ZStack(alignment: .topLeading) {
+                    baseBackground
+                    background
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .clipped()
+                        .overlay {
+                            if showHeroTrailer, let heroTrailerKey {
+                                VeyraTrailerAutoplayView(youtubeKey: heroTrailerKey)
+                                    .frame(width: geometry.size.width, height: geometry.size.height)
+                                    .clipped()
+                                    .transition(.opacity)
+                            }
+                        }
+                        .overlay {
+                            ZStack {
+                                Color.black.opacity(0.25)
+                                LinearGradient(
+                                    colors: [.black.opacity(0.55), .clear],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                                LinearGradient(
+                                    colors: [.black.opacity(0.40), .clear],
+                                    startPoint: .top,
+                                    endPoint: UnitPoint(x: 0.5, y: 0.35)
+                                )
+                            }
+                            .allowsHitTesting(false)
+                        }
+                        .veyraHeroBackdropBlend()
+
+                    VeyraScrollView {
+                        hero
+
+                        CastRow(item: movie, preloadedCredits: movie.tmdbID == nil ? .none : (didLoadDetails ? .value(details?.credits) : .pending))
+                            .padding(.horizontal, 48)
+                            .padding(.top, 12)
+
+                        TrailerSection(item: movie, preloadedTrailer: movie.tmdbID == nil ? .none : (didLoadDetails ? .value(details?.videos?.results.bestTrailer) : .pending))
+                            .padding(.horizontal, 48)
+                            .padding(.top, 12)
+
+                        ReviewsSection(item: movie, preloadedReviews: movie.tmdbID == nil ? .none : (didLoadDetails ? .value(details?.reviews?.results.withUsableContent ?? []) : .pending))
+                            .padding(.horizontal, 48)
+                            .padding(.top, 12)
+
+                        SimilarTitlesRow(item: movie)
+                            .padding(.horizontal, 48)
+                            .padding(.top, 12)
+                            .padding(.bottom, 60)
+                    }
+                    .contentMargins(.top, 0, for: .scrollContent)
+                    .contentMargins(.horizontal, 0, for: .scrollContent)
+                    .scrollClipDisabled()
                     .frame(width: geometry.size.width, height: geometry.size.height)
-                    .clipped()
-                    .overlay {
-                        if showHeroTrailer, let heroTrailerKey {
-                            VeyraTrailerAutoplayView(youtubeKey: heroTrailerKey)
-                                .frame(width: geometry.size.width, height: geometry.size.height)
-                                .clipped()
-                                .transition(.opacity)
-                        }
-                    }
-                    .overlay {
-                        ZStack {
-                            Color.black.opacity(0.25)
-                            LinearGradient(
-                                colors: [.black.opacity(0.55), .clear],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                            LinearGradient(
-                                colors: [.black.opacity(0.40), .clear],
-                                startPoint: .top,
-                                endPoint: UnitPoint(x: 0.5, y: 0.35)
-                            )
-                        }
-                        .allowsHitTesting(false)
-                    }
-
-                ScrollView {
-                    hero
-
-                    CastRow(item: movie, preloadedCredits: movie.tmdbID == nil ? .none : (didLoadDetails ? .value(details?.credits) : .pending))
-                        .padding(.horizontal, 48)
-                        .padding(.top, 12)
-
-                    TrailerSection(item: movie, preloadedTrailer: movie.tmdbID == nil ? .none : (didLoadDetails ? .value(details?.videos?.results.bestTrailer) : .pending))
-                        .padding(.horizontal, 48)
-                        .padding(.top, 12)
-
-                    ReviewsSection(item: movie, preloadedReviews: movie.tmdbID == nil ? .none : (didLoadDetails ? .value(details?.reviews?.results.withUsableContent ?? []) : .pending))
-                        .padding(.horizontal, 48)
-                        .padding(.top, 12)
-
-                    SimilarTitlesRow(item: movie)
-                        .padding(.horizontal, 48)
-                        .padding(.top, 12)
-                        .padding(.bottom, 60)
                 }
-                .contentMargins(.top, 0, for: .scrollContent)
-                .contentMargins(.horizontal, 0, for: .scrollContent)
-                .scrollClipDisabled()
-                .frame(width: geometry.size.width, height: geometry.size.height)
             }
-        }
-        .ignoresSafeArea()
-        .task(id: movie.id) {
-            didLoadDetails = false
-            details = nil
-            defer { didLoadDetails = true }
-            guard let tmdbID = movie.tmdbID else { return }
-            // Fase 3+4 (TMDB-spec, duplicate-request cleanup + append_to_response): dit haalde
-            // voorheen 3x los hetzelfde filmdetail-eindpunt op (ratings/runtime/collection), en
-            // CastRow/TrailerSection/ReviewsSection vroegen daarna ZELF nog eens credits/videos/
-            // reviews los op -- nu allemaal in ÉÉN gecombineerde aanvraag.
-            var loaded: TMDBMovie?
-            if let token = AppConfiguration.tmdbReadAccessToken {
-                loaded = try? await TMDBClient(readAccessToken: token)
-                    .movieDetails(id: tmdbID, append: ["credits", "videos", "reviews"])
-            }
-            details = loaded
-            ratings = await MetadataRatingsService.movieRatings(
-                tmdbID: tmdbID, imdbID: movie.imdbID, title: movie.title, knownTMDBRating: loaded?.voteAverage
-            )
-            runtimeMinutes = loaded?.runtime
-            belongsToCollection = loaded?.belongsToCollection
-        }
-        .onChange(of: isPlayFocused) { _, focused in
-            let generation = UUID()
-            dwellGeneration = generation
-            guard focused else {
-                withAnimation(.easeInOut(duration: 0.3)) { showHeroTrailer = false }
-                return
-            }
-            Task {
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
-                guard !Task.isCancelled, dwellGeneration == generation else { return }
-                if heroTrailerKey == nil {
-                    heroTrailerKey = await MetadataTrailerService.trailer(for: movie)?.key
+            .ignoresSafeArea()
+            .task(id: movie.id) {
+                didLoadDetails = false
+                details = nil
+                defer { didLoadDetails = true }
+                guard let tmdbID = movie.tmdbID else { return }
+                // Fase 3+4 (TMDB-spec, duplicate-request cleanup + append_to_response): dit haalde
+                // voorheen 3x los hetzelfde filmdetail-eindpunt op (ratings/runtime/collection), en
+                // CastRow/TrailerSection/ReviewsSection vroegen daarna ZELF nog eens credits/videos/
+                // reviews los op -- nu allemaal in ÉÉN gecombineerde aanvraag.
+                var loaded: TMDBMovie?
+                if let token = AppConfiguration.tmdbReadAccessToken {
+                    loaded = try? await TMDBClient(readAccessToken: token)
+                        .movieDetails(id: tmdbID, append: ["credits", "videos", "reviews"])
                 }
-                guard dwellGeneration == generation, heroTrailerKey != nil else { return }
-                withAnimation(.easeInOut(duration: 0.6)) { showHeroTrailer = true }
+                details = loaded
+                ratings = await MetadataRatingsService.movieRatings(
+                    tmdbID: tmdbID, imdbID: movie.imdbID, title: movie.title, knownTMDBRating: loaded?.voteAverage
+                )
+                runtimeMinutes = loaded?.runtime
+                belongsToCollection = loaded?.belongsToCollection
             }
-        }
-        .onChange(of: movie.id) { _, _ in
-            heroTrailerKey = nil
-            showHeroTrailer = false
-            dwellGeneration = UUID()
+            .onChange(of: isPlayFocused) { _, focused in
+                let generation = UUID()
+                dwellGeneration = generation
+                guard focused else {
+                    withAnimation(.easeInOut(duration: 0.3)) { showHeroTrailer = false }
+                    return
+                }
+                Task {
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    guard !Task.isCancelled, dwellGeneration == generation else { return }
+                    if heroTrailerKey == nil {
+                        heroTrailerKey = await MetadataTrailerService.trailer(for: movie)?.key
+                    }
+                    guard dwellGeneration == generation, heroTrailerKey != nil else { return }
+                    withAnimation(.easeInOut(duration: 0.6)) { showHeroTrailer = true }
+                }
+            }
+            .onChange(of: movie.id) { _, _ in
+                heroTrailerKey = nil
+                showHeroTrailer = false
+                dwellGeneration = UUID()
+            }
+
         }
     }
 

@@ -13,28 +13,30 @@ struct EpisodeView: View {
     )!
 
     var body: some View {
-        ZStack {
-            background
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                background
 
-            LinearGradient(
-                colors: [
-                    .black.opacity(0.25),
-                    .black.opacity(0.72),
-                    Color(
-                        red: 0.01,
-                        green: 0.04,
-                        blue: 0.07
-                    )
-                ],
-                startPoint: .topTrailing,
-                endPoint: .bottomLeading
-            )
-            .ignoresSafeArea()
+                LinearGradient(
+                    colors: [
+                        .black.opacity(0.25),
+                        .black.opacity(0.72),
+                        Color(
+                            red: 0.01,
+                            green: 0.04,
+                            blue: 0.07
+                        )
+                    ],
+                    startPoint: .topTrailing,
+                    endPoint: .bottomLeading
+                )
+                .ignoresSafeArea()
 
-            content
-        }
-        .task {
-            await loadExternalIDs()
+                content
+            }
+            .task {
+                await loadExternalIDs()
+            }
         }
     }
 

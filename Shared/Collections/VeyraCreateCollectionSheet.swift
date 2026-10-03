@@ -47,7 +47,7 @@ struct VeyraCreateCollectionSheet: View {
     }
 
     private var form: some View {
-        Form {
+        VeyraForm {
             Section {
                 TextField("Naam", text: $name)
             } header: {
@@ -88,21 +88,23 @@ struct VeyraCreateCollectionSheet: View {
     }
 
     var body: some View {
-        content
-        .navigationTitle(isEditing ? "Bewerk collectie" : "Nieuwe collectie")
-        #if os(iOS)
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) { Button("Annuleren") { dismiss() } }
-            ToolbarItem(placement: .confirmationAction) {
+        VeyraDynamicBackgroundScope {
+            content
+            .navigationTitle(isEditing ? "Bewerk collectie" : "Nieuwe collectie")
+            #if os(iOS)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Annuleren") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(isEditing ? "Bewaar" : "Maken") { save() }.disabled(trimmedName.isEmpty)
+                }
+            }
+            #else
+            .toolbar {
+                Button("Annuleren") { dismiss() }
                 Button(isEditing ? "Bewaar" : "Maken") { save() }.disabled(trimmedName.isEmpty)
             }
+            #endif
         }
-        #else
-        .toolbar {
-            Button("Annuleren") { dismiss() }
-            Button(isEditing ? "Bewaar" : "Maken") { save() }.disabled(trimmedName.isEmpty)
-        }
-        #endif
     }
 
     private func save() {

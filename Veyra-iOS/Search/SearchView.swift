@@ -35,88 +35,91 @@ struct SearchView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        ContentUnavailableView.search
-                    } else if isSearching {
-                        ProgressView("Zoeken…")
-                            .frame(maxWidth: .infinity)
-                    } else if let errorMessage {
-                        ContentUnavailableView("Zoeken is mislukt", systemImage: "exclamationmark.magnifyingglass",
-                                               description: Text(errorMessage))
-                    } else if movies.isEmpty && series.isEmpty {
-                        ContentUnavailableView.search(text: query)
-                    } else {
-                        if !movies.isEmpty {
-                            sectionTitle("FILMS")
-                            LazyVGrid(columns: metrics.columns, spacing: metrics.rowSpacing) {
-                                ForEach(movies) { movie in
-                                    Button {
-                                        Task { await openMovie(movie) }
-                                    } label: {
-                                        VeyraPosterCard(
-                                            title: movie.title,
-                                            url: posterURL(movie.posterPath),
-                                            width: metrics.posterWidth,
-                                            tmdbID: movie.id,
-                                            isMovie: true,
-                                            watchedTarget: .movie(TraktIDs(tmdb: movie.id))
-                                        )
-                                    }
-                                    .buttonStyle(.plain)
-                                    .disabled(isOpeningMovie)
-                                    .task {
-                                        if movie.id == movies.last?.id { await loadMoreMoviesIfNeeded() }
+        VeyraDynamicBackgroundScope {
+            NavigationStack {
+                VeyraScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+                        if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            ContentUnavailableView.search
+                        } else if isSearching {
+                            ProgressView("Zoeken…")
+                                .frame(maxWidth: .infinity)
+                        } else if let errorMessage {
+                            ContentUnavailableView("Zoeken is mislukt", systemImage: "exclamationmark.magnifyingglass",
+                                                   description: Text(errorMessage))
+                        } else if movies.isEmpty && series.isEmpty {
+                            ContentUnavailableView.search(text: query)
+                        } else {
+                            if !movies.isEmpty {
+                                sectionTitle("FILMS")
+                                LazyVGrid(columns: metrics.columns, spacing: metrics.rowSpacing) {
+                                    ForEach(movies) { movie in
+                                        Button {
+                                            Task { await openMovie(movie) }
+                                        } label: {
+                                            VeyraPosterCard(
+                                                title: movie.title,
+                                                url: posterURL(movie.posterPath),
+                                                width: metrics.posterWidth,
+                                                tmdbID: movie.id,
+                                                isMovie: true,
+                                                watchedTarget: .movie(TraktIDs(tmdb: movie.id))
+                                            )
+                                        }
+                                        .buttonStyle(.plain)
+                                        .disabled(isOpeningMovie)
+                                        .task {
+                                            if movie.id == movies.last?.id { await loadMoreMoviesIfNeeded() }
+                                        }
                                     }
                                 }
                             }
-                        }
 
-                        if !series.isEmpty {
-                            sectionTitle("SERIES")
-                            LazyVGrid(columns: metrics.columns, spacing: metrics.rowSpacing) {
-                                ForEach(series) { item in
-                                    Button { selectedSeries = item } label: {
-                                        VeyraPosterCard(
-                                            title: item.name,
-                                            url: posterURL(item.posterPath),
-                                            symbol: "tv",
-                                            width: metrics.posterWidth,
-                                            tmdbID: item.id,
-                                            isMovie: false,
-                                            watchedTarget: .show(TraktIDs(tmdb: item.id))
-                                        )
-                                    }
-                                    .buttonStyle(.plain)
-                                    .task {
-                                        if item.id == series.last?.id { await loadMoreSeriesIfNeeded() }
+                            if !series.isEmpty {
+                                sectionTitle("SERIES")
+                                LazyVGrid(columns: metrics.columns, spacing: metrics.rowSpacing) {
+                                    ForEach(series) { item in
+                                        Button { selectedSeries = item } label: {
+                                            VeyraPosterCard(
+                                                title: item.name,
+                                                url: posterURL(item.posterPath),
+                                                symbol: "tv",
+                                                width: metrics.posterWidth,
+                                                tmdbID: item.id,
+                                                isMovie: false,
+                                                watchedTarget: .show(TraktIDs(tmdb: item.id))
+                                            )
+                                        }
+                                        .buttonStyle(.plain)
+                                        .task {
+                                            if item.id == series.last?.id { await loadMoreSeriesIfNeeded() }
+                                        }
                                     }
                                 }
                             }
                         }
                     }
+                    .padding(.horizontal)
+                    .padding(.vertical, 24)
+                    .veyraReadableWidth()
                 }
-                .padding(.horizontal)
-                .padding(.vertical, 24)
-                .veyraReadableWidth()
-            }
-            .background(VeyraColors.background.ignoresSafeArea())
-            .navigationTitle("Zoeken")
-            .searchable(text: $query, prompt: "Zoek films en series")
-            .task(id: query) { await search() }
-            .navigationDestination(item: $selectedSeries) { SeriesDetailView(series: $0) }
-            .navigationDestination(item: $detailItem) { ShelfItemDestination(item: $0) }
-            .overlay {
-                if isOpeningMovie {
-                    ProgressView("Film openen…")
-                        .padding()
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                .background(VeyraBackground().ignoresSafeArea())
+                .navigationTitle("Zoeken")
+                .searchable(text: $query, prompt: "Zoek films en series")
+                .task(id: query) { await search() }
+                .navigationDestination(item: $selectedSeries) { SeriesDetailView(series: $0) }
+                .navigationDestination(item: $detailItem) { ShelfItemDestination(item: $0) }
+                .overlay {
+                    if isOpeningMovie {
+                        ProgressView("Film openen…")
+                            .padding()
+                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    }
                 }
             }
+            .mediaNavigationRoot()
+
         }
-        .mediaNavigationRoot()
     }
 
     private func sectionTitle(_ title: String) -> some View {

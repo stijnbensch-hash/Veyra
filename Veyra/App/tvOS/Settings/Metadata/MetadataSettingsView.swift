@@ -7,48 +7,51 @@ struct MetadataSettingsView: View {
     @State private var destination: MetadataSettingsDestination?
 
     var body: some View {
-        ZStack {
-            VeyraBackground().ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 18) {
-                    categoryCard(
-                        .posterEnrichment, icon: "photo.badge.checkmark", title: "Posterverrijking",
-                        subtitle: "Genre-/beoordelingsbadge op posters"
-                    )
-                    categoryCard(
-                        .source, icon: "server.rack", title: "Metadatabron",
-                        subtitle: "Poster, achtergrond en omschrijving"
-                    )
-                    categoryCard(
-                        .artwork, icon: "textformat", title: "Artwork",
-                        subtitle: "ClearLogo en titelweergave"
-                    )
-                    categoryCard(
-                        .ratings, icon: "star.leadinghalf.filled", title: "Ratings",
-                        subtitle: "Zichtbare beoordelingen op detailpagina's"
-                    )
-                    categoryCard(
-                        .diagnostics, icon: "stethoscope", title: "Diagnostics",
-                        subtitle: "Metadata-/artworkbron, cache, fallback, duur"
-                    )
+                VeyraScrollView(.vertical, showsIndicators: false) {
+                    VStack(spacing: 18) {
+                        categoryCard(
+                            .posterEnrichment, icon: "photo.badge.checkmark", title: "Posterverrijking",
+                            subtitle: "Genre-/beoordelingsbadge op posters"
+                        )
+                        categoryCard(
+                            .source, icon: "server.rack", title: "Metadatabron",
+                            subtitle: "Poster, achtergrond en omschrijving"
+                        )
+                        categoryCard(
+                            .artwork, icon: "textformat", title: "Artwork",
+                            subtitle: "ClearLogo en titelweergave"
+                        )
+                        categoryCard(
+                            .ratings, icon: "star.leadinghalf.filled", title: "Ratings",
+                            subtitle: "Zichtbare beoordelingen op detailpagina's"
+                        )
+                        categoryCard(
+                            .diagnostics, icon: "stethoscope", title: "Diagnostics",
+                            subtitle: "Metadata-/artworkbron, cache, fallback, duur"
+                        )
+                    }
+                    .frame(maxWidth: 1300, alignment: .leading)
+                    .padding(.horizontal, VeyraSpacing.page)
+                    .padding(.top, 36)
+                    .padding(.bottom, 60)
+                    .frame(maxWidth: .infinity)
                 }
-                .frame(maxWidth: 1300, alignment: .leading)
-                .padding(.horizontal, VeyraSpacing.page)
-                .padding(.top, 36)
-                .padding(.bottom, 60)
-                .frame(maxWidth: .infinity)
             }
-        }
-        .navigationTitle("Metadata")
-        .navigationDestination(item: $destination) { destination in
-            switch destination {
-            case .posterEnrichment: PosterEnrichmentSettingsView()
-            case .source: MetadataSourceSettingsView()
-            case .artwork: ArtworkSettingsSettingsView()
-            case .ratings: MetadataRatingsSettingsView()
-            case .diagnostics: MetadataDiagnosticsView()
+            .navigationTitle("Metadata")
+            .navigationDestination(item: $destination) { destination in
+                switch destination {
+                case .posterEnrichment: PosterEnrichmentSettingsView()
+                case .source: MetadataSourceSettingsView()
+                case .artwork: ArtworkSettingsSettingsView()
+                case .ratings: MetadataRatingsSettingsView()
+                case .diagnostics: MetadataDiagnosticsView()
+                }
             }
+
         }
     }
 
@@ -123,49 +126,52 @@ private struct PosterEnrichmentSettingsView: View {
     }
 
     var body: some View {
-        Form {
-            Section {
-                Picker("Bron", selection: $posterEnrichmentSourceRaw) {
-                    ForEach(PosterEnrichmentMode.allCases) { option in
-                        Text(option.title).tag(option.rawValue)
-                    }
-                }
-                .pickerStyle(.menu)
-
-                if posterEnrichmentSource == .betterPosters {
-                    HStack {
-                        Spacer()
-                        VeyraPosterCard(
-                            title: "Voorbeeldfilm",
-                            url: nil,
-                            width: 220,
-                            genre: "Actie",
-                            rating: 7.8
-                        )
-                        Spacer()
-                    }
-
-                    VeyraSettingsToggleRow(icon: "tag", title: "Genre", isOn: $posterShowGenre)
-                    VeyraSettingsToggleRow(icon: "star", title: "Beoordeling", isOn: $posterShowRating)
-                    if posterShowRating {
-                        Picker("Bron beoordeling", selection: $posterRatingSourceRaw) {
-                            ForEach(PosterRatingSource.allCases) { option in
-                                Text(option.title).tag(option.rawValue)
-                            }
+        VeyraDynamicBackgroundScope {
+            VeyraForm {
+                Section {
+                    Picker("Bron", selection: $posterEnrichmentSourceRaw) {
+                        ForEach(PosterEnrichmentMode.allCases) { option in
+                            Text(option.title).tag(option.rawValue)
                         }
-                        .pickerStyle(.menu)
                     }
-                    VeyraSettingsToggleRow(icon: "checkmark.seal", title: "Leeftijdsclassificatie", isOn: $posterShowAgeRating)
-                    VeyraSettingsToggleRow(icon: "rosette", title: "Kwaliteitslabels", isOn: $posterShowQuality)
-                        .disabled(true)
-                    VeyraSettingsToggleRow(icon: "chart.line.uptrend.xyaxis", title: "Trendlabels", isOn: $posterShowTrending)
+                    .pickerStyle(.menu)
+
+                    if posterEnrichmentSource == .betterPosters {
+                        HStack {
+                            Spacer()
+                            VeyraPosterCard(
+                                title: "Voorbeeldfilm",
+                                url: nil,
+                                width: 220,
+                                genre: "Actie",
+                                rating: 7.8
+                            )
+                            Spacer()
+                        }
+
+                        VeyraSettingsToggleRow(icon: "tag", title: "Genre", isOn: $posterShowGenre)
+                        VeyraSettingsToggleRow(icon: "star", title: "Beoordeling", isOn: $posterShowRating)
+                        if posterShowRating {
+                            Picker("Bron beoordeling", selection: $posterRatingSourceRaw) {
+                                ForEach(PosterRatingSource.allCases) { option in
+                                    Text(option.title).tag(option.rawValue)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                        }
+                        VeyraSettingsToggleRow(icon: "checkmark.seal", title: "Leeftijdsclassificatie", isOn: $posterShowAgeRating)
+                        VeyraSettingsToggleRow(icon: "rosette", title: "Kwaliteitslabels", isOn: $posterShowQuality)
+                            .disabled(true)
+                        VeyraSettingsToggleRow(icon: "chart.line.uptrend.xyaxis", title: "Trendlabels", isOn: $posterShowTrending)
+                    }
+                } footer: {
+                    Text("Toont een badge op de posters in Films, Series en het startscherm. Genre, Beoordeling, Leeftijdsclassificatie en Trendlabels werken allemaal echt. Kwaliteitslabels staat uitgeschakeld: dat vraagt per titel een opgezochte stream, wat voor een heel posterrooster te veel netwerkverkeer zou zijn.")
                 }
-            } footer: {
-                Text("Toont een badge op de posters in Films, Series en het startscherm. Genre, Beoordeling, Leeftijdsclassificatie en Trendlabels werken allemaal echt. Kwaliteitslabels staat uitgeschakeld: dat vraagt per titel een opgezochte stream, wat voor een heel posterrooster te veel netwerkverkeer zou zijn.")
             }
+            .frame(maxWidth: 1000)
+            .navigationTitle("Posterverrijking")
+
         }
-        .frame(maxWidth: 1000)
-        .navigationTitle("Posterverrijking")
     }
 }
 
@@ -180,24 +186,27 @@ private struct MetadataSourceSettingsView: View {
     @State private var connectivity: AddonConnectivityStatus?
 
     var body: some View {
-        Form {
-            Section {
-                VeyraSettingsChoiceRow<MetadataSourceOption>(icon: "text.book.closed", "Metadatabron", selection: $metadataSourceRaw)
-            } footer: {
-                Text("Bepaalt waar poster, achtergrond en omschrijving vandaan komen voor titels zonder eigen afbeeldingen (bv. Trakt-lijsten). AIOMetadata gebruikt de addonconfiguratie via VeyraHub.")
-            }
-
-            if let addon = MetadataSourcePreference.activeAddon() {
+        VeyraDynamicBackgroundScope {
+            VeyraForm {
                 Section {
-                    AddonConnectivityRow(addon: addon, status: connectivity)
-                } header: {
-                    Text("Status")
+                    VeyraSettingsChoiceRow<MetadataSourceOption>(icon: "text.book.closed", "Metadatabron", selection: $metadataSourceRaw)
+                } footer: {
+                    Text("Bepaalt waar poster, achtergrond en omschrijving vandaan komen voor titels zonder eigen afbeeldingen (bv. Trakt-lijsten). AIOMetadata gebruikt de addonconfiguratie via VeyraHub.")
+                }
+
+                if let addon = MetadataSourcePreference.activeAddon() {
+                    Section {
+                        AddonConnectivityRow(addon: addon, status: connectivity)
+                    } header: {
+                        Text("Status")
+                    }
                 }
             }
+            .frame(maxWidth: 1000)
+            .navigationTitle("Metadatabron")
+            .task(id: metadataSourceRaw) { await checkConnectivity() }
+
         }
-        .frame(maxWidth: 1000)
-        .navigationTitle("Metadatabron")
-        .task(id: metadataSourceRaw) { await checkConnectivity() }
     }
 
     private func checkConnectivity() async {
@@ -217,17 +226,20 @@ private struct ArtworkSettingsSettingsView: View {
     private let store = ArtworkSettingsStore()
 
     var body: some View {
-        Form {
-            Section {
-                VeyraSettingsChoiceRow<ArtworkTitleDisplayMode>(icon: "textformat", "Titelweergave", selection: titleDisplayBinding)
-                VeyraSettingsChoiceRow<ArtworkLanguageOption>(icon: "globe", "Taalvoorkeur", selection: languageBinding)
-                VeyraSettingsChoiceRow<ArtworkLanguageOption>(icon: "globe", "Fallbacktaal", selection: fallbackLanguageBinding)
-            } footer: {
-                Text("Bepaalt of Detail/Hero/Player een ClearLogo tonen i.p.v. titeltekst, en in welke taal. Geldt voor zowel TMDB als een gekozen AIOMetadata-addon.")
+        VeyraDynamicBackgroundScope {
+            VeyraForm {
+                Section {
+                    VeyraSettingsChoiceRow<ArtworkTitleDisplayMode>(icon: "textformat", "Titelweergave", selection: titleDisplayBinding)
+                    VeyraSettingsChoiceRow<ArtworkLanguageOption>(icon: "globe", "Taalvoorkeur", selection: languageBinding)
+                    VeyraSettingsChoiceRow<ArtworkLanguageOption>(icon: "globe", "Fallbacktaal", selection: fallbackLanguageBinding)
+                } footer: {
+                    Text("Bepaalt of Detail/Hero/Player een ClearLogo tonen i.p.v. titeltekst, en in welke taal. Geldt voor zowel TMDB als een gekozen AIOMetadata-addon.")
+                }
             }
+            .frame(maxWidth: 1000)
+            .navigationTitle("Artwork")
+
         }
-        .frame(maxWidth: 1000)
-        .navigationTitle("Artwork")
     }
 
     private var titleDisplayBinding: Binding<String> {
@@ -280,45 +292,48 @@ private struct MetadataRatingsSettingsView: View {
     @AppStorage("metadata.rating.mal") private var mal = true
 
     var body: some View {
-        Form {
-            Section {
-                ratingToggleRow(providerRow(.imdb), isOn: $imdb)
-                ratingToggleRow(providerRow(.tmdb), isOn: $tmdb)
-                ratingToggleRow(providerRow(.tomatometer), isOn: $tomatometer)
-                ratingToggleRow(providerRow(.metacritic), isOn: $metacritic)
-                ratingToggleRow(providerRow(.trakt), isOn: $trakt)
-                ratingToggleRow(providerRow(.popcornmeter), isOn: $popcornmeter)
-                ratingToggleRow(providerRow(.letterboxd), isOn: $letterboxd)
-                ratingToggleRow(providerRow(.mal), isOn: $mal)
-            } footer: {
-                Text("Kies welke ratings zichtbaar zijn op film- en seriepagina's. Popcornmeter en Letterboxd tonen enkel iets wanneer je bij Account een MDBList API-sleutel hebt ingesteld.")
+        VeyraDynamicBackgroundScope {
+            VeyraForm {
+                Section {
+                    ratingToggleRow(providerRow(.imdb), isOn: $imdb)
+                    ratingToggleRow(providerRow(.tmdb), isOn: $tmdb)
+                    ratingToggleRow(providerRow(.tomatometer), isOn: $tomatometer)
+                    ratingToggleRow(providerRow(.metacritic), isOn: $metacritic)
+                    ratingToggleRow(providerRow(.trakt), isOn: $trakt)
+                    ratingToggleRow(providerRow(.popcornmeter), isOn: $popcornmeter)
+                    ratingToggleRow(providerRow(.letterboxd), isOn: $letterboxd)
+                    ratingToggleRow(providerRow(.mal), isOn: $mal)
+                } footer: {
+                    Text("Kies welke ratings zichtbaar zijn op film- en seriepagina's. Popcornmeter en Letterboxd tonen enkel iets wanneer je bij Account een MDBList API-sleutel hebt ingesteld.")
+                }
+
+                Section {
+                    Button {
+                        enableAll()
+                    } label: {
+                        VeyraSettingsCardRowLabel(icon: "checkmark.circle", title: "Alle ratings inschakelen")
+                    }
+                    .veyraCardRow()
+
+                    Button {
+                        disableAll()
+                    } label: {
+                        VeyraSettingsCardRowLabel(icon: "xmark.circle", title: "Alle ratings uitschakelen")
+                    }
+                    .veyraCardRow()
+
+                    Button {
+                        resetDefaults()
+                    } label: {
+                        VeyraSettingsCardRowLabel(icon: "arrow.counterclockwise", title: "Standaardinstellingen herstellen")
+                    }
+                    .veyraCardRow()
+                }
             }
+            .frame(maxWidth: 1000)
+            .navigationTitle("Ratings")
 
-            Section {
-                Button {
-                    enableAll()
-                } label: {
-                    VeyraSettingsCardRowLabel(icon: "checkmark.circle", title: "Alle ratings inschakelen")
-                }
-                .veyraCardRow()
-
-                Button {
-                    disableAll()
-                } label: {
-                    VeyraSettingsCardRowLabel(icon: "xmark.circle", title: "Alle ratings uitschakelen")
-                }
-                .veyraCardRow()
-
-                Button {
-                    resetDefaults()
-                } label: {
-                    VeyraSettingsCardRowLabel(icon: "arrow.counterclockwise", title: "Standaardinstellingen herstellen")
-                }
-                .veyraCardRow()
-            }
         }
-        .frame(maxWidth: 1000)
-        .navigationTitle("Ratings")
     }
 
     // MARK: - Provider Row

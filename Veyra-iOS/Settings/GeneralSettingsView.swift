@@ -36,86 +36,89 @@ struct GeneralSettingsView: View {
     private var ipadNavigationStyleRaw = IPadNavigationStyle.sidebar.rawValue
 
     var body: some View {
-        ZStack {
-            VeyraColors.background.ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            List {
-                Section {
-                    Picker("Oorspronkelijke taal", selection: $catalogLanguages) {
-                        Text("Nederlands en Engels").tag("nl-en")
-                        Text("Alle talen").tag("all")
-                    }
-                } header: {
-                    sectionHeader("TMDB-lijsten", symbol: "line.3.horizontal.decrease.circle", tint: VeyraColors.cyan)
-                } footer: {
-                    Text("Filtert automatisch samengestelde lijsten, ook op Home. Zoeken en eigen lijsten blijven volledig beschikbaar.")
-                }
-
-                Section {
-                    Toggle("Recensies tonen", isOn: $showReviews)
-                } header: {
-                    sectionHeader("Recensies", symbol: "text.bubble", tint: VeyraColors.cyan)
-                } footer: {
-                    Text("Door kijkers geschreven TMDB-recensies op film- en seriepagina's.")
-                }
-
-                Section {
-                    Toggle("Uitslag verbergen tot tik", isOn: $hideScoreSpoilers)
-                    Toggle("Zender kiezen bij tik", isOn: $chooseChannelOnTap)
-                    NavigationLink {
-                        SportsFavoritesSettingsView()
-                    } label: {
-                        Label("Favoriete teams", systemImage: "star")
-                    }
-                    NavigationLink {
-                        SportsDisplaySettingsView()
-                    } label: {
-                        Label("Getoonde sporten", systemImage: "sportscourt")
-                    }
-                } header: {
-                    sectionHeader("Sport", symbol: "sportscourt", tint: VeyraColors.red)
-                } footer: {
-                    Text("\"Uitslag verbergen tot tik\" vervaagt de stand op live en afgelopen wedstrijden tot je erop tikt — actief op Home en de wedstrijdpagina. \"Zender kiezen bij tik\" heeft nog geen effect: Veyra heeft nog geen zender-/uitzendingskeuze bij sportwedstrijden.")
-                }
-
-                Section {
-                    Toggle("Releasejaar tonen", isOn: $showReleaseYear)
-                    Toggle("Titel onder poster verbergen", isOn: $hideTitlesUnderPosters)
-                    Toggle("Resterende afleveringen verbergen", isOn: $hideEpisodesRemaining)
-                } header: {
-                    sectionHeader("Kaarten & posters", symbol: "photo.on.rectangle.angled", tint: VeyraColors.ice)
-                } footer: {
-                    Text("Releasejaar en titel-onder-poster zijn actief op Home, Films en Series. \"Resterende afleveringen verbergen\" heeft nog geen effect: Veyra toont nergens een \"X resterend\"-telling om te verbergen.")
-                }
-
-                Section {
-                    Picker("Tekstgrootte", selection: $textSizeRaw) {
-                        ForEach(GeneralTextSize.allCases) { size in
-                            Text(size.title).tag(size.rawValue)
+                VeyraList {
+                    Section {
+                        Picker("Oorspronkelijke taal", selection: $catalogLanguages) {
+                            Text("Nederlands en Engels").tag("nl-en")
+                            Text("Alle talen").tag("all")
                         }
+                    } header: {
+                        sectionHeader("TMDB-lijsten", symbol: "line.3.horizontal.decrease.circle", tint: VeyraColors.cyan)
+                    } footer: {
+                        Text("Filtert automatisch samengestelde lijsten, ook op Home. Zoeken en eigen lijsten blijven volledig beschikbaar.")
                     }
-                } header: {
-                    sectionHeader("Toegankelijkheid", symbol: "textformat.size", tint: VeyraColors.secondary)
-                } footer: {
-                    Text("Past tekst aan die Dynamic Type volgt. De meeste titels en koppen in Veyra gebruiken een vaste grootte en reageren hier nog niet op.")
-                }
 
-                // Enkel op iPad (en altijd op Mac) tonen -- op iPhone is er sowieso
-                // altijd een tabbalk onderaan, dus deze instelling heeft daar geen
-                // effect en stond enkel nutteloos in de weg. `UIDevice` bestaat niet
-                // op macOS, dus daar toont de sectie gewoon altijd (was al de intentie,
-                // zie de footer-tekst hieronder).
-                #if os(iOS)
-                if UIDevice.current.userInterfaceIdiom == .pad {
+                    Section {
+                        Toggle("Recensies tonen", isOn: $showReviews)
+                    } header: {
+                        sectionHeader("Recensies", symbol: "text.bubble", tint: VeyraColors.cyan)
+                    } footer: {
+                        Text("Door kijkers geschreven TMDB-recensies op film- en seriepagina's.")
+                    }
+
+                    Section {
+                        Toggle("Uitslag verbergen tot tik", isOn: $hideScoreSpoilers)
+                        Toggle("Zender kiezen bij tik", isOn: $chooseChannelOnTap)
+                        NavigationLink {
+                            SportsFavoritesSettingsView()
+                        } label: {
+                            Label("Favoriete teams", systemImage: "star")
+                        }
+                        NavigationLink {
+                            SportsDisplaySettingsView()
+                        } label: {
+                            Label("Getoonde sporten", systemImage: "sportscourt")
+                        }
+                    } header: {
+                        sectionHeader("Sport", symbol: "sportscourt", tint: VeyraColors.red)
+                    } footer: {
+                        Text("\"Uitslag verbergen tot tik\" vervaagt de stand op live en afgelopen wedstrijden tot je erop tikt — actief op Home en de wedstrijdpagina. \"Zender kiezen bij tik\" heeft nog geen effect: Veyra heeft nog geen zender-/uitzendingskeuze bij sportwedstrijden.")
+                    }
+
+                    Section {
+                        Toggle("Releasejaar tonen", isOn: $showReleaseYear)
+                        Toggle("Titel onder poster verbergen", isOn: $hideTitlesUnderPosters)
+                        Toggle("Resterende afleveringen verbergen", isOn: $hideEpisodesRemaining)
+                    } header: {
+                        sectionHeader("Kaarten & posters", symbol: "photo.on.rectangle.angled", tint: VeyraColors.ice)
+                    } footer: {
+                        Text("Releasejaar en titel-onder-poster zijn actief op Home, Films en Series. \"Resterende afleveringen verbergen\" heeft nog geen effect: Veyra toont nergens een \"X resterend\"-telling om te verbergen.")
+                    }
+
+                    Section {
+                        Picker("Tekstgrootte", selection: $textSizeRaw) {
+                            ForEach(GeneralTextSize.allCases) { size in
+                                Text(size.title).tag(size.rawValue)
+                            }
+                        }
+                    } header: {
+                        sectionHeader("Toegankelijkheid", symbol: "textformat.size", tint: VeyraColors.secondary)
+                    } footer: {
+                        Text("Past tekst aan die Dynamic Type volgt. De meeste titels en koppen in Veyra gebruiken een vaste grootte en reageren hier nog niet op.")
+                    }
+
+                    // Enkel op iPad (en altijd op Mac) tonen -- op iPhone is er sowieso
+                    // altijd een tabbalk onderaan, dus deze instelling heeft daar geen
+                    // effect en stond enkel nutteloos in de weg. `UIDevice` bestaat niet
+                    // op macOS, dus daar toont de sectie gewoon altijd (was al de intentie,
+                    // zie de footer-tekst hieronder).
+                    #if os(iOS)
+                    if UIDevice.current.userInterfaceIdiom == .pad {
+                        navigationStyleSection
+                    }
+                    #else
                     navigationStyleSection
+                    #endif
                 }
-                #else
-                navigationStyleSection
-                #endif
+                .scrollContentBackground(.hidden)
             }
-            .scrollContentBackground(.hidden)
+            .navigationTitle("Algemeen")
+
         }
-        .navigationTitle("Algemeen")
     }
 
     @ViewBuilder

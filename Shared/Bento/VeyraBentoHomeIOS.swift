@@ -50,6 +50,13 @@ struct VeyraBentoHomeView: View {
     @AppStorage(TMDBCatalogLanguageFilter.key) private var catalogLanguages = "nl-en"
     @AppStorage(GeneralSettingsDefaults.showUpcomingKey) private var showUpcoming = true
     @AppStorage(GeneralSettingsDefaults.liveFavoritesOnlyKey) private var liveFavoritesOnly = false
+    // Op iPad met de zwevende menubalk boven (i.p.v. zijbalk, zie `ContentView`/
+    // `IPadNavigationStyle`) zweeft die balk over de volle breedte vlak onder de
+    // statuszone -- de hero negeert de safe area bewust (zie `homeHeroTopInset`)
+    // om zelf tot onder de statuszone door te lopen, waardoor de diensten-rij
+    // anders ONDER die zwevende balk terechtkomt i.p.v. erna. Zelfde sleutel als
+    // `ContentView` leest.
+    @AppStorage(GeneralSettingsDefaults.ipadNavigationStyleKey) private var ipadNavigationStyleRaw = IPadNavigationStyle.sidebar.rawValue
     @State private var layout = VeyraHomeLayoutStore.load()
     @State private var nowSettings = VeyraNowSettingsStore.load()
     @State private var askPreset = false
@@ -104,169 +111,193 @@ struct VeyraBentoHomeView: View {
     // MARK: Body
 
     var body: some View {
-        GeometryReader { rootGeo in
-            // Beschikbare breedte binnen de compacte zijmarge van 12pt,
-            // zodat de horizontaal scrollende rijen hun vaste kaartbreedtes hierop kunnen clampen en NOOIT
-            // breder worden dan het scherm — op elk toestel, ook grotere iPhones die per ongeluk `regular` zijn.
-            let contentWidth = max(rootGeo.size.width - 24, 0)
+        VeyraDynamicBackgroundScope {
+            GeometryReader { rootGeo in
+                // Beschikbare breedte binnen de compacte zijmarge van 12pt,
+                // zodat de horizontaal scrollende rijen hun vaste kaartbreedtes hierop kunnen clampen en NOOIT
+                // breder worden dan het scherm — op elk toestel, ook grotere iPhones die per ongeluk `regular` zijn.
+                let contentWidth = max(rootGeo.size.width - 24, 0)
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    if showsHero || showsStreamingRibbon || floatingButtons {
-                        homeHeader(availableHeight: rootGeo.size.height)
-                    }
-
-                    VStack(alignment: .leading, spacing: 32) {
-                        // "Context Ribbon": rouleert door Nu/volgende aflevering/live nu/sport --
-                        // onderaan de hero, zodat Home meteen anders aanvoelt (zie ook de kleinere
-                        // Pulse-badge in de hero zelf hierboven, `continueRibbonInfo`).
-                        TimelineView(.periodic(from: .now, by: 5)) { context in
-                            VeyraContextRibbon(items: contextRibbonItems(now: context.date), now: context.date)
+                VeyraScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+                        if showsHero || showsStreamingRibbon || floatingButtons {
+                            homeHeader(availableHeight: rootGeo.size.height)
                         }
 
-                        if let message = model.home.notice {
-                            VeyraStatusMessage(text: message) { Task { await model.load(force: true) } }
-                        }
-
-                        // "Verder kijken" en "Binnenkort" helemaal bovenaan, net als op tvOS.
-                        TimelineView(.periodic(from: .now, by: 30)) { context in
-                            bentoTop(now: context.date, contentWidth: contentWidth)
-                        }
-
-                        VeyraYourCollectionsSection()
-
-                        // "Live nu" hier vlak onder "Jouw collecties" (op uitdrukkelijk verzoek
-                        // verplaatst, stond voorheen verderop samen met "Voor jou").
-                        TimelineView(.periodic(from: .now, by: 30)) { context in
-                            bentoMiddle(now: context.date, contentWidth: contentWidth, tiles: [.live])
-                        }
-
-                        // "Nieuw van hier" (Regional Releases fase 4/10, spec §4/§30): op tvOS
-                        // staat dit als eigen prominente rij met focus/kalender-modus
-                        // (`VeyraRegionalReleasesRow`, tvOS-only i.v.m. focus-afhandeling) --
-                        // op iOS/iPadOS was deze sectie tot nu toe nergens aangesloten (de hele
-                        // tvOS Home-file is `#if os(tvOS)`), waardoor "Nieuw van hier" hier
-                        // volledig ontbrak. Dit is de iOS-tegenhanger: een gewone horizontale
-                        // plank (`VeyraBentoShelf`), geen eigen kalenderweergave/live-knop --
-                        // tikken opent dezelfde bestaande TMDB-titelroute als op tvOS.
-                        TimelineView(.periodic(from: .now, by: 30)) { context in
-                            bentoRegional(now: context.date)
-                        }
-
-                        // "Discovery Flow": Trending, los van het bento-raster -- Stap 9 van het
-                        // Home Visual System-spec, direct na "Verder kijken" (spec §97), net als op tvOS.
-                        VeyraDiscoveryFlow(title: "Trending", items: trendingItems)
-
-                        // "Dynamic Mosaic": Voor Jou -- Stap 10, direct na Trending (spec §97).
-                        VeyraMosaicSection(title: "Voor jou", items: voorJouItems)
-
-                        // "Binnenkort" teruggezet in "Verder kijken"-rij (zie bentoTop) -- geen
-                        // losse Calendar Horizon-sectie meer.
-
-                        // "Sports Stage": uitgelichte live wedstrijd, los van de rest van de
-                        // Sport-sectie -- Stap 14, direct na Nu op tv, vóór Live Sport (spec §97).
-                        TimelineView(.periodic(from: .now, by: 30)) { context in
-                            bentoSportsStage(now: context.date)
-                        }
-
-                        // Sport onder "Streamingdiensten", net als op tvOS.
-                        if layout.showSport, let sportModel, !sportModel.events.isEmpty {
-                            SportSection(
-                                model: sportModel,
-                                regular: regular,
-                                onPlay: onPlaySport,
-                                onToggleReminder: onToggleSportReminder,
-                                onOpenCompetition: onOpenCompetition)
-                        } else if layout.showSport, let sportModel, sportModel.phase != .idle, sportModel.phase != .loading {
-                            Button { onOpenCompetition(SportCompetition(name: "Sport", liveCount: 0, eventCount: 0, nextStart: nil)) } label: {
-                                VeyraStatusMessage(text: "Sport: geen wedstrijden gevonden. Tik om het Sport-menu te openen.")
+                        VStack(alignment: .leading, spacing: 32) {
+                            // "Context Ribbon": rouleert door Nu/volgende aflevering/live nu/sport --
+                            // onderaan de hero, zodat Home meteen anders aanvoelt (zie ook de kleinere
+                            // Pulse-badge in de hero zelf hierboven, `continueRibbonInfo`).
+                            TimelineView(.periodic(from: .now, by: 5)) { context in
+                                VeyraContextRibbon(items: contextRibbonItems(now: context.date), now: context.date)
                             }
-                            .buttonStyle(.plain)
-                        }
 
-                        // "IPTV films"/"IPTV series" pas na Sport, net als op tvOS.
-                        TimelineView(.periodic(from: .now, by: 30)) { context in
-                            bentoIPTV(now: context.date)
-                        }
+                            if let message = model.home.notice {
+                                VeyraStatusMessage(text: message) { Task { await model.load(force: true) } }
+                            }
 
-                        if layout.showShelves { VeyraBentoUserShelves(compact: true, onOpen: onOpenTMDBTitle) }
+                            // "Verder kijken" en "Binnenkort" helemaal bovenaan, net als op tvOS.
+                            TimelineView(.periodic(from: .now, by: 30)) { context in
+                                bentoTop(now: context.date, contentWidth: contentWidth)
+                            }
+
+                            VeyraYourCollectionsSection()
+
+                            // "Live nu" hier vlak onder "Jouw collecties" (op uitdrukkelijk verzoek
+                            // verplaatst, stond voorheen verderop samen met "Voor jou").
+                            TimelineView(.periodic(from: .now, by: 30)) { context in
+                                bentoMiddle(now: context.date, contentWidth: contentWidth, tiles: [.live])
+                            }
+
+                            // "Nieuw van hier" (Regional Releases fase 4/10, spec §4/§30): op tvOS
+                            // staat dit als eigen prominente rij met focus/kalender-modus
+                            // (`VeyraRegionalReleasesRow`, tvOS-only i.v.m. focus-afhandeling) --
+                            // op iOS/iPadOS was deze sectie tot nu toe nergens aangesloten (de hele
+                            // tvOS Home-file is `#if os(tvOS)`), waardoor "Nieuw van hier" hier
+                            // volledig ontbrak. Dit is de iOS-tegenhanger: een gewone horizontale
+                            // plank (`VeyraBentoShelf`), geen eigen kalenderweergave/live-knop --
+                            // tikken opent dezelfde bestaande TMDB-titelroute als op tvOS.
+                            TimelineView(.periodic(from: .now, by: 30)) { context in
+                                bentoRegional(now: context.date)
+                            }
+                            // Iets extra ruimte boven "Nieuw van hier": stond anders te krap
+                            // tegen "Live nu" erboven aan.
+                            .padding(.top, 12)
+
+                            // "Discovery Flow": Trending, los van het bento-raster -- Stap 9 van het
+                            // Home Visual System-spec, direct na "Verder kijken" (spec §97), net als op tvOS.
+                            VeyraDiscoveryFlow(title: "Trending", items: trendingItems)
+
+                            // "Dynamic Mosaic": Voor Jou -- Stap 10, direct na Trending (spec §97).
+                            VeyraMosaicSection(title: "Voor jou", items: voorJouItems)
+
+                            // "Binnenkort" teruggezet in "Verder kijken"-rij (zie bentoTop) -- geen
+                            // losse Calendar Horizon-sectie meer.
+
+                            // "Sports Stage": uitgelichte live wedstrijd, los van de rest van de
+                            // Sport-sectie -- Stap 14, direct na Nu op tv, vóór Live Sport (spec §97).
+                            TimelineView(.periodic(from: .now, by: 30)) { context in
+                                bentoSportsStage(now: context.date)
+                            }
+
+                            // Sport onder "Streamingdiensten", net als op tvOS.
+                            if layout.showSport, let sportModel, !sportModel.events.isEmpty {
+                                SportSection(
+                                    model: sportModel,
+                                    regular: regular,
+                                    onPlay: onPlaySport,
+                                    onToggleReminder: onToggleSportReminder,
+                                    onOpenCompetition: onOpenCompetition)
+                            } else if layout.showSport, let sportModel, sportModel.phase != .idle, sportModel.phase != .loading {
+                                Button { onOpenCompetition(SportCompetition(name: "Sport", liveCount: 0, eventCount: 0, nextStart: nil)) } label: {
+                                    VeyraStatusMessage(text: "Sport: geen wedstrijden gevonden. Tik om het Sport-menu te openen.")
+                                }
+                                .buttonStyle(.plain)
+                            }
+
+                            // "IPTV films"/"IPTV series" pas na Sport, net als op tvOS.
+                            TimelineView(.periodic(from: .now, by: 30)) { context in
+                                bentoIPTV(now: context.date)
+                            }
+
+                            if layout.showShelves { VeyraBentoUserShelves(compact: true, onOpen: onOpenTMDBTitle) }
+                        }
+                        .padding(.horizontal, 12)
+                        // Een kleine afstand tussen de hero en de eerste rij.
+                        .padding(.top, 8)
+                        .padding(.bottom, 32)
                     }
-                    .padding(.horizontal, 12)
-                    // Een kleine afstand tussen de hero en de eerste rij.
-                    .padding(.top, 8)
-                    .padding(.bottom, 32)
+                    .background(VeyraScrollPositionReader())
                 }
-                .background(VeyraScrollPositionReader())
-            }
-            .scrollIndicators(.hidden)
-            .veyraScrollingBackground()
-            .refreshable {
-                await model.load(force: true)
-                await sportModel?.load()
-            }
-            .task { await model.load() }
-            // Trending/Voor jou/Top 10 na elkaar laden, niet gelijktijdig --
-            // zelfde reden als op tvOS: te veel gelijktijdige TMDB-clearlogo-
-            // verzoeken bovenop de IPTV-opstart-ververs duwde het geheugen te
-            // hoog (app-crash bij opstart).
-            .task {
-                trendingItems = await HeroSpotlightLoader.load(settings: .default)
-                voorJouItems = await HeroSpotlightLoader.load(settings: HeroSpotlightSettings(
-                    style: .card,
-                    primarySource: .trakt(list: .watchlist, kind: .movie),
-                    secondarySource: .trakt(list: .watchlist, kind: .series)
-                ))
-                top10Items = await HeroSpotlightLoader.load(settings: HeroSpotlightSettings(
-                    style: .card,
-                    primarySource: .tmdb(list: .popular, kind: .movie),
-                    secondarySource: .tmdb(list: .popular, kind: .series)
-                ))
-            }
-            .onChange(of: catalogLanguages) { _, _ in Task { await model.load(force: true) } }
-            .onReceive(NotificationCenter.default.publisher(for: .veyraHomeLayoutDidChange)) { _ in reloadLayout() }
-            .onReceive(NotificationCenter.default.publisher(for: .veyraNowSettingsDidChange)) { _ in nowSettings = VeyraNowSettingsStore.load() }
-            .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in reloadLayout() }
-            // Anders blijven "IPTV films"/"IPTV series" de oude, al-in-memory
-            // lijst tonen totdat je handmatig ververst (pull-to-refresh) of de
-            // app herstart, ook als je net iets verborgen hebt bij "VOD beheren".
-            .onReceive(NotificationCenter.default.publisher(for: .iptvConfigurationDidChange)) { _ in
-                Task { await model.load(force: true) }
-            }
-            // Aflevering/film afgekeken (Trakt-stop): "Verder kijken" meteen opnieuw ophalen.
-            .onReceive(NotificationCenter.default.publisher(for: .veyraTraktHistoryDidChange)) { _ in
-                Task { await model.load(force: true) }
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .veyraTraktSnapshotDidChange)) { _ in
-                Task { await model.home.refreshContinueOrder() }
-            }
-            .onAppear { askPreset = !VeyraHomeLayoutStore.hasChosen }
-            .sheet(isPresented: $askPreset, onDismiss: { VeyraHomeLayoutStore.markChosen() }) {
-                VeyraHomePresetPickerView { askPreset = false }
-            }
-            .task { if let sportModel, sportModel.phase == .idle { await sportModel.load() } }
-            .task { heroSpotlight.reloadIfNeeded() }
-            .onReceive(NotificationCenter.default.publisher(for: .heroSpotlightSettingsChanged)) { _ in
-                heroSpotlight.settingsChanged()
-            }
-            .task {
-                while !Task.isCancelled {
-                    try? await Task.sleep(for: .seconds(120))
-                    if Task.isCancelled { break }
-                    await model.refreshLive()
-                    if let sportModel, sportModel.events.isEmpty { await sportModel.reload() }
+                .scrollIndicators(.hidden)
+
+                .refreshable {
+                    await model.load(force: true)
+                    await sportModel?.load()
+                }
+                .task { await model.load() }
+                // Trending/Voor jou/Top 10 na elkaar laden, niet gelijktijdig --
+                // zelfde reden als op tvOS: te veel gelijktijdige TMDB-clearlogo-
+                // verzoeken bovenop de IPTV-opstart-ververs duwde het geheugen te
+                // hoog (app-crash bij opstart).
+                .task {
+                    trendingItems = await HeroSpotlightLoader.load(settings: .default)
+                    voorJouItems = await HeroSpotlightLoader.load(settings: HeroSpotlightSettings(
+                        style: .card,
+                        primarySource: .trakt(list: .watchlist, kind: .movie),
+                        secondarySource: .trakt(list: .watchlist, kind: .series)
+                    ))
+                    top10Items = await HeroSpotlightLoader.load(settings: HeroSpotlightSettings(
+                        style: .card,
+                        primarySource: .tmdb(list: .popular, kind: .movie),
+                        secondarySource: .tmdb(list: .popular, kind: .series)
+                    ))
+                }
+                .onChange(of: catalogLanguages) { _, _ in Task { await model.load(force: true) } }
+                .onReceive(NotificationCenter.default.publisher(for: .veyraHomeLayoutDidChange)) { _ in reloadLayout() }
+                .onReceive(NotificationCenter.default.publisher(for: .veyraNowSettingsDidChange)) { _ in nowSettings = VeyraNowSettingsStore.load() }
+                .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in reloadLayout() }
+                // Anders blijven "IPTV films"/"IPTV series" de oude, al-in-memory
+                // lijst tonen totdat je handmatig ververst (pull-to-refresh) of de
+                // app herstart, ook als je net iets verborgen hebt bij "VOD beheren".
+                .onReceive(NotificationCenter.default.publisher(for: .iptvConfigurationDidChange)) { _ in
+                    Task { await model.load(force: true) }
+                }
+                // Aflevering/film afgekeken (Trakt-stop): "Verder kijken" meteen opnieuw ophalen.
+                .onReceive(NotificationCenter.default.publisher(for: .veyraTraktHistoryDidChange)) { _ in
+                    Task { await model.load(force: true) }
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .veyraTraktSnapshotDidChange)) { _ in
+                    Task { await model.home.refreshContinueOrder() }
+                }
+                .onAppear { askPreset = !VeyraHomeLayoutStore.hasChosen }
+                .sheet(isPresented: $askPreset, onDismiss: { VeyraHomeLayoutStore.markChosen() }) {
+                    VeyraHomePresetPickerView { askPreset = false }
+                }
+                .task { if let sportModel, sportModel.phase == .idle { await sportModel.load() } }
+                .task { heroSpotlight.reloadIfNeeded() }
+                .onReceive(NotificationCenter.default.publisher(for: .heroSpotlightSettingsChanged)) { _ in
+                    heroSpotlight.settingsChanged()
+                }
+                .task {
+                    while !Task.isCancelled {
+                        try? await Task.sleep(for: .seconds(120))
+                        if Task.isCancelled { break }
+                        await model.refreshLive()
+                        if let sportModel, sportModel.events.isEmpty { await sportModel.reload() }
+                    }
                 }
             }
+            .background(VeyraBackground())
+            #if os(iOS)
+            // Het beeld vult ook de statuszone; de scrollende bediening heeft eigen veilige bovenruimte.
+            .ignoresSafeArea(edges: showsHero && heroSpotlight.settings.style == .fullscreen ? .top : [])
+            #endif
+
         }
-        .background(VeyraBackground())
+    }
+
+    private var isPad: Bool {
         #if os(iOS)
-        // Het beeld vult ook de statuszone; de scrollende bediening heeft eigen veilige bovenruimte.
-        .ignoresSafeArea(edges: showsHero && heroSpotlight.settings.style == .fullscreen ? .top : [])
+        UIDevice.current.userInterfaceIdiom == .pad
+        #else
+        false
         #endif
+    }
+
+    /// Hoogte van de zwevende menubalk boven op iPad (Home/Films/Series/…) wanneer die balk-stijl
+    /// actief is i.p.v. de zijbalk -- geschatte waarde (systeem geeft deze niet rechtstreeks door
+    /// zodra de hero zijn eigen `.ignoresSafeArea()` gebruikt).
+    private var floatingTopTabBarHeight: CGFloat {
+        guard isPad, (IPadNavigationStyle(rawValue: ipadNavigationStyleRaw) ?? .sidebar) == .topBar else { return 0 }
+        return 64
     }
 
     private var homeHeroTopInset: CGFloat {
         #if os(iOS)
-        showsHero && heroSpotlight.settings.style == .fullscreen ? VeyraSafeArea.top : 0
+        showsHero && heroSpotlight.settings.style == .fullscreen
+            ? VeyraSafeArea.top + floatingTopTabBarHeight
+            : 0
         #else
         0
         #endif
@@ -732,7 +763,12 @@ struct VeyraBentoHomeView: View {
 
     @ViewBuilder
     private func bentoMiddle(now: Date, contentWidth: CGFloat, tiles: Set<BentoTile>) -> some View {
-        let live = tiles.contains(.live) ? model.liveRows(at: now, limit: 4, recentFirst: true, favoritesOnly: liveFavoritesOnly) : []
+        // iPad/macOS (`regular`) krijgt, net als tvOS, 8 zenders in twee kolommen van 4 naast
+        // elkaar i.p.v. één kolom van 4 -- er is daar toch al de volle breedte beschikbaar
+        // (`.live` krijgt die als enige tegel in deze rij, zie `BentoProfile.make`).
+        let live = tiles.contains(.live)
+            ? model.liveRows(at: now, limit: regular ? 8 : 4, recentFirst: true, favoritesOnly: liveFavoritesOnly)
+            : []
         let present = middlePresentTiles(live: live).intersection(tiles)
         let order = layout.orderedTiles.filter { present.contains($0) }
         let profile = BentoProfile.make(regular ? .tablet : .phone, order: order)
@@ -741,11 +777,18 @@ struct VeyraBentoHomeView: View {
             VeyraBentoGrid(profile: profile) {
                 if present.contains(.live) {
                     VeyraBentoLiveList(compact: true) {
-                        ForEach(live) { row in
-                            Button { onPlayChannel(row.channelID) } label: {
-                                VeyraBentoLiveRowContent(row: row, compact: true)
+                        if regular {
+                            HStack(alignment: .top, spacing: 14) {
+                                liveColumn(Array(live.prefix(4)))
+                                liveColumn(Array(live.dropFirst(4).prefix(4)))
                             }
-                            .buttonStyle(.plain)
+                        } else {
+                            ForEach(live) { row in
+                                Button { onPlayChannel(row.channelID) } label: {
+                                    VeyraBentoLiveRowContent(row: row, compact: true)
+                                }
+                                .buttonStyle(.plain)
+                            }
                         }
                     }
                     .veyraHomeTileMenu(.live)
@@ -754,6 +797,22 @@ struct VeyraBentoHomeView: View {
 
             }
         }
+    }
+
+    /// Eén kolom van maximaal 4 zenders, voor de iPad/macOS "Live nu" naast-elkaar-weergave
+    /// (zelfde opbouw als `liveColumn` op tvOS in `VeyraBentoHome.swift`, maar zonder focus-
+    /// afhandeling, die daar tvOS-specifiek is).
+    @ViewBuilder
+    private func liveColumn(_ rows: [BentoLiveRow]) -> some View {
+        VStack(spacing: 7) {
+            ForEach(rows) { row in
+                Button { onPlayChannel(row.channelID) } label: {
+                    VeyraBentoLiveRowContent(row: row, compact: true)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .top)
     }
 
     // MARK: Raster — IPTV: films · series (na Sport & Filmcollecties)

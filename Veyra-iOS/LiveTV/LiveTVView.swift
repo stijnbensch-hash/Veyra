@@ -29,6 +29,12 @@ struct LiveTVView: View {
     private var showFolders = false
 
     @State
+    private var showProviders = false
+
+    @State
+    private var showCategories = false
+
+    @State
     private var displayMode: LiveTVDisplayMode = .channels
 
     @AppStorage("liveTV.epgViewMode") private var epgViewModeRaw = VeyraEPGViewMode.grid.rawValue
@@ -63,279 +69,409 @@ struct LiveTVView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                VeyraColors.background
-                    .ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            NavigationStack {
+                ZStack {
+                    VeyraBackground()
+                        .ignoresSafeArea()
 
-                VStack(
-                    spacing: 0
-                ) {
-                    Picker("Weergave", selection: $displayMode) {
-                        Text("Kanalen").tag(LiveTVDisplayMode.channels)
-                        Text("Gids").tag(LiveTVDisplayMode.guide)
+                    VStack(
+                        spacing: 0
+                    ) {
+                        // Zelfde opbouw als tvOS (`LiveTVView.swift` daar): titel + één rij
+                        // knoppen i.p.v. gestapelde segmented pickers, zodat beide platformen
+                        // hetzelfde scherm laten zien.
+                        toolbarHeader
+
+                        content
                     }
-                    .pickerStyle(.segmented)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-
-                    categorySelector
-
-                    if displayMode == .guide {
-                        Picker("Gidsweergave", selection: $epgViewModeRaw) {
-                            Text("Raster").tag(VeyraEPGViewMode.grid.rawValue)
-                            Text("Flow").tag(VeyraEPGViewMode.flow.rawValue)
-                        }
-                        .pickerStyle(.segmented)
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 8)
-                    }
-
-                    content
                 }
-            }
-            .navigationTitle(
-                "Live TV"
-            )
-            .searchable(
-                text:
-                    $guide.searchText
-            )
-            .task(
-                id:
-                    guide.reloadID
-            ) {
-                await guide.reload()
-            }
-            .onReceive(
-                Timer.publish(every: 1_800, on: .main, in: .common).autoconnect()
-            ) { _ in
-                guide.reloadID = UUID()
-            }
-            .onReceive(
-                NotificationCenter
-                    .default
-                    .publisher(
-                        for:
-                            .iptvConfigurationDidChange
-                    )
-            ) { _ in
-                guide.reloadID =
-                    UUID()
-            }
-            .onReceive(
-                NotificationCenter
-                    .default
-                    .publisher(
-                        for:
-                            .channelOverrideChanged
-                    )
-            ) { _ in
-                logoOverrideVersion += 1
-            }
-            .onChange(of: scenePhase) { _, phase in
-                if phase != .active { flowPreview.stop() }
-            }
-            .onChange(of: displayMode) { _, _ in flowPreview.stop() }
-            .onChange(of: epgViewModeRaw) { _, _ in flowPreview.stop() }
-            .onChange(of: guide.activeProviderID) { _, _ in
-                flowPreview.stop()
-                flowSelectedChannelID = nil
-            }
-            .onChange(of: showFolders) { _, showing in
-                if showing { flowPreview.stop() }
-            }
-            .onChange(of: showRecordings) { _, showing in
-                if showing { flowPreview.stop() }
-            }
-            .onDisappear { flowPreview.stop() }
-            .navigationDestination(
-                item:
-                    $selectedSource
-            ) { source in
-                PlayerView(
-                    source:
-                        source,
-                    item:
-                        MediaItem(
-                            title:
-                                source.name,
-                            type:
-                                .liveTV
-                        )
+                .navigationTitle(
+                    "Live TV"
                 )
-            }
-            .toolbar {
-                ToolbarItem(
-                    placement:
-                        .topBarTrailing
+                .searchable(
+                    text:
+                        $guide.searchText
+                )
+                .task(
+                    id:
+                        guide.reloadID
                 ) {
-                    if guide.selectedCategory
-                        == "favorites",
-                       !guide.favoriteRows.isEmpty
+                    await guide.reload()
+                }
+                .onReceive(
+                    Timer.publish(every: 1_800, on: .main, in: .common).autoconnect()
+                ) { _ in
+                    guide.reloadID = UUID()
+                }
+                .onReceive(
+                    NotificationCenter
+                        .default
+                        .publisher(
+                            for:
+                                .iptvConfigurationDidChange
+                        )
+                ) { _ in
+                    guide.reloadID =
+                        UUID()
+                }
+                .onReceive(
+                    NotificationCenter
+                        .default
+                        .publisher(
+                            for:
+                                .channelOverrideChanged
+                        )
+                ) { _ in
+                    logoOverrideVersion += 1
+                }
+                .onChange(of: scenePhase) { _, phase in
+                    if phase != .active { flowPreview.stop() }
+                }
+                .onChange(of: displayMode) { _, _ in flowPreview.stop() }
+                .onChange(of: epgViewModeRaw) { _, _ in flowPreview.stop() }
+                .onChange(of: guide.activeProviderID) { _, _ in
+                    flowPreview.stop()
+                    flowSelectedChannelID = nil
+                }
+                .onChange(of: showFolders) { _, showing in
+                    if showing { flowPreview.stop() }
+                }
+                .onChange(of: showRecordings) { _, showing in
+                    if showing { flowPreview.stop() }
+                }
+                .onDisappear { flowPreview.stop() }
+                .navigationDestination(
+                    item:
+                        $selectedSource
+                ) { source in
+                    PlayerView(
+                        source:
+                            source,
+                        item:
+                            MediaItem(
+                                title:
+                                    source.name,
+                                type:
+                                    .liveTV
+                            )
+                    )
+                }
+                // Opnames/Mijn mappen/Vernieuwen/Ordenen zitten nu in `toolbarHeader`
+                // hierboven (zelfde opbouw als tvOS) i.p.v. in de systeem-navigatiebalk.
+                .veyraConfirmationDialog("Kies je IPTV-provider", isPresented: $showProviders) {
+                    providerDialogButtons
+                }
+                .veyraConfirmationDialog("Kanalen", isPresented: $showCategories) {
+                    categoryDialogButtons
+                }
+                .sheet(isPresented: $showRecordings) {
+                    VeyraRecordingsView()
+                }
+                .sheet(isPresented: $showFolders) {
+                    NavigationStack {
+                        LiveTVFoldersListView()
+                    }
+                }
+                .sheet(
+                    isPresented:
+                        Binding(
+                            get: {
+                                editingLogoChannelID
+                                != nil
+                            },
+                            set: {
+                                if !$0 {
+                                    editingLogoChannelID =
+                                        nil
+                                }
+                            }
+                        )
+                ) {
+                    if let channelID =
+                        editingLogoChannelID
                     {
-                        Button {
-                            showFavoriteOrder =
-                                true
-
-                        } label: {
-                            Label(
-                                "Ordenen",
-                                systemImage:
-                                    "line.3.horizontal"
+                        ChannelLogoPickerView(
+                            channelID:
+                                channelID,
+                            channelName:
+                                editingLogoChannelName,
+                            currentOverrideURL:
+                                ChannelLogoOverrideStore
+                                    .logoURL(
+                                        forChannelID:
+                                            channelID
+                                    ),
+                            currentNameOverride:
+                                ChannelNameOverrideStore
+                                    .name(
+                                        forChannelID:
+                                            channelID
+                                    )
+                        ) {
+                            logoOverrideVersion += 1
+                        }
+                    }
+                }
+                .sheet(
+                    isPresented:
+                        $showFavoriteOrder
+                ) {
+                    LiveTVFavoritesOrderView(
+                        guide:
+                            guide
+                    )
+                }
+                .sheet(isPresented: $showFlowPreview, onDismiss: {
+                    if let source = pendingFlowSource {
+                        pendingFlowSource = nil
+                        selectedSource = source
+                    }
+                }) {
+                    NavigationStack {
+                        TimelineView(.periodic(from: .now, by: 60)) { context in
+                            VeyraPortableFlowPreview(
+                                guide: guide,
+                                row: flowSelectedRow,
+                                now: context.date,
+                                controller: flowPreview,
+                                onPlay: playFlowChannel
                             )
                         }
-                    }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    if !isPad {
-                        Button {
-                            showRecordings = true
-                        } label: {
-                            Label("Opnames", systemImage: "record.circle")
-                        }
-                    }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showFolders = true
-                    } label: {
-                        Label("Mijn mappen", systemImage: "folder")
-                    }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        // Rechtstreeks force-reloaden i.p.v. alleen
-                        // `reloadID` te wijzigen -- anders zou dit niets
-                        // doen zolang het ingestelde verversinterval nog
-                        // niet verstreken was (zie `VeyraEPGStore.reload`).
-                        Task { await guide.reload(force: true) }
-                    } label: {
-                        Label("Vernieuwen", systemImage: "arrow.clockwise")
-                    }
-                }
-            }
-            .sheet(isPresented: $showRecordings) {
-                VeyraRecordingsView()
-            }
-            .sheet(isPresented: $showFolders) {
-                NavigationStack {
-                    LiveTVFoldersListView()
-                }
-            }
-            .sheet(
-                isPresented:
-                    Binding(
-                        get: {
-                            editingLogoChannelID
-                            != nil
-                        },
-                        set: {
-                            if !$0 {
-                                editingLogoChannelID =
-                                    nil
+                        .navigationTitle("Live voorbeeld")
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("Sluiten") { showFlowPreview = false }
                             }
                         }
-                    )
-            ) {
-                if let channelID =
-                    editingLogoChannelID
-                {
-                    ChannelLogoPickerView(
-                        channelID:
-                            channelID,
-                        channelName:
-                            editingLogoChannelName,
-                        currentOverrideURL:
-                            ChannelLogoOverrideStore
-                                .logoURL(
-                                    forChannelID:
-                                        channelID
-                                ),
-                        currentNameOverride:
-                            ChannelNameOverrideStore
-                                .name(
-                                    forChannelID:
-                                        channelID
-                                )
-                    ) {
-                        logoOverrideVersion += 1
                     }
                 }
             }
-            .sheet(
-                isPresented:
-                    $showFavoriteOrder
-            ) {
-                LiveTVFavoritesOrderView(
-                    guide:
-                        guide
-                )
-            }
-            .sheet(isPresented: $showFlowPreview, onDismiss: {
-                if let source = pendingFlowSource {
-                    pendingFlowSource = nil
-                    selectedSource = source
-                }
-            }) {
-                NavigationStack {
-                    TimelineView(.periodic(from: .now, by: 60)) { context in
-                        VeyraPortableFlowPreview(
-                            guide: guide,
-                            row: flowSelectedRow,
-                            now: context.date,
-                            controller: flowPreview,
-                            onPlay: playFlowChannel
-                        )
-                    }
-                    .navigationTitle("Live voorbeeld")
-                    .toolbar {
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button("Sluiten") { showFlowPreview = false }
-                        }
-                    }
-                }
-            }
+
         }
     }
 
-    // MARK: - Category selector
+    // MARK: - Toolbar (zelfde opbouw als tvOS)
 
-    private var categorySelector: some View {
-        Picker(
-            "Kanalen",
-            selection:
-                $guide.selectedCategory
-        ) {
-            Text(
-                "Favorieten"
-            )
-            .tag(
-                "favorites"
-            )
+    private var toolbarHeader: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(VeyraColors.cyan)
+                    .frame(width: 3, height: 26)
 
-            Text(
-                "Alle kanalen"
-            )
-            .tag(
-                "all"
-            )
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("LIVE TV")
+                        .font(.system(size: 20, weight: .light))
+                        .tracking(3)
+                    Text("JOUW PROGRAMMAGIDS")
+                        .font(.system(size: 10, weight: .medium))
+                        .tracking(1.5)
+                        .foregroundStyle(VeyraColors.cyan.opacity(0.75))
+                }
+
+                Spacer(minLength: 8)
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    providerButton
+                    categoryButton
+                    modeToggleButton
+                    if displayMode == .guide {
+                        flowToggleButton
+                    }
+                    nowButton
+                    refreshButton
+                    foldersButton
+                    if guide.selectedCategory == "favorites", !guide.favoriteRows.isEmpty {
+                        favoriteOrderButton
+                    }
+                    if !isPad {
+                        recordingsButton
+                    }
+                }
+                .padding(.vertical, 2)
+            }
         }
-        .pickerStyle(
-            .segmented
-        )
-        .padding(
-            .horizontal,
-            16
-        )
-        .padding(
-            .top,
-            8
-        )
-        .padding(
-            .bottom,
-            10
-        )
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .padding(.bottom, 10)
+    }
+
+    private var toolbarLabelFont: Font { .system(size: 14, weight: .semibold) }
+
+    private var providerButton: some View {
+        Button {
+            showProviders = true
+        } label: {
+            Label(guide.providerName, systemImage: "antenna.radiowaves.left.and.right")
+                .lineLimit(1)
+                .font(toolbarLabelFont)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+        }
+        .buttonStyle(VeyraEPGPillButtonStyle())
+        .disabled(guide.providers.isEmpty)
+    }
+
+    private var categoryButton: some View {
+        Button {
+            showCategories = true
+        } label: {
+            Label(currentCategoryTitle, systemImage: "line.3.horizontal")
+                .lineLimit(1)
+                .font(toolbarLabelFont)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+        }
+        .buttonStyle(VeyraEPGPillButtonStyle())
+    }
+
+    /// "Kanalen" (platte lijst) versus "Gids" (programmaraster/Flow) -- op tvOS bestaat enkel de
+    /// gids, maar de eenvoudige kanalenlijst blijft hier beschikbaar als compacte knop i.p.v. een
+    /// grote segmented control.
+    private var modeToggleButton: some View {
+        Button {
+            displayMode = displayMode == .channels ? .guide : .channels
+        } label: {
+            Image(systemName: displayMode == .channels ? "list.bullet" : "rectangle.grid.2x2")
+                .frame(width: 44, height: 44)
+        }
+        .buttonStyle(VeyraEPGIconButtonStyle())
+        .accessibilityLabel(displayMode == .channels ? "Wissel naar programmagids" : "Wissel naar kanalenlijst")
+    }
+
+    private var flowToggleButton: some View {
+        Button {
+            flowPreview.stop()
+            epgViewModeRaw = (epgViewMode == .grid ? VeyraEPGViewMode.flow : .grid).rawValue
+        } label: {
+            Image(systemName: epgViewMode == .grid ? "rectangle.grid.2x2" : "list.bullet.rectangle")
+                .frame(width: 44, height: 44)
+        }
+        .buttonStyle(VeyraEPGIconButtonStyle())
+        .accessibilityLabel(epgViewMode == .grid ? "Wissel naar Flow-weergave" : "Wissel naar rasterweergave")
+    }
+
+    private var nowButton: some View {
+        Button {
+            guide.showNow()
+        } label: {
+            Label("Nu", systemImage: "clock")
+                .font(toolbarLabelFont)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+        }
+        .buttonStyle(VeyraEPGPillButtonStyle())
+    }
+
+    private var refreshButton: some View {
+        Button {
+            Task { await guide.reload(force: true) }
+        } label: {
+            Image(systemName: "arrow.clockwise")
+                .frame(width: 44, height: 44)
+        }
+        .buttonStyle(VeyraEPGIconButtonStyle())
+        .accessibilityLabel("Zenders en programmagids nu vernieuwen")
+    }
+
+    private var foldersButton: some View {
+        Button {
+            showFolders = true
+        } label: {
+            Image(systemName: "folder")
+                .frame(width: 44, height: 44)
+        }
+        .buttonStyle(VeyraEPGIconButtonStyle())
+        .accessibilityLabel("Mijn mappen")
+    }
+
+    private var favoriteOrderButton: some View {
+        Button {
+            showFavoriteOrder = true
+        } label: {
+            Image(systemName: "arrow.up.arrow.down")
+                .frame(width: 44, height: 44)
+        }
+        .buttonStyle(VeyraEPGIconButtonStyle())
+        .accessibilityLabel("Volgorde favorieten aanpassen")
+    }
+
+    private var recordingsButton: some View {
+        Button {
+            showRecordings = true
+        } label: {
+            Image(systemName: "record.circle")
+                .frame(width: 44, height: 44)
+        }
+        .buttonStyle(VeyraEPGIconButtonStyle())
+        .accessibilityLabel("Opnames")
+    }
+
+    private var recentCount: Int {
+        guide.channels.filter { guide.recent.contains($0.id) }.count
+    }
+
+    /// Leesbare titel van de actieve categorie, getoond op de werkbalkknop die de categoriekeuze
+    /// opent -- zelfde logica als tvOS.
+    private var currentCategoryTitle: String {
+        switch guide.selectedCategory {
+        case "all":
+            return "Alle zenders"
+        case "favorites":
+            return "Favorieten"
+        case "recent":
+            return "Recent geopend"
+        default:
+            if guide.selectedCategory.hasPrefix("group:") {
+                let id = String(guide.selectedCategory.dropFirst("group:".count))
+                return guide.categories.first { $0.id == id }?.name ?? "Categorie"
+            }
+            return "Kanalen"
+        }
+    }
+
+    @ViewBuilder
+    private var providerDialogButtons: some View {
+        ForEach(guide.providers) { provider in
+            Button(providerTitle(provider)) {
+                showProviders = false
+                guide.selectProvider(provider)
+            }
+        }
+        Button("Annuleren", role: .cancel) { showProviders = false }
+    }
+
+    private func providerTitle(_ provider: IPTVStoredProvider) -> String {
+        if provider.id == guide.activeProviderID {
+            return provider.displayName + " (actief)"
+        }
+        return provider.displayName
+    }
+
+    @ViewBuilder
+    private var categoryDialogButtons: some View {
+        Button("Alle zenders (\(guide.channels.count))") {
+            showCategories = false
+            guide.selectedCategory = "all"
+        }
+        Button("Favorieten (\(guide.favoriteRows.count))") {
+            showCategories = false
+            guide.selectedCategory = "favorites"
+        }
+        Button("Recent geopend (\(recentCount))") {
+            showCategories = false
+            guide.selectedCategory = "recent"
+        }
+        ForEach(guide.categories) { category in
+            Button(category.name) {
+                showCategories = false
+                guide.selectedCategory = "group:" + category.id
+            }
+        }
+        Button("Annuleren", role: .cancel) { showCategories = false }
     }
 
     // MARK: - Content
@@ -418,6 +554,11 @@ struct LiveTVView: View {
     private var flowGuide: some View {
         TimelineView(.periodic(from: .now, by: 60)) { context in
             HStack(alignment: .top, spacing: 12) {
+                EmptyView()
+                    .onAppear {
+                        guard isPad, flowPreview.engine == nil, let row = flowSelectedRow else { return }
+                        selectFlowChannel(row)
+                    }
                 VeyraFlowEPGView(
                     guide: guide,
                     channels: guide.visibleChannels,
@@ -439,7 +580,11 @@ struct LiveTVView: View {
                     .frame(width: 340)
                 }
             }
-            .onChange(of: flowSelectedRow?.id) { _, _ in flowPreview.stop() }
+            // GEEN `.onChange(of: flowSelectedRow?.id) { flowPreview.stop() }` meer hier: dat
+            // stopte de voorvertoning meteen weer nadat `selectFlowChannel` hieronder hem net
+            // had gestart (de state-wijziging die de selectie zet, triggert deze onChange op de
+            // volgende render-cyclus, ná de `flowPreview.start(row)`-aanroep eronder) -- daardoor
+            // startte "Voorvertoning meteen tonen" in de praktijk nooit zichtbaar op.
         }
     }
 
@@ -477,7 +622,7 @@ struct LiveTVView: View {
 
     /// iPad: kanalen als kaarten in meerdere kolommen in plaats van één lange lijst.
     private var channelGrid: some View {
-        ScrollView {
+        VeyraScrollView {
             LazyVGrid(
                 columns: [GridItem(.adaptive(minimum: 320), spacing: 14)],
                 spacing: 14
@@ -618,6 +763,8 @@ struct LiveTVView: View {
                 .hidden
             )
         }
+        .scrollContentBackground(.hidden)
+        .veyraScrollingBackground(legacyList: true)
         .listStyle(
             .plain
         )
@@ -832,4 +979,32 @@ struct LiveTVView: View {
 private enum LiveTVDisplayMode: Hashable {
     case channels
     case guide
+}
+
+// MARK: - Werkbalkstijlen (zelfde opbouw als tvOS' `VeyraEPGButtonStyle`, maar met
+// aanraakgrootte/glasmateriaal i.p.v. de focus-gedreven stijl van Apple TV)
+
+private struct VeyraEPGPillButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(.white)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(VeyraColors.cyan.opacity(0.35), lineWidth: 1)
+            )
+            .opacity(configuration.isPressed ? 0.7 : 1)
+    }
+}
+
+private struct VeyraEPGIconButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(.white)
+            .background(.ultraThinMaterial, in: Circle())
+            .overlay(
+                Circle().strokeBorder(VeyraColors.cyan.opacity(0.35), lineWidth: 1)
+            )
+            .opacity(configuration.isPressed ? 0.7 : 1)
+    }
 }

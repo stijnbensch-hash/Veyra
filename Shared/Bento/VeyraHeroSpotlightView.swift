@@ -47,7 +47,7 @@ struct VeyraHeroSpotlightView: View {
     }
 
     /// Hoeveel de achtergrond voorbij de hero zelf doorloopt voordat hij
-    /// helemaal opgaat in de effen schermachtergrond -- zorgt dat de rij
+    /// helemaal opgaat in de pagina-achtergrond -- zorgt dat de rij
     /// eronder (bv. "Verder kijken") niet met een harde rand botst, net als
     /// bij Strand/Films.
     private let ambientBleed: CGFloat = 220
@@ -165,11 +165,8 @@ struct VeyraHeroSpotlightView: View {
 
     // MARK: Doorlopende achtergrond (alleen schermvullend)
 
-    /// De enige achtergrondafbeelding voor de schermvullende stijl: rekt door
-    /// tot voorbij de hero-hoogte en vervaagt daar naar `VeyraHomeStyle.ink`
-    /// (dezelfde kleur als de rest van het scherm), zodat er geen naad kan
-    /// ontstaan -- `slide(_:)` zelf tekent in deze stijl geen eigen
-    /// achtergrond meer, alleen de leesbaarheids-gradient en de inhoud.
+    /// Eén afbeelding met een transparante onderrand naar de echte pagina-achtergrond.
+    /// Ook de leesbaarheidslaag vervaagt mee, zodat er geen zwarte balk overblijft.
     private func backdrop(_ item: HeroSpotlightItem) -> some View {
         VeyraHeroAmbientBackdrop(url: item.backdropURL, id: item.id, height: height, bleed: ambientBleed)
     }
@@ -179,32 +176,10 @@ struct VeyraHeroSpotlightView: View {
     /// backdrop: posters hebben vaak de filmtitel al in de afbeelding staan,
     /// terwijl het losse clearlogo onderaan de hero die titel opnieuw toont.
     private func scrollingBackdrop(_ item: HeroSpotlightItem) -> some View {
-        return GeometryReader { geo in
-            VeyraAsyncImage(url: item.backdropURL) { phase in
-                if case .success(let image) = phase {
-                    image.resizable().scaledToFill()
-                } else {
-                    VeyraHomeStyle.ink
-                }
-            }
-            .id(item.id)
-            .frame(width: geo.size.width, height: geo.size.height)
-            .clipped()
-            .overlay {
-                LinearGradient(
-                    stops: [
-                        .init(color: .clear, location: 0),
-                        .init(color: .clear, location: 0.72),
-                        .init(color: VeyraHomeStyle.ink.opacity(0.55), location: 0.9),
-                        .init(color: VeyraHomeStyle.ink, location: 1)
-                    ],
-                    startPoint: .top, endPoint: .bottom
-                )
-            }
-        }
-        .frame(height: height + 20)
-        .allowsHitTesting(false)
-        .animation(.easeInOut(duration: 0.5), value: item.id)
+        backdrop(item)
+            // Behoud de bestaande layoutmaat; alleen het beeld vervaagt verder
+            // onder de paginastippen en de eerste rij, zonder inhoud te verschuiven.
+            .frame(height: height + 20, alignment: .top)
     }
     #endif
 
@@ -268,8 +243,10 @@ struct VeyraHeroSpotlightView: View {
                     }
                 }
 
-                LinearGradient(colors: [.black.opacity(0.9), .black.opacity(0.25), .clear],
-                               startPoint: .bottom, endPoint: .center)
+                if style == .card || externalBackdrop {
+                    LinearGradient(colors: [.black.opacity(0.9), .black.opacity(0.25), .clear],
+                                   startPoint: .bottom, endPoint: .center)
+                }
 
                 content(item)
                     .id(item.id)
@@ -277,7 +254,9 @@ struct VeyraHeroSpotlightView: View {
                     .padding(.horizontal, style == .fullscreen ? 24 : 20)
                     .padding(.bottom, 22)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // Ook zonder een beeldvullende overlay moet de inhoud onderaan
+            // de vaste hero-band staan, niet midden in de resterende ruimte.
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
             .clipShape(RoundedRectangle(cornerRadius: style == .card ? 20 : 0, style: .continuous))
             .contentShape(Rectangle())
             .animation(.easeInOut(duration: 0.4), value: item.id)
@@ -419,8 +398,8 @@ private struct HeroSpotlightButtonStyle: ButtonStyle {
 #endif
 
 
-/// Eén doorlopende achtergrond die voorbij de hero-hoogte vervaagt naar de
-/// effen schermkleur (`VeyraHomeStyle.ink`) -- gedeeld door `VeyraHeroSpotlightView`
+/// Eén doorlopende achtergrond die voorbij de hero-hoogte transparant wordt
+/// boven de bestaande schermachtergrond -- gedeeld door `VeyraHeroSpotlightView`
 /// zelf (wanneer die de achtergrond intern tekent) én door schermen die hem
 /// BUITEN hun ScrollView om moeten tekenen (zie `externalBackdrop` hierboven).
 /// Eén enkele afbeelding i.p.v. een losse vervaagde kopie, anders knippen
@@ -438,32 +417,17 @@ struct VeyraHeroAmbientBackdrop: View {
                 if case .success(let image) = phase {
                     image.resizable().scaledToFill()
                 } else {
-                    VeyraHomeStyle.ink
+                    Color.clear
                 }
             }
             .id(id)
             .transition(.opacity)
             .frame(width: geo.size.width, height: height + bleed)
             .clipped()
-            .overlay {
-                // Blijft volledig doorschijnend over de hero-hoogte zelf,
-                // vervaagt pas in het extra stuk (`bleed`) daaronder naar de
-                // effen achtergrondkleur.
-                let solid = height / (height + bleed)
-                LinearGradient(
-                    stops: [
-                        .init(color: .clear, location: 0),
-                        .init(color: .clear, location: solid),
-                        .init(color: VeyraHomeStyle.ink, location: 1)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            }
+            .veyraHeroBackdropBlend()
         }
         .frame(height: height + bleed)
         .allowsHitTesting(false)
-        .ignoresSafeArea(edges: .top)
         .animation(.easeInOut(duration: 0.5), value: id)
     }
 }

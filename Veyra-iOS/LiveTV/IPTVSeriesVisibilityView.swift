@@ -27,58 +27,61 @@ struct IPTVSeriesVisibilityView: View {
     private let service = IPTVService()
 
     var body: some View {
-        Group {
+        VeyraDynamicBackgroundScope {
             Group {
-                if isLoading && categories.isEmpty {
-                    ProgressView("Series-categorieën laden…")
-                } else if let errorMessage, categories.isEmpty {
-                    ContentUnavailableView(
-                        "Series konden niet worden geladen",
-                        systemImage: "wifi.exclamationmark",
-                        description: Text(errorMessage)
-                    )
-                } else if categories.isEmpty {
-                    ContentUnavailableView("Geen series-categorieën", systemImage: "tv.badge.wifi")
-                } else {
-                    List {
-                        ForEach(categories) { category in
-                            categorySection(category)
+                Group {
+                    if isLoading && categories.isEmpty {
+                        ProgressView("Series-categorieën laden…")
+                    } else if let errorMessage, categories.isEmpty {
+                        ContentUnavailableView(
+                            "Series konden niet worden geladen",
+                            systemImage: "wifi.exclamationmark",
+                            description: Text(errorMessage)
+                        )
+                    } else if categories.isEmpty {
+                        ContentUnavailableView("Geen series-categorieën", systemImage: "tv.badge.wifi")
+                    } else {
+                        VeyraList {
+                            ForEach(categories) { category in
+                                categorySection(category)
+                            }
                         }
+                        .scrollContentBackground(.hidden)
+                        .searchable(text: $searchText, prompt: "Zoek series")
                     }
-                    .scrollContentBackground(.hidden)
-                    .searchable(text: $searchText, prompt: "Zoek series")
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(VeyraBackground())
+                .navigationTitle("Series beheren")
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Menu {
+                            Button("Alles zichtbaar maken", systemImage: "eye") {
+                                var updated = preferences
+                                updated.hiddenSeriesCategoryIDs.removeAll()
+                                updated.hiddenSeriesItemIDs.removeAll()
+                                save(updated)
+                            }
+                            Button("Alles verbergen", systemImage: "eye.slash") {
+                                var updated = preferences
+                                updated.hiddenSeriesCategoryIDs = Set(categories.map(\.id))
+                                updated.hiddenSeriesItemIDs.removeAll()
+                                save(updated)
+                            }
+                        } label: { Image(systemName: "ellipsis.circle") }
+                        .disabled(categories.isEmpty)
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button { Task { await load() } } label: { Image(systemName: "arrow.clockwise") }
+                            .accessibilityLabel("Categorieën nu vernieuwen")
+                    }
+                }
+                .task { await load() }
+                .onReceive(NotificationCenter.default.publisher(for: .iptvConfigurationDidChange)) { _ in
+                    if let configuration { preferences = preferencesStore.load(for: configuration) }
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(VeyraColors.background)
-            .navigationTitle("Series beheren")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Button("Alles zichtbaar maken", systemImage: "eye") {
-                            var updated = preferences
-                            updated.hiddenSeriesCategoryIDs.removeAll()
-                            updated.hiddenSeriesItemIDs.removeAll()
-                            save(updated)
-                        }
-                        Button("Alles verbergen", systemImage: "eye.slash") {
-                            var updated = preferences
-                            updated.hiddenSeriesCategoryIDs = Set(categories.map(\.id))
-                            updated.hiddenSeriesItemIDs.removeAll()
-                            save(updated)
-                        }
-                    } label: { Image(systemName: "ellipsis.circle") }
-                    .disabled(categories.isEmpty)
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { Task { await load() } } label: { Image(systemName: "arrow.clockwise") }
-                        .accessibilityLabel("Categorieën nu vernieuwen")
-                }
-            }
-            .task { await load() }
-            .onReceive(NotificationCenter.default.publisher(for: .iptvConfigurationDidChange)) { _ in
-                if let configuration { preferences = preferencesStore.load(for: configuration) }
-            }
+
         }
     }
 

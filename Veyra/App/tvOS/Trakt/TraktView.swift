@@ -12,34 +12,37 @@ struct TraktView: View {
     @State private var confirmDisconnect = false
 
     var body: some View {
-        ZStack {
-            VeyraBackground().ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            if store.isConnected {
-                connectedContent
-            } else {
-                connectionContent
+                if store.isConnected {
+                    connectedContent
+                } else {
+                    connectionContent
+                }
             }
-        }
-        .navigationTitle("Trakt")
-        .task { await store.refreshIfNeeded() }
-        .onDisappear { loginTask?.cancel(); loginTask = nil; isLinking = false; deviceCode = nil }
-        .veyraConfirmationDialog("Trakt ontkoppelen?", isPresented: $confirmDisconnect) {
-            Button("Ontkoppelen", role: .destructive) {
-                confirmDisconnect = false
-                disconnecting = true
-                Task { await store.disconnect(); disconnecting = false }
+            .navigationTitle("Trakt")
+            .task { await store.refreshIfNeeded() }
+            .onDisappear { loginTask?.cancel(); loginTask = nil; isLinking = false; deviceCode = nil }
+            .veyraConfirmationDialog("Trakt ontkoppelen?", isPresented: $confirmDisconnect) {
+                Button("Ontkoppelen", role: .destructive) {
+                    confirmDisconnect = false
+                    disconnecting = true
+                    Task { await store.disconnect(); disconnecting = false }
+                }
+                Button("Annuleren", role: .cancel) { confirmDisconnect = false }
+            } message: {
+                Text("De koppeling en geladen Trakt-gegevens worden van deze Apple TV verwijderd. Je geschiedenis en lijsten bij Trakt blijven behouden.")
             }
-            Button("Annuleren", role: .cancel) { confirmDisconnect = false }
-        } message: {
-            Text("De koppeling en geladen Trakt-gegevens worden van deze Apple TV verwijderd. Je geschiedenis en lijsten bij Trakt blijven behouden.")
+
         }
     }
 
     // MARK: - Niet gekoppeld
 
     private var connectionContent: some View {
-        ScrollView {
+        VeyraScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 Text("Je kijkwereld, op één plek")
                     .font(.title2)
@@ -93,7 +96,7 @@ struct TraktView: View {
     // MARK: - Verbonden
 
     private var connectedContent: some View {
-        List {
+        VeyraList {
             Section {
                 VeyraSettingsCardRowLabel(
                     icon: "checkmark.circle",
@@ -261,24 +264,27 @@ struct TraktView: View {
 
 struct TraktPrivacyView: View {
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 26) {
-                Text("Privacy en Trakt").font(.largeTitle)
-                Text("Trakt is een vrijwillige koppeling. Veyra leest je Trakt-profiel, kijkgeschiedenis, kijkstatus, voortgang, watchlist, eigen lijsten en beoordelingen om ze op deze Apple TV te tonen.")
-                Text("Acties zoals een beoordeling, een wijziging aan een lijst of een markering als bekeken worden naar Trakt verzonden. Automatisch delen van de afgespeelde titel en het bekeken percentage gebeurt alleen als je dat zelf inschakelt.")
-                Text("Veyra bewaart de toegangstokens in de beveiligde sleutelhanger van deze Apple TV. Geladen Trakt-gegevens blijven alleen in het geheugen van de app. Veyra stuurt geen streamadressen of Trakt-wachtwoord naar Trakt en gebruikt deze koppeling niet voor advertenties.")
-                Text("Ontkoppelen verwijdert de lokale toegangstokens en geladen gegevens en probeert de toegang bij Trakt in te trekken. Je geschiedenis en lijsten bij Trakt blijven bestaan. Je kunt ze in Trakt beheren of verwijderen. De zichtbaarheid van je activiteit volgt je instellingen bij Trakt.")
-                Text("Trakt-privacybeleid: https://trakt.tv/privacy")
-                    .foregroundStyle(VeyraColors.cyan)
-                if let url = AppConfiguration.privacyPolicyURL {
-                    Text("Privacybeleid Veyra: \(url.absoluteString)").foregroundStyle(VeyraColors.cyan)
+        VeyraDynamicBackgroundScope {
+            VeyraScrollView {
+                VStack(alignment: .leading, spacing: 26) {
+                    Text("Privacy en Trakt").font(.largeTitle)
+                    Text("Trakt is een vrijwillige koppeling. Veyra leest je Trakt-profiel, kijkgeschiedenis, kijkstatus, voortgang, watchlist, eigen lijsten en beoordelingen om ze op deze Apple TV te tonen.")
+                    Text("Acties zoals een beoordeling, een wijziging aan een lijst of een markering als bekeken worden naar Trakt verzonden. Automatisch delen van de afgespeelde titel en het bekeken percentage gebeurt alleen als je dat zelf inschakelt.")
+                    Text("Veyra bewaart de toegangstokens in de beveiligde sleutelhanger van deze Apple TV. Geladen Trakt-gegevens blijven alleen in het geheugen van de app. Veyra stuurt geen streamadressen of Trakt-wachtwoord naar Trakt en gebruikt deze koppeling niet voor advertenties.")
+                    Text("Ontkoppelen verwijdert de lokale toegangstokens en geladen gegevens en probeert de toegang bij Trakt in te trekken. Je geschiedenis en lijsten bij Trakt blijven bestaan. Je kunt ze in Trakt beheren of verwijderen. De zichtbaarheid van je activiteit volgt je instellingen bij Trakt.")
+                    Text("Trakt-privacybeleid: https://trakt.tv/privacy")
+                        .foregroundStyle(VeyraColors.cyan)
+                    if let url = AppConfiguration.privacyPolicyURL {
+                        Text("Privacybeleid Veyra: \(url.absoluteString)").foregroundStyle(VeyraColors.cyan)
+                    }
                 }
+                .frame(maxWidth: 1300, alignment: .leading)
+                .padding(.horizontal, VeyraSpacing.page)
+                .padding(.top, 36)
+                .padding(.bottom, 50)
             }
-            .frame(maxWidth: 1300, alignment: .leading)
-            .padding(.horizontal, VeyraSpacing.page)
-            .padding(.top, 36)
-            .padding(.bottom, 50)
+            .background(VeyraBackground())
+
         }
-        .background(VeyraBackground())
     }
 }

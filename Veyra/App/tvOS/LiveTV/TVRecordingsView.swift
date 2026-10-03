@@ -36,42 +36,45 @@ struct TVRecordingsView: View {
     }
 
     var body: some View {
-        ZStack {
-            VeyraBackground().ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            if recordings.isEmpty, let message {
-                Text(message)
-                    .foregroundStyle(.white.opacity(0.6))
-            } else {
-                List {
-                    if !singleRecordings.isEmpty {
-                        Section {
-                            ForEach(singleRecordings) { recording in
-                                row(for: recording)
+                if recordings.isEmpty, let message {
+                    Text(message)
+                        .foregroundStyle(.white.opacity(0.6))
+                } else {
+                    VeyraList {
+                        if !singleRecordings.isEmpty {
+                            Section {
+                                ForEach(singleRecordings) { recording in
+                                    row(for: recording)
+                                }
+                            } header: {
+                                Text("Losse opnames")
                             }
-                        } header: {
-                            Text("Losse opnames")
+                        }
+
+                        if !seriesRecordings.isEmpty {
+                            Section {
+                                ForEach(seriesRecordings) { recording in
+                                    row(for: recording)
+                                }
+                            } header: {
+                                Text("Serie-opnames")
+                            }
                         }
                     }
-
-                    if !seriesRecordings.isEmpty {
-                        Section {
-                            ForEach(seriesRecordings) { recording in
-                                row(for: recording)
-                            }
-                        } header: {
-                            Text("Serie-opnames")
-                        }
-                    }
+                    .frame(maxWidth: 1850)
                 }
-                .frame(maxWidth: 1850)
             }
+            .navigationTitle("Mijn opnames")
+            .fullScreenCover(item: $playingSource) { source in
+                PlayerView(source: source)
+            }
+            .task { await load() }
+
         }
-        .navigationTitle("Mijn opnames")
-        .fullScreenCover(item: $playingSource) { source in
-            PlayerView(source: source)
-        }
-        .task { await load() }
     }
 
     private func row(for recording: VeyraHubRecording) -> some View {

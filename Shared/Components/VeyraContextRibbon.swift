@@ -356,8 +356,11 @@ struct VeyraContextRibbon: View {
         if let backdrop = item.backdropURL {
             posterNode(item, kind: kind) {
                 if item.contentKind == .release {
-                    // Dezelfde begrensde artworkweergave als de Verder kijken-kaarten.
-                    VeyraArt(url: backdrop, seed: item.text, contentMode: .fit)
+                    // Was `.fit`: liet de effen `VeyraArt`-placeholderkleur boven/onder de
+                    // afbeelding zichtbaar (een harde rand waar het "passende" beeld ophield) --
+                    // nu `.fill`, net als alle andere kaarten hier, zodat de foto het hele
+                    // kader dekt.
+                    VeyraArt(url: backdrop, seed: item.text, contentMode: .fill)
                 } else {
                     VeyraAsyncImage(url: backdrop) { phase in
                         if case .success(let image) = phase {
@@ -492,15 +495,11 @@ struct VeyraContextRibbon: View {
                     .shadow(color: .black.opacity(0.6), radius: 3, y: 1)
                     .lineLimit(1)
             }
-            if let detail = item.detail, !detail.isEmpty {
-                Text(detail)
-                    .font(.system(size: metrics.metaSize, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.9))
-                    .shadow(color: .black.opacity(0.6), radius: 3, y: 1)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
-            }
-            RibbonEnrichmentBadge(tmdbID: item.tmdbID, isMovie: item.isMovie, fontSize: metrics.metaSize)
+            // "Serie"/"Film" en het genre/beoordeling op dezelfde regel i.p.v. onder elkaar
+            // (`detail` als voorvoegsel van de badge-tekst, zoals "Serie · Komedie · ★ 7.4" op
+            // de Films/Series/Kijklijst-kaarten).
+            RibbonEnrichmentBadge(tmdbID: item.tmdbID, isMovie: item.isMovie, fontSize: metrics.metaSize,
+                                   prefix: item.detail)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -523,6 +522,9 @@ struct VeyraContextRibbon: View {
         let tmdbID: Int?
         let isMovie: Bool
         let fontSize: CGFloat
+        /// "Serie"/"Film" (`item.detail`) -- staat, als die er is, vóór genre/beoordeling op
+        /// dezelfde regel i.p.v. als eigen tekstregel erboven.
+        var prefix: String?
 
         @AppStorage(PosterEnrichmentDefaults.modeKey)
         private var enrichmentSourceRaw = PosterEnrichmentMode.betterPosters.rawValue
@@ -539,10 +541,12 @@ struct VeyraContextRibbon: View {
         }
 
         private var text: String? {
-            guard enrichmentSource == .betterPosters else { return nil }
             var parts: [String] = []
-            if showGenre, let genre { parts.append(genre) }
-            if showRating, let rating, rating > 0 { parts.append(String(format: "★ %.1f", rating)) }
+            if let prefix, !prefix.isEmpty { parts.append(prefix) }
+            if enrichmentSource == .betterPosters {
+                if showGenre, let genre { parts.append(genre) }
+                if showRating, let rating, rating > 0 { parts.append(String(format: "★ %.1f", rating)) }
+            }
             return parts.isEmpty ? nil : parts.joined(separator: " · ")
         }
 

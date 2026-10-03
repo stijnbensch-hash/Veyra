@@ -34,39 +34,42 @@ struct VeyraSportsHome: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: sectionSpacing) {
-                header
+        VeyraDynamicBackgroundScope {
+            VeyraScrollView {
+                VStack(alignment: .leading, spacing: sectionSpacing) {
+                    header
 
-                if hasPersonalContent {
-                    if !favoriteTeams.isEmpty {
-                        VeyraSportsTeamStrip(teams: favoriteTeams, sportModel: sportModel, now: now, onSelect: onSelectTeam)
+                    if hasPersonalContent {
+                        if !favoriteTeams.isEmpty {
+                            VeyraSportsTeamStrip(teams: favoriteTeams, sportModel: sportModel, now: now, onSelect: onSelectTeam)
+                        }
+                        if !favoriteLeagues.isEmpty {
+                            VeyraSportsLeagueStrip(leagues: favoriteLeagues, sportModel: sportModel, now: now, onSelect: onSelectLeague)
+                        }
+
+                        let live = sportModel.liveForYou(at: now, favoriteTeamIDs: favoriteTeamIDs, favoriteLeagueNames: favoriteLeagueNames)
+                        VeyraSportsLiveStage(events: live, now: now, onPlay: onPlay)
+
+                        let today = sportModel.today(at: now, favoriteTeamIDs: favoriteTeamIDs, favoriteLeagueNames: favoriteLeagueNames)
+                        VeyraSportsTodayTimeline(events: today, now: now, onSelect: onPlay)
+
+                        let upcoming = sportModel.upcoming(at: now, favoriteTeamIDs: favoriteTeamIDs, favoriteLeagueNames: favoriteLeagueNames)
+                        VeyraSportsUpcomingSection(events: upcoming, now: now, onSelect: onPlay)
+                    } else {
+                        onboarding
                     }
-                    if !favoriteLeagues.isEmpty {
-                        VeyraSportsLeagueStrip(leagues: favoriteLeagues, sportModel: sportModel, now: now, onSelect: onSelectLeague)
-                    }
 
-                    let live = sportModel.liveForYou(at: now, favoriteTeamIDs: favoriteTeamIDs, favoriteLeagueNames: favoriteLeagueNames)
-                    VeyraSportsLiveStage(events: live, now: now, onPlay: onPlay)
-
-                    let today = sportModel.today(at: now, favoriteTeamIDs: favoriteTeamIDs, favoriteLeagueNames: favoriteLeagueNames)
-                    VeyraSportsTodayTimeline(events: today, now: now, onSelect: onPlay)
-
-                    let upcoming = sportModel.upcoming(at: now, favoriteTeamIDs: favoriteTeamIDs, favoriteLeagueNames: favoriteLeagueNames)
-                    VeyraSportsUpcomingSection(events: upcoming, now: now, onSelect: onPlay)
-                } else {
-                    onboarding
+                    discoverMore
                 }
-
-                discoverMore
+                .padding(.horizontal, sidePadding)
+                .padding(.vertical, 24)
             }
-            .padding(.horizontal, sidePadding)
-            .padding(.vertical, 24)
+            .background(VeyraBackground())
+            #if os(tvOS)
+            .scrollClipDisabled()
+            #endif
+
         }
-        .background(VeyraBackground())
-        #if os(tvOS)
-        .scrollClipDisabled()
-        #endif
     }
 
     // MARK: - Header (spec §6: compacte identity header, geen filmhero, geen dubbele navigation)

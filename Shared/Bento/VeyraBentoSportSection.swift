@@ -215,10 +215,13 @@ private struct SportPreview: View {
     @FocusState private var focus: VeyraHomeFocus?
 
     var body: some View {
-        SportSection(model: model, focus: $focus, onPlay: { _, _ in }, onToggleReminder: { _, _ in }, onOpenCompetition: { _ in })
-            .padding(80)
-            .background(VeyraHomeStyle.ink)
-            .task { await model.load() }
+        VeyraDynamicBackgroundScope {
+            SportSection(model: model, focus: $focus, onPlay: { _, _ in }, onToggleReminder: { _, _ in }, onOpenCompetition: { _ in })
+                .padding(80)
+                .background(VeyraHomeStyle.ink)
+                .task { await model.load() }
+
+        }
     }
 }
 

@@ -10,23 +10,26 @@ struct SportsFavoritesSettingsView: View {
     private var results: [SportsTeam] { directory.search(query) }
 
     var body: some View {
-        ZStack {
-            VeyraColors.background.ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            List {
-                if query.trimmingCharacters(in: .whitespaces).isEmpty {
-                    favoritesSection
-                } else {
-                    searchSection
+                VeyraList {
+                    if query.trimmingCharacters(in: .whitespaces).isEmpty {
+                        favoritesSection
+                    } else {
+                        searchSection
+                    }
                 }
+                .scrollContentBackground(.hidden)
             }
-            .scrollContentBackground(.hidden)
+            .navigationTitle("Favoriete teams")
+            .navigationBarTitleDisplayMode(.inline)
+            .veyraTeamSearch(text: $query)
+            .task { await directory.load() }
+            .onChange(of: directory.teams.count) { _, _ in backfill() }
+
         }
-        .navigationTitle("Favoriete teams")
-        .navigationBarTitleDisplayMode(.inline)
-        .veyraTeamSearch(text: $query)
-        .task { await directory.load() }
-        .onChange(of: directory.teams.count) { _, _ in backfill() }
     }
 
     /// Favorieten die vroeger zonder naam bewaard werden, krijgen hun naam en logo zodra de teamlijst geladen is.

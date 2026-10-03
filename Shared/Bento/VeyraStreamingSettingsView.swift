@@ -13,76 +13,79 @@ struct VeyraStreamingSettingsView: View {
     @State private var catalogs: [String: BentoCatalog] = [:]
 
     var body: some View {
-        Form {
-            Section {
-                if loading {
-                    ProgressView()
-                } else if entries.isEmpty {
-                    Text("Nog geen streamingdiensten.").foregroundStyle(.secondary)
-                }
-                // Volgorde bepaal je hier rechtstreeks in de lijst (sleepbalkje op
-                // iOS via "Bewerken", knoppen op tvOS) i.p.v. in het deelmenu van
-                // een losse dienst. Op tvOS staan de op/neer-knoppen bewust NAAST
-                // de NavigationLink (niet erin genest) -- een Button genest in het
-                // label van een NavigationLink krijgt op tvOS geen eigen
-                // remote-focus en zou dus onbruikbaar zijn.
-                ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
-                    HStack(spacing: 14) {
-                        #if !os(iOS)
-                        Image(systemName: "line.3.horizontal")
-                            .foregroundStyle(.secondary)
-                        #endif
-                        NavigationLink {
-                            VeyraStreamingEditorView(entryID: entry.id, entries: $entries, catalogs: catalogs)
-                        } label: {
-                            row(entry)
-                        }
-                        #if !os(iOS)
-                        Spacer()
-                        VStack(spacing: 6) {
-                            Button { moveEntry(index, by: -1) } label: {
-                                Image(systemName: "chevron.up")
-                            }.disabled(index == 0)
-                            Button { moveEntry(index, by: 1) } label: {
-                                Image(systemName: "chevron.down")
-                            }.disabled(index >= entries.count - 1)
-                        }
-                        .buttonStyle(.plain)
-                        #endif
+        VeyraDynamicBackgroundScope {
+            VeyraForm {
+                Section {
+                    if loading {
+                        ProgressView()
+                    } else if entries.isEmpty {
+                        Text("Nog geen streamingdiensten.").foregroundStyle(.secondary)
                     }
+                    // Volgorde bepaal je hier rechtstreeks in de lijst (sleepbalkje op
+                    // iOS via "Bewerken", knoppen op tvOS) i.p.v. in het deelmenu van
+                    // een losse dienst. Op tvOS staan de op/neer-knoppen bewust NAAST
+                    // de NavigationLink (niet erin genest) -- een Button genest in het
+                    // label van een NavigationLink krijgt op tvOS geen eigen
+                    // remote-focus en zou dus onbruikbaar zijn.
+                    ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                        HStack(spacing: 14) {
+                            #if !os(iOS)
+                            Image(systemName: "line.3.horizontal")
+                                .foregroundStyle(.secondary)
+                            #endif
+                            NavigationLink {
+                                VeyraStreamingEditorView(entryID: entry.id, entries: $entries, catalogs: catalogs)
+                            } label: {
+                                row(entry)
+                            }
+                            #if !os(iOS)
+                            Spacer()
+                            VStack(spacing: 6) {
+                                Button { moveEntry(index, by: -1) } label: {
+                                    Image(systemName: "chevron.up")
+                                }.disabled(index == 0)
+                                Button { moveEntry(index, by: 1) } label: {
+                                    Image(systemName: "chevron.down")
+                                }.disabled(index >= entries.count - 1)
+                            }
+                            .buttonStyle(.plain)
+                            #endif
+                        }
+                    }
+                    .onMove { offsets, destination in
+                        entries.move(fromOffsets: offsets, toOffset: destination)
+                        VeyraStreamingStore.save(entries)
+                    }
+                } header: {
+                    Text("Streamingdiensten op Home")
+                } footer: {
+                    Text("Kies een dienst om de naam of het logo aan te passen, of om hem te verwijderen.")
                 }
-                .onMove { offsets, destination in
-                    entries.move(fromOffsets: offsets, toOffset: destination)
-                    VeyraStreamingStore.save(entries)
-                }
-            } header: {
-                Text("Streamingdiensten op Home")
-            } footer: {
-                Text("Kies een dienst om de naam of het logo aan te passen, of om hem te verwijderen.")
-            }
 
-            Section {
-                NavigationLink("Diensten in jouw regio") {
-                    VeyraStreamingProviderPickerView(entries: $entries)
+                Section {
+                    NavigationLink("Diensten in jouw regio") {
+                        VeyraStreamingProviderPickerView(entries: $entries)
+                    }
+                    NavigationLink("Catalogi uit addons / VeyraHub") {
+                        VeyraStreamingAddonPickerView(entries: $entries)
+                    }
+                } header: {
+                    Text("Toevoegen")
+                } footer: {
+                    Text("Addon-catalogi (bv. AIOMetadata) komen ook via VeyraHub op je andere apparaten.")
                 }
-                NavigationLink("Catalogi uit addons / VeyraHub") {
-                    VeyraStreamingAddonPickerView(entries: $entries)
-                }
-            } header: {
-                Text("Toevoegen")
-            } footer: {
-                Text("Addon-catalogi (bv. AIOMetadata) komen ook via VeyraHub op je andere apparaten.")
-            }
 
-            Section {
-                Button("Standaardlijst herstellen") { reset() }
+                Section {
+                    Button("Standaardlijst herstellen") { reset() }
+                }
             }
+            .navigationTitle("Streamingdiensten")
+            #if os(iOS)
+            .toolbar { EditButton() }
+            #endif
+            .task { await load() }
+
         }
-        .navigationTitle("Streamingdiensten")
-        #if os(iOS)
-        .toolbar { EditButton() }
-        #endif
-        .task { await load() }
     }
 
     private func row(_ entry: BentoStreamingEntry) -> some View {
@@ -180,62 +183,65 @@ struct VeyraStreamingProviderPickerView: View {
     }
 
     var body: some View {
-        Form {
-            Section {
-                if loadingCountries {
-                    ProgressView()
-                } else {
-                    Picker("Land", selection: $selectedCountryCode) {
-                        ForEach(countries, id: \.code) { country in
-                            Text(country.name).tag(country.code)
+        VeyraDynamicBackgroundScope {
+            VeyraForm {
+                Section {
+                    if loadingCountries {
+                        ProgressView()
+                    } else {
+                        Picker("Land", selection: $selectedCountryCode) {
+                            ForEach(countries, id: \.code) { country in
+                                Text(country.name).tag(country.code)
+                            }
                         }
                     }
+                } header: {
+                    Text("Land")
+                } footer: {
+                    Text("Je algemene kijkregio (bij de algemene instellingen) blijft ongewijzigd -- dit kiest alleen uit welk land je hier diensten toevoegt.")
                 }
-            } header: {
-                Text("Land")
-            } footer: {
-                Text("Je algemene kijkregio (bij de algemene instellingen) blijft ongewijzigd -- dit kiest alleen uit welk land je hier diensten toevoegt.")
+
+                Section {
+                    if loading {
+                        ProgressView()
+                    } else if available.isEmpty {
+                        Text("Alle diensten in \(selectedCountryName) staan al op Home.").foregroundStyle(.secondary)
+                    }
+                    ForEach(available) { option in
+                        Button { add(option) } label: {
+                            HStack {
+                                if let brand = VeyraStreamingBrand.named(option.name) {
+                                    VeyraStreamingWordmark(brand: brand)
+                                        .frame(width: 84, height: 40)
+                                } else {
+                                    VeyraAsyncImage(url: option.logoPath.flatMap { URL(string: "https://image.tmdb.org/t/p/w92\($0)") }) { phase in
+                                        if let image = phase.image { image.resizable().scaledToFill() } else { Color.white.opacity(0.1) }
+                                    }
+                                    .frame(width: 40, height: 40)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                }
+                                Text(option.name)
+                                Spacer()
+                                Image(systemName: "plus.circle").foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Diensten in \(selectedCountryName)")
+                } footer: {
+                    Text("Toevoegen vult je bestaande lijst op Home aan -- niets wordt vervangen.")
+                }
+            }
+            .navigationTitle("Diensten in jouw regio")
+            .task {
+                countries = await VeyraCatalogSource().availableProviderCountries()
+                loadingCountries = false
+                await loadProviders()
+            }
+            .onChange(of: selectedCountryCode) { _, _ in
+                Task { await loadProviders() }
             }
 
-            Section {
-                if loading {
-                    ProgressView()
-                } else if available.isEmpty {
-                    Text("Alle diensten in \(selectedCountryName) staan al op Home.").foregroundStyle(.secondary)
-                }
-                ForEach(available) { option in
-                    Button { add(option) } label: {
-                        HStack {
-                            if let brand = VeyraStreamingBrand.named(option.name) {
-                                VeyraStreamingWordmark(brand: brand)
-                                    .frame(width: 84, height: 40)
-                            } else {
-                                VeyraAsyncImage(url: option.logoPath.flatMap { URL(string: "https://image.tmdb.org/t/p/w92\($0)") }) { phase in
-                                    if let image = phase.image { image.resizable().scaledToFill() } else { Color.white.opacity(0.1) }
-                                }
-                                .frame(width: 40, height: 40)
-                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                            }
-                            Text(option.name)
-                            Spacer()
-                            Image(systemName: "plus.circle").foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            } header: {
-                Text("Diensten in \(selectedCountryName)")
-            } footer: {
-                Text("Toevoegen vult je bestaande lijst op Home aan -- niets wordt vervangen.")
-            }
-        }
-        .navigationTitle("Diensten in jouw regio")
-        .task {
-            countries = await VeyraCatalogSource().availableProviderCountries()
-            loadingCountries = false
-            await loadProviders()
-        }
-        .onChange(of: selectedCountryCode) { _, _ in
-            Task { await loadProviders() }
         }
     }
 
@@ -271,42 +277,45 @@ struct VeyraStreamingAddonPickerView: View {
     @State private var loading = true
 
     var body: some View {
-        Form {
-            if loading {
-                Section { ProgressView() }
-            } else if groups.isEmpty {
-                Section {
-                    Text("Geen addons met catalogi gevonden. Stel de metadata-addon (bv. AIOMetadata) in via VeyraHub.")
-                        .foregroundStyle(.secondary)
+        VeyraDynamicBackgroundScope {
+            VeyraForm {
+                if loading {
+                    Section { ProgressView() }
+                } else if groups.isEmpty {
+                    Section {
+                        Text("Geen addons met catalogi gevonden. Stel de metadata-addon (bv. AIOMetadata) in via VeyraHub.")
+                            .foregroundStyle(.secondary)
+                    }
                 }
-            }
-            ForEach(groups) { group in
-                Section {
-                    ForEach(group.catalogs, id: \.uniqueID) { catalog in
-                        let entry = BentoStreamingEntry(addonID: group.id, catalogType: catalog.type, catalogID: catalog.id,
-                                                        name: catalog.displayName)
-                        if !entries.contains(where: { $0.id == entry.id }) {
-                            Button { add(entry) } label: {
-                                HStack {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(catalog.displayName)
-                                        Text(catalog.type == "series" ? "Series" : "Films")
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
+                ForEach(groups) { group in
+                    Section {
+                        ForEach(group.catalogs, id: \.uniqueID) { catalog in
+                            let entry = BentoStreamingEntry(addonID: group.id, catalogType: catalog.type, catalogID: catalog.id,
+                                                            name: catalog.displayName)
+                            if !entries.contains(where: { $0.id == entry.id }) {
+                                Button { add(entry) } label: {
+                                    HStack {
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(catalog.displayName)
+                                            Text(catalog.type == "series" ? "Series" : "Films")
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        Spacer()
+                                        Image(systemName: "plus.circle").foregroundStyle(.secondary)
                                     }
-                                    Spacer()
-                                    Image(systemName: "plus.circle").foregroundStyle(.secondary)
                                 }
                             }
                         }
+                    } header: {
+                        Text(group.name)
                     }
-                } header: {
-                    Text(group.name)
                 }
             }
+            .navigationTitle("Addon-catalogi")
+            .task { await load() }
+
         }
-        .navigationTitle("Addon-catalogi")
-        .task { await load() }
     }
 
     private func load() async {
@@ -346,52 +355,55 @@ struct VeyraStreamingEditorView: View {
     private var index: Int? { entries.firstIndex { $0.id == entryID } }
 
     var body: some View {
-        Form {
-            if let index {
-                Section {
-                    TextField("Naam", text: nameBinding(index))
-                } header: {
-                    Text("Naam")
-                }
+        VeyraDynamicBackgroundScope {
+            VeyraForm {
+                if let index {
+                    Section {
+                        TextField("Naam", text: nameBinding(index))
+                    } header: {
+                        Text("Naam")
+                    }
 
-                Section {
-                    preview(entries[index])
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 110)
-                        .background(Color.white.opacity(0.08))
-                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    Section {
+                        preview(entries[index])
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 110)
+                            .background(Color.white.opacity(0.08))
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
-                    TextField("Eigen logo (https-adres)", text: $urlText)
+                        TextField("Eigen logo (https-adres)", text: $urlText)
+                            #if os(iOS)
+                            .textInputAutocapitalization(.never)
+                            .keyboardType(.URL)
+                            #endif
+                        Button("Dit adres gebruiken") { useURLText() }
+                            .disabled(urlText.trimmingCharacters(in: .whitespaces).isEmpty)
+
                         #if os(iOS)
-                        .textInputAutocapitalization(.never)
-                        .keyboardType(.URL)
+                        PhotosPicker("Kies een foto uit Foto's", selection: $photo, matching: .images)
                         #endif
-                    Button("Dit adres gebruiken") { useURLText() }
-                        .disabled(urlText.trimmingCharacters(in: .whitespaces).isEmpty)
 
-                    #if os(iOS)
-                    PhotosPicker("Kies een foto uit Foto's", selection: $photo, matching: .images)
-                    #endif
+                        Button("Standaardlogo herstellen") { setLogo(nil) }
+                            .disabled(entries[index].customLogo == nil)
+                    } header: {
+                        Text("Logo")
+                    } footer: {
+                        Text("Een https-adres wordt ook op je andere apparaten gebruikt; een foto blijft op dit apparaat. Het logo vult automatisch het volledige kader, dus elke verhouding werkt -- voor het beste resultaat kies je een afbeelding waarbij het logo het hele vlak vult (zonder brede lege randen).")
+                    }
 
-                    Button("Standaardlogo herstellen") { setLogo(nil) }
-                        .disabled(entries[index].customLogo == nil)
-                } header: {
-                    Text("Logo")
-                } footer: {
-                    Text("Een https-adres wordt ook op je andere apparaten gebruikt; een foto blijft op dit apparaat. Het logo vult automatisch het volledige kader, dus elke verhouding werkt -- voor het beste resultaat kies je een afbeelding waarbij het logo het hele vlak vult (zonder brede lege randen).")
-                }
-
-                Section {
-                    Button("Verwijderen", role: .destructive) { remove(index) }
+                    Section {
+                        Button("Verwijderen", role: .destructive) { remove(index) }
+                    }
                 }
             }
+            .navigationTitle("Streamingdienst")
+            #if os(iOS)
+            .onChange(of: photo) { _, item in
+                Task { await importPhoto(item) }
+            }
+            #endif
+
         }
-        .navigationTitle("Streamingdienst")
-        #if os(iOS)
-        .onChange(of: photo) { _, item in
-            Task { await importPhoto(item) }
-        }
-        #endif
     }
 
     @ViewBuilder

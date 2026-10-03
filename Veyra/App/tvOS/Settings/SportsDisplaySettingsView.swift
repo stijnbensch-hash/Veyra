@@ -13,44 +13,47 @@ struct SportsDisplaySettingsView: View {
     }
 
     var body: some View {
-        ZStack {
-            VeyraBackground().ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            List {
-                ForEach(SportCategory.allCases) { category in
-                    let isCategoryOn = enabledCategories.contains(category)
+                VeyraList {
+                    ForEach(SportCategory.allCases) { category in
+                        let isCategoryOn = enabledCategories.contains(category)
 
-                    Section {
-                        VeyraSettingsToggleRow(
-                            icon: "sportscourt",
-                            title: category.displayName,
-                            subtitle: "Toon deze sport op Home en in het Sport-menu",
-                            isOn: Binding(
-                                get: { isCategoryOn },
-                                set: { setCategory(category, enabled: $0) }
-                            )
-                        )
-
-                        if isCategoryOn {
-                            ForEach(leagues(for: category)) { league in
-                                VeyraSettingsToggleRow(
-                                    icon: league.symbol,
-                                    title: league.name,
-                                    isOn: Binding(
-                                        get: { enabledLeagueIDs.contains(league.id) },
-                                        set: { setLeague(league.id, enabled: $0) }
-                                    )
+                        Section {
+                            VeyraSettingsToggleRow(
+                                icon: "sportscourt",
+                                title: category.displayName,
+                                subtitle: "Toon deze sport op Home en in het Sport-menu",
+                                isOn: Binding(
+                                    get: { isCategoryOn },
+                                    set: { setCategory(category, enabled: $0) }
                                 )
+                            )
+
+                            if isCategoryOn {
+                                ForEach(leagues(for: category)) { league in
+                                    VeyraSettingsToggleRow(
+                                        icon: league.symbol,
+                                        title: league.name,
+                                        isOn: Binding(
+                                            get: { enabledLeagueIDs.contains(league.id) },
+                                            set: { setLeague(league.id, enabled: $0) }
+                                        )
+                                    )
+                                }
                             }
+                        } header: {
+                            Text(category.displayName)
                         }
-                    } header: {
-                        Text(category.displayName)
                     }
                 }
+                .frame(maxWidth: 1000)
             }
-            .frame(maxWidth: 1000)
+            .navigationTitle("Sport")
+
         }
-        .navigationTitle("Sport")
     }
 
     private func setCategory(_ category: SportCategory, enabled: Bool) {

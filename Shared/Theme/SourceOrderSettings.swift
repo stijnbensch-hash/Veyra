@@ -127,36 +127,92 @@ enum SourceOrderDefaults {
     /// voorkomen (nieuwe addon, nog niet ingesteld) behouden hun relatieve
     /// plek, achteraan.
     ///
-    /// `isFromHub` markeert bronnen die via een VeyraHub-server komen. Voor
-    /// die bronnen is VeyraHub's eigen addonvolgorde (in te stellen op de
-    /// hub zelf) leidend — de API levert streams al in die volgorde aan.
-    /// Deze functie past de lokale Bronvolgorde-lijst daarom NOOIT toe op
-    /// hub-bronnen, ook niet als een addonnaam toevallig ook in de lokale
-    /// lijst voorkomt (bv. een stale/verouderde entry): ze behouden altijd
-    /// hun binnenkomende (hub-gerangschikte) relatieve volgorde. Zo hoeft
-    /// een VeyraHub-addon niet apart in Instellingen → Bronvolgorde gezet
-    /// te worden, en kan de volgorde nooit uit sync raken met de hub.
+    /// `isFromHub` markeert bronnen die via een VeyraHub-server komen; die
+    /// staan als GROEP altijd eerst. Binnen die groep bleek VeyraHub's eigen
+    /// API-volgorde in de praktijk NIET altijd de volgorde te volgen die op
+    /// VeyraHub zelf (Bronnen-pagina, addons verplaatsen) is ingesteld — dus
+    /// ook hub-addons worden nu gerangschikt via dezelfde lokale Bronvolgorde
+    /// (Instellingen → Bronnen → Bronverschijning → Bronvolgorde) als de
+    /// niet-hub-bronnen; dat is de enige volgorde die vanuit de app zelf
+    /// echt betrouwbaar is in te stellen. Een hub-addon die nog niet in die
+    /// lijst voorkomt behoudt zijn binnenkomende relatieve plek (achteraan).
+    ///
+    /// Binnen de niet-hub-bronnen bepaalt `category`/`categoryOrder` eerst
+    /// of mediaservers of IPTV voorrang krijgen (Instellingen → Bronnen →
+    /// categoriekaarten); pas daarna telt de naam-specifieke Bronvolgorde.
     static func sortedByOriginOrder<T>(
         _ values: [T],
         order: [String],
         originName: (T) -> String,
-        isFromHub: (T) -> Bool = { _ in false }
+        isFromHub: (T) -> Bool = { _ in false },
+        category: (T) -> SourceCategory? = { _ in nil },
+        categoryOrder: [SourceCategory] = SourceOrderDefaults.defaultCategoryOrder
     ) -> [T] {
-        guard !order.isEmpty else { return values }
-
         var rank: [String: Int] = [:]
         for (index, name) in order.enumerated() {
             rank[name.lowercased()] = index
         }
 
+        var categoryRank: [SourceCategory: Int] = [:]
+        for (index, cat) in categoryOrder.enumerated() {
+            categoryRank[cat] = index
+        }
+
         let indexed = values.enumerated().map { ($0.offset, $0.element) }
         let sorted = indexed.sorted { lhs, rhs in
-            let lhsRank = isFromHub(lhs.1) ? (order.count + lhs.0) : (rank[originName(lhs.1).lowercased()] ?? (order.count + lhs.0))
-            let rhsRank = isFromHub(rhs.1) ? (order.count + rhs.0) : (rank[originName(rhs.1).lowercased()] ?? (order.count + rhs.0))
+            let lhsFromHub = isFromHub(lhs.1)
+            let rhsFromHub = isFromHub(rhs.1)
+            if lhsFromHub != rhsFromHub { return lhsFromHub }
+
+            if !lhsFromHub {
+                let lhsCategoryRank = category(lhs.1).flatMap { categoryRank[$0] } ?? categoryRank.count
+                let rhsCategoryRank = category(rhs.1).flatMap { categoryRank[$0] } ?? categoryRank.count
+                if lhsCategoryRank != rhsCategoryRank { return lhsCategoryRank < rhsCategoryRank }
+            }
+
+            let lhsRank = rank[originName(lhs.1).lowercased()] ?? (order.count + lhs.0)
+            let rhsRank = rank[originName(rhs.1).lowercased()] ?? (order.count + rhs.0)
             if lhsRank != rhsRank { return lhsRank < rhsRank }
             return lhs.0 < rhs.0
         }
 
         return sorted.map(\.1)
+    }
+
+    // MARK: - Bekende VeyraHub-addonnamen
+
+    /// Namen van VeyraHub-addons (bv. "Torrent", "Usenet") die ooit als bron
+    /// zijn tegengekomen — zodat ze ook zichtbaar en herschikbaar worden op
+    /// het Bronvolgorde-scherm, ook al zijn ze geen lokaal geïnstalleerde
+    /// addon of mediaserver. Wordt bijgehouden door `SourceSelectionViewModel`
+    /// / `SourceSelectionView` bij het laden van bronnen.
+    static let knownHubAddonNamesKey = "sourceOrder.knownHubAddonNames"
+
+    static func loadKnownHubAddonNames(from defaults: UserDefaults = .standard) -> [String] {
+        guard let data = defaults.data(forKey: knownHubAddonNamesKey),
+              let names = try? JSONDecoder().decode([String].self, from: data) else {
+            return []
+        }
+        return names
+    }
+
+    /// Voegt nieuw gezien hub-addonnamen toe aan de bekende lijst, in
+    /// ontdekkingsvolgorde, zonder duplicaten (hoofdletterongevoelig).
+    static func recordKnownHubAddonNames(_ names: [String], to defaults: UserDefaults = .standard) {
+        guard !names.isEmpty else { return }
+        var known = loadKnownHubAddonNames(from: defaults)
+        var seen = Set(known.map { $0.lowercased() })
+        var didAdd = false
+        for name in names {
+            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { continue }
+            let key = trimmed.lowercased()
+            guard !seen.contains(key) else { continue }
+            seen.insert(key)
+            known.append(trimmed)
+            didAdd = true
+        }
+        guard didAdd, let data = try? JSONEncoder().encode(known) else { return }
+        defaults.set(data, forKey: knownHubAddonNamesKey)
     }
 }

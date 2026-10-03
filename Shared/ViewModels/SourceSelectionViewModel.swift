@@ -32,6 +32,10 @@ final class SourceSelectionViewModel: ObservableObject {
         let (addonValues, mediaServerValues) = await (addonValuesTask, mediaServerValuesTask)
         guard !Task.isCancelled, self.generation == generation else { return }
 
+        SourceOrderDefaults.recordKnownHubAddonNames(
+            (addonValues + mediaServerValues).filter(\.isFromHub).map(\.originName)
+        )
+
         sources = Self.applyOriginOrder(
             SourceResolver.deduplicated(addonValues + mediaServerValues)
         )
@@ -60,7 +64,9 @@ final class SourceSelectionViewModel: ObservableObject {
             values,
             order: SourceOrderDefaults.loadOriginOrder(),
             originName: { $0.originName },
-            isFromHub: { $0.isFromHub }
+            isFromHub: { $0.isFromHub },
+            category: { $0.category },
+            categoryOrder: SourceOrderDefaults.loadCategoryOrder()
         )
     }
 }

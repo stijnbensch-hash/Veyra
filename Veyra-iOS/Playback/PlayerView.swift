@@ -1272,136 +1272,139 @@ private struct IOSSubtitleTrackSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                VeyraColors.background.ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            NavigationStack {
+                ZStack {
+                    VeyraBackground()
 
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 10) {
-                        trackRow(
-                            title: "Uit", subtitle: "Geen ondertitels",
-                            systemImage: "captions.bubble.fill",
-                            selected: !engine.isSubtitleActive
-                        ) {
-                            SubtitleService.shared.userSelectedTrack()
-                            engine.clearSubtitle()
-                            engine.clearSecondarySubtitle()
-                            dismiss()
-                        }
-
-                        ForEach(engine.subtitleTracks) { track in
+                    VeyraScrollView {
+                        VStack(alignment: .leading, spacing: 10) {
                             trackRow(
-                                title: title(track), subtitle: details(track),
-                                systemImage: "captions.bubble",
-                                selected: engine.activeSubtitleTrackIndex == track.id
+                                title: "Uit", subtitle: "Geen ondertitels",
+                                systemImage: "captions.bubble.fill",
+                                selected: !engine.isSubtitleActive
                             ) {
                                 SubtitleService.shared.userSelectedTrack()
-                                engine.selectSubtitleTrack(index: track.id)
+                                engine.clearSubtitle()
+                                engine.clearSecondarySubtitle()
                                 dismiss()
                             }
-                        }
 
-                        if engine.subtitleTracks.isEmpty && !engine.isLoadingSubtitles {
-                            Text("Deze stream biedt momenteel geen selecteerbare ondertitels aan.")
-                                .font(.subheadline)
-                                .foregroundStyle(.white.opacity(0.6))
+                            ForEach(engine.subtitleTracks) { track in
+                                trackRow(
+                                    title: title(track), subtitle: details(track),
+                                    systemImage: "captions.bubble",
+                                    selected: engine.activeSubtitleTrackIndex == track.id
+                                ) {
+                                    SubtitleService.shared.userSelectedTrack()
+                                    engine.selectSubtitleTrack(index: track.id)
+                                    dismiss()
+                                }
+                            }
+
+                            if engine.subtitleTracks.isEmpty && !engine.isLoadingSubtitles {
+                                Text("Deze stream biedt momenteel geen selecteerbare ondertitels aan.")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.white.opacity(0.6))
+                                    .padding(.top, 12)
+                            }
+
+                            if engine.isLoadingSubtitles {
+                                HStack(spacing: 10) {
+                                    ProgressView()
+                                    Text("Ondertitels laden…").foregroundStyle(.white.opacity(0.6))
+                                }
                                 .padding(.top, 12)
-                        }
-
-                        if engine.isLoadingSubtitles {
-                            HStack(spacing: 10) {
-                                ProgressView()
-                                Text("Ondertitels laden…").foregroundStyle(.white.opacity(0.6))
                             }
+
+                            Button {
+                                showOpenSubtitlesSearch = true
+                            } label: {
+                                HStack(spacing: 14) {
+                                    Image(systemName: "globe")
+                                        .font(.system(size: 18))
+                                        .foregroundStyle(VeyraColors.cyan)
+                                        .frame(width: 28)
+
+                                    Text("Zoek online via OpenSubtitles")
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundStyle(.white)
+
+                                    Spacer()
+
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundStyle(.white.opacity(0.4))
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 14)
+                                .veyraGlass(radius: 14, backgroundOpacity: 0.6)
+                            }
+                            .buttonStyle(.plain)
                             .padding(.top, 12)
-                        }
 
-                        Button {
-                            showOpenSubtitlesSearch = true
-                        } label: {
-                            HStack(spacing: 14) {
-                                Image(systemName: "globe")
-                                    .font(.system(size: 18))
-                                    .foregroundStyle(VeyraColors.cyan)
-                                    .frame(width: 28)
+                            sectionHeader("WEERGAVE")
 
-                                Text("Zoek online via OpenSubtitles")
-                                    .font(.system(size: 16, weight: .medium))
-                                    .foregroundStyle(.white)
+                            appearanceRow(
+                                title: "Tekstgrootte", value: subtitleSize.title,
+                                systemImage: "textformat.size"
+                            ) { cycleSubtitleSize() }
 
-                                Spacer()
+                            appearanceRow(
+                                title: "Achtergrond", value: subtitleBackground.title,
+                                systemImage: "rectangle.fill"
+                            ) { cycleBackground() }
 
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .foregroundStyle(.white.opacity(0.4))
+                            appearanceRow(
+                                title: "Plaatsing", value: subtitlePosition.title,
+                                systemImage: "rectangle.bottomthird.inset.filled"
+                            ) { cyclePosition() }
+
+                            appearanceRow(
+                                title: "Schaduw", value: subtitleShadow ? "Aan" : "Uit",
+                                systemImage: "shadow"
+                            ) { subtitleShadow.toggle() }
+
+                            sectionHeader("SYNCHRONISATIE")
+
+                            Text(currentOffsetDescription)
+                                .font(.footnote)
+                                .foregroundStyle(.white.opacity(0.6))
+                                .padding(.bottom, 4)
+
+                            actionRow(title: "10 sec vroeger", systemImage: "gobackward.10") {
+                                adjustOffset(by: -10)
                             }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 14)
-                            .veyraGlass(radius: 14, backgroundOpacity: 0.6)
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.top, 12)
-
-                        sectionHeader("WEERGAVE")
-
-                        appearanceRow(
-                            title: "Tekstgrootte", value: subtitleSize.title,
-                            systemImage: "textformat.size"
-                        ) { cycleSubtitleSize() }
-
-                        appearanceRow(
-                            title: "Achtergrond", value: subtitleBackground.title,
-                            systemImage: "rectangle.fill"
-                        ) { cycleBackground() }
-
-                        appearanceRow(
-                            title: "Plaatsing", value: subtitlePosition.title,
-                            systemImage: "rectangle.bottomthird.inset.filled"
-                        ) { cyclePosition() }
-
-                        appearanceRow(
-                            title: "Schaduw", value: subtitleShadow ? "Aan" : "Uit",
-                            systemImage: "shadow"
-                        ) { subtitleShadow.toggle() }
-
-                        sectionHeader("SYNCHRONISATIE")
-
-                        Text(currentOffsetDescription)
-                            .font(.footnote)
-                            .foregroundStyle(.white.opacity(0.6))
-                            .padding(.bottom, 4)
-
-                        actionRow(title: "10 sec vroeger", systemImage: "gobackward.10") {
-                            adjustOffset(by: -10)
-                        }
-                        actionRow(title: "0,1 sec vroeger", systemImage: "minus") {
-                            adjustOffset(by: -0.1)
-                        }
-                        actionRow(title: "0,1 sec later", systemImage: "plus") {
-                            adjustOffset(by: 0.1)
-                        }
-                        actionRow(title: "10 sec later", systemImage: "goforward.10") {
-                            adjustOffset(by: 10)
-                        }
-                        if subtitleOffset != 0 {
-                            actionRow(title: "Terugzetten naar 0,0s", systemImage: "arrow.counterclockwise") {
-                                subtitleOffset = 0
+                            actionRow(title: "0,1 sec vroeger", systemImage: "minus") {
+                                adjustOffset(by: -0.1)
+                            }
+                            actionRow(title: "0,1 sec later", systemImage: "plus") {
+                                adjustOffset(by: 0.1)
+                            }
+                            actionRow(title: "10 sec later", systemImage: "goforward.10") {
+                                adjustOffset(by: 10)
+                            }
+                            if subtitleOffset != 0 {
+                                actionRow(title: "Terugzetten naar 0,0s", systemImage: "arrow.counterclockwise") {
+                                    subtitleOffset = 0
+                                }
                             }
                         }
+                        .padding(20)
                     }
-                    .padding(20)
+                }
+                .navigationTitle("Ondertitels")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Sluiten") { dismiss() }
+                    }
+                }
+                .sheet(isPresented: $showOpenSubtitlesSearch) {
+                    OpenSubtitlesSearchView(item: item, engine: engine)
                 }
             }
-            .navigationTitle("Ondertitels")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Sluiten") { dismiss() }
-                }
-            }
-            .sheet(isPresented: $showOpenSubtitlesSearch) {
-                OpenSubtitlesSearchView(item: item, engine: engine)
-            }
+
         }
     }
 
@@ -1567,63 +1570,66 @@ private struct IOSAudioTrackSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                VeyraColors.background.ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            NavigationStack {
+                ZStack {
+                    VeyraBackground()
 
-                if engine.audioTracks.isEmpty {
-                    Text("Geen audiotracks beschikbaar voor deze stream.")
-                        .font(.subheadline)
-                        .foregroundStyle(.white.opacity(0.6))
-                        .padding(24)
-                } else {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 10) {
-                            ForEach(engine.audioTracks) { track in
-                                Button {
-                                    engine.selectAudioTrack(index: track.id)
-                                    dismiss()
-                                } label: {
-                                    HStack(spacing: 14) {
-                                        Image(
-                                            systemName: engine.activeAudioTrackIndex == track.id
-                                                ? "checkmark.circle.fill" : "circle"
-                                        )
-                                        .foregroundStyle(VeyraColors.cyan)
+                    if engine.audioTracks.isEmpty {
+                        Text("Geen audiotracks beschikbaar voor deze stream.")
+                            .font(.subheadline)
+                            .foregroundStyle(.white.opacity(0.6))
+                            .padding(24)
+                    } else {
+                        VeyraScrollView {
+                            VStack(alignment: .leading, spacing: 10) {
+                                ForEach(engine.audioTracks) { track in
+                                    Button {
+                                        engine.selectAudioTrack(index: track.id)
+                                        dismiss()
+                                    } label: {
+                                        HStack(spacing: 14) {
+                                            Image(
+                                                systemName: engine.activeAudioTrackIndex == track.id
+                                                    ? "checkmark.circle.fill" : "circle"
+                                            )
+                                            .foregroundStyle(VeyraColors.cyan)
 
-                                        VStack(alignment: .leading, spacing: 3) {
-                                            Text(track.name.isEmpty ? "Audiotrack \(track.id + 1)" : track.name)
-                                                .font(.system(size: 16, weight: .medium))
-                                                .foregroundStyle(.white)
+                                            VStack(alignment: .leading, spacing: 3) {
+                                                Text(track.name.isEmpty ? "Audiotrack \(track.id + 1)" : track.name)
+                                                    .font(.system(size: 16, weight: .medium))
+                                                    .foregroundStyle(.white)
 
-                                            Text(audioDescription(track))
-                                                .font(.footnote)
-                                                .foregroundStyle(.white.opacity(0.6))
+                                                Text(audioDescription(track))
+                                                    .font(.footnote)
+                                                    .foregroundStyle(.white.opacity(0.6))
+                                            }
+
+                                            Spacer()
                                         }
-
-                                        Spacer()
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 14)
+                                        .veyraGlass(
+                                            radius: 14,
+                                            backgroundOpacity: engine.activeAudioTrackIndex == track.id ? 1.0 : 0.6
+                                        )
                                     }
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 14)
-                                    .veyraGlass(
-                                        radius: 14,
-                                        backgroundOpacity: engine.activeAudioTrackIndex == track.id ? 1.0 : 0.6
-                                    )
+                                    .buttonStyle(.plain)
                                 }
-                                .buttonStyle(.plain)
                             }
+                            .padding(20)
                         }
-                        .padding(20)
+                    }
+                }
+                .navigationTitle("Audio")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Sluiten") { dismiss() }
                     }
                 }
             }
-            .navigationTitle("Audio")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Sluiten") { dismiss() }
-                }
-            }
+
         }
     }
 

@@ -8,7 +8,7 @@ struct VeyraHomePresetPickerView: View {
     var onDone: () -> Void
 
     var body: some View {
-        ScrollView {
+        VeyraScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 Text("Wat wil je op Home zien?")
                     .font(.largeTitle.bold())
@@ -50,131 +50,134 @@ struct VeyraHomeLayoutSettingsView: View {
     @AppStorage(GeneralSettingsDefaults.liveFavoritesOnlyKey) private var liveFavoritesOnly = false
 
     var body: some View {
-        Form {
-            Section {
-                ForEach(VeyraHomePreset.all) { preset in
+        VeyraDynamicBackgroundScope {
+            VeyraForm {
+                Section {
+                    ForEach(VeyraHomePreset.all) { preset in
+                        Button {
+                            layout = preset.layout
+                            VeyraHomeLayoutStore.save(layout)
+                        } label: {
+                            #if os(tvOS)
+                            // Een kale `Button` in een tvOS-`List` krijgt bij focus altijd de
+                            // felwitte systeemkaart -- i.p.v. daarvan hier dezelfde donkere
+                            // kaart + cyaan gloed als de rest van de instellingenschermen
+                            // (zie `VeyraSettingsCardRow.swift`).
+                            VeyraSettingsCardRowLabel(icon: preset.symbol, title: preset.title, subtitle: preset.detail) {
+                                if layout.preset == preset.id {
+                                    Image(systemName: "checkmark").foregroundStyle(VeyraColors.cyan)
+                                }
+                            }
+                            #else
+                            HStack {
+                                Label {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(preset.title)
+                                        Text(preset.detail).font(.caption).foregroundStyle(.secondary)
+                                    }
+                                } icon: {
+                                    Image(systemName: preset.symbol)
+                                }
+                                Spacer()
+                                if layout.preset == preset.id { Image(systemName: "checkmark").foregroundStyle(VeyraColors.cyan) }
+                            }
+                            #endif
+                        }
+                        #if os(tvOS)
+                        .veyraCardRow()
+                        #endif
+                    }
+                } header: {
+                    Text("Start met")
+                } footer: {
+                    Text("Een preset zet alle blokken in één keer; daarna pas je ze hieronder aan.")
+                }
+
+                Section {
+                    // Volgorde bepaal je hier rechtstreeks in de lijst (sleepbalkje
+                    // op iOS via "Bewerken", knoppen op tvOS) i.p.v. in het
+                    // deelmenu van een los blok. Op tvOS staan de op/neer-knoppen
+                    // bewust NAAST de NavigationLink (niet erin genest) -- een
+                    // Button genest in het label van een NavigationLink krijgt op
+                    // tvOS geen eigen remote-focus.
+                    ForEach(Array(layout.orderedTiles.enumerated()), id: \.element) { index, tile in
+                        HStack {
+                            #if !os(iOS)
+                            Image(systemName: "line.3.horizontal")
+                                .foregroundStyle(.secondary)
+                            #endif
+                            NavigationLink {
+                                VeyraHomeTileEditorView(tile: tile, layout: $layout)
+                            } label: {
+                                HStack {
+                                    Label(tile.title, systemImage: tile.symbol)
+                                    Spacer()
+                                    Text(layout.isVisible(tile) ? "Aan" : "Uit").foregroundStyle(.secondary)
+                                }
+                            }
+                            #if !os(iOS)
+                            VStack(spacing: 6) {
+                                Button { moveTile(index, by: -1) } label: {
+                                    Image(systemName: "chevron.up")
+                                }.disabled(index == 0)
+                                Button { moveTile(index, by: 1) } label: {
+                                    Image(systemName: "chevron.down")
+                                }.disabled(index >= layout.orderedTiles.count - 1)
+                            }
+                            .buttonStyle(.plain)
+                            #endif
+                        }
+                    }
+                    .onMove { offsets, destination in
+                        layout.move(fromOffsets: offsets, toOffset: destination)
+                        persist()
+                    }
+                } header: {
+                    Text("Blokken op Home (in volgorde)")
+                } footer: {
+                    Text("Blokken zonder inhoud (bijvoorbeeld Live nu zonder IPTV) verschijnen vanzelf niet.")
+                }
+
+                Section {
+                    Toggle("Sport", isOn: Binding(get: { layout.showSport }, set: { layout.showSport = $0; layout.preset = nil; persist() }))
+                    Toggle("Eigen planken", isOn: Binding(get: { layout.showShelves }, set: { layout.showShelves = $0; layout.preset = nil; persist() }))
+                } header: {
+                    Text("Overig")
+                }
+
+                Section {
+                    Toggle("Enkel favoriete zenders tonen", isOn: $liveFavoritesOnly)
+                } header: {
+                    Text("Live TV")
+                } footer: {
+                    Text("Geldt voor \"Live nu\" op Home en Veyra Now. Zonder favoriete zenders blijft dit blok leeg.")
+                }
+
+                Section {
                     Button {
-                        layout = preset.layout
-                        VeyraHomeLayoutStore.save(layout)
+                        layout = .standard
+                        persist()
                     } label: {
                         #if os(tvOS)
-                        // Een kale `Button` in een tvOS-`List` krijgt bij focus altijd de
-                        // felwitte systeemkaart -- i.p.v. daarvan hier dezelfde donkere
-                        // kaart + cyaan gloed als de rest van de instellingenschermen
-                        // (zie `VeyraSettingsCardRow.swift`).
-                        VeyraSettingsCardRowLabel(icon: preset.symbol, title: preset.title, subtitle: preset.detail) {
-                            if layout.preset == preset.id {
-                                Image(systemName: "checkmark").foregroundStyle(VeyraColors.cyan)
-                            }
-                        }
+                        VeyraSettingsCardRowLabel(icon: "arrow.counterclockwise", title: "Standaardindeling herstellen")
                         #else
-                        HStack {
-                            Label {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(preset.title)
-                                    Text(preset.detail).font(.caption).foregroundStyle(.secondary)
-                                }
-                            } icon: {
-                                Image(systemName: preset.symbol)
-                            }
-                            Spacer()
-                            if layout.preset == preset.id { Image(systemName: "checkmark").foregroundStyle(VeyraColors.cyan) }
-                        }
+                        Text("Standaardindeling herstellen")
                         #endif
                     }
                     #if os(tvOS)
                     .veyraCardRow()
                     #endif
                 }
-            } header: {
-                Text("Start met")
-            } footer: {
-                Text("Een preset zet alle blokken in één keer; daarna pas je ze hieronder aan.")
+            }
+            .navigationTitle("Indeling")
+            #if os(iOS)
+            .toolbar { EditButton() }
+            #endif
+            .onReceive(NotificationCenter.default.publisher(for: .veyraHomeLayoutDidChange)) { _ in
+                let fresh = VeyraHomeLayoutStore.load()
+                if fresh != layout { layout = fresh }
             }
 
-            Section {
-                // Volgorde bepaal je hier rechtstreeks in de lijst (sleepbalkje
-                // op iOS via "Bewerken", knoppen op tvOS) i.p.v. in het
-                // deelmenu van een los blok. Op tvOS staan de op/neer-knoppen
-                // bewust NAAST de NavigationLink (niet erin genest) -- een
-                // Button genest in het label van een NavigationLink krijgt op
-                // tvOS geen eigen remote-focus.
-                ForEach(Array(layout.orderedTiles.enumerated()), id: \.element) { index, tile in
-                    HStack {
-                        #if !os(iOS)
-                        Image(systemName: "line.3.horizontal")
-                            .foregroundStyle(.secondary)
-                        #endif
-                        NavigationLink {
-                            VeyraHomeTileEditorView(tile: tile, layout: $layout)
-                        } label: {
-                            HStack {
-                                Label(tile.title, systemImage: tile.symbol)
-                                Spacer()
-                                Text(layout.isVisible(tile) ? "Aan" : "Uit").foregroundStyle(.secondary)
-                            }
-                        }
-                        #if !os(iOS)
-                        VStack(spacing: 6) {
-                            Button { moveTile(index, by: -1) } label: {
-                                Image(systemName: "chevron.up")
-                            }.disabled(index == 0)
-                            Button { moveTile(index, by: 1) } label: {
-                                Image(systemName: "chevron.down")
-                            }.disabled(index >= layout.orderedTiles.count - 1)
-                        }
-                        .buttonStyle(.plain)
-                        #endif
-                    }
-                }
-                .onMove { offsets, destination in
-                    layout.move(fromOffsets: offsets, toOffset: destination)
-                    persist()
-                }
-            } header: {
-                Text("Blokken op Home (in volgorde)")
-            } footer: {
-                Text("Blokken zonder inhoud (bijvoorbeeld Live nu zonder IPTV) verschijnen vanzelf niet.")
-            }
-
-            Section {
-                Toggle("Sport", isOn: Binding(get: { layout.showSport }, set: { layout.showSport = $0; layout.preset = nil; persist() }))
-                Toggle("Eigen planken", isOn: Binding(get: { layout.showShelves }, set: { layout.showShelves = $0; layout.preset = nil; persist() }))
-            } header: {
-                Text("Overig")
-            }
-
-            Section {
-                Toggle("Enkel favoriete zenders tonen", isOn: $liveFavoritesOnly)
-            } header: {
-                Text("Live TV")
-            } footer: {
-                Text("Geldt voor \"Live nu\" op Home en Veyra Now. Zonder favoriete zenders blijft dit blok leeg.")
-            }
-
-            Section {
-                Button {
-                    layout = .standard
-                    persist()
-                } label: {
-                    #if os(tvOS)
-                    VeyraSettingsCardRowLabel(icon: "arrow.counterclockwise", title: "Standaardindeling herstellen")
-                    #else
-                    Text("Standaardindeling herstellen")
-                    #endif
-                }
-                #if os(tvOS)
-                .veyraCardRow()
-                #endif
-            }
-        }
-        .navigationTitle("Indeling")
-        #if os(iOS)
-        .toolbar { EditButton() }
-        #endif
-        .onReceive(NotificationCenter.default.publisher(for: .veyraHomeLayoutDidChange)) { _ in
-            let fresh = VeyraHomeLayoutStore.load()
-            if fresh != layout { layout = fresh }
         }
     }
 
@@ -195,15 +198,18 @@ struct VeyraHomeTileEditorView: View {
     @Binding var layout: VeyraHomeLayout
 
     var body: some View {
-        Form {
-            Section {
-                Toggle("Tonen op Home", isOn: Binding(
-                    get: { layout.isVisible(tile) },
-                    set: { layout.setVisible($0, tile); VeyraHomeLayoutStore.save(layout) }))
-            } footer: {
-                Text(tile.detail)
+        VeyraDynamicBackgroundScope {
+            VeyraForm {
+                Section {
+                    Toggle("Tonen op Home", isOn: Binding(
+                        get: { layout.isVisible(tile) },
+                        set: { layout.setVisible($0, tile); VeyraHomeLayoutStore.save(layout) }))
+                } footer: {
+                    Text(tile.detail)
+                }
             }
+            .navigationTitle(tile.title)
+
         }
-        .navigationTitle(tile.title)
     }
 }

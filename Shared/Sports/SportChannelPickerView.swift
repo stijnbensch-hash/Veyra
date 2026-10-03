@@ -100,7 +100,7 @@ struct SportChannelPickerView: View {
             }
             .padding(40)
         } else {
-            ScrollView {
+            VeyraScrollView {
                 VStack(alignment: .leading, spacing: 10) {
                     Text(query.title)
                         .font(.subheadline.weight(.semibold))

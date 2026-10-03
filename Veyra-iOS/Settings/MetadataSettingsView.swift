@@ -41,128 +41,131 @@ struct MetadataSettingsView: View {
     @AppStorage(MetadataRatingProvider.mal.storageKey) private var mal = true
 
     var body: some View {
-        ZStack {
-            VeyraColors.background.ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            List {
-                Section {
-                    Picker("Posterverrijking", selection: $posterEnrichmentSourceRaw) {
-                        ForEach(PosterEnrichmentMode.allCases) { option in
-                            Text(option.title).tag(option.rawValue)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-
-                    if posterEnrichmentSource == .betterPosters {
-                        HStack {
-                            Spacer()
-                            VeyraPosterCard(
-                                title: "Voorbeeldfilm",
-                                url: nil,
-                                width: 100,
-                                genre: "Actie",
-                                rating: 7.8
-                            )
-                            Spacer()
-                        }
-                        .listRowBackground(Color.clear)
-
-                        Toggle("Genre", isOn: $posterShowGenre)
-                        Toggle("Beoordeling", isOn: $posterShowRating)
-                        if posterShowRating {
-                            Picker("Bron", selection: $posterRatingSourceRaw) {
-                                ForEach(PosterRatingSource.allCases) { option in
-                                    Text(option.title).tag(option.rawValue)
-                                }
+                VeyraList {
+                    Section {
+                        Picker("Posterverrijking", selection: $posterEnrichmentSourceRaw) {
+                            ForEach(PosterEnrichmentMode.allCases) { option in
+                                Text(option.title).tag(option.rawValue)
                             }
                         }
-                        Toggle("Leeftijdsclassificatie", isOn: $posterShowAgeRating)
-                        Toggle("Kwaliteitslabels", isOn: $posterShowQuality)
-                            .disabled(true)
-                        Toggle("Trendlabels", isOn: $posterShowTrending)
-                    }
-                } header: {
-                    Text("Posterverrijking")
-                } footer: {
-                    Text("Toont een badge op de posters in Films, Series en het startscherm. Genre, Beoordeling, Leeftijdsclassificatie en Trendlabels werken allemaal echt. Kwaliteitslabels staat uitgeschakeld: dat vraagt per titel een opgezochte stream, wat voor een heel posterrooster te veel netwerkverkeer zou zijn.")
-                }
+                        .pickerStyle(.segmented)
 
-                Section {
-                    Picker("Metadatabron", selection: $metadataSourceRaw) {
-                        ForEach(MetadataSourceOption.allCases) { option in
-                            Text(option.title).tag(option.rawValue)
+                        if posterEnrichmentSource == .betterPosters {
+                            HStack {
+                                Spacer()
+                                VeyraPosterCard(
+                                    title: "Voorbeeldfilm",
+                                    url: nil,
+                                    width: 100,
+                                    genre: "Actie",
+                                    rating: 7.8
+                                )
+                                Spacer()
+                            }
+                            .listRowBackground(Color.clear)
+
+                            Toggle("Genre", isOn: $posterShowGenre)
+                            Toggle("Beoordeling", isOn: $posterShowRating)
+                            if posterShowRating {
+                                Picker("Bron", selection: $posterRatingSourceRaw) {
+                                    ForEach(PosterRatingSource.allCases) { option in
+                                        Text(option.title).tag(option.rawValue)
+                                    }
+                                }
+                            }
+                            Toggle("Leeftijdsclassificatie", isOn: $posterShowAgeRating)
+                            Toggle("Kwaliteitslabels", isOn: $posterShowQuality)
+                                .disabled(true)
+                            Toggle("Trendlabels", isOn: $posterShowTrending)
                         }
-                    }
-                } header: {
-                    Text("Metadatabron")
-                } footer: {
-                    Text("Bepaalt waar poster, achtergrond en omschrijving vandaan komen voor titels zonder eigen afbeeldingen (bv. Trakt-lijsten). AIOMetadata gebruikt de addonconfiguratie via VeyraHub.")
-                }
-
-                if let addon = MetadataSourcePreference.activeAddon() {
-                    Section {
-                        AddonConnectivityRow(addon: addon, status: connectivity)
                     } header: {
-                        Text("Status")
+                        Text("Posterverrijking")
+                    } footer: {
+                        Text("Toont een badge op de posters in Films, Series en het startscherm. Genre, Beoordeling, Leeftijdsclassificatie en Trendlabels werken allemaal echt. Kwaliteitslabels staat uitgeschakeld: dat vraagt per titel een opgezochte stream, wat voor een heel posterrooster te veel netwerkverkeer zou zijn.")
                     }
-                }
 
-                Section {
-                    NavigationLink {
-                        MetadataDiagnosticsView()
-                    } label: {
-                        Label("Diagnostics", systemImage: "stethoscope")
+                    Section {
+                        Picker("Metadatabron", selection: $metadataSourceRaw) {
+                            ForEach(MetadataSourceOption.allCases) { option in
+                                Text(option.title).tag(option.rawValue)
+                            }
+                        }
+                    } header: {
+                        Text("Metadatabron")
+                    } footer: {
+                        Text("Bepaalt waar poster, achtergrond en omschrijving vandaan komen voor titels zonder eigen afbeeldingen (bv. Trakt-lijsten). AIOMetadata gebruikt de addonconfiguratie via VeyraHub.")
                     }
-                } footer: {
-                    Text("Metadata-/artworkbron, cache, fallback en duur van de laatste aanvragen deze sessie.")
-                }
 
-                Section {
-                    Picker("Titelweergave", selection: artworkBinding(\.titleDisplay)) {
-                        ForEach(ArtworkTitleDisplayMode.allCases) { option in
-                            Text(option.title).tag(option)
+                    if let addon = MetadataSourcePreference.activeAddon() {
+                        Section {
+                            AddonConnectivityRow(addon: addon, status: connectivity)
+                        } header: {
+                            Text("Status")
                         }
                     }
-                    Picker("Taalvoorkeur", selection: artworkBinding(\.language)) {
-                        ForEach(ArtworkLanguageOption.allCases) { option in
-                            Text(option.title).tag(option)
-                        }
-                    }
-                    Picker("Fallbacktaal", selection: artworkBinding(\.fallbackLanguage)) {
-                        ForEach(ArtworkLanguageOption.allCases) { option in
-                            Text(option.title).tag(option)
-                        }
-                    }
-                } header: {
-                    Text("Artwork")
-                } footer: {
-                    Text("Bepaalt of Detail/Hero/Player een ClearLogo tonen i.p.v. titeltekst, en in welke taal. Geldt voor zowel TMDB als een gekozen AIOMetadata-addon.")
-                }
 
-                Section {
-                    toggleRow(.imdb, isOn: $imdb)
-                    toggleRow(.tmdb, isOn: $tmdb)
-                    toggleRow(.tomatometer, isOn: $tomatometer)
-                    toggleRow(.metacritic, isOn: $metacritic)
-                    toggleRow(.trakt, isOn: $trakt)
-                    toggleRow(.popcornmeter, isOn: $popcornmeter)
-                    toggleRow(.letterboxd, isOn: $letterboxd)
-                    toggleRow(.mal, isOn: $mal)
-                } header: {
-                    Text("Ratings")
-                } footer: {
-                    Text("Kies welke ratings zichtbaar zijn op film- en seriepagina's. Een titel toont alleen de scores die de bron er daadwerkelijk voor heeft. Popcornmeter en Letterboxd tonen enkel iets wanneer je bij Account een MDBList API-sleutel hebt ingesteld.")
-                }
+                    Section {
+                        NavigationLink {
+                            MetadataDiagnosticsView()
+                        } label: {
+                            Label("Diagnostics", systemImage: "stethoscope")
+                        }
+                    } footer: {
+                        Text("Metadata-/artworkbron, cache, fallback en duur van de laatste aanvragen deze sessie.")
+                    }
 
-                Section {
-                    Button("Alle ratings inschakelen") { setAll(true) }
-                    Button("Alle ratings uitschakelen") { setAll(false) }
+                    Section {
+                        Picker("Titelweergave", selection: artworkBinding(\.titleDisplay)) {
+                            ForEach(ArtworkTitleDisplayMode.allCases) { option in
+                                Text(option.title).tag(option)
+                            }
+                        }
+                        Picker("Taalvoorkeur", selection: artworkBinding(\.language)) {
+                            ForEach(ArtworkLanguageOption.allCases) { option in
+                                Text(option.title).tag(option)
+                            }
+                        }
+                        Picker("Fallbacktaal", selection: artworkBinding(\.fallbackLanguage)) {
+                            ForEach(ArtworkLanguageOption.allCases) { option in
+                                Text(option.title).tag(option)
+                            }
+                        }
+                    } header: {
+                        Text("Artwork")
+                    } footer: {
+                        Text("Bepaalt of Detail/Hero/Player een ClearLogo tonen i.p.v. titeltekst, en in welke taal. Geldt voor zowel TMDB als een gekozen AIOMetadata-addon.")
+                    }
+
+                    Section {
+                        toggleRow(.imdb, isOn: $imdb)
+                        toggleRow(.tmdb, isOn: $tmdb)
+                        toggleRow(.tomatometer, isOn: $tomatometer)
+                        toggleRow(.metacritic, isOn: $metacritic)
+                        toggleRow(.trakt, isOn: $trakt)
+                        toggleRow(.popcornmeter, isOn: $popcornmeter)
+                        toggleRow(.letterboxd, isOn: $letterboxd)
+                        toggleRow(.mal, isOn: $mal)
+                    } header: {
+                        Text("Ratings")
+                    } footer: {
+                        Text("Kies welke ratings zichtbaar zijn op film- en seriepagina's. Een titel toont alleen de scores die de bron er daadwerkelijk voor heeft. Popcornmeter en Letterboxd tonen enkel iets wanneer je bij Account een MDBList API-sleutel hebt ingesteld.")
+                    }
+
+                    Section {
+                        Button("Alle ratings inschakelen") { setAll(true) }
+                        Button("Alle ratings uitschakelen") { setAll(false) }
+                    }
                 }
+                .scrollContentBackground(.hidden)
             }
-            .scrollContentBackground(.hidden)
+            .navigationTitle("Metadata")
+            .task(id: metadataSourceRaw) { await checkConnectivity() }
+
         }
-        .navigationTitle("Metadata")
-        .task(id: metadataSourceRaw) { await checkConnectivity() }
     }
 
     private func checkConnectivity() async {

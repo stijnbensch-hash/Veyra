@@ -70,7 +70,9 @@ struct LiveTVView: View {
     private let guideFocusInset: CGFloat = 12
 
     var body: some View {
-        navigationLayer
+        VeyraDynamicBackgroundScope {
+            navigationLayer
+        }
     }
 
     // MARK: - Root layers
@@ -984,7 +986,7 @@ struct LiveTVView: View {
         ScrollViewReader {
             proxy in
 
-            ScrollView(
+            VeyraScrollView(
                 .vertical,
                 showsIndicators: false
             ) {
@@ -1715,110 +1717,113 @@ private struct LiveTVSearchView: View {
     private var dismiss
 
     var body: some View {
-        ZStack {
-            VeyraEPGTheme.background
-                .ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraEPGTheme.background
+                    .ignoresSafeArea()
 
-            VStack(
-                alignment: .leading,
-                spacing: 30
-            ) {
-                HStack {
-                    Text(
-                        "ZOEKEN"
+                VStack(
+                    alignment: .leading,
+                    spacing: 30
+                ) {
+                    HStack {
+                        Text(
+                            "ZOEKEN"
+                        )
+                        .font(
+                            .system(
+                                size: 38,
+                                weight: .light
+                            )
+                        )
+                        .tracking(
+                            4
+                        )
+
+                        Spacer()
+
+                        Button {
+                            dismiss()
+
+                        } label: {
+                            Image(
+                                systemName:
+                                    "xmark"
+                            )
+                            .frame(
+                                width: 60,
+                                height: 60
+                            )
+                        }
+                        .buttonStyle(
+                            VeyraEPGButtonStyle()
+                        )
+                    }
+
+                    TextField(
+                        "Zoek zenders en programma's",
+                        text:
+                            $searchText
                     )
                     .font(
                         .system(
-                            size: 38,
-                            weight: .light
+                            size: 28
                         )
                     )
-                    .tracking(
-                        4
+                    .textInputAutocapitalization(
+                        .never
                     )
+                    .autocorrectionDisabled()
+                    .textFieldStyle(
+                        .plain
+                    )
+                    .padding(
+                        20
+                    )
+                    .background(
+                        RoundedRectangle(
+                            cornerRadius: 14,
+                            style: .continuous
+                        )
+                        .fill(
+                            Color(
+                                red: 0.035,
+                                green: 0.10,
+                                blue: 0.16
+                            )
+                        )
+                    )
+
+                    if !searchText.isEmpty {
+                        Button {
+                            searchText = ""
+
+                        } label: {
+                            Label(
+                                "Zoekopdracht wissen",
+                                systemImage:
+                                    "xmark.circle"
+                            )
+                            .padding(
+                                16
+                            )
+                        }
+                        .buttonStyle(
+                            VeyraEPGButtonStyle()
+                        )
+                    }
 
                     Spacer()
-
-                    Button {
-                        dismiss()
-
-                    } label: {
-                        Image(
-                            systemName:
-                                "xmark"
-                        )
-                        .frame(
-                            width: 60,
-                            height: 60
-                        )
-                    }
-                    .buttonStyle(
-                        VeyraEPGButtonStyle()
-                    )
                 }
-
-                TextField(
-                    "Zoek zenders en programma's",
-                    text:
-                        $searchText
-                )
-                .font(
-                    .system(
-                        size: 28
-                    )
-                )
-                .textInputAutocapitalization(
-                    .never
-                )
-                .autocorrectionDisabled()
-                .textFieldStyle(
-                    .plain
-                )
                 .padding(
-                    20
+                    60
                 )
-                .background(
-                    RoundedRectangle(
-                        cornerRadius: 14,
-                        style: .continuous
-                    )
-                    .fill(
-                        Color(
-                            red: 0.035,
-                            green: 0.10,
-                            blue: 0.16
-                        )
-                    )
-                )
-
-                if !searchText.isEmpty {
-                    Button {
-                        searchText = ""
-
-                    } label: {
-                        Label(
-                            "Zoekopdracht wissen",
-                            systemImage:
-                                "xmark.circle"
-                        )
-                        .padding(
-                            16
-                        )
-                    }
-                    .buttonStyle(
-                        VeyraEPGButtonStyle()
-                    )
-                }
-
-                Spacer()
             }
-            .padding(
-                60
+            .foregroundStyle(
+                .white
             )
+
         }
-        .foregroundStyle(
-            .white
-        )
     }
 }
 
@@ -1863,250 +1868,253 @@ private struct VeyraEPGDetails: View {
     private var dismiss
 
     var body: some View {
-        ZStack {
-            VeyraEPGTheme.background
-                .ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraEPGTheme.background
+                    .ignoresSafeArea()
 
-            ScrollView {
-                VStack(
-                    alignment: .leading,
-                    spacing: 24
-                ) {
-                    Text(
-                        ChannelNameOverrideStore
-                            .effectiveName(
-                                channelID:
-                                    selection.row
-                                        .channel
-                                        .id,
-                                defaultName:
-                                    selection.row
-                                        .channel
-                                        .name
-                            )
-                    )
-                    .font(
-                        .system(
-                            size: 22,
-                            weight: .semibold
-                        )
-                    )
-                    .foregroundStyle(
-                        .cyan
-                    )
-
-                    Text(
-                        selection.programme?
-                            .title
-                        ??
-                        "Zenderinformatie"
-                    )
-                    .font(
-                        .system(
-                            size: 38,
-                            weight: .semibold
-                        )
-                    )
-
-                    if let programme =
-                        selection.programme
-                    {
+                VeyraScrollView {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 24
+                    ) {
                         Text(
-                            VeyraEPGFormat.day(
-                                programme.start
-                            )
-                            +
-                            "  "
-                            +
-                            VeyraEPGFormat.time(
-                                programme.start
-                            )
-                            +
-                            " - "
-                            +
-                            VeyraEPGFormat.time(
-                                programme.end
+                            ChannelNameOverrideStore
+                                .effectiveName(
+                                    channelID:
+                                        selection.row
+                                            .channel
+                                            .id,
+                                    defaultName:
+                                        selection.row
+                                            .channel
+                                            .name
+                                )
+                        )
+                        .font(
+                            .system(
+                                size: 22,
+                                weight: .semibold
                             )
                         )
                         .foregroundStyle(
-                            .cyan.opacity(
-                                0.8
+                            .cyan
+                        )
+
+                        Text(
+                            selection.programme?
+                                .title
+                            ??
+                            "Zenderinformatie"
+                        )
+                        .font(
+                            .system(
+                                size: 38,
+                                weight: .semibold
                             )
                         )
 
-                        if !programme
-                            .subtitle
-                            .isEmpty
+                        if let programme =
+                            selection.programme
                         {
                             Text(
-                                programme.subtitle
+                                VeyraEPGFormat.day(
+                                    programme.start
+                                )
+                                +
+                                "  "
+                                +
+                                VeyraEPGFormat.time(
+                                    programme.start
+                                )
+                                +
+                                " - "
+                                +
+                                VeyraEPGFormat.time(
+                                    programme.end
+                                )
                             )
-                            .font(
-                                .title3
+                            .foregroundStyle(
+                                .cyan.opacity(
+                                    0.8
+                                )
                             )
-                        }
 
-                        Text(
-                            programme.summary
+                            if !programme
+                                .subtitle
                                 .isEmpty
-                            ?
-                            "Geen beschrijving beschikbaar."
-                            :
-                            programme.summary
-                        )
-                        .foregroundStyle(
-                            .white.opacity(
-                                0.75
-                            )
-                        )
-                        .fixedSize(
-                            horizontal: false,
-                            vertical: true
-                        )
+                            {
+                                Text(
+                                    programme.subtitle
+                                )
+                                .font(
+                                    .title3
+                                )
+                            }
 
-                        if programme.estimatedEnd {
                             Text(
-                                "De eindtijd is afgeleid van het volgende programma."
-                            )
-                            .font(
-                                .caption
-                            )
-                            .foregroundStyle(
-                                .secondary
-                            )
-                        }
-
-                        if !programme.isOnAir(
-                            at: Date()
-                        ) {
-                            Text(
-                                "Kijk live opent de huidige uitzending van deze zender, niet dit geplande of afgelopen programma. Terugkijken is in deze gids nog niet ingebouwd."
-                            )
-                            .font(
-                                .callout
-                            )
-                            .foregroundStyle(
-                                .secondary
-                            )
-                        }
-
-                    } else {
-                        Text(
-                            "Geen programma-informatie voor dit tijdvak. De livezender blijft beschikbaar."
-                        )
-                        .foregroundStyle(
-                            .secondary
-                        )
-                    }
-
-                    HStack(
-                        spacing: 20
-                    ) {
-                        Button(
-                            action:
-                                onPlay
-                        ) {
-                            Label(
-                                "Kijk live",
-                                systemImage:
-                                    "play.fill"
-                            )
-                            .padding(
-                                16
-                            )
-                        }
-                        .buttonStyle(
-                            VeyraEPGButtonStyle(
-                                selected: true
-                            )
-                        )
-
-                        Button {
-                            guide.toggleFavorite(
-                                selection.row
-                            )
-
-                        } label: {
-                            Label(
-                                guide.favorites
-                                    .contains(
-                                        selection.row.id
-                                    )
+                                programme.summary
+                                    .isEmpty
                                 ?
-                                "Favoriet verwijderen"
+                                "Geen beschrijving beschikbaar."
                                 :
-                                "Favoriet maken",
-                                systemImage:
+                                programme.summary
+                            )
+                            .foregroundStyle(
+                                .white.opacity(
+                                    0.75
+                                )
+                            )
+                            .fixedSize(
+                                horizontal: false,
+                                vertical: true
+                            )
+
+                            if programme.estimatedEnd {
+                                Text(
+                                    "De eindtijd is afgeleid van het volgende programma."
+                                )
+                                .font(
+                                    .caption
+                                )
+                                .foregroundStyle(
+                                    .secondary
+                                )
+                            }
+
+                            if !programme.isOnAir(
+                                at: Date()
+                            ) {
+                                Text(
+                                    "Kijk live opent de huidige uitzending van deze zender, niet dit geplande of afgelopen programma. Terugkijken is in deze gids nog niet ingebouwd."
+                                )
+                                .font(
+                                    .callout
+                                )
+                                .foregroundStyle(
+                                    .secondary
+                                )
+                            }
+
+                        } else {
+                            Text(
+                                "Geen programma-informatie voor dit tijdvak. De livezender blijft beschikbaar."
+                            )
+                            .foregroundStyle(
+                                .secondary
+                            )
+                        }
+
+                        HStack(
+                            spacing: 20
+                        ) {
+                            Button(
+                                action:
+                                    onPlay
+                            ) {
+                                Label(
+                                    "Kijk live",
+                                    systemImage:
+                                        "play.fill"
+                                )
+                                .padding(
+                                    16
+                                )
+                            }
+                            .buttonStyle(
+                                VeyraEPGButtonStyle(
+                                    selected: true
+                                )
+                            )
+
+                            Button {
+                                guide.toggleFavorite(
+                                    selection.row
+                                )
+
+                            } label: {
+                                Label(
                                     guide.favorites
                                         .contains(
                                             selection.row.id
                                         )
                                     ?
-                                    "star.fill"
+                                    "Favoriet verwijderen"
                                     :
-                                    "star"
+                                    "Favoriet maken",
+                                    systemImage:
+                                        guide.favorites
+                                            .contains(
+                                                selection.row.id
+                                            )
+                                        ?
+                                        "star.fill"
+                                        :
+                                        "star"
+                                )
+                                .padding(
+                                    16
+                                )
+                            }
+                            .buttonStyle(
+                                VeyraEPGButtonStyle()
                             )
+
+                            Button(
+                                "Sluiten"
+                            ) {
+                                dismiss()
+                            }
                             .padding(
                                 16
                             )
-                        }
-                        .buttonStyle(
-                            VeyraEPGButtonStyle()
-                        )
-
-                        Button(
-                            "Sluiten"
-                        ) {
-                            dismiss()
-                        }
-                        .padding(
-                            16
-                        )
-                        .buttonStyle(
-                            VeyraEPGButtonStyle()
-                        )
-                    }
-
-                    if let programme = selection.programme,
-                       programme.end > Date() {
-                        Button {
-                            Task { await scheduleRecording(programme) }
-                        } label: {
-                            Label("Neem deze aflevering op", systemImage: "record.circle")
-                                .padding(16)
-                        }
-                        .buttonStyle(VeyraEPGButtonStyle())
-                        .disabled(schedulingRecording)
-
-                        let seriesActive = isRecordingWholeSeries(programme)
-                        Button {
-                            toggleSeriesRecording(programme)
-                        } label: {
-                            Label(
-                                seriesActive ? "Stop met hele serie opnemen" : "Neem hele serie op",
-                                systemImage: seriesActive ? "record.circle.fill" : "tv.badge.wifi"
+                            .buttonStyle(
+                                VeyraEPGButtonStyle()
                             )
-                            .padding(16)
                         }
-                        .buttonStyle(VeyraEPGButtonStyle(selected: seriesActive))
+
+                        if let programme = selection.programme,
+                           programme.end > Date() {
+                            Button {
+                                Task { await scheduleRecording(programme) }
+                            } label: {
+                                Label("Neem deze aflevering op", systemImage: "record.circle")
+                                    .padding(16)
+                            }
+                            .buttonStyle(VeyraEPGButtonStyle())
+                            .disabled(schedulingRecording)
+
+                            let seriesActive = isRecordingWholeSeries(programme)
+                            Button {
+                                toggleSeriesRecording(programme)
+                            } label: {
+                                Label(
+                                    seriesActive ? "Stop met hele serie opnemen" : "Neem hele serie op",
+                                    systemImage: seriesActive ? "record.circle.fill" : "tv.badge.wifi"
+                                )
+                                .padding(16)
+                            }
+                            .buttonStyle(VeyraEPGButtonStyle(selected: seriesActive))
+                        }
                     }
+                    .frame(
+                        maxWidth: 1200,
+                        alignment: .leading
+                    )
+                    .padding(
+                        60
+                    )
                 }
-                .frame(
-                    maxWidth: 1200,
-                    alignment: .leading
-                )
-                .padding(
-                    60
-                )
             }
-        }
-        .foregroundStyle(
-            .white
-        )
-        .alert("VeyraHub Recorder", isPresented: $showRecorderAlert) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text(recorderMessage)
+            .foregroundStyle(
+                .white
+            )
+            .alert("VeyraHub Recorder", isPresented: $showRecorderAlert) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(recorderMessage)
+            }
+
         }
     }
 
@@ -2328,30 +2336,10 @@ private enum VeyraEPGTheme {
         }
     }
 
-    static var background:
-        LinearGradient
-    {
-        switch guideTheme {
-        case .colourful:
-            return LinearGradient(
-                colors: [
-                    VeyraColors.background,
-                    Color(red: 0.015, green: 0.09, blue: 0.13),
-                    Color(red: 0.075, green: 0.015, blue: 0.045)
-                ],
-                startPoint: .bottomLeading, endPoint: .topTrailing
-            )
-        case .grey:
-            return LinearGradient(
-                colors: [Color(white: 0.07), Color(white: 0.12), Color(white: 0.07)],
-                startPoint: .bottomLeading, endPoint: .topTrailing
-            )
-        case .black:
-            return LinearGradient(
-                colors: [Color.black, Color.black],
-                startPoint: .bottomLeading, endPoint: .topTrailing
-            )
-        }
+    static var background: some View {
+        VeyraBackground()
+            .saturation(guideTheme == .colourful ? 1 : 0)
+            .brightness(guideTheme == .black ? -0.06 : 0)
     }
 }
 

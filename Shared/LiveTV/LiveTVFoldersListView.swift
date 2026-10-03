@@ -12,18 +12,21 @@ struct LiveTVFoldersListView: View {
     @State private var editingFolder: LiveTVFolder?
 
     var body: some View {
-        platformBody
-            .navigationTitle("Mijn mappen")
-            .sheet(isPresented: $showAddSheet, onDismiss: viewModel.reload) {
-                NavigationStack { LiveTVFolderEditView(folder: nil, viewModel: viewModel) }
-            }
-            .sheet(item: $editingFolder, onDismiss: viewModel.reload) { folder in
-                NavigationStack { LiveTVFolderEditView(folder: folder, viewModel: viewModel) }
-            }
-            .onAppear(perform: viewModel.reload)
-            .onReceive(NotificationCenter.default.publisher(for: .veyraLiveTVFoldersDidChange)) { _ in
-                viewModel.reload()
-            }
+        VeyraDynamicBackgroundScope {
+            platformBody
+                .navigationTitle("Mijn mappen")
+                .sheet(isPresented: $showAddSheet, onDismiss: viewModel.reload) {
+                    NavigationStack { LiveTVFolderEditView(folder: nil, viewModel: viewModel) }
+                }
+                .sheet(item: $editingFolder, onDismiss: viewModel.reload) { folder in
+                    NavigationStack { LiveTVFolderEditView(folder: folder, viewModel: viewModel) }
+                }
+                .onAppear(perform: viewModel.reload)
+                .onReceive(NotificationCenter.default.publisher(for: .veyraLiveTVFoldersDidChange)) { _ in
+                    viewModel.reload()
+                }
+
+        }
     }
 
     // Op tvOS wordt dit scherm altijd als `.sheet` getoond, en een tvOS-sheet
@@ -66,13 +69,13 @@ struct LiveTVFoldersListView: View {
             // `MacPlayerView`'s "Open Subtitles"-sheet: een expliciete
             // `.frame(minWidth:minHeight:)` + effen achtergrond.
             .frame(minWidth: 480, minHeight: 420)
-            .background(VeyraColors.background)
+            .background(VeyraBackground())
             #endif
         #endif
     }
 
     private var foldersList: some View {
-        List {
+        VeyraList {
             if viewModel.folders.isEmpty {
                 Section {
                     Text("Nog geen mappen. Maak een map aan (bv. \"Sport\") en voeg er kanalen uit één of meerdere IPTV-providers aan toe.")

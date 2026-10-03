@@ -16,3 +16,14 @@ struct VeyraPosterMetrics {
     var rowSpacing: CGFloat { regular ? 22 : 14 }
     var backdropHeight: CGFloat { 380 }
 }
+
+/// De gedeelde catalogusviews gebruiken op Mac het bestaande adaptieve raster.
+struct VeyraCatalogPosterGridLayout {
+    let availableWidth: CGFloat
+    let regular: Bool
+    private var metrics: VeyraPosterMetrics { VeyraPosterMetrics(regular: regular) }
+    var posterWidth: CGFloat { metrics.posterWidth }
+    var horizontalPadding: CGFloat { 16 }
+    var columns: [GridItem] { metrics.columns }
+    var rowSpacing: CGFloat { metrics.rowSpacing }
+}

@@ -83,141 +83,144 @@ struct VeyraBentoHomeView: View {
     // MARK: Body
 
     var body: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 0) {
-                streamingRibbon
-                VStack(alignment: .leading, spacing: 48) {
-                    // Context en aanbevelingen onder de mee scrollende dienstenrij.
-                    TimelineView(.periodic(from: .now, by: 5)) { context in
-                        VeyraContextRibbon(items: contextRibbonItems(now: context.date), now: context.date)
-                    }
-
-                    if let message = model.home.notice {
-                        VeyraStatusMessage(text: message) { Task { await model.load(force: true) } }
-                    }
-
-                    // "Verder kijken" en "Binnenkort" helemaal bovenaan, los van de rest van het raster.
-                    TimelineView(.periodic(from: .now, by: 30)) { context in
-                        bentoTop(now: context.date)
-                    }
-
-                    VeyraYourCollectionsSection()
-
-                    // "Live nu" hier vlak onder "Jouw collecties" (op uitdrukkelijk verzoek
-                    // verplaatst, stond voorheen na "Verder met je collecties" hieronder).
-                    TimelineView(.periodic(from: .now, by: 30)) { context in
-                        bentoLive(now: context.date)
-                    }
-
-                    // "Nieuw van hier" (Regional Releases fase 4, spec §4/§30): volledig regionaal
-                    // discovery-overzicht, meteen onder "Verder kijken"/"Binnenkort" -- zelfde
-                    // prominentie als de rest van de Home-top, los van het bento-raster net als
-                    // Trending/Voor jou hieronder.
-                    TimelineView(.periodic(from: .now, by: 30)) { context in
-                        bentoRegional(now: context.date)
-                    }
-
-                    // "Discovery Flow": Trending, los van het bento-raster -- Stap 9 van het
-                    // Home Visual System-spec, direct na "Verder kijken" (spec §97).
-                    VeyraDiscoveryFlow(title: "Trending", items: trendingItems)
-
-                    // "Dynamic Mosaic": Voor Jou -- Stap 10, direct na Trending (spec §97).
-                    VeyraMosaicSection(title: "Voor jou", items: voorJouItems)
-
-                    // Collections: "Verder met je collecties" -- toont zichzelf enkel wanneer er
-                    // effectief iets te hervatten valt (zie VeyraContinueCollectionsSection).
-                    VeyraContinueCollectionsSection()
-
-                    // "Binnenkort" teruggezet in "Verder kijken"-rij (zie bentoTop) -- geen
-                    // losse Calendar Horizon-sectie meer.
-
-                    // "Sports Stage": uitgelichte live wedstrijd, los van de rest van de
-                    // Sport-sectie -- Stap 14, direct na Nu op tv, vóór Live Sport (spec §97).
-                    TimelineView(.periodic(from: .now, by: 30)) { context in
-                        bentoSportsStage(now: context.date)
-                    }
-
-                    // Sport onder "Streamingdiensten".
-                    if layout.showSport, let sportModel, !sportModel.events.isEmpty {
-                        SportSection(
-                            model: sportModel,
-                            focus: $focus,
-                            onPlay: onPlaySport,
-                            onToggleReminder: onToggleSportReminder,
-                            onOpenCompetition: onOpenCompetition)
-                    } else if layout.showSport, let sportModel, sportModel.phase != .idle, sportModel.phase != .loading {
-                        Button { onOpenCompetition(SportCompetition(name: "Sport", liveCount: 0, eventCount: 0, nextStart: nil)) } label: {
-                            VeyraStatusMessage(text: "Sport: geen wedstrijden gevonden. Open het Sport-menu.")
+        VeyraDynamicBackgroundScope {
+            VeyraScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 0) {
+                    streamingRibbon
+                    VStack(alignment: .leading, spacing: 48) {
+                        // Context en aanbevelingen onder de mee scrollende dienstenrij.
+                        TimelineView(.periodic(from: .now, by: 5)) { context in
+                            VeyraContextRibbon(items: contextRibbonItems(now: context.date), now: context.date)
                         }
-                        .buttonStyle(VeyraTileStyle())
-                        .focused($focus, equals: .competition("Sport"))
-                    }
 
-                    // "IPTV films"/"IPTV series" pas na Sport.
-                    TimelineView(.periodic(from: .now, by: 30)) { context in
-                        bentoIPTV(now: context.date)
-                    }
+                        if let message = model.home.notice {
+                            VeyraStatusMessage(text: message) { Task { await model.load(force: true) } }
+                        }
 
-                    if layout.showShelves { VeyraBentoUserShelves(onOpen: onOpenTMDBTitle) }
+                        // "Verder kijken" en "Binnenkort" helemaal bovenaan, los van de rest van het raster.
+                        TimelineView(.periodic(from: .now, by: 30)) { context in
+                            bentoTop(now: context.date)
+                        }
+
+                        VeyraYourCollectionsSection()
+
+                        // "Live nu" hier vlak onder "Jouw collecties" (op uitdrukkelijk verzoek
+                        // verplaatst, stond voorheen na "Verder met je collecties" hieronder).
+                        TimelineView(.periodic(from: .now, by: 30)) { context in
+                            bentoLive(now: context.date)
+                        }
+
+                        // "Nieuw van hier" (Regional Releases fase 4, spec §4/§30): volledig regionaal
+                        // discovery-overzicht, meteen onder "Verder kijken"/"Binnenkort" -- zelfde
+                        // prominentie als de rest van de Home-top, los van het bento-raster net als
+                        // Trending/Voor jou hieronder.
+                        TimelineView(.periodic(from: .now, by: 30)) { context in
+                            bentoRegional(now: context.date)
+                        }
+
+                        // "Discovery Flow": Trending, los van het bento-raster -- Stap 9 van het
+                        // Home Visual System-spec, direct na "Verder kijken" (spec §97).
+                        VeyraDiscoveryFlow(title: "Trending", items: trendingItems)
+
+                        // "Dynamic Mosaic": Voor Jou -- Stap 10, direct na Trending (spec §97).
+                        VeyraMosaicSection(title: "Voor jou", items: voorJouItems)
+
+                        // Collections: "Verder met je collecties" -- toont zichzelf enkel wanneer er
+                        // effectief iets te hervatten valt (zie VeyraContinueCollectionsSection).
+                        VeyraContinueCollectionsSection()
+
+                        // "Binnenkort" teruggezet in "Verder kijken"-rij (zie bentoTop) -- geen
+                        // losse Calendar Horizon-sectie meer.
+
+                        // "Sports Stage": uitgelichte live wedstrijd, los van de rest van de
+                        // Sport-sectie -- Stap 14, direct na Nu op tv, vóór Live Sport (spec §97).
+                        TimelineView(.periodic(from: .now, by: 30)) { context in
+                            bentoSportsStage(now: context.date)
+                        }
+
+                        // Sport onder "Streamingdiensten".
+                        if layout.showSport, let sportModel, !sportModel.events.isEmpty {
+                            SportSection(
+                                model: sportModel,
+                                focus: $focus,
+                                onPlay: onPlaySport,
+                                onToggleReminder: onToggleSportReminder,
+                                onOpenCompetition: onOpenCompetition)
+                        } else if layout.showSport, let sportModel, sportModel.phase != .idle, sportModel.phase != .loading {
+                            Button { onOpenCompetition(SportCompetition(name: "Sport", liveCount: 0, eventCount: 0, nextStart: nil)) } label: {
+                                VeyraStatusMessage(text: "Sport: geen wedstrijden gevonden. Open het Sport-menu.")
+                            }
+                            .buttonStyle(VeyraTileStyle())
+                            .focused($focus, equals: .competition("Sport"))
+                        }
+
+                        // "IPTV films"/"IPTV series" pas na Sport.
+                        TimelineView(.periodic(from: .now, by: 30)) { context in
+                            bentoIPTV(now: context.date)
+                        }
+
+                        if layout.showShelves { VeyraBentoUserShelves(onOpen: onOpenTMDBTitle) }
+                    }
+                    .padding(.leading, 40)
+                    .padding(.trailing, 80)
+                    .padding(.top, 16)
+                    .padding(.bottom, 80)
                 }
-                .padding(.leading, 40)
-                .padding(.trailing, 80)
-                .padding(.top, 16)
-                .padding(.bottom, 80)
+                .background(VeyraScrollPositionReader())
             }
-            .background(VeyraScrollPositionReader())
-        }
-        .veyraScrollingBackground()
-        .ignoresSafeArea(edges: [.horizontal, .bottom])
-        .task { await model.load() }
-        // Trending/Voor jou/Top 10 NA ELKAAR laden (niet gelijktijdig): elke
-        // HeroSpotlightLoader-call doet zelf al tot 14 gelijktijdige TMDB-
-        // clearlogo-verzoeken. Alle drie tegelijk bovenop de IPTV-opstart-
-        // ververs (zware VOD-JSON-decode, zie VeyraApp.swift) en model.load()
-        // duwde het geheugengebruik op tvOS te hoog -- app-crash bij opstart.
-        // Na elkaar geeft hetzelfde eindresultaat, met veel lagere piekbelasting.
-        .task {
-            trendingItems = await HeroSpotlightLoader.load(settings: .default)
-            voorJouItems = await HeroSpotlightLoader.load(settings: HeroSpotlightSettings(
-                style: .card,
-                primarySource: .trakt(list: .watchlist, kind: .movie),
-                secondarySource: .trakt(list: .watchlist, kind: .series)
-            ))
-            top10Items = await HeroSpotlightLoader.load(settings: HeroSpotlightSettings(
-                style: .card,
-                primarySource: .tmdb(list: .popular, kind: .movie),
-                secondarySource: .tmdb(list: .popular, kind: .series)
-            ))
-        }
-        .onChange(of: catalogLanguages) { _, _ in Task { await model.load(force: true) } }
-        .onReceive(NotificationCenter.default.publisher(for: .veyraHomeLayoutDidChange)) { _ in reloadLayout() }
-            .onReceive(NotificationCenter.default.publisher(for: .veyraNowSettingsDidChange)) { _ in nowSettings = VeyraNowSettingsStore.load() }
-        .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in reloadLayout() }
-        // Anders blijven "IPTV films"/"IPTV series" de oude, al-in-memory
-        // lijst tonen totdat je handmatig ververst of de app herstart, ook
-        // als je net iets verborgen hebt bij "VOD beheren".
-        .onReceive(NotificationCenter.default.publisher(for: .iptvConfigurationDidChange)) { _ in
-            Task { await model.load(force: true) }
-        }
-        // Aflevering/film afgekeken (Trakt-stop): "Verder kijken" meteen opnieuw ophalen.
-        .onReceive(NotificationCenter.default.publisher(for: .veyraTraktHistoryDidChange)) { _ in
-            Task { await model.load(force: true) }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .veyraTraktSnapshotDidChange)) { _ in
-            Task { await model.home.refreshContinueOrder() }
-        }
-        .onAppear { askPreset = !VeyraHomeLayoutStore.hasChosen }
-        .sheet(isPresented: $askPreset, onDismiss: { VeyraHomeLayoutStore.markChosen() }) {
-            VeyraHomePresetPickerView { askPreset = false }
-        }
-        .task { if let sportModel, sportModel.phase == .idle { await sportModel.load() } }
-        .task {
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(120))
-                if Task.isCancelled { break }
-                await model.refreshLive()
-                if let sportModel, sportModel.events.isEmpty { await sportModel.reload() }
+
+            .ignoresSafeArea(edges: [.horizontal, .bottom])
+            .task { await model.load() }
+            // Trending/Voor jou/Top 10 NA ELKAAR laden (niet gelijktijdig): elke
+            // HeroSpotlightLoader-call doet zelf al tot 14 gelijktijdige TMDB-
+            // clearlogo-verzoeken. Alle drie tegelijk bovenop de IPTV-opstart-
+            // ververs (zware VOD-JSON-decode, zie VeyraApp.swift) en model.load()
+            // duwde het geheugengebruik op tvOS te hoog -- app-crash bij opstart.
+            // Na elkaar geeft hetzelfde eindresultaat, met veel lagere piekbelasting.
+            .task {
+                trendingItems = await HeroSpotlightLoader.load(settings: .default)
+                voorJouItems = await HeroSpotlightLoader.load(settings: HeroSpotlightSettings(
+                    style: .card,
+                    primarySource: .trakt(list: .watchlist, kind: .movie),
+                    secondarySource: .trakt(list: .watchlist, kind: .series)
+                ))
+                top10Items = await HeroSpotlightLoader.load(settings: HeroSpotlightSettings(
+                    style: .card,
+                    primarySource: .tmdb(list: .popular, kind: .movie),
+                    secondarySource: .tmdb(list: .popular, kind: .series)
+                ))
             }
+            .onChange(of: catalogLanguages) { _, _ in Task { await model.load(force: true) } }
+            .onReceive(NotificationCenter.default.publisher(for: .veyraHomeLayoutDidChange)) { _ in reloadLayout() }
+                .onReceive(NotificationCenter.default.publisher(for: .veyraNowSettingsDidChange)) { _ in nowSettings = VeyraNowSettingsStore.load() }
+            .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in reloadLayout() }
+            // Anders blijven "IPTV films"/"IPTV series" de oude, al-in-memory
+            // lijst tonen totdat je handmatig ververst of de app herstart, ook
+            // als je net iets verborgen hebt bij "VOD beheren".
+            .onReceive(NotificationCenter.default.publisher(for: .iptvConfigurationDidChange)) { _ in
+                Task { await model.load(force: true) }
+            }
+            // Aflevering/film afgekeken (Trakt-stop): "Verder kijken" meteen opnieuw ophalen.
+            .onReceive(NotificationCenter.default.publisher(for: .veyraTraktHistoryDidChange)) { _ in
+                Task { await model.load(force: true) }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .veyraTraktSnapshotDidChange)) { _ in
+                Task { await model.home.refreshContinueOrder() }
+            }
+            .onAppear { askPreset = !VeyraHomeLayoutStore.hasChosen }
+            .sheet(isPresented: $askPreset, onDismiss: { VeyraHomeLayoutStore.markChosen() }) {
+                VeyraHomePresetPickerView { askPreset = false }
+            }
+            .task { if let sportModel, sportModel.phase == .idle { await sportModel.load() } }
+            .task {
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(120))
+                    if Task.isCancelled { break }
+                    await model.refreshLive()
+                    if let sportModel, sportModel.events.isEmpty { await sportModel.reload() }
+                }
+            }
+
         }
     }
 

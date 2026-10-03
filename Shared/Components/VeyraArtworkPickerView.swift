@@ -34,10 +34,12 @@ struct VeyraArtworkPickerView: View {
     }
 
     var body: some View {
-        content
-            .navigationTitle("Artwork aanpassen")
-            .task { await load() }
-            .onChange(of: artworkRefresh.generation) { _, _ in refreshOverrides() }
+        VeyraDynamicBackgroundScope {
+            content
+                .navigationTitle("Artwork aanpassen")
+                .task { await load() }
+                .onChange(of: artworkRefresh.generation) { _, _ in refreshOverrides() }
+        }
     }
 
     @ViewBuilder
@@ -53,7 +55,7 @@ struct VeyraArtworkPickerView: View {
     }
 
     private var form: some View {
-        Form {
+        VeyraForm {
             if item.tmdbID == nil {
                 Section {
                     Text("Geen TMDB-ID bekend voor deze titel — artwork aanpassen is hier niet mogelijk.")

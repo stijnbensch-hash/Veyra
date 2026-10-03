@@ -98,11 +98,13 @@ struct TrailerSection: View {
 
     private func play(_ trailer: TMDBVideo) {
         #if os(tvOS)
-        guard let url = URL(string: "youtube://www.youtube.com/watch?v=\(trailer.key)"),
-              UIApplication.shared.canOpenURL(url) else {
+        guard let url = URL(string: "youtube://www.youtube.com/watch?v=\(trailer.key)") else {
             showUnavailableAlert = true
             return
         }
+        // `canOpenURL` is deprecated op tvOS 27 ("Prefer attempting to open
+        // URLs and handling any failures") -- we proberen de URL nu direct
+        // te openen en vangen een mislukte poging op via het resultaat.
         Task {
             if !(await UIApplication.shared.open(url)) {
                 showUnavailableAlert = true

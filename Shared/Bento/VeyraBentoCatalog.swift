@@ -786,19 +786,40 @@ struct VeyraBentoCatalogView: View {
     }
 
     // Zelfde postermaat en rasterindeling als "Films"/"Series" in het hoofdmenu
-    // (`VeyraPosterMetrics` op iOS, `gridPosterWidth`/`railSpacing` op tvOS).
+    // (`VeyraPosterMetrics`/`VeyraCatalogPosterGridLayout` op iOS, `gridPosterWidth`/
+    // `railSpacing` op tvOS) -- op iPhone dus ook 3 vaste kolommen i.p.v. een adaptief
+    // raster dat er (bij deze postermaat) maar 2 kwijt kon.
     #if os(tvOS)
     private let posterWidth: CGFloat = 240
     private let railSpacing: CGFloat = 32
     #else
-    private var posterWidth: CGFloat { wideLayout ? 192 : 124 }
+    // Volledige breedte van het scherm (incl. de horizontale marge hieronder), gemeten via
+    // de achtergrond-`GeometryReader` in `body` -- 0 zolang die nog niet gemeten heeft.
+    @State private var measuredScreenWidth: CGFloat = 0
+
+    private var phoneContentWidth: CGFloat {
+        max(0, measuredScreenWidth - 2 * (compact ? 16 : 28))
+    }
+
+    private var posterWidth: CGFloat {
+        if wideLayout { return 192 }
+        guard phoneContentWidth > 0 else { return 124 }
+        return min(124, max(1, (phoneContentWidth - 8) / 3))
+    }
     #endif
 
     private var gridColumns: [GridItem] {
         #if os(tvOS)
         return [GridItem(.adaptive(minimum: posterWidth, maximum: posterWidth + 40), spacing: railSpacing, alignment: .top)]
         #else
-        return [GridItem(.adaptive(minimum: posterWidth), spacing: wideLayout ? 26 : 16, alignment: .top)]
+        if wideLayout {
+            return [GridItem(.adaptive(minimum: posterWidth), spacing: 26, alignment: .top)]
+        }
+        guard phoneContentWidth > 0 else {
+            return [GridItem(.adaptive(minimum: posterWidth), spacing: 16, alignment: .top)]
+        }
+        let spacing = max(8, (phoneContentWidth - 3 * posterWidth) / 2)
+        return Array(repeating: GridItem(.fixed(posterWidth), spacing: spacing, alignment: .top), count: 3)
         #endif
     }
 
@@ -816,88 +837,101 @@ struct VeyraBentoCatalogView: View {
     }
 
     var body: some View {
-        ZStack {
-            if catalog.isService {
-                ZStack(alignment: .top) {
-                    VeyraBackground()
-                    VeyraArtworkBackground(url: focusedServiceBackdrop ?? featuredBackdropURL,
-                                           maxPixelSize: compact ? (wideLayout ? 1440 : 1024) : 1920)
-                        .id(focusedServiceHeroID ?? "catalog-hero:\(catalog.id):\(heroRotationIndex)")
-                        .frame(height: serviceArtworkHeight)
-                        .clipped()
-                        .animation(.easeInOut(duration: 0.35), value: focusedServiceHeroID)
-                        .animation(.easeInOut(duration: 0.35), value: featuredBackdropURL)
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                if catalog.isService {
+                    ZStack(alignment: .top) {
+                        VeyraBackground()
+                        // Zelfde "Living Backdrop" + vervloeiing naar de pagina-achtergrond als
+                        // de hero op "Films"/"Series" (`VeyraCatalogHero` -> `VeyraHeroArtworkBackground`)
+                        // -- voorheen hard `.clipped()` zonder enige overgang naar beneden toe.
+                        VeyraHeroArtworkBackground(url: focusedServiceBackdrop ?? featuredBackdropURL)
+                            .id(focusedServiceHeroID ?? "catalog-hero:\(catalog.id):\(heroRotationIndex)")
+                            .frame(height: serviceArtworkHeight)
+                    }
+                    .ignoresSafeArea()
+                } else {
+                    VeyraBackground().ignoresSafeArea()
                 }
-                .ignoresSafeArea()
-            } else {
-                VeyraHomeStyle.ink.ignoresSafeArea()
-            }
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: catalog.isService ? (compact ? 12 : 24) : (compact ? 16 : 30)) {
-                    hero
+                VeyraScrollView {
+                    VStack(alignment: .leading, spacing: catalog.isService ? (compact ? 12 : 24) : (compact ? 16 : 30)) {
+                        hero
 
-                    if sections.count > 1 {
-                        HStack(spacing: compact ? 10 : 20) {
-                            ForEach(sections) { section in tab(section) }
+                        if sections.count > 1 {
+                            HStack(spacing: compact ? 10 : 20) {
+                                ForEach(sections) { section in tab(section) }
+                            }
+                        }
+
+                        if loading {
+                            ProgressView()
+                                .frame(maxWidth: .infinity)
+                                .padding(.top, 40)
+                        } else if current == nil {
+                            Text("Niets gevonden.")
+                                .font(.title3)
+                                .foregroundStyle(VeyraHomeStyle.dim)
+                        }
+
+                        if let current {
+                            // `id: \.offset` i.p.v. het TMDB-id zelf: als twee titels
+                            // (door een mislukte koppeling) toch hetzelfde id hebben,
+                            // blijft elke kaart een eigen, stabiele identiteit houden
+                            // zodat tikken altijd de juiste kaart opent.
+                            LazyVGrid(columns: gridColumns, alignment: .leading, spacing: gridRowSpacing) {
+                                ForEach(Array(current.titles.enumerated()), id: \.offset) { _, title in card(title) }
+                            }
+                            // Extra 6pt, zoals bij "Films"/"Series" op het hoofdmenu -- daar
+                            // krijgt het raster zelf nog wat marge bovenop de VStack-marge.
+                            .padding(.horizontal, compact ? 0 : 6)
+                            // Zonder dit blijft alle overtollige rijbreedte rechts hangen (asymmetrisch); zo
+                            // verdeelt de resterende ruimte zich gelijk aan beide kanten van het raster.
+                            .frame(maxWidth: .infinity, alignment: .center)
                         }
                     }
-
-                    if loading {
-                        ProgressView()
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, 40)
-                    } else if current == nil {
-                        Text("Niets gevonden.")
-                            .font(.title3)
-                            .foregroundStyle(VeyraHomeStyle.dim)
-                    }
-
-                    if let current {
-                        // `id: \.offset` i.p.v. het TMDB-id zelf: als twee titels
-                        // (door een mislukte koppeling) toch hetzelfde id hebben,
-                        // blijft elke kaart een eigen, stabiele identiteit houden
-                        // zodat tikken altijd de juiste kaart opent.
-                        LazyVGrid(columns: gridColumns, alignment: .leading, spacing: gridRowSpacing) {
-                            ForEach(Array(current.titles.enumerated()), id: \.offset) { _, title in card(title) }
-                        }
-                        // Extra 6pt, zoals bij "Films"/"Series" op het hoofdmenu -- daar
-                        // krijgt het raster zelf nog wat marge bovenop de VStack-marge.
-                        .padding(.horizontal, compact ? 0 : 6)
-                        // Zonder dit blijft alle overtollige rijbreedte rechts hangen (asymmetrisch); zo
-                        // verdeelt de resterende ruimte zich gelijk aan beide kanten van het raster.
-                        .frame(maxWidth: .infinity, alignment: .center)
-                    }
+                    // Horizontaal dezelfde inzet als "Films"/"Series" in het hoofdmenu (28pt
+                    // VStack-marge + 6pt grid-marge hierboven) -- stond hiervoor op 60pt,
+                    // waardoor het raster merkbaar smaller en meer naar binnen begon.
+                    .padding(.horizontal, compact ? 16 : 28)
+                    .padding(.top, catalog.isService ? (compact ? 8 : 24) : (compact ? 16 : 60))
+                    .padding(.bottom, compact ? 16 : 60)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                // Horizontaal dezelfde inzet als "Films"/"Series" in het hoofdmenu (28pt
-                // VStack-marge + 6pt grid-marge hierboven) -- stond hiervoor op 60pt,
-                // waardoor het raster merkbaar smaller en meer naar binnen begon.
-                .padding(.horizontal, compact ? 16 : 28)
-                .padding(.top, catalog.isService ? (compact ? 8 : 24) : (compact ? 16 : 60))
-                .padding(.bottom, compact ? 16 : 60)
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
-        }
-        .foregroundStyle(.white)
-        #if !os(tvOS)
-        .navigationTitle(catalog.name)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
-        .task(id: catalog.id + "|" + catalogLanguages) {
-            loading = true
-            let loaded = await VeyraCatalogSource().sections(for: catalog)
-            sections = loaded
-            selected = loaded.first?.id ?? ""
-            heroURL = Self.heroImage(catalog: catalog, sections: loaded)
-            loading = false
-        }
-        #if os(iOS)
-        .task {
-            if catalog.isService { await TraktStore.shared.refreshIfNeeded() }
-        }
-        #endif
-        .task(id: heroPool.map(\.id)) {
-            if catalog.isService { await rotateHeroAutomatically() }
+            .foregroundStyle(.white)
+            #if !os(tvOS)
+            // Meet de volledige schermbreedte zodat `posterWidth`/`gridColumns` hierboven op
+            // iPhone exact 3 vaste kolommen kunnen uitrekenen, zoals "Films"/"Series".
+            .background(
+                GeometryReader { geo in
+                    Color.clear
+                        .onAppear { measuredScreenWidth = geo.size.width }
+                        .onChange(of: geo.size.width) { _, newWidth in measuredScreenWidth = newWidth }
+                }
+            )
+            // De grote merk-wordmark in de hero toont de naam al -- de extra titel in de
+            // navigatiebalk was een letterlijke dubbele "Netflix" erboven.
+            .navigationTitle(catalog.isService ? "" : catalog.name)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .task(id: catalog.id + "|" + catalogLanguages) {
+                loading = true
+                let loaded = await VeyraCatalogSource().sections(for: catalog)
+                sections = loaded
+                selected = loaded.first?.id ?? ""
+                heroURL = Self.heroImage(catalog: catalog, sections: loaded)
+                loading = false
+            }
+            #if os(iOS)
+            .task {
+                if catalog.isService { await TraktStore.shared.refreshIfNeeded() }
+            }
+            #endif
+            .task(id: heroPool.map(\.id)) {
+                if catalog.isService { await rotateHeroAutomatically() }
+            }
+
         }
     }
 
@@ -1156,113 +1190,116 @@ struct VeyraCollectionsSettingsView: View {
     private var trimmed: String { query.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     var body: some View {
-        Form {
-            Section {
-                Toggle("Namen onder banners tonen", isOn: $showNames)
-            } footer: {
-                Text("Toont of verbergt de naam onder elke collectiebanner op Home.")
-            }
-
-            Section {
-                if loading {
-                    ProgressView()
-                } else if entries.isEmpty {
-                    Text("Nog geen collecties.").foregroundStyle(.secondary)
+        VeyraDynamicBackgroundScope {
+            VeyraForm {
+                Section {
+                    Toggle("Namen onder banners tonen", isOn: $showNames)
+                } footer: {
+                    Text("Toont of verbergt de naam onder elke collectiebanner op Home.")
                 }
-                // Volgorde bepaal je hier rechtstreeks in de lijst (sleepbalkje op
-                // iOS via "Bewerken", knoppen op tvOS) i.p.v. in het deelmenu van
-                // een losse collectie. Op tvOS staan de op/neer-knoppen bewust
-                // NAAST de NavigationLink (niet erin genest) -- een Button genest
-                // in het label van een NavigationLink krijgt op tvOS geen eigen
-                // remote-focus.
-                ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
-                    HStack(spacing: 14) {
-                        #if !os(iOS)
-                        Image(systemName: "line.3.horizontal")
-                            .foregroundStyle(.secondary)
-                        #endif
-                        NavigationLink {
-                            VeyraCollectionEditorView(entryID: entry.id, entries: $entries)
-                        } label: {
-                            row(entry)
-                        }
-                        #if !os(iOS)
-                        Spacer()
-                        VStack(spacing: 6) {
-                            Button { moveEntry(index, by: -1) } label: {
-                                Image(systemName: "chevron.up")
-                            }.disabled(index == 0)
-                            Button { moveEntry(index, by: 1) } label: {
-                                Image(systemName: "chevron.down")
-                            }.disabled(index >= entries.count - 1)
-                        }
-                        .buttonStyle(.plain)
-                        #endif
+
+                Section {
+                    if loading {
+                        ProgressView()
+                    } else if entries.isEmpty {
+                        Text("Nog geen collecties.").foregroundStyle(.secondary)
                     }
-                }
-                .onMove { offsets, destination in
-                    entries.move(fromOffsets: offsets, toOffset: destination)
-                    VeyraCollectionsStore.save(entries)
-                }
-            } header: {
-                Text("Collecties op Home")
-            } footer: {
-                Text("Kies een collectie om de naam of banner aan te passen, of om hem te verwijderen.")
-            }
-
-            Section {
-                TextField("Zoek een filmcollectie, bv. Alien", text: $query)
-                    .onSubmit { Task { await search() } }
-                Button("Zoeken") { Task { await search() } }
-                    .disabled(trimmed.isEmpty || searching)
-                if searching {
-                    ProgressView()
-                } else if searched && results.isEmpty {
-                    Text("Niets gevonden.").foregroundStyle(.secondary)
-                }
-                ForEach(results) { result in
-                    Button { add(result) } label: {
-                        HStack {
-                            Text(result.name)
+                    // Volgorde bepaal je hier rechtstreeks in de lijst (sleepbalkje op
+                    // iOS via "Bewerken", knoppen op tvOS) i.p.v. in het deelmenu van
+                    // een losse collectie. Op tvOS staan de op/neer-knoppen bewust
+                    // NAAST de NavigationLink (niet erin genest) -- een Button genest
+                    // in het label van een NavigationLink krijgt op tvOS geen eigen
+                    // remote-focus.
+                    ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                        HStack(spacing: 14) {
+                            #if !os(iOS)
+                            Image(systemName: "line.3.horizontal")
+                                .foregroundStyle(.secondary)
+                            #endif
+                            NavigationLink {
+                                VeyraCollectionEditorView(entryID: entry.id, entries: $entries)
+                            } label: {
+                                row(entry)
+                            }
+                            #if !os(iOS)
                             Spacer()
-                            Image(systemName: "plus.circle").foregroundStyle(.secondary)
+                            VStack(spacing: 6) {
+                                Button { moveEntry(index, by: -1) } label: {
+                                    Image(systemName: "chevron.up")
+                                }.disabled(index == 0)
+                                Button { moveEntry(index, by: 1) } label: {
+                                    Image(systemName: "chevron.down")
+                                }.disabled(index >= entries.count - 1)
+                            }
+                            .buttonStyle(.plain)
+                            #endif
                         }
                     }
+                    .onMove { offsets, destination in
+                        entries.move(fromOffsets: offsets, toOffset: destination)
+                        VeyraCollectionsStore.save(entries)
+                    }
+                } header: {
+                    Text("Collecties op Home")
+                } footer: {
+                    Text("Kies een collectie om de naam of banner aan te passen, of om hem te verwijderen.")
                 }
-            } header: {
-                Text("Filmcollectie toevoegen")
-            }
 
-            Section {
-                Button(loadingTrakt ? "Laden…" : "Mijn Trakt-lijsten tonen") { Task { await loadTraktLists() } }
-                    .disabled(loadingTrakt)
-                if traktLoaded && availableTraktLists.isEmpty {
-                    Text("Geen (nieuwe) lijsten gevonden. Is Trakt gekoppeld?").foregroundStyle(.secondary)
-                }
-                ForEach(availableTraktLists, id: \.ids.trakt) { list in
-                    Button { addTrakt(list) } label: {
-                        HStack {
-                            Text(list.name)
-                            Spacer()
-                            Image(systemName: "plus.circle").foregroundStyle(.secondary)
+                Section {
+                    TextField("Zoek een filmcollectie, bv. Alien", text: $query)
+                        .onSubmit { Task { await search() } }
+                    Button("Zoeken") { Task { await search() } }
+                        .disabled(trimmed.isEmpty || searching)
+                    if searching {
+                        ProgressView()
+                    } else if searched && results.isEmpty {
+                        Text("Niets gevonden.").foregroundStyle(.secondary)
+                    }
+                    ForEach(results) { result in
+                        Button { add(result) } label: {
+                            HStack {
+                                Text(result.name)
+                                Spacer()
+                                Image(systemName: "plus.circle").foregroundStyle(.secondary)
+                            }
                         }
                     }
+                } header: {
+                    Text("Filmcollectie toevoegen")
                 }
-            } header: {
-                Text("Trakt-lijst toevoegen")
-            } footer: {
-                Text("Een eigen Trakt-lijst verschijnt als collectie, met de films en series uit die lijst.")
-            }
 
-            Section {
-                Button("Standaardlijst herstellen") { reset() }
+                Section {
+                    Button(loadingTrakt ? "Laden…" : "Mijn Trakt-lijsten tonen") { Task { await loadTraktLists() } }
+                        .disabled(loadingTrakt)
+                    if traktLoaded && availableTraktLists.isEmpty {
+                        Text("Geen (nieuwe) lijsten gevonden. Is Trakt gekoppeld?").foregroundStyle(.secondary)
+                    }
+                    ForEach(availableTraktLists, id: \.ids.trakt) { list in
+                        Button { addTrakt(list) } label: {
+                            HStack {
+                                Text(list.name)
+                                Spacer()
+                                Image(systemName: "plus.circle").foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Trakt-lijst toevoegen")
+                } footer: {
+                    Text("Een eigen Trakt-lijst verschijnt als collectie, met de films en series uit die lijst.")
+                }
+
+                Section {
+                    Button("Standaardlijst herstellen") { reset() }
+                }
             }
+            .navigationTitle("Filmcollecties")
+            #if os(iOS)
+            .toolbar { EditButton() }
+            #endif
+            .task { await load() }
+
         }
-        .navigationTitle("Filmcollecties")
-        #if os(iOS)
-        .toolbar { EditButton() }
-        #endif
-        .task { await load() }
     }
 
     private var availableTraktLists: [TraktPersonalList] {
@@ -1371,84 +1408,87 @@ struct VeyraCollectionEditorView: View {
     private static let bannerAspect: CGFloat = 1536.0 / 1024.0
 
     var body: some View {
-        Form {
-            if let index {
-                Section {
-                    TextField("Naam", text: nameBinding(index))
-                } header: {
-                    Text("Naam")
-                }
-
-                Section {
-                    // Zelfde verhouding als de banner op Home (ongeveer 3:1), zodat je precies ziet wat
-                    // er getoond wordt; het beeld ligt als overlay zodat het de rij niet oprekt.
-                    Color.white.opacity(0.08)
-                        .frame(maxWidth: .infinity)
-                        .aspectRatio(Self.bannerAspect, contentMode: .fit)
-                        .overlay {
-                            VeyraAsyncImage(url: VeyraCollectionsStore.imageURL(for: entries[index])) { phase in
-                                if let image = phase.image { image.resizable().scaledToFill() } else { Color.clear }
-                            }
-                        }
-                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-
-                    Button(loadingOptions ? "Laden…" : "Kies uit bronnen (TMDB, fanart)") { Task { await loadOptions() } }
-                        .disabled(loadingOptions)
-                    if optionsLoaded && options.isEmpty {
-                        Text("Geen afbeeldingen gevonden.").foregroundStyle(.secondary)
+        VeyraDynamicBackgroundScope {
+            VeyraForm {
+                if let index {
+                    Section {
+                        TextField("Naam", text: nameBinding(index))
+                    } header: {
+                        Text("Naam")
                     }
-                    if !options.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 16) {
-                                ForEach(options, id: \.self) { url in
-                                    Color.white.opacity(0.08)
-                                        .frame(width: 260, height: 260 / Self.bannerAspect)
-                                        .overlay {
-                                            VeyraAsyncImage(url: url) { phase in
-                                                if let image = phase.image { image.resizable().scaledToFill() } else { Color.clear }
-                                            }
-                                        }
-                                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                                    .contentShape(Rectangle())
-                                    // Een `Button` in een horizontale ScrollView binnenin een Form-rij
-                                    // krijgt op iOS soms geen tikken (de rij "wint" de gesture) — een
-                                    // losse tap-gesture op de afbeelding zelf werkt wel betrouwbaar.
-                                    .onTapGesture { setImage(url.absoluteString) }
+
+                    Section {
+                        // Zelfde verhouding als de banner op Home (ongeveer 3:1), zodat je precies ziet wat
+                        // er getoond wordt; het beeld ligt als overlay zodat het de rij niet oprekt.
+                        Color.white.opacity(0.08)
+                            .frame(maxWidth: .infinity)
+                            .aspectRatio(Self.bannerAspect, contentMode: .fit)
+                            .overlay {
+                                VeyraAsyncImage(url: VeyraCollectionsStore.imageURL(for: entries[index])) { phase in
+                                    if let image = phase.image { image.resizable().scaledToFill() } else { Color.clear }
                                 }
                             }
-                            .padding(8)
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+                        Button(loadingOptions ? "Laden…" : "Kies uit bronnen (TMDB, fanart)") { Task { await loadOptions() } }
+                            .disabled(loadingOptions)
+                        if optionsLoaded && options.isEmpty {
+                            Text("Geen afbeeldingen gevonden.").foregroundStyle(.secondary)
                         }
-                        .scrollClipDisabled()
+                        if !options.isEmpty {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 16) {
+                                    ForEach(options, id: \.self) { url in
+                                        Color.white.opacity(0.08)
+                                            .frame(width: 260, height: 260 / Self.bannerAspect)
+                                            .overlay {
+                                                VeyraAsyncImage(url: url) { phase in
+                                                    if let image = phase.image { image.resizable().scaledToFill() } else { Color.clear }
+                                                }
+                                            }
+                                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                        .contentShape(Rectangle())
+                                        // Een `Button` in een horizontale ScrollView binnenin een Form-rij
+                                        // krijgt op iOS soms geen tikken (de rij "wint" de gesture) — een
+                                        // losse tap-gesture op de afbeelding zelf werkt wel betrouwbaar.
+                                        .onTapGesture { setImage(url.absoluteString) }
+                                    }
+                                }
+                                .padding(8)
+                            }
+                            .scrollClipDisabled()
+                        }
+
+                        TextField("Eigen afbeelding (https-adres)", text: $urlText)
+                            #if os(iOS)
+                            .textInputAutocapitalization(.never)
+                            .keyboardType(.URL)
+                            #endif
+                        Button("Dit adres gebruiken") { useURLText() }
+                            .disabled(urlText.trimmingCharacters(in: .whitespaces).isEmpty)
+
+                        #if os(iOS)
+                        PhotosPicker("Kies een foto uit Foto's", selection: $photo, matching: .images)
+                        #endif
+
+                        Button("Standaardbanner herstellen") { setImage(nil) }
+                    } header: {
+                        Text("Banner")
                     }
 
-                    TextField("Eigen afbeelding (https-adres)", text: $urlText)
-                        #if os(iOS)
-                        .textInputAutocapitalization(.never)
-                        .keyboardType(.URL)
-                        #endif
-                    Button("Dit adres gebruiken") { useURLText() }
-                        .disabled(urlText.trimmingCharacters(in: .whitespaces).isEmpty)
-
-                    #if os(iOS)
-                    PhotosPicker("Kies een foto uit Foto's", selection: $photo, matching: .images)
-                    #endif
-
-                    Button("Standaardbanner herstellen") { setImage(nil) }
-                } header: {
-                    Text("Banner")
-                }
-
-                Section {
-                    Button("Verwijderen", role: .destructive) { remove(index) }
+                    Section {
+                        Button("Verwijderen", role: .destructive) { remove(index) }
+                    }
                 }
             }
+            .navigationTitle("Collectie")
+            #if os(iOS)
+            .onChange(of: photo) { _, item in
+                Task { await importPhoto(item) }
+            }
+            #endif
+
         }
-        .navigationTitle("Collectie")
-        #if os(iOS)
-        .onChange(of: photo) { _, item in
-            Task { await importPhoto(item) }
-        }
-        #endif
     }
 
     private func nameBinding(_ index: Int) -> Binding<String> {

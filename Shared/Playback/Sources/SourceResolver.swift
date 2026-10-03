@@ -43,6 +43,15 @@ struct ResolvedSource:
     var id: UUID {
         source.id
     }
+
+    /// Categorie voor sortering tussen mediaservers en IPTV — los van
+    /// VeyraHub-addons, die als groep altijd vooraan staan (zie
+    /// `isFromHub` / `SourceOrderDefaults.sortedByOriginOrder`). IPTV-
+    /// bronnen krijgen altijd `originName == "IPTV"` (zie boven); elke
+    /// andere niet-hub-bron komt van een "echte" mediaserver.
+    var category: SourceCategory {
+        originName.caseInsensitiveCompare("IPTV") == .orderedSame ? .iptv : .mediaServers
+    }
 }
 
 // MARK: - Optioneel protocol

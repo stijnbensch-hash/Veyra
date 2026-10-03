@@ -6,6 +6,11 @@ import Foundation
 /// removed). The local stores remain the UI's cache.
 @MainActor
 final class VeyraHubSyncService {
+    // Een `static let` van dit (Sendable) type is zelf al zonder actor-hop
+    // bereikbaar vanuit bewust `nonisolated` opslagstructs (bv.
+    // `IPTVConfigurationStore`) -- `nonisolated(unsafe)` is hier dus niet
+    // nodig. Enkel de `init()` hieronder moet expliciet `nonisolated` zijn,
+    // zodat het aanmaken van deze singleton zelf ook zonder actor-hop kan.
     static let shared = VeyraHubSyncService()
 
     /// `nonisolated(unsafe)`: een eenvoudige statusvlag die ook synchroon gelezen wordt vanuit
@@ -171,7 +176,11 @@ final class VeyraHubSyncService {
     private var baseline: [String: [String: String]] = [:]
     private var activeAccountID: UUID?
 
-    private init() {}
+    // `nonisolated`: deze init doet niets anders dan lege/standaard opslag
+    // aanmaken (geen toegang tot @MainActor-geïsoleerde toestand), en moet
+    // zonder actor-hop aanroepbaar zijn om `shared` hierboven synchroon te
+    // kunnen initialiseren vanuit een nonisolated context.
+    nonisolated private init() {}
 
     func start() {
         guard !started else { return }

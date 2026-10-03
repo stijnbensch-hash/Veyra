@@ -33,231 +33,231 @@ struct SeriesDetailView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(
-                alignment: .leading,
-                spacing: 18
-            ) {
-                backdrop
-
+        VeyraDynamicBackgroundScope {
+            VeyraScrollView {
                 VStack(
                     alignment: .leading,
-                    spacing: 14
+                    spacing: 18
                 ) {
-                    if viewModel.isLoading {
-                        ProgressView(
-                            "Serie laden…"
-                        )
+                    backdrop
 
-                    } else if
-                        let errorMessage =
-                            viewModel.errorMessage
-                    {
-                        Text(
-                            "Serie kon niet worden geladen"
-                        )
-                        .font(.headline)
-
-                        Text(
-                            errorMessage
-                        )
-                        .font(.subheadline)
-                        .foregroundStyle(
-                            .secondary
-                        )
-
-                    } else if
-                        let details =
-                            viewModel.details
-                    {
-                        VeyraClearLogo(
-                            item: mediaItem(from: details),
-                            fallbackTitle: details.name,
-                            maxWidth: 320,
-                            maxHeight: 80,
-                            font: .title.weight(.bold)
-                        )
-
-                        if let year =
-                            releaseYear(
-                                from:
-                                    details
-                                    .firstAirDate
+                    VStack(
+                        alignment: .leading,
+                        spacing: 14
+                    ) {
+                        if viewModel.isLoading {
+                            ProgressView(
+                                "Serie laden…"
                             )
-                        {
-                            Text(year)
-                                .font(
-                                    .subheadline
-                                )
-                                .foregroundStyle(
-                                    VeyraColors
-                                        .cyan
-                                )
-                        }
 
-                        MetadataRatingsView(
-                            ratings:
-                                viewModel.ratings
-                        )
-
-                        if !details
-                            .overview
-                            .isEmpty
+                        } else if
+                            let errorMessage =
+                                viewModel.errorMessage
                         {
                             Text(
-                                details
-                                    .overview
+                                "Serie kon niet worden geladen"
                             )
-                            .font(.body)
+                            .font(.headline)
+
+                            Text(
+                                errorMessage
+                            )
+                            .font(.subheadline)
                             .foregroundStyle(
                                 .secondary
                             )
-                        }
 
-                        HStack(spacing: 10) {
-                            WatchedToggleButton(item: mediaItem(from: details))
-                            FavoriteToggleButton(item: mediaItem(from: details), compact: true)
-                            WatchlistToggleButton(item: mediaItem(from: details), compact: true)
-                            NavigationLink {
-                                VeyraArtworkPickerView(item: mediaItem(from: details))
-                            } label: {
-                                Label("Artwork", systemImage: "photo.on.rectangle.angled")
-                            }
-                            .buttonStyle(.bordered)
-                            .tint(VeyraColors.cyan)
-                        }
-
-                        let seasons =
-                            details.seasons
-                                .filter {
-                                    $0.seasonNumber
-                                        > 0
-                                }
-
-                        if !seasons.isEmpty {
-                            Text(
-                                "Seizoenen"
-                            )
-                            .font(
-                                .headline
-                            )
-                            .padding(
-                                .top,
-                                8
+                        } else if
+                            let details =
+                                viewModel.details
+                        {
+                            VeyraClearLogo(
+                                item: mediaItem(from: details),
+                                fallbackTitle: details.name,
+                                maxWidth: 320,
+                                maxHeight: 80,
+                                font: .title.weight(.bold)
                             )
 
-                            ForEach(
-                                seasons
-                            ) { season in
-                                NavigationLink {
-                                    SeasonEpisodesView(
-                                        series:
-                                            details,
-                                        season:
-                                            season
-                                    )
-
-                                } label: {
-                                    HStack(
-                                        spacing: 12
-                                    ) {
-                                        Text(
-                                            "Seizoen \(season.seasonNumber)"
-                                        )
-
-                                        if isSeasonWatched(
-                                            seasonNumber:
-                                                season.seasonNumber,
-                                            episodeCount:
-                                                season.episodeCount
-                                        ) {
-                                            watchedBadge
-                                        }
-
-                                        Spacer()
-
-                                        Text(
-                                            "\(season.episodeCount) afl."
-                                        )
-                                        .foregroundStyle(
-                                            .secondary
-                                        )
-
-                                        Image(
-                                            systemName:
-                                                "chevron.right"
-                                        )
-                                        .font(
-                                            .caption
-                                        )
-                                        .foregroundStyle(
-                                            .secondary
-                                        )
-                                    }
+                            if let year =
+                                releaseYear(
+                                    from:
+                                        details
+                                        .firstAirDate
+                                )
+                            {
+                                Text(year)
                                     .font(
                                         .subheadline
                                     )
                                     .foregroundStyle(
-                                        .primary
+                                        VeyraColors
+                                            .cyan
                                     )
-                                    .contentShape(
-                                        Rectangle()
-                                    )
+                            }
+
+                            MetadataRatingsView(
+                                ratings:
+                                    viewModel.ratings
+                            )
+
+                            if !details
+                                .overview
+                                .isEmpty
+                            {
+                                Text(
+                                    details
+                                        .overview
+                                )
+                                .font(.body)
+                                .foregroundStyle(
+                                    .secondary
+                                )
+                            }
+
+                            HStack(spacing: 10) {
+                                WatchedToggleButton(item: mediaItem(from: details))
+                                FavoriteToggleButton(item: mediaItem(from: details), compact: true)
+                                WatchlistToggleButton(item: mediaItem(from: details), compact: true)
+                                NavigationLink {
+                                    VeyraArtworkPickerView(item: mediaItem(from: details))
+                                } label: {
+                                    Label("Artwork", systemImage: "photo.on.rectangle.angled")
                                 }
-                                .buttonStyle(
-                                    .plain
+                                .buttonStyle(.bordered)
+                                .tint(VeyraColors.cyan)
+                            }
+
+                            let seasons =
+                                details.seasons
+                                    .filter {
+                                        $0.seasonNumber
+                                            > 0
+                                    }
+
+                            if !seasons.isEmpty {
+                                Text(
+                                    "Seizoenen"
+                                )
+                                .font(
+                                    .headline
+                                )
+                                .padding(
+                                    .top,
+                                    8
                                 )
 
-                                Divider()
+                                ForEach(
+                                    seasons
+                                ) { season in
+                                    NavigationLink {
+                                        SeasonEpisodesView(
+                                            series:
+                                                details,
+                                            season:
+                                                season
+                                        )
+
+                                    } label: {
+                                        HStack(
+                                            spacing: 12
+                                        ) {
+                                            Text(
+                                                "Seizoen \(season.seasonNumber)"
+                                            )
+
+                                            if isSeasonWatched(
+                                                seasonNumber:
+                                                    season.seasonNumber,
+                                                episodeCount:
+                                                    season.episodeCount
+                                            ) {
+                                                watchedBadge
+                                            }
+
+                                            Spacer()
+
+                                            Text(
+                                                "\(season.episodeCount) afl."
+                                            )
+                                            .foregroundStyle(
+                                                .secondary
+                                            )
+
+                                            Image(
+                                                systemName:
+                                                    "chevron.right"
+                                            )
+                                            .font(
+                                                .caption
+                                            )
+                                            .foregroundStyle(
+                                                .secondary
+                                            )
+                                        }
+                                        .font(
+                                            .subheadline
+                                        )
+                                        .foregroundStyle(
+                                            .primary
+                                        )
+                                        .contentShape(
+                                            Rectangle()
+                                        )
+                                    }
+                                    .buttonStyle(
+                                        .plain
+                                    )
+
+                                    Divider()
+                                }
                             }
                         }
                     }
+                    .padding(
+                        .horizontal
+                    )
+
+                    CastRow(item: MediaItem(title: series.name, type: .series, tmdbID: series.id))
+
+                    TrailerSection(item: MediaItem(title: series.name, type: .series, tmdbID: series.id))
+
+                    ReviewsSection(item: MediaItem(title: series.name, type: .series, tmdbID: series.id))
+
+                    SimilarTitlesRow(item: MediaItem(title: series.name, type: .series, tmdbID: series.id))
                 }
                 .padding(
-                    .horizontal
+                    .bottom,
+                    40
                 )
-
-                CastRow(item: MediaItem(title: series.name, type: .series, tmdbID: series.id))
-
-                TrailerSection(item: MediaItem(title: series.name, type: .series, tmdbID: series.id))
-
-                ReviewsSection(item: MediaItem(title: series.name, type: .series, tmdbID: series.id))
-
-                SimilarTitlesRow(item: MediaItem(title: series.name, type: .series, tmdbID: series.id))
+                // Op uitdrukkelijk verzoek GEEN `.veyraReadableWidth()` hier meer: op iPad moet
+                // dit scherm de volle breedte gebruiken i.p.v. een gecentreerde, smallere kolom.
             }
-            .padding(
-                .bottom,
-                40
-            )
-            .veyraReadableWidth()
-        }
-        .background(
-            VeyraColors
-                .background
-                .ignoresSafeArea()
-        )
-        .veyraHideNavigationBar()
-        .overlay(alignment: .topLeading) {
-            BackButtonCircle()
-                .padding(.leading, 16)
-                .padding(.top, 50)
-        }
-        .ignoresSafeArea(
-            edges: .top
-        )
-        .task {
-            async let detailsTask:
-                Void =
-                viewModel.loadDetails()
 
-            async let traktTask:
-                Void =
-                refreshTrakt()
-
-            _ = await (
-                detailsTask,
-                traktTask
+            .veyraHideNavigationBar()
+            .overlay(alignment: .topLeading) {
+                BackButtonCircle()
+                    .padding(.leading, 16)
+                    .padding(.top, 50)
+            }
+            .ignoresSafeArea(
+                edges: .top
             )
+            .task {
+                async let detailsTask:
+                    Void =
+                    viewModel.loadDetails()
+
+                async let traktTask:
+                    Void =
+                    refreshTrakt()
+
+                _ = await (
+                    detailsTask,
+                    traktTask
+                )
+            }
+
         }
     }
 
@@ -289,8 +289,10 @@ struct SeriesDetailView: View {
                         .transition(.opacity)
                 }
             }
-            .frame(width: geo.size.width, height: geo.size.height)
+            // Alleen het beeld loopt door onder het logo; de layoutmaat blijft gelijk.
+            .frame(width: geo.size.width, height: geo.size.height + 120)
             .clipped()
+            .veyraHeroBackdropBlend()
         }
         .frame(height: VeyraPosterMetrics(regular: sizeClass == .regular).backdropHeight)
         .task(id: series.id) {

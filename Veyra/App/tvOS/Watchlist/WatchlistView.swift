@@ -17,29 +17,32 @@ struct WatchlistView: View {
     private let gridPosterWidth: CGFloat = 240
 
     var body: some View {
-        ZStack(alignment: .top) {
-            VeyraArtworkBackground(url: nil)
+        VeyraDynamicBackgroundScope {
+            ZStack(alignment: .top) {
+                VeyraArtworkBackground(url: nil)
 
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 28) {
-                    VeyraSectionHeader(title: "Kijklijst", subtitle: "Trakt")
+                VeyraScrollView(.vertical, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 28) {
+                        VeyraSectionHeader(title: "Kijklijst", subtitle: "Trakt")
 
-                    if trakt.isConnected, !isLoading, !(movies.isEmpty && series.isEmpty) {
-                        kindPicker
+                        if trakt.isConnected, !isLoading, !(movies.isEmpty && series.isEmpty) {
+                            kindPicker
+                        }
+
+                        content
                     }
-
-                    content
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 28)
+                    .padding(.top, 36)
+                    .padding(.bottom, 50)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 28)
-                .padding(.top, 36)
-                .padding(.bottom, 50)
+                .contentMargins(.horizontal, 0, for: .scrollContent)
+                .scrollClipDisabled()
             }
-            .contentMargins(.horizontal, 0, for: .scrollContent)
-            .scrollClipDisabled()
+            .task { await trakt.refreshIfNeeded() }
+            .task(id: reloadKey) { await load() }
+
         }
-        .task { await trakt.refreshIfNeeded() }
-        .task(id: reloadKey) { await load() }
     }
 
     // Herlaadt zodra de koppeling of het aantal items in de watchlist

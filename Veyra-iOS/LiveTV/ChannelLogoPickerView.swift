@@ -49,117 +49,120 @@ struct ChannelLogoPickerView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                VeyraColors.background.ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            NavigationStack {
+                ZStack {
+                    VeyraBackground().ignoresSafeArea()
 
-                List {
-                    Section {
-                        TextField("Zendernaam", text: $nameText)
-                            .textInputAutocapitalization(.words)
-                        Button("Naam opslaan") {
-                            saveName()
-                        }
-                        .disabled(isNameUnchanged || trimmedName.isEmpty)
-
-                        if currentNameOverride != nil {
-                            Button("Naam herstellen naar origineel", role: .destructive) {
-                                ChannelNameOverrideStore.removeOverride(forChannelID: channelID)
-                                nameText = channelName
-                                onSaved()
-                            }
-                        }
-                    } header: {
-                        Text("Naam")
-                    } footer: {
-                        Text("Geldt overal waar deze zender wordt getoond, ook in de speler.")
-                    }
-
-                    Section {
-                        currentLogoPreview
-                    } header: {
-                        Text("Huidig logo")
-                    }
-
-                    Section {
-                        TextField("Zoek zendernaam (bv. \"BBC One\")", text: $query)
-                            .textInputAutocapitalization(.words)
-                            .onChange(of: query) { _, _ in Task { await search() } }
-
-                        if isSearching {
-                            HStack(spacing: 10) {
-                                ProgressView()
-                                Text("Zoeken in iptv-org + tv-logos…").foregroundStyle(.secondary)
-                            }
-                        } else if let searchError {
-                            Text(searchError).foregroundStyle(.red)
-                        } else if !results.isEmpty {
-                            ForEach(results) { result in
-                                resultRow(result)
-                            }
-                        } else if !query.trimmingCharacters(in: .whitespaces).isEmpty {
-                            Text("Geen logo's gevonden voor \"\(query)\".").foregroundStyle(.secondary)
-                        }
-                    } header: {
-                        Text("Zoeken in logo-databases (iptv-org + tv-logos)")
-                    } footer: {
-                        Text("Gratis, doorzoekbare verzameling zenderlogo's van de open-source projecten iptv-org en tv-logo/tv-logos.")
-                    }
-
-                    Section {
-                        TextField("https://…/logo.png", text: $customURLString)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .keyboardType(.URL)
-
-                        Button("Eigen URL gebruiken") {
-                            applyCustomURL()
-                        }
-                        .disabled(URL(string: customURLString.trimmingCharacters(in: .whitespaces))?.host == nil)
-                    } header: {
-                        Text("Eigen logo-URL")
-                    }
-
-                    Section {
-                        PhotosPicker(selection: $photoSelection, matching: .images) {
-                            Label("Kies foto uit bibliotheek", systemImage: "photo.on.rectangle")
-                        }
-
-                        if isImportingPhoto {
-                            HStack(spacing: 10) {
-                                ProgressView()
-                                Text("Foto verwerken…").foregroundStyle(.secondary)
-                            }
-                        } else if let photoError {
-                            Text(photoError).foregroundStyle(.red)
-                        }
-                    } header: {
-                        Text("Eigen foto")
-                    }
-
-                    if currentOverrideURL != nil {
+                    VeyraList {
                         Section {
-                            Button("Terugzetten naar standaardlogo", role: .destructive) {
-                                ChannelLogoOverrideStore.removeOverride(forChannelID: channelID)
-                                onSaved()
-                                dismiss()
+                            TextField("Zendernaam", text: $nameText)
+                                .textInputAutocapitalization(.words)
+                            Button("Naam opslaan") {
+                                saveName()
+                            }
+                            .disabled(isNameUnchanged || trimmedName.isEmpty)
+
+                            if currentNameOverride != nil {
+                                Button("Naam herstellen naar origineel", role: .destructive) {
+                                    ChannelNameOverrideStore.removeOverride(forChannelID: channelID)
+                                    nameText = channelName
+                                    onSaved()
+                                }
+                            }
+                        } header: {
+                            Text("Naam")
+                        } footer: {
+                            Text("Geldt overal waar deze zender wordt getoond, ook in de speler.")
+                        }
+
+                        Section {
+                            currentLogoPreview
+                        } header: {
+                            Text("Huidig logo")
+                        }
+
+                        Section {
+                            TextField("Zoek zendernaam (bv. \"BBC One\")", text: $query)
+                                .textInputAutocapitalization(.words)
+                                .onChange(of: query) { _, _ in Task { await search() } }
+
+                            if isSearching {
+                                HStack(spacing: 10) {
+                                    ProgressView()
+                                    Text("Zoeken in iptv-org + tv-logos…").foregroundStyle(.secondary)
+                                }
+                            } else if let searchError {
+                                Text(searchError).foregroundStyle(.red)
+                            } else if !results.isEmpty {
+                                ForEach(results) { result in
+                                    resultRow(result)
+                                }
+                            } else if !query.trimmingCharacters(in: .whitespaces).isEmpty {
+                                Text("Geen logo's gevonden voor \"\(query)\".").foregroundStyle(.secondary)
+                            }
+                        } header: {
+                            Text("Zoeken in logo-databases (iptv-org + tv-logos)")
+                        } footer: {
+                            Text("Gratis, doorzoekbare verzameling zenderlogo's van de open-source projecten iptv-org en tv-logo/tv-logos.")
+                        }
+
+                        Section {
+                            TextField("https://…/logo.png", text: $customURLString)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .keyboardType(.URL)
+
+                            Button("Eigen URL gebruiken") {
+                                applyCustomURL()
+                            }
+                            .disabled(URL(string: customURLString.trimmingCharacters(in: .whitespaces))?.host == nil)
+                        } header: {
+                            Text("Eigen logo-URL")
+                        }
+
+                        Section {
+                            PhotosPicker(selection: $photoSelection, matching: .images) {
+                                Label("Kies foto uit bibliotheek", systemImage: "photo.on.rectangle")
+                            }
+
+                            if isImportingPhoto {
+                                HStack(spacing: 10) {
+                                    ProgressView()
+                                    Text("Foto verwerken…").foregroundStyle(.secondary)
+                                }
+                            } else if let photoError {
+                                Text(photoError).foregroundStyle(.red)
+                            }
+                        } header: {
+                            Text("Eigen foto")
+                        }
+
+                        if currentOverrideURL != nil {
+                            Section {
+                                Button("Terugzetten naar standaardlogo", role: .destructive) {
+                                    ChannelLogoOverrideStore.removeOverride(forChannelID: channelID)
+                                    onSaved()
+                                    dismiss()
+                                }
                             }
                         }
                     }
+                    .scrollContentBackground(.hidden)
                 }
-                .scrollContentBackground(.hidden)
-            }
-            .navigationTitle(currentNameOverride ?? channelName)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Sluiten") { dismiss() }
+                .navigationTitle(currentNameOverride ?? channelName)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Sluiten") { dismiss() }
+                    }
+                }
+                .onChange(of: photoSelection) { _, newValue in
+                    guard let newValue else { return }
+                    Task { await importPhoto(newValue) }
                 }
             }
-            .onChange(of: photoSelection) { _, newValue in
-                guard let newValue else { return }
-                Task { await importPhoto(newValue) }
-            }
+
         }
     }
 

@@ -102,7 +102,9 @@ struct VeyraCollectionArtworkPickerView: View {
     }
 
     var body: some View {
-        content
+        VeyraDynamicBackgroundScope {
+            content
+        }
     }
 
     // tvOS: zie VeyraCreateCollectionSheet.swift -- Form krijgt daar geen eigen donkere
@@ -121,7 +123,7 @@ struct VeyraCollectionArtworkPickerView: View {
     }
 
     private var form: some View {
-        Form {
+        VeyraForm {
             artworkSection
             logoSection
         }

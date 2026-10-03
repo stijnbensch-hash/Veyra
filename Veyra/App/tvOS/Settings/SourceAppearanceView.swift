@@ -8,100 +8,103 @@ struct SourceAppearanceView: View {
     @State private var showPackPreview = false
 
     var body: some View {
-        ZStack {
-            VeyraBackground().ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            List {
-                Section {
-                    NavigationLink {
-                        SourceOrderView()
-                    } label: {
-                        VeyraSettingsCardRowLabel(icon: "arrow.up.arrow.down", title: "Bronvolgorde") {
-                            EmptyView()
-                        }
-                    }
-                    .veyraCardRow()
-                } footer: {
-                    Text("Bepaal de volgorde van addons en mediaservers bij \"Selecteer bron\".")
-                }
-
-                Section {
-                modeRow(icon: "circle.slash", title: "Geen badges", subtitle: "Verberg alle badges", isSelected: store.mode == .off) {
-                    store.setMode(.off)
-                }
-
-                modeRow(icon: "tag", title: "Ingebouwd", subtitle: "Veyra's standaardbadges", isSelected: store.mode == .builtIn) {
-                    store.setMode(.builtIn)
-                }
-
-                ForEach(store.packs) { pack in
-                    packRow(pack)
-                }
-            } header: {
-                Text("Badges")
-            }
-
-            Section {
-                inputSection(title: "PAKKET-URL") {
-                    HStack(spacing: 16) {
-                        TextField("https://voorbeeld.app/badges.json", text: $packURLText)
-
-                        if store.isLoading {
-                            ProgressView()
-                        } else {
-                            Button {
-                                addPack()
-                            } label: {
-                                Image(systemName: "plus.circle.fill")
+                VeyraList {
+                    Section {
+                        NavigationLink {
+                            SourceOrderView()
+                        } label: {
+                            VeyraSettingsCardRowLabel(icon: "arrow.up.arrow.down", title: "Bronvolgorde") {
+                                EmptyView()
                             }
-                            .disabled(packURLText.trimmingCharacters(in: .whitespaces).isEmpty)
+                        }
+                        .veyraCardRow()
+                    } footer: {
+                        Text("Bepaal de volgorde van addons en mediaservers bij \"Selecteer bron\".")
+                    }
+
+                    Section {
+                    modeRow(icon: "circle.slash", title: "Geen badges", subtitle: "Verberg alle badges", isSelected: store.mode == .off) {
+                        store.setMode(.off)
+                    }
+
+                    modeRow(icon: "tag", title: "Ingebouwd", subtitle: "Veyra's standaardbadges", isSelected: store.mode == .builtIn) {
+                        store.setMode(.builtIn)
+                    }
+
+                    ForEach(store.packs) { pack in
+                        packRow(pack)
+                    }
+                } header: {
+                    Text("Badges")
+                }
+
+                Section {
+                    inputSection(title: "PAKKET-URL") {
+                        HStack(spacing: 16) {
+                            TextField("https://voorbeeld.app/badges.json", text: $packURLText)
+
+                            if store.isLoading {
+                                ProgressView()
+                            } else {
+                                Button {
+                                    addPack()
+                                } label: {
+                                    Image(systemName: "plus.circle.fill")
+                                }
+                                .disabled(packURLText.trimmingCharacters(in: .whitespaces).isEmpty)
+                            }
                         }
                     }
-                }
 
-                if let error = store.lastError {
-                    Label(error, systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(VeyraColors.red)
-                }
-            } footer: {
-                Text("Badges verschijnen naast elke bron in het bronkeuzescherm, op basis van trefwoorden in de bronnaam. Een eigen pakket is een JSON-bestand op een URL met een lijst van { match, imageURL of label, color }.")
-            }
-
-            Section {
-                Button {
-                    showBuiltInPreview.toggle()
-                } label: {
-                    VeyraSettingsCardRowLabel(icon: "eye", title: "Bekijk ingebouwde badges") {
-                        Image(systemName: showBuiltInPreview ? "chevron.up" : "chevron.down")
-                            .foregroundStyle(.white.opacity(0.45))
+                    if let error = store.lastError {
+                        Label(error, systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(VeyraColors.red)
                     }
-                }
-                .veyraCardRow()
-
-                if showBuiltInPreview {
-                    badgePreviewRow(SourceBadgeStore.builtIn)
+                } footer: {
+                    Text("Badges verschijnen naast elke bron in het bronkeuzescherm, op basis van trefwoorden in de bronnaam. Een eigen pakket is een JSON-bestand op een URL met een lijst van { match, imageURL of label, color }.")
                 }
 
-                if let activePack {
+                Section {
                     Button {
-                        showPackPreview.toggle()
+                        showBuiltInPreview.toggle()
                     } label: {
-                        VeyraSettingsCardRowLabel(icon: "eye", title: "Bekijk pakketbadges", subtitle: "\(activePack.badges.count) badges") {
-                            Image(systemName: showPackPreview ? "chevron.up" : "chevron.down")
+                        VeyraSettingsCardRowLabel(icon: "eye", title: "Bekijk ingebouwde badges") {
+                            Image(systemName: showBuiltInPreview ? "chevron.up" : "chevron.down")
                                 .foregroundStyle(.white.opacity(0.45))
                         }
                     }
                     .veyraCardRow()
 
-                    if showPackPreview {
-                        badgePreviewRow(activePack.badges)
+                    if showBuiltInPreview {
+                        badgePreviewRow(SourceBadgeStore.builtIn)
+                    }
+
+                    if let activePack {
+                        Button {
+                            showPackPreview.toggle()
+                        } label: {
+                            VeyraSettingsCardRowLabel(icon: "eye", title: "Bekijk pakketbadges", subtitle: "\(activePack.badges.count) badges") {
+                                Image(systemName: showPackPreview ? "chevron.up" : "chevron.down")
+                                    .foregroundStyle(.white.opacity(0.45))
+                            }
+                        }
+                        .veyraCardRow()
+
+                        if showPackPreview {
+                            badgePreviewRow(activePack.badges)
+                        }
                     }
                 }
+                }
+                .frame(maxWidth: 1000)
             }
-            }
-            .frame(maxWidth: 1000)
+            .navigationTitle("Bronverschijning")
+
         }
-        .navigationTitle("Bronverschijning")
     }
 
     // MARK: - Rows

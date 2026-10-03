@@ -23,42 +23,44 @@ struct LiveTVGuideView: View {
     private var rowHeight: CGFloat { sizeClass == .regular ? 96 : 82 }
 
     var body: some View {
-        VStack(spacing: 0) {
-            controls
+        VeyraDynamicBackgroundScope {
+            VStack(spacing: 0) {
+                controls
 
-            if guide.loadingGuide {
-                ProgressView("Programmagids laden…")
-                    .font(.caption)
-                    .padding(.vertical, 8)
-            } else if let message = guide.guideMessage {
-                Text(message)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 8)
-            }
-
-            TimelineView(.periodic(from: .now, by: 60)) { context in
-                ScrollView(.vertical) {
-                    HStack(alignment: .top, spacing: 0) {
-                        channelColumn
-                            .frame(width: channelWidth)
-
-                        ScrollView(.horizontal) {
-                            timeline(now: context.date)
-                                .frame(width: timelineWidth)
-                        }
-                        .scrollIndicators(.visible)
-                    }
+                if guide.loadingGuide {
+                    ProgressView("Programmagids laden…")
+                        .font(.caption)
+                        .padding(.vertical, 8)
+                } else if let message = guide.guideMessage {
+                    Text(message)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 8)
                 }
-                .scrollIndicators(.visible)
+
+                TimelineView(.periodic(from: .now, by: 60)) { context in
+                    VeyraScrollView(.vertical) {
+                        HStack(alignment: .top, spacing: 0) {
+                            channelColumn
+                                .frame(width: channelWidth)
+
+                            ScrollView(.horizontal) {
+                                timeline(now: context.date)
+                                    .frame(width: timelineWidth)
+                            }
+                            .scrollIndicators(.visible)
+                        }
+                    }
+                    .scrollIndicators(.visible)
+                }
             }
-        }
-        .sheet(item: $selection) { selected in
-            details(for: selected)
-                .presentationDetents([.medium, .large])
+            .sheet(item: $selection) { selected in
+                details(for: selected)
+                    .presentationDetents([.medium, .large])
+            }
         }
     }
 
@@ -224,7 +226,7 @@ struct LiveTVGuideView: View {
 
     private func details(for selected: ProgrammeSelection) -> some View {
         NavigationStack {
-            ScrollView {
+            VeyraScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     Text(ChannelNameOverrideStore.effectiveName(
                         channelID: selected.row.channel.id,
@@ -306,7 +308,7 @@ struct LiveTVGuideView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(20)
             }
-            .background(VeyraColors.background)
+            .background(VeyraBackground())
             .navigationTitle("Programma")
             .navigationBarTitleDisplayMode(.inline)
             .alert("VeyraHub Recorder", isPresented: $showRecorderAlert) {

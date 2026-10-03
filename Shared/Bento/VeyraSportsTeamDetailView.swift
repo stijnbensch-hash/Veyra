@@ -30,44 +30,47 @@ struct VeyraSportsTeamDetailView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
-                identity
+        VeyraDynamicBackgroundScope {
+            VeyraScrollView {
+                VStack(alignment: .leading, spacing: 28) {
+                    identity
 
-                if let live {
-                    VeyraSportsStage(event: live, now: now) { onPlay(live) }
-                } else if let next {
-                    VeyraSportsStage(event: next, now: now) { onPlay(next) }
-                }
-
-                if !upcoming.isEmpty {
-                    section("Binnenkort") {
-                        ForEach(upcoming) { event in row(event) }
+                    if let live {
+                        VeyraSportsStage(event: live, now: now) { onPlay(live) }
+                    } else if let next {
+                        VeyraSportsStage(event: next, now: now) { onPlay(next) }
                     }
-                }
 
-                if !recent.isEmpty {
-                    section("Recente resultaten") {
-                        ForEach(recent) { event in row(event) }
+                    if !upcoming.isEmpty {
+                        section("Binnenkort") {
+                            ForEach(upcoming) { event in row(event) }
+                        }
                     }
-                }
 
-                if !competitions.isEmpty {
-                    section("Competities") {
-                        ForEach(competitions, id: \.self) { name in
-                            Text(name)
-                                .font(.system(size: rowTitleSize, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.75))
+                    if !recent.isEmpty {
+                        section("Recente resultaten") {
+                            ForEach(recent) { event in row(event) }
+                        }
+                    }
+
+                    if !competitions.isEmpty {
+                        section("Competities") {
+                            ForEach(competitions, id: \.self) { name in
+                                Text(name)
+                                    .font(.system(size: rowTitleSize, weight: .medium))
+                                    .foregroundStyle(.white.opacity(0.75))
+                            }
                         }
                     }
                 }
+                .padding(sidePadding)
             }
-            .padding(sidePadding)
+            .background(VeyraBackground())
+            // Geen `.navigationTitle(team.name)` -- op tvOS toont dat een grote, gecentreerde
+            // titel middenin het scherm, dubbel op met de eigen `identity`-rij hieronder.
+            .navigationTitle("")
+
         }
-        .background(VeyraBackground())
-        // Geen `.navigationTitle(team.name)` -- op tvOS toont dat een grote, gecentreerde
-        // titel middenin het scherm, dubbel op met de eigen `identity`-rij hieronder.
-        .navigationTitle("")
     }
 
     private var identity: some View {

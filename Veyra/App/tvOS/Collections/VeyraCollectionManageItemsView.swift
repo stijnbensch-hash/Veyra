@@ -21,42 +21,45 @@ struct VeyraCollectionManageItemsView: View {
     }
 
     var body: some View {
-        ZStack {
-            VeyraHomeStyle.ink.ignoresSafeArea()
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    Text("BEHEER \(collection?.name.uppercased() ?? "")")
-                        .font(.system(size: 20, weight: .bold))
-                        .tracking(1.5)
-                        .foregroundStyle(VeyraColors.cyan.opacity(0.85))
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
+                VeyraScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        Text("BEHEER \(collection?.name.uppercased() ?? "")")
+                            .font(.system(size: 20, weight: .bold))
+                            .tracking(1.5)
+                            .foregroundStyle(VeyraColors.cyan.opacity(0.85))
 
-                    if isLoading {
-                        ProgressView()
-                    } else if orderedResolved.isEmpty {
-                        Text("Nog geen films in deze collectie.")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        VStack(spacing: 14) {
-                            ForEach(Array(orderedResolved.enumerated()), id: \.element.id) { index, resolved in
-                                row(resolved, index: index, total: orderedResolved.count)
+                        if isLoading {
+                            ProgressView()
+                        } else if orderedResolved.isEmpty {
+                            Text("Nog geen films in deze collectie.")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            VStack(spacing: 14) {
+                                ForEach(Array(orderedResolved.enumerated()), id: \.element.id) { index, resolved in
+                                    row(resolved, index: index, total: orderedResolved.count)
+                                }
                             }
                         }
-                    }
 
-                    Button {
-                        dismiss()
-                    } label: {
-                        VeyraActionLabel(title: "GEREED", symbol: "checkmark", compact: true)
+                        Button {
+                            dismiss()
+                        } label: {
+                            VeyraActionLabel(title: "GEREED", symbol: "checkmark", compact: true)
+                        }
+                        .buttonStyle(VeyraFocusButtonStyle(primary: true))
+                        .padding(.top, 8)
                     }
-                    .buttonStyle(VeyraFocusButtonStyle(primary: true))
-                    .padding(.top, 8)
+                    .padding(.horizontal, 48)
+                    .padding(.vertical, 36)
                 }
-                .padding(.horizontal, 48)
-                .padding(.vertical, 36)
             }
+            .navigationTitle("Beheer films")
+            .task(id: collectionID) { await load() }
+
         }
-        .navigationTitle("Beheer films")
-        .task(id: collectionID) { await load() }
     }
 
     private func load() async {

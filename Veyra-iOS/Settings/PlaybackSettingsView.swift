@@ -56,82 +56,85 @@ struct PlaybackSettingsView: View {
     private var countdownDurationRaw = PlaybackCountdownDuration.ten.rawValue
 
     var body: some View {
-        ZStack {
-            VeyraColors.background.ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            List {
-                Section {
-                    Toggle("Automatisch draaien naar liggend", isOn: $autoRotateLandscape)
-                    Toggle("Volgende aflevering automatisch afspelen", isOn: $autoPlayNextEpisode)
-                    Toggle("Eerste bron automatisch selecteren", isOn: $autoSelectFirstSource)
-                    Toggle("Details overslaan bij verdergaan", isOn: $skipContinueWatchingDetails)
-                } header: {
-                    Text("Afspelen")
-                } footer: {
-                    Text("HDR en Dolby Vision worden automatisch herkend en afgespeeld door de speler — daar is geen instelling voor nodig.")
+                VeyraList {
+                    Section {
+                        Toggle("Automatisch draaien naar liggend", isOn: $autoRotateLandscape)
+                        Toggle("Volgende aflevering automatisch afspelen", isOn: $autoPlayNextEpisode)
+                        Toggle("Eerste bron automatisch selecteren", isOn: $autoSelectFirstSource)
+                        Toggle("Details overslaan bij verdergaan", isOn: $skipContinueWatchingDetails)
+                    } header: {
+                        Text("Afspelen")
+                    } footer: {
+                        Text("HDR en Dolby Vision worden automatisch herkend en afgespeeld door de speler — daar is geen instelling voor nodig.")
+                    }
+
+                    Section {
+                        Picker("Audiotaal", selection: $audioLanguageRaw) {
+                            ForEach(PlaybackLanguageOption.allCases) { option in
+                                Text(option.title).tag(option.rawValue)
+                            }
+                        }
+                        Picker("Audiotaal (terugval)", selection: $audioFallbackLanguageRaw) {
+                            ForEach(PlaybackLanguageOption.allCases) { option in
+                                Text(option.title).tag(option.rawValue)
+                            }
+                        }
+                        Picker("Ondertiteltaal", selection: $subtitleLanguageRaw) {
+                            ForEach(PlaybackLanguageOption.allCases) { option in
+                                Text(option.title).tag(option.rawValue)
+                            }
+                        }
+                        Picker("Ondertiteltaal (terugval)", selection: $subtitleFallbackLanguageRaw) {
+                            ForEach(PlaybackLanguageOption.allCases) { option in
+                                Text(option.title).tag(option.rawValue)
+                            }
+                        }
+                        Picker("Ondertitels automatisch selecteren", selection: $autoSelectSubtitlesRaw) {
+                            ForEach(PlaybackAutoSelectSubtitlesOption.allCases) { option in
+                                Text(option.title).tag(option.rawValue)
+                            }
+                        }
+                    } header: {
+                        Text("Taal")
+                    }
+
+                    Section {
+                        Toggle("Knop 'Intro overslaan' tonen", isOn: $showSkipIntroButton)
+                        Toggle("Intro automatisch overslaan", isOn: $autoSkipIntro)
+                        Toggle("Knop 'Samenvatting overslaan' tonen", isOn: $showSkipRecapButton)
+                        Toggle("Samenvatting automatisch overslaan", isOn: $autoSkipRecap)
+                        Toggle("Knop 'Aftiteling overslaan' tonen", isOn: $showSkipCreditsButton)
+                        Toggle("Aftiteling automatisch overslaan", isOn: $autoSkipCredits)
+                        Toggle("Knop 'Preview overslaan' tonen", isOn: $showSkipPreviewButton)
+                        Toggle("Preview automatisch overslaan", isOn: $autoSkipPreview)
+                    } header: {
+                        Text("Oversla-segmenten")
+                    } footer: {
+                        Text("Automatisch overslaan gebeurt alleen bij voldoende betrouwbare tijden. Tijden zijn niet voor elke film of aflevering beschikbaar.")
+                    }
+
+                    Section {
+                        Toggle("Aftelling voor volgende aflevering", isOn: $autoPlayNextCountdownEnabled)
+
+                        Picker("Duur van de aftelling", selection: $countdownDurationRaw) {
+                            ForEach(PlaybackCountdownDuration.allCases) { option in
+                                Text(option.title).tag(option.rawValue)
+                            }
+                        }
+                        .disabled(!autoPlayNextCountdownEnabled)
+                    } header: {
+                        Text("Hierna")
+                    }
                 }
-
-                Section {
-                    Picker("Audiotaal", selection: $audioLanguageRaw) {
-                        ForEach(PlaybackLanguageOption.allCases) { option in
-                            Text(option.title).tag(option.rawValue)
-                        }
-                    }
-                    Picker("Audiotaal (terugval)", selection: $audioFallbackLanguageRaw) {
-                        ForEach(PlaybackLanguageOption.allCases) { option in
-                            Text(option.title).tag(option.rawValue)
-                        }
-                    }
-                    Picker("Ondertiteltaal", selection: $subtitleLanguageRaw) {
-                        ForEach(PlaybackLanguageOption.allCases) { option in
-                            Text(option.title).tag(option.rawValue)
-                        }
-                    }
-                    Picker("Ondertiteltaal (terugval)", selection: $subtitleFallbackLanguageRaw) {
-                        ForEach(PlaybackLanguageOption.allCases) { option in
-                            Text(option.title).tag(option.rawValue)
-                        }
-                    }
-                    Picker("Ondertitels automatisch selecteren", selection: $autoSelectSubtitlesRaw) {
-                        ForEach(PlaybackAutoSelectSubtitlesOption.allCases) { option in
-                            Text(option.title).tag(option.rawValue)
-                        }
-                    }
-                } header: {
-                    Text("Taal")
-                }
-
-                Section {
-                    Toggle("Knop 'Intro overslaan' tonen", isOn: $showSkipIntroButton)
-                    Toggle("Intro automatisch overslaan", isOn: $autoSkipIntro)
-                    Toggle("Knop 'Samenvatting overslaan' tonen", isOn: $showSkipRecapButton)
-                    Toggle("Samenvatting automatisch overslaan", isOn: $autoSkipRecap)
-                    Toggle("Knop 'Aftiteling overslaan' tonen", isOn: $showSkipCreditsButton)
-                    Toggle("Aftiteling automatisch overslaan", isOn: $autoSkipCredits)
-                    Toggle("Knop 'Preview overslaan' tonen", isOn: $showSkipPreviewButton)
-                    Toggle("Preview automatisch overslaan", isOn: $autoSkipPreview)
-                } header: {
-                    Text("Oversla-segmenten")
-                } footer: {
-                    Text("Automatisch overslaan gebeurt alleen bij voldoende betrouwbare tijden. Tijden zijn niet voor elke film of aflevering beschikbaar.")
-                }
-
-                Section {
-                    Toggle("Aftelling voor volgende aflevering", isOn: $autoPlayNextCountdownEnabled)
-
-                    Picker("Duur van de aftelling", selection: $countdownDurationRaw) {
-                        ForEach(PlaybackCountdownDuration.allCases) { option in
-                            Text(option.title).tag(option.rawValue)
-                        }
-                    }
-                    .disabled(!autoPlayNextCountdownEnabled)
-                } header: {
-                    Text("Hierna")
-                }
+                .scrollContentBackground(.hidden)
             }
-            .scrollContentBackground(.hidden)
+            .navigationTitle("Afspelen")
+
         }
-        .navigationTitle("Afspelen")
     }
 }
 

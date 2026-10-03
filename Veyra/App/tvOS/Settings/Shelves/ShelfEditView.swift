@@ -91,96 +91,99 @@ struct ShelfEditView: View {
     }
 
     var body: some View {
-        Form {
-            Section {
-                VeyraSettingsChoiceRow<ShelfMediaKind>(icon: "square.stack.3d.up", "Soort", selection: Binding(
-                    get: { kind.rawValue },
-                    set: { kind = ShelfMediaKind(rawValue: $0) ?? .movie }
-                ))
-
-                // .segmented: deze rij wordt direct gevolgd door een switch
-                // die op basis van sourceKind hele secties in-/uitklapt. Zie
-                // de zelfde fix + toelichting in MetadataSettingsView.swift.
-                Picker("Bron", selection: $sourceKind) {
-                    Text("Trakt").tag(ShelfSourceKind.trakt)
-                    Text("TMDB").tag(ShelfSourceKind.tmdb)
-                    Text("Addon").tag(ShelfSourceKind.addon)
-                    Text("Server").tag(ShelfSourceKind.mediaServer)
-                    Text("IPTV").tag(ShelfSourceKind.iptv)
-                }
-                .pickerStyle(.segmented)
-            }
-
-            switch sourceKind {
-            case .trakt:
-                traktSourceSection
-            case .tmdb:
-                tmdbSourceSection
-            case .addon:
-                addonSourceSection
-            case .mediaServer:
-                mediaServerSourceSection
-            case .iptv:
-                iptvSourceSection
-            }
-
-            Section("Titel") {
-                VeyraSettingsCardRowLabel(icon: "textformat", title: "Titel") {
-                    TextField("Titel", text: titleBinding)
-                        .multilineTextAlignment(.trailing)
-                }
-            }
-
-            Section {
-                VeyraSettingsToggleRow(icon: "power", title: "Ingeschakeld", isOn: $isEnabled)
-            }
-
-            if let errorMessage {
-                Section { Text(errorMessage).foregroundStyle(.orange) }
-            }
-
-            if shelf != nil {
+        VeyraDynamicBackgroundScope {
+            VeyraForm {
                 Section {
-                    Button(role: .destructive) {
-                        if let shelf { viewModel.remove(shelf) }
-                        dismiss()
-                    } label: {
-                        VeyraSettingsCardRowLabel(icon: "trash", title: "Plank verwijderen")
+                    VeyraSettingsChoiceRow<ShelfMediaKind>(icon: "square.stack.3d.up", "Soort", selection: Binding(
+                        get: { kind.rawValue },
+                        set: { kind = ShelfMediaKind(rawValue: $0) ?? .movie }
+                    ))
+
+                    // .segmented: deze rij wordt direct gevolgd door een switch
+                    // die op basis van sourceKind hele secties in-/uitklapt. Zie
+                    // de zelfde fix + toelichting in MetadataSettingsView.swift.
+                    Picker("Bron", selection: $sourceKind) {
+                        Text("Trakt").tag(ShelfSourceKind.trakt)
+                        Text("TMDB").tag(ShelfSourceKind.tmdb)
+                        Text("Addon").tag(ShelfSourceKind.addon)
+                        Text("Server").tag(ShelfSourceKind.mediaServer)
+                        Text("IPTV").tag(ShelfSourceKind.iptv)
                     }
-                    .veyraCardRow()
+                    .pickerStyle(.segmented)
+                }
+
+                switch sourceKind {
+                case .trakt:
+                    traktSourceSection
+                case .tmdb:
+                    tmdbSourceSection
+                case .addon:
+                    addonSourceSection
+                case .mediaServer:
+                    mediaServerSourceSection
+                case .iptv:
+                    iptvSourceSection
+                }
+
+                Section("Titel") {
+                    VeyraSettingsCardRowLabel(icon: "textformat", title: "Titel") {
+                        TextField("Titel", text: titleBinding)
+                            .multilineTextAlignment(.trailing)
+                    }
+                }
+
+                Section {
+                    VeyraSettingsToggleRow(icon: "power", title: "Ingeschakeld", isOn: $isEnabled)
+                }
+
+                if let errorMessage {
+                    Section { Text(errorMessage).foregroundStyle(.orange) }
+                }
+
+                if shelf != nil {
+                    Section {
+                        Button(role: .destructive) {
+                            if let shelf { viewModel.remove(shelf) }
+                            dismiss()
+                        } label: {
+                            VeyraSettingsCardRowLabel(icon: "trash", title: "Plank verwijderen")
+                        }
+                        .veyraCardRow()
+                    }
                 }
             }
+            .frame(maxWidth: 1000)
+            .navigationTitle(shelf == nil ? "Plank toevoegen" : "Plank bewerken")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Annuleren") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) { Button("Opslaan") { save() } }
+            }
+            .onAppear { setupFromExisting() }
+            .onChange(of: kind) { _, _ in
+                updateDefaultTitleIfNeeded()
+                Task { await loadLibraries() }
+            }
+            .onChange(of: sourceKind) { _, newValue in
+                handleSourceKindChange(newValue)
+            }
+            .onChange(of: traktList) { _, _ in updateDefaultTitleIfNeeded() }
+            .onChange(of: tmdbList) { _, _ in updateDefaultTitleIfNeeded() }
+            .onChange(of: tmdbListSourceMode) { _, newValue in
+                tmdbPersonalListError = nil
+                if newValue == .standard { tmdbPersonalListName = nil }
+            }
+            .onChange(of: selectedAddonID) { _, _ in Task { await loadCatalogs() } }
+            .onChange(of: selectedCatalog) { _, _ in updateDefaultTitleIfNeeded() }
+            .onChange(of: selectedServerID) { _, _ in Task { await loadLibraries() } }
+            .onChange(of: selectedGroupID) { _, newValue in
+                guard sourceKind == .mediaServer else { return }
+                if let current = selectedLibrary, (current.groupID ?? "_") == newValue { return }
+                selectedLibrary = availableLibraries.first { ($0.groupID ?? "_") == newValue }
+                updateDefaultTitleIfNeeded()
+            }
+            .onChange(of: selectedLibrary) { _, _ in updateDefaultTitleIfNeeded() }
+
         }
-        .frame(maxWidth: 1000)
-        .navigationTitle(shelf == nil ? "Plank toevoegen" : "Plank bewerken")
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) { Button("Annuleren") { dismiss() } }
-            ToolbarItem(placement: .confirmationAction) { Button("Opslaan") { save() } }
-        }
-        .onAppear { setupFromExisting() }
-        .onChange(of: kind) { _, _ in
-            updateDefaultTitleIfNeeded()
-            Task { await loadLibraries() }
-        }
-        .onChange(of: sourceKind) { _, newValue in
-            handleSourceKindChange(newValue)
-        }
-        .onChange(of: traktList) { _, _ in updateDefaultTitleIfNeeded() }
-        .onChange(of: tmdbList) { _, _ in updateDefaultTitleIfNeeded() }
-        .onChange(of: tmdbListSourceMode) { _, newValue in
-            tmdbPersonalListError = nil
-            if newValue == .standard { tmdbPersonalListName = nil }
-        }
-        .onChange(of: selectedAddonID) { _, _ in Task { await loadCatalogs() } }
-        .onChange(of: selectedCatalog) { _, _ in updateDefaultTitleIfNeeded() }
-        .onChange(of: selectedServerID) { _, _ in Task { await loadLibraries() } }
-        .onChange(of: selectedGroupID) { _, newValue in
-            guard sourceKind == .mediaServer else { return }
-            if let current = selectedLibrary, (current.groupID ?? "_") == newValue { return }
-            selectedLibrary = availableLibraries.first { ($0.groupID ?? "_") == newValue }
-            updateDefaultTitleIfNeeded()
-        }
-        .onChange(of: selectedLibrary) { _, _ in updateDefaultTitleIfNeeded() }
     }
 
     // MARK: - Source sections

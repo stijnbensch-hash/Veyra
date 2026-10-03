@@ -18,26 +18,29 @@ struct IPTVProviderManagementView: View {
         IPTVProviderPreferencesStore()
 
     var body: some View {
-        ZStack {
-            VeyraBackground()
-            .ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground()
+                .ignoresSafeArea()
 
-            VStack(
-                alignment: .leading,
-                spacing: 34
-            ) {
-                header
+                VStack(
+                    alignment: .leading,
+                    spacing: 34
+                ) {
+                    header
 
-                content
+                    content
 
-                Spacer()
+                    Spacer()
+                }
+                .padding(.horizontal, VeyraSpacing.page)
+                .padding(.top, 36)
+                .padding(.bottom, 50)
             }
-            .padding(.horizontal, VeyraSpacing.page)
-            .padding(.top, 36)
-            .padding(.bottom, 50)
-        }
-        .onAppear {
-            loadConfiguration()
+            .onAppear {
+                loadConfiguration()
+            }
+
         }
     }
 

@@ -44,13 +44,15 @@ struct VeyraHeroSourcePickerView: View {
     }
 
     var body: some View {
-        content
-            .navigationTitle(title)
-            .task { await loadTraktPersonalLists() }
-            .onChange(of: mediaKind) { _, _ in apply() }
-            .onChange(of: kind) { _, _ in apply() }
-            .onChange(of: traktList) { _, _ in apply() }
-            .onChange(of: tmdbList) { _, _ in apply() }
+        VeyraDynamicBackgroundScope {
+            content
+                .navigationTitle(title)
+                .task { await loadTraktPersonalLists() }
+                .onChange(of: mediaKind) { _, _ in apply() }
+                .onChange(of: kind) { _, _ in apply() }
+                .onChange(of: traktList) { _, _ in apply() }
+                .onChange(of: tmdbList) { _, _ in apply() }
+        }
     }
 
     @ViewBuilder
@@ -58,13 +60,13 @@ struct VeyraHeroSourcePickerView: View {
         #if os(tvOS)
         ZStack {
             VeyraBackground().ignoresSafeArea()
-            List {
+            VeyraList {
                 Section { picks } footer: { Text("Kies de lijst die deze bron voor de hero levert.") }
             }
             .frame(maxWidth: 1000)
         }
         #else
-        Form {
+        VeyraForm {
             Section { picks } footer: { Text("Kies de lijst die deze bron voor de hero levert.") }
         }
         #endif

@@ -57,28 +57,31 @@ private struct VeyraSettingsChoiceListView<Option: VeyraSettingsOption>: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        ZStack {
-            VeyraBackground().ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            List {
-                Section {
-                    ForEach(options) { option in
-                        Button {
-                            selectionRaw = option.rawValue
-                            dismiss()
-                        } label: {
-                            VeyraSettingsCardRowLabel(
-                                icon: option.rawValue == selectionRaw ? "checkmark.circle.fill" : "circle",
-                                title: option.title
-                            )
+                VeyraList {
+                    Section {
+                        ForEach(options) { option in
+                            Button {
+                                selectionRaw = option.rawValue
+                                dismiss()
+                            } label: {
+                                VeyraSettingsCardRowLabel(
+                                    icon: option.rawValue == selectionRaw ? "checkmark.circle.fill" : "circle",
+                                    title: option.title
+                                )
+                            }
+                            .veyraCardRow()
                         }
-                        .veyraCardRow()
                     }
                 }
+                .frame(maxWidth: 1000)
             }
-            .frame(maxWidth: 1000)
+            .navigationTitle(title)
+
         }
-        .navigationTitle(title)
     }
 }
 

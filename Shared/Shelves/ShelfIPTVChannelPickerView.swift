@@ -66,78 +66,81 @@ struct ShelfIPTVChannelPickerView: View {
     }
 
     var body: some View {
-        List {
-            if providers.count > 1 {
-                Section("Provider") {
-                    // Naam + soort (Xtream/M3U) samen per optie, zodat je bij
-                    // meerdere providers meteen ziet welke welke is.
-                    Picker("Provider", selection: $selectedProviderID) {
-                        ForEach(providers) { provider in
-                            Text("\(provider.displayName) · \(provider.kindLabel)")
-                                .tag(provider.id as UUID?)
+        VeyraDynamicBackgroundScope {
+            VeyraList {
+                if providers.count > 1 {
+                    Section("Provider") {
+                        // Naam + soort (Xtream/M3U) samen per optie, zodat je bij
+                        // meerdere providers meteen ziet welke welke is.
+                        Picker("Provider", selection: $selectedProviderID) {
+                            ForEach(providers) { provider in
+                                Text("\(provider.displayName) · \(provider.kindLabel)")
+                                    .tag(provider.id as UUID?)
+                            }
                         }
+                        .pickerStyle(.menu)
                     }
-                    .pickerStyle(.menu)
                 }
-            }
 
-            Section {
-                Picker("Soort", selection: $contentKind) {
-                    Text("Zenders").tag(ShelfIPTVItemKind.live)
-                    Text("VOD").tag(ShelfIPTVItemKind.vod)
+                Section {
+                    Picker("Soort", selection: $contentKind) {
+                        Text("Zenders").tag(ShelfIPTVItemKind.live)
+                        Text("VOD").tag(ShelfIPTVItemKind.vod)
+                    }
+                    .pickerStyle(.segmented)
                 }
-                .pickerStyle(.segmented)
-            }
 
-            if isLoading {
-                ProgressView(contentKind == .live ? "Kanalen laden…" : "Aanbieders laden…")
-            } else if let errorMessage {
-                Text(errorMessage).foregroundStyle(.secondary)
-            } else if providers.isEmpty {
-                Text("Stel eerst een IPTV-provider in bij Live TV.")
-                    .foregroundStyle(.secondary)
-            } else if contentKind == .live {
-                liveContent
-            } else {
-                vodContent
-            }
-        }
-        .searchable(
-            text: $searchText,
-            prompt: contentKind == .live ? "Zoek een kanaal" : "Zoek een aanbieder"
-        )
-        .navigationTitle("Kanalen kiezen")
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button {
-                    Task { await refresh() }
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                }
-                .accessibilityLabel(contentKind == .live ? "Kanalen nu vernieuwen" : "Aanbieders nu vernieuwen")
-            }
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Gereed") {
-                    commit()
-                    dismiss()
-                }
-            }
-        }
-        .task { await loadProviders() }
-        .onChange(of: selectedProviderID) { _, _ in
-            vodCategorySections = []
-            vodLoaded = false
-            Task {
-                if contentKind == .live {
-                    await loadLiveChannels()
+                if isLoading {
+                    ProgressView(contentKind == .live ? "Kanalen laden…" : "Aanbieders laden…")
+                } else if let errorMessage {
+                    Text(errorMessage).foregroundStyle(.secondary)
+                } else if providers.isEmpty {
+                    Text("Stel eerst een IPTV-provider in bij Live TV.")
+                        .foregroundStyle(.secondary)
+                } else if contentKind == .live {
+                    liveContent
                 } else {
-                    await loadVODCategories()
+                    vodContent
                 }
             }
-        }
-        .onChange(of: contentKind) { _, newValue in
-            guard newValue == .vod, !vodLoaded else { return }
-            Task { await loadVODCategories() }
+            .searchable(
+                text: $searchText,
+                prompt: contentKind == .live ? "Zoek een kanaal" : "Zoek een aanbieder"
+            )
+            .navigationTitle("Kanalen kiezen")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button {
+                        Task { await refresh() }
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .accessibilityLabel(contentKind == .live ? "Kanalen nu vernieuwen" : "Aanbieders nu vernieuwen")
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Gereed") {
+                        commit()
+                        dismiss()
+                    }
+                }
+            }
+            .task { await loadProviders() }
+            .onChange(of: selectedProviderID) { _, _ in
+                vodCategorySections = []
+                vodLoaded = false
+                Task {
+                    if contentKind == .live {
+                        await loadLiveChannels()
+                    } else {
+                        await loadVODCategories()
+                    }
+                }
+            }
+            .onChange(of: contentKind) { _, newValue in
+                guard newValue == .vod, !vodLoaded else { return }
+                Task { await loadVODCategories() }
+            }
+
         }
     }
 

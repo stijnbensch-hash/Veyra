@@ -9,8 +9,10 @@ struct VeyraHeroSpotlightSettingsView: View {
     private let store = HeroSpotlightSettingsStore()
 
     var body: some View {
-        content
-            .navigationTitle("Hero")
+        VeyraDynamicBackgroundScope {
+            content
+                .navigationTitle("Hero")
+        }
     }
 
     @ViewBuilder
@@ -18,7 +20,7 @@ struct VeyraHeroSpotlightSettingsView: View {
         #if os(tvOS)
         ZStack {
             VeyraBackground().ignoresSafeArea()
-            List {
+            VeyraList {
                 Section {
                     Picker("Stijl", selection: styleBinding) {
                         ForEach(HeroSpotlightStyle.allCases, id: \.self) { Text($0.label).tag($0) }
@@ -48,7 +50,7 @@ struct VeyraHeroSpotlightSettingsView: View {
             .frame(maxWidth: 1000)
         }
         #else
-        Form {
+        VeyraForm {
             Section {
                 Picker("Stijl", selection: styleBinding) {
                     ForEach(HeroSpotlightStyle.allCases, id: \.self) { Text($0.label).tag($0) }

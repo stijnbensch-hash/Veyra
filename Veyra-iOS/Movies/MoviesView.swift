@@ -24,132 +24,136 @@ struct MoviesView: View {
 
     @Environment(\.horizontalSizeClass) private var sizeClass
 
-    private var metrics: VeyraPosterMetrics { VeyraPosterMetrics(regular: sizeClass == .regular) }
-    private var columns: [GridItem] { metrics.columns }
-
     private let posterBaseURL =
         URL(string: "https://image.tmdb.org/t/p/w500")!
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                VeyraBackground()
+        VeyraDynamicBackgroundScope {
+            NavigationStack {
+                GeometryReader { geometry in
+                    let metrics = VeyraCatalogPosterGridLayout(availableWidth: geometry.size.width,
+                                                             regular: sizeClass == .regular)
+                    ZStack {
+                        VeyraBackground()
 
-                ScrollView(
-                    .vertical,
-                    showsIndicators: false
-                ) {
-                    VStack(
-                        alignment: .leading,
-                        spacing: 24
-                    ) {
-                        if let featured {
-                            VeyraCatalogHero(
-                                url: featured.backdropPath.flatMap {
-                                    URL(string: "https://image.tmdb.org/t/p/w1280" + $0)
-                                }, topInset: VeyraSafeArea.top
+                        VeyraScrollView(
+                            .vertical,
+                            showsIndicators: false
+                        ) {
+                            VStack(
+                                alignment: .leading,
+                                spacing: 24
                             ) {
-                                VeyraHero(
-                                    title: featured.title,
-                                    eyebrow: "Uitgelicht",
-                                    overview: featured.overview,
-                                    metadata:
-                                        featured.releaseDate.map {
-                                            [
-                                                String(
-                                                    $0.prefix(4)
+                                if let featured {
+                                    VeyraCatalogHero(
+                                        url: featured.backdropPath.flatMap {
+                                            URL(string: "https://image.tmdb.org/t/p/w1280" + $0)
+                                        }, topInset: VeyraSafeArea.top
+                                    ) {
+                                        VeyraHero(
+                                            title: featured.title,
+                                            eyebrow: "Uitgelicht",
+                                            overview: featured.overview,
+                                            metadata:
+                                                featured.releaseDate.map {
+                                                    [
+                                                        String(
+                                                            $0.prefix(4)
+                                                        )
+                                                    ]
+                                                }
+                                                ?? [],
+                                            item: MediaItem(title: featured.title, type: .movie,
+                                                            tmdbID: featured.id, rating: featured.voteAverage)
+                                        ) {
+                                            NavigationLink {
+                                                MovieDetailView(movie: mediaItem(for: featured))
+                                            } label: {
+                                                VeyraActionLabel(
+                                                    title:
+                                                        "Meer informatie",
+                                                    symbol:
+                                                        "info.circle"
                                                 )
-                                            ]
+                                            }
+                                            .buttonStyle(.plain)
+                                            .background(
+                                                .white.opacity(0.14),
+                                                in: Capsule()
+                                            )
                                         }
-                                        ?? [],
-                                    item: MediaItem(title: featured.title, type: .movie,
-                                                    tmdbID: featured.id, rating: featured.voteAverage)
-                                ) {
-                                    NavigationLink {
-                                        MovieDetailView(movie: mediaItem(for: featured))
-                                    } label: {
-                                        VeyraActionLabel(
-                                            title:
-                                                "Meer informatie",
-                                            symbol:
-                                                "info.circle"
-                                        )
+
                                     }
-                                    .buttonStyle(.plain)
-                                    .background(
-                                        .white.opacity(0.14),
-                                        in: Capsule()
+                                }
+
+                                VStack(
+                                    alignment: .leading,
+                                    spacing: 6
+                                ) {
+                                    header
+
+                                    NavigationLink {
+                                        VeyraCollectionsBrowserView()
+                                    } label: {
+                                        Label("Collecties", systemImage: "rectangle.stack.fill")
+                                            .font(.subheadline.weight(.semibold))
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .tint(VeyraColors.cyan)
+
+                                    MediaFiltersRowIOS(
+                                        kind: .movie,
+                                        selectedGenreID:
+                                            $selectedGenreID,
+                                        selectedDecade:
+                                            $selectedDecade,
+                                        selectedRating:
+                                            $selectedRating,
+                                        selectedSort:
+                                            $selectedSort
                                     )
                                 }
 
+                                .padding(.horizontal, 16)
+
+                                content(metrics: metrics)
+                                    .padding(.horizontal, metrics.horizontalPadding)
                             }
+                            .padding(.bottom, 40)
                         }
 
-                        VStack(
-                            alignment: .leading,
-                            spacing: 6
-                        ) {
-                            header
-
-                            NavigationLink {
-                                VeyraCollectionsBrowserView()
-                            } label: {
-                                Label("Collecties", systemImage: "rectangle.stack.fill")
-                                    .font(.subheadline.weight(.semibold))
-                            }
-                            .buttonStyle(.bordered)
-                            .tint(VeyraColors.cyan)
-
-                            MediaFiltersRowIOS(
-                                kind: .movie,
-                                selectedGenreID:
-                                    $selectedGenreID,
-                                selectedDecade:
-                                    $selectedDecade,
-                                selectedRating:
-                                    $selectedRating,
-                                selectedSort:
-                                    $selectedSort
-                            )
-                        }
-
-                        .padding(.horizontal, 16)
-
-                        content
-                            .padding(.horizontal, 16)
                     }
-                    .padding(.bottom, 40)
                 }
+                #if os(iOS)
+                .ignoresSafeArea(.container, edges: .top)
+                #endif
+                .veyraHideNavigationBar()
+                .onChange(
+                    of: watchRegion
+                ) { _, _ in
+                    selectedProvider = nil
+                }
+                .task(
+                    id: catalogTaskID
+                ) {
+                    async let catalogTask:
+                        Void = loadMovies()
 
-            }
-            #if os(iOS)
-            .ignoresSafeArea(.container, edges: .top)
-            #endif
-            .veyraHideNavigationBar()
-            .onChange(
-                of: watchRegion
-            ) { _, _ in
-                selectedProvider = nil
-            }
-            .task(
-                id: catalogTaskID
-            ) {
-                async let catalogTask:
-                    Void = loadMovies()
+                    async let traktTask:
+                        Void = refreshTrakt()
 
-                async let traktTask:
-                    Void = refreshTrakt()
+                    _ = await (
+                        catalogTask,
+                        traktTask
+                    )
+                }
+                .task(id: heroPool.map(\.id)) {
+                    await rotateHeroAutomatically()
+                }
+            }
+            .mediaNavigationRoot()
 
-                _ = await (
-                    catalogTask,
-                    traktTask
-                )
-            }
-            .task(id: heroPool.map(\.id)) {
-                await rotateHeroAutomatically()
-            }
         }
-        .mediaNavigationRoot()
     }
 
     // MARK: - Hero rotatie
@@ -247,7 +251,7 @@ struct MoviesView: View {
     // MARK: - Content
 
     @ViewBuilder
-    private var content: some View {
+    private func content(metrics: VeyraCatalogPosterGridLayout) -> some View {
         if isLoading
             && movies.isEmpty
         {
@@ -274,7 +278,7 @@ struct MoviesView: View {
 
         } else {
             LazyVGrid(
-                columns: columns,
+                columns: metrics.columns,
                 spacing: metrics.rowSpacing
             ) {
                 ForEach(movies) {

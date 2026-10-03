@@ -27,67 +27,70 @@ struct IPTVPlaybackSettingsView: View {
     }
 
     var body: some View {
-        ZStack {
-            VeyraColors.background.ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            List {
-                Section {
-                    Picker("Gidsthema", selection: $guideThemeRaw) {
-                        ForEach(IPTVGuideTheme.allCases) { theme in
-                            Text(theme.title).tag(theme.rawValue)
+                VeyraList {
+                    Section {
+                        Picker("Gidsthema", selection: $guideThemeRaw) {
+                            ForEach(IPTVGuideTheme.allCases) { theme in
+                                Text(theme.title).tag(theme.rawValue)
+                            }
                         }
+                        Toggle("Landcode voor zendernaam verbergen", isOn: $hideCountryPrefix)
+                    } header: {
+                        sectionHeader("Zenderguide", symbol: "tv.badge.wifi", tint: VeyraColors.cyan)
+                    } footer: {
+                        Text("Gidsthema past de kleuren van de programmagids aan. Bij ingeschakeld wordt de landcode voor zendernamen weggelaten (bv. \"AU: Fox Sports 503\" wordt \"Fox Sports 503\").")
                     }
-                    Toggle("Landcode voor zendernaam verbergen", isOn: $hideCountryPrefix)
-                } header: {
-                    sectionHeader("Zenderguide", symbol: "tv.badge.wifi", tint: VeyraColors.cyan)
-                } footer: {
-                    Text("Gidsthema past de kleuren van de programmagids aan. Bij ingeschakeld wordt de landcode voor zendernamen weggelaten (bv. \"AU: Fox Sports 503\" wordt \"Fox Sports 503\").")
+
+                    Section {
+                        Picker("Afspeelmotor", selection: $playerEngineRaw) {
+                            ForEach(IPTVPlayerEngineOption.allCases) { option in
+                                Text(option.title).tag(option.rawValue)
+                            }
+                        }
+
+                        Picker("Buffering", selection: $bufferDurationRaw) {
+                            ForEach(IPTVBufferDurationOption.allCases) { option in
+                                Text(option.title).tag(option.rawValue)
+                            }
+                        }
+
+                        Picker("Catch-up-tijdcorrectie", selection: $catchUpOffsetModeRaw) {
+                            ForEach(IPTVCatchUpOffsetMode.allCases) { mode in
+                                Text(mode.title).tag(mode.rawValue)
+                            }
+                        }
+
+                        if catchUpOffsetMode == .manual {
+                            Stepper(
+                                "Correctie: \(catchUpOffsetManualSeconds) sec",
+                                value: $catchUpOffsetManualSeconds,
+                                in: -3600...3600,
+                                step: 60
+                            )
+                        }
+                    } header: {
+                        sectionHeader("Afspelen", symbol: "play.laptopcomputer", tint: VeyraColors.ice)
+                    } footer: {
+                        Text("Afspeelmotor bepaalt welke engine live-zenders afspeelt. Buffering: hoeveel live video vooraf klaarstaat. Catch-up-tijdcorrectie volgt normaal de klok van de provider; zet 'm op handmatig als terugkijken op het verkeerde moment start. Nog niet aangesloten op de speler.")
+                    }
+
+                    Section {
+                        Toggle("FPS-teller tonen", isOn: $showFPSCounter)
+                    } header: {
+                        sectionHeader("Ontwikkelaarsopties", symbol: "ladybug", tint: VeyraColors.red)
+                    } footer: {
+                        Text("Er is nog geen FPS-teller in Veyra; deze schakelaar heeft voorlopig geen effect.")
+                    }
                 }
-
-                Section {
-                    Picker("Afspeelmotor", selection: $playerEngineRaw) {
-                        ForEach(IPTVPlayerEngineOption.allCases) { option in
-                            Text(option.title).tag(option.rawValue)
-                        }
-                    }
-
-                    Picker("Buffering", selection: $bufferDurationRaw) {
-                        ForEach(IPTVBufferDurationOption.allCases) { option in
-                            Text(option.title).tag(option.rawValue)
-                        }
-                    }
-
-                    Picker("Catch-up-tijdcorrectie", selection: $catchUpOffsetModeRaw) {
-                        ForEach(IPTVCatchUpOffsetMode.allCases) { mode in
-                            Text(mode.title).tag(mode.rawValue)
-                        }
-                    }
-
-                    if catchUpOffsetMode == .manual {
-                        Stepper(
-                            "Correctie: \(catchUpOffsetManualSeconds) sec",
-                            value: $catchUpOffsetManualSeconds,
-                            in: -3600...3600,
-                            step: 60
-                        )
-                    }
-                } header: {
-                    sectionHeader("Afspelen", symbol: "play.laptopcomputer", tint: VeyraColors.ice)
-                } footer: {
-                    Text("Afspeelmotor bepaalt welke engine live-zenders afspeelt. Buffering: hoeveel live video vooraf klaarstaat. Catch-up-tijdcorrectie volgt normaal de klok van de provider; zet 'm op handmatig als terugkijken op het verkeerde moment start. Nog niet aangesloten op de speler.")
-                }
-
-                Section {
-                    Toggle("FPS-teller tonen", isOn: $showFPSCounter)
-                } header: {
-                    sectionHeader("Ontwikkelaarsopties", symbol: "ladybug", tint: VeyraColors.red)
-                } footer: {
-                    Text("Er is nog geen FPS-teller in Veyra; deze schakelaar heeft voorlopig geen effect.")
-                }
+                .scrollContentBackground(.hidden)
             }
-            .scrollContentBackground(.hidden)
+            .navigationTitle("Live TV")
+
         }
-        .navigationTitle("Live TV")
     }
 
     @ViewBuilder

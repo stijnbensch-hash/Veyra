@@ -30,7 +30,7 @@ private struct TraktItemActionsView: View {
     @State private var selectedRating = 7
 
     var body: some View {
-        ScrollView {
+        VeyraScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 Text(item.title).font(.title)
                 if store.isConnected {

@@ -20,37 +20,39 @@ struct VeyraChronologyEditorView: View {
     }
 
     var body: some View {
-        Group {
-            if isLoading {
-                ProgressView()
-            } else {
-                List {
-                    Section {
-                        Text("Bepaal de verhaalvolgorde van deze collectie -- los van releasedatum.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                    Section {
-                        ForEach(Array(orderedResolved.enumerated()), id: \.element.id) { index, resolved in
-                            row(resolved, index: index)
+        VeyraDynamicBackgroundScope {
+            Group {
+                if isLoading {
+                    ProgressView()
+                } else {
+                    VeyraList {
+                        Section {
+                            Text("Bepaal de verhaalvolgorde van deze collectie -- los van releasedatum.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
                         }
-                        .onMove(perform: moveItems)
+                        Section {
+                            ForEach(Array(orderedResolved.enumerated()), id: \.element.id) { index, resolved in
+                                row(resolved, index: index)
+                            }
+                            .onMove(perform: moveItems)
+                        }
                     }
+                    .listStyle(.plain)
+                #if os(iOS)
+                    .environment(\.editMode, .constant(.active))
+                #endif
                 }
-                .listStyle(.plain)
-            #if os(iOS)
-                .environment(\.editMode, .constant(.active))
-            #endif
             }
-        }
-        .navigationTitle("Chronologie instellen")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Gereed") { dismiss() }
+            .navigationTitle("Chronologie instellen")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Gereed") { dismiss() }
+                }
             }
+            .task(id: collectionID) { await load() }
         }
-        .task(id: collectionID) { await load() }
     }
 
     private func load() async {

@@ -36,7 +36,7 @@ struct VeyraFlowEPGView: View {
     }
 
     var body: some View {
-        ScrollView {
+        VeyraScrollView {
             LazyVStack(spacing: rowSpacing) {
                 ForEach(channels) { row in
                     VeyraFlowEPGRow(

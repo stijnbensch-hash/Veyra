@@ -8,123 +8,126 @@ struct SourceAppearanceView: View {
     @State private var showPackPreview = false
 
     var body: some View {
-        ZStack {
-            VeyraColors.background.ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            List {
-                Section {
-                    NavigationLink {
-                        SourceOrderView()
-                    } label: {
-                        HStack(spacing: 14) {
-                            Image(systemName: "arrow.up.arrow.down")
-                                .frame(width: 22)
-                                .foregroundStyle(.white.opacity(0.7))
+                VeyraList {
+                    Section {
+                        NavigationLink {
+                            SourceOrderView()
+                        } label: {
+                            HStack(spacing: 14) {
+                                Image(systemName: "arrow.up.arrow.down")
+                                    .frame(width: 22)
+                                    .foregroundStyle(.white.opacity(0.7))
 
-                            Text("Bronvolgorde")
-                                .foregroundStyle(.white)
-                        }
-                    }
-                } footer: {
-                    Text("Bepaal de volgorde van addons en mediaservers bij \"Selecteer bron\".")
-                }
-
-                Section {
-                    modeRow(
-                        icon: "circle.slash",
-                        title: "Geen badges",
-                        trailing: "Verberg alle badges",
-                        isSelected: store.mode == .off
-                    ) {
-                        store.setMode(.off)
-                    }
-
-                    modeRow(
-                        icon: "tag",
-                        title: "Ingebouwd",
-                        trailing: "Veyra's standaardbadges",
-                        isSelected: store.mode == .builtIn
-                    ) {
-                        store.setMode(.builtIn)
-                    }
-
-                    ForEach(store.packs) { pack in
-                        packRow(pack)
-                    }
-
-                    HStack(spacing: 10) {
-                        Image(systemName: "link")
-                            .foregroundStyle(.white.opacity(0.45))
-
-                        TextField("Voeg een pakket-URL toe", text: $packURLText)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .keyboardType(.URL)
-                            .foregroundStyle(.white)
-
-                        if store.isLoading {
-                            ProgressView()
-                        } else {
-                            Button {
-                                addPack()
-                            } label: {
-                                Image(systemName: "plus.circle.fill")
-                                    .foregroundStyle(VeyraColors.cyan)
+                                Text("Bronvolgorde")
+                                    .foregroundStyle(.white)
                             }
-                            .disabled(packURLText.trimmingCharacters(in: .whitespaces).isEmpty)
                         }
+                    } footer: {
+                        Text("Bepaal de volgorde van addons en mediaservers bij \"Selecteer bron\".")
                     }
 
-                    if let error = store.lastError {
-                        Label(error, systemImage: "exclamationmark.triangle.fill")
-                            .font(.footnote)
-                            .foregroundStyle(VeyraColors.red)
-                    }
-
-                    Button {
-                        showBuiltInPreview.toggle()
-                    } label: {
-                        HStack {
-                            Label("Bekijk ingebouwde badges", systemImage: "eye")
-                            Spacer()
-                            Image(systemName: showBuiltInPreview ? "chevron.up" : "chevron.down")
-                                .font(.caption)
+                    Section {
+                        modeRow(
+                            icon: "circle.slash",
+                            title: "Geen badges",
+                            trailing: "Verberg alle badges",
+                            isSelected: store.mode == .off
+                        ) {
+                            store.setMode(.off)
                         }
-                    }
-                    .foregroundStyle(.white)
 
-                    if showBuiltInPreview {
-                        badgePreviewRow(SourceBadgeStore.builtIn)
-                    }
+                        modeRow(
+                            icon: "tag",
+                            title: "Ingebouwd",
+                            trailing: "Veyra's standaardbadges",
+                            isSelected: store.mode == .builtIn
+                        ) {
+                            store.setMode(.builtIn)
+                        }
 
-                    if let activePack {
+                        ForEach(store.packs) { pack in
+                            packRow(pack)
+                        }
+
+                        HStack(spacing: 10) {
+                            Image(systemName: "link")
+                                .foregroundStyle(.white.opacity(0.45))
+
+                            TextField("Voeg een pakket-URL toe", text: $packURLText)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .keyboardType(.URL)
+                                .foregroundStyle(.white)
+
+                            if store.isLoading {
+                                ProgressView()
+                            } else {
+                                Button {
+                                    addPack()
+                                } label: {
+                                    Image(systemName: "plus.circle.fill")
+                                        .foregroundStyle(VeyraColors.cyan)
+                                }
+                                .disabled(packURLText.trimmingCharacters(in: .whitespaces).isEmpty)
+                            }
+                        }
+
+                        if let error = store.lastError {
+                            Label(error, systemImage: "exclamationmark.triangle.fill")
+                                .font(.footnote)
+                                .foregroundStyle(VeyraColors.red)
+                        }
+
                         Button {
-                            showPackPreview.toggle()
+                            showBuiltInPreview.toggle()
                         } label: {
                             HStack {
-                                Label("Bekijk pakketbadges", systemImage: "eye")
+                                Label("Bekijk ingebouwde badges", systemImage: "eye")
                                 Spacer()
-                                Text("\(activePack.badges.count)")
-                                    .foregroundStyle(.white.opacity(0.45))
-                                Image(systemName: showPackPreview ? "chevron.up" : "chevron.down")
+                                Image(systemName: showBuiltInPreview ? "chevron.up" : "chevron.down")
                                     .font(.caption)
                             }
                         }
                         .foregroundStyle(.white)
 
-                        if showPackPreview {
-                            badgePreviewRow(activePack.badges)
+                        if showBuiltInPreview {
+                            badgePreviewRow(SourceBadgeStore.builtIn)
                         }
+
+                        if let activePack {
+                            Button {
+                                showPackPreview.toggle()
+                            } label: {
+                                HStack {
+                                    Label("Bekijk pakketbadges", systemImage: "eye")
+                                    Spacer()
+                                    Text("\(activePack.badges.count)")
+                                        .foregroundStyle(.white.opacity(0.45))
+                                    Image(systemName: showPackPreview ? "chevron.up" : "chevron.down")
+                                        .font(.caption)
+                                }
+                            }
+                            .foregroundStyle(.white)
+
+                            if showPackPreview {
+                                badgePreviewRow(activePack.badges)
+                            }
+                        }
+                    } header: {
+                        Text("Badges")
+                    } footer: {
+                        Text("Badges verschijnen naast elke bron in het bronkeuzescherm, op basis van trefwoorden in de bronnaam. Een eigen pakket is een JSON-bestand op een URL, bijvoorbeeld https://voorbeeld.app/badges.json, met een lijst van { match, imageURL of label, color }.")
                     }
-                } header: {
-                    Text("Badges")
-                } footer: {
-                    Text("Badges verschijnen naast elke bron in het bronkeuzescherm, op basis van trefwoorden in de bronnaam. Een eigen pakket is een JSON-bestand op een URL, bijvoorbeeld https://voorbeeld.app/badges.json, met een lijst van { match, imageURL of label, color }.")
                 }
+                .scrollContentBackground(.hidden)
             }
-            .scrollContentBackground(.hidden)
+            .navigationTitle("Bronverschijning")
+
         }
-        .navigationTitle("Bronverschijning")
     }
 
     // MARK: - Rows

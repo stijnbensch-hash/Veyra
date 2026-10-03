@@ -64,49 +64,52 @@ struct PersonDetailView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: sectionSpacing) {
-#if os(tvOS)
-                Button { dismiss() } label: {
-                    Label("Terug", systemImage: "chevron.left")
+        VeyraDynamicBackgroundScope {
+            VeyraScrollView {
+                VStack(alignment: .leading, spacing: sectionSpacing) {
+    #if os(tvOS)
+                    Button { dismiss() } label: {
+                        Label("Terug", systemImage: "chevron.left")
+                    }
+                    .buttonStyle(VeyraFocusButtonStyle())
+                    .focused($backFocused)
+    #endif
+
+                    header
+
+                    if !knownFor.isEmpty {
+                        knownForSection
+                    }
+
+                    biographySection
+
+                    filmographySection
                 }
-                .buttonStyle(VeyraFocusButtonStyle())
-                .focused($backFocused)
-#endif
-
-                header
-
-                if !knownFor.isEmpty {
-                    knownForSection
-                }
-
-                biographySection
-
-                filmographySection
+                .padding(.bottom, 80)
+    #if os(tvOS)
+                .padding(.horizontal, 40)
+                .padding(.top, 32)
+                .frame(maxWidth: .infinity, alignment: .leading)
+    #else
+                .frame(maxWidth: 1400)
+                .frame(maxWidth: .infinity)
+    #endif
             }
-            .padding(.bottom, 80)
-#if os(tvOS)
-            .padding(.horizontal, 40)
-            .padding(.top, 32)
-            .frame(maxWidth: .infinity, alignment: .leading)
-#else
-            .frame(maxWidth: 1400)
-            .frame(maxWidth: .infinity)
-#endif
+    #if os(tvOS)
+            // De scrollweergave zelf begint onder de navigatie. Dit blijft ook zo
+            // wanneer tvOS automatisch naar een gefocust element scrolt.
+            .padding(.top, 120)
+            // Zonder focusbaar element boven de posterstrip kiest tvOS meteen de
+            // eerste film en scrolt het portret deels uit beeld. Begin bovenaan.
+            .defaultFocus($backFocused, true)
+    #endif
+            .background(VeyraBackground().ignoresSafeArea())
+    #if !os(tvOS)
+            .navigationTitle(name)
+    #endif
+            .task(id: personID) { await load() }
+
         }
-#if os(tvOS)
-        // De scrollweergave zelf begint onder de navigatie. Dit blijft ook zo
-        // wanneer tvOS automatisch naar een gefocust element scrolt.
-        .padding(.top, 120)
-        // Zonder focusbaar element boven de posterstrip kiest tvOS meteen de
-        // eerste film en scrolt het portret deels uit beeld. Begin bovenaan.
-        .defaultFocus($backFocused, true)
-#endif
-        .background(VeyraColors.background.ignoresSafeArea())
-#if !os(tvOS)
-        .navigationTitle(name)
-#endif
-        .task(id: personID) { await load() }
     }
 
     // MARK: - Header

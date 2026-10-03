@@ -23,119 +23,122 @@ struct SettingsView: View {
         MediaServerStore()
 
     var body: some View {
-        ZStack {
-            VeyraBackground().ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 44) {
-                    header
+                VeyraScrollView(.vertical, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 44) {
+                        header
 
-                    settingsSection(title: "Live TV") {
-                        settingsCard(destination: .liveTVSettings, icon: "slider.horizontal.3", title: "Live TV instellingen",
-                                     subtitle: "Gids, player, buffer en kanaalcache", status: "", statusColor: VeyraColors.secondary)
-                    }
-
-                    settingsSection(title: "Bronnen") {
-                        settingsCard(destination: .sourceAppearance, icon: "tag", title: "Bronverschijning",
-                                     subtitle: "Badges in het bronkeuzescherm", status: "", statusColor: VeyraColors.secondary)
-
-                        ForEach(categoryOrder) { category in
-                            bronnenRow(for: category)
+                        settingsSection(title: "Weergave") {
+                            settingsCard(destination: .home, icon: "house", title: "Home",
+                                         subtitle: "Planken op het hoofdmenu", status: "", statusColor: VeyraColors.secondary)
+                            settingsCard(destination: .subtitles, icon: "captions.bubble", title: "Ondertitels",
+                                         subtitle: "Taal, OpenSubtitles en weergave", status: "", statusColor: VeyraColors.cyan)
+                            settingsCard(destination: .general, icon: "gearshape", title: "Algemeen",
+                                         subtitle: "Sport en favoriete teams", status: "", statusColor: VeyraColors.secondary)
+                            settingsCard(destination: .playback, icon: "play.circle", title: "Afspelen",
+                                         subtitle: "Resolutie, taal en oversla-segmenten", status: "", statusColor: VeyraColors.secondary)
+                            settingsCard(destination: .metadata, icon: "star.leadinghalf.filled", title: "Metadata",
+                                         subtitle: "Ratings op film- en seriepagina's", status: "", statusColor: VeyraColors.secondary)
                         }
-                    }
 
-                    settingsSection(title: "Weergave") {
-                        settingsCard(destination: .subtitles, icon: "captions.bubble", title: "Ondertitels",
-                                     subtitle: "Taal, OpenSubtitles en weergave", status: "", statusColor: VeyraColors.cyan)
-                        settingsCard(destination: .general, icon: "gearshape", title: "Algemeen",
-                                     subtitle: "Sport en favoriete teams", status: "", statusColor: VeyraColors.secondary)
-                        settingsCard(destination: .playback, icon: "play.circle", title: "Afspelen",
-                                     subtitle: "Resolutie, taal en oversla-segmenten", status: "", statusColor: VeyraColors.secondary)
-                        settingsCard(destination: .metadata, icon: "star.leadinghalf.filled", title: "Metadata",
-                                     subtitle: "Ratings op film- en seriepagina's", status: "", statusColor: VeyraColors.secondary)
-                        settingsCard(destination: .home, icon: "house", title: "Home",
-                                     subtitle: "Planken op het hoofdmenu", status: "", statusColor: VeyraColors.secondary)
-                    }
+                        settingsSection(title: "Bronnen") {
+                            settingsCard(destination: .sourceAppearance, icon: "tag", title: "Bronverschijning",
+                                         subtitle: "Badges in het bronkeuzescherm", status: "", statusColor: VeyraColors.secondary)
 
-                    settingsSection(title: "Data") {
-                        settingsCard(destination: .data, icon: "internaldrive", title: "Data",
-                                     subtitle: "Cache legen, automatisch verversen, VeyraHub Recorder", status: "", statusColor: VeyraColors.secondary)
-                    }
+                            ForEach(categoryOrder) { category in
+                                bronnenRow(for: category)
+                            }
+                        }
 
-                    settingsSection(title: "Account") {
-                        settingsCard(destination: .account, icon: "person.crop.circle", title: "Account",
-                                     subtitle: "Trakt, ondertitels en profiel",
-                                     status: trakt.isConnected ? "Trakt verbonden" : "Trakt niet gekoppeld",
-                                     statusColor: trakt.isConnected ? VeyraColors.cyan : VeyraColors.secondary)
-                    }
+                        settingsSection(title: "Live TV") {
+                            settingsCard(destination: .liveTVSettings, icon: "slider.horizontal.3", title: "Live TV instellingen",
+                                         subtitle: "Gids, player, buffer en kanaalcache", status: "", statusColor: VeyraColors.secondary)
+                        }
 
-                    if let errorMessage {
-                        Text(errorMessage).foregroundStyle(VeyraColors.red)
-                    }
+                        settingsSection(title: "Account") {
+                            settingsCard(destination: .account, icon: "person.crop.circle", title: "Account",
+                                         subtitle: "Trakt, ondertitels en profiel",
+                                         status: trakt.isConnected ? "Trakt verbonden" : "Trakt niet gekoppeld",
+                                         statusColor: trakt.isConnected ? VeyraColors.cyan : VeyraColors.secondary)
+                        }
 
-                    versionInformation
-                    VeyraStreamingLogoAttribution()
+                        settingsSection(title: "Data") {
+                            settingsCard(destination: .data, icon: "internaldrive", title: "Data",
+                                         subtitle: "Cache legen, automatisch verversen, VeyraHub Recorder", status: "", statusColor: VeyraColors.secondary)
+                        }
+
+                        if let errorMessage {
+                            Text(errorMessage).foregroundStyle(VeyraColors.red)
+                        }
+
+                        versionInformation
+                        VeyraStreamingLogoAttribution()
+                    }
+                    .frame(maxWidth: 1300, alignment: .leading)
+                    .padding(.horizontal, VeyraSpacing.page)
+                    .padding(.top, 36)
+                    .padding(.bottom, 60)
+                    .frame(maxWidth: .infinity)
                 }
-                .frame(maxWidth: 1300, alignment: .leading)
-                .padding(.horizontal, VeyraSpacing.page)
-                .padding(.top, 36)
-                .padding(.bottom, 60)
-                .frame(maxWidth: .infinity)
             }
-        }
-        .onAppear {
-            loadConfiguration()
-            loadMediaServerStatus()
-        }
-        .onReceive(
-            NotificationCenter.default.publisher(
-                for: .iptvConfigurationDidChange
-            )
-        ) { _ in
-            loadConfiguration()
-        }
-        .onReceive(
-            NotificationCenter.default.publisher(
-                for: .veyraMediaServerConfigurationDidChange
-            )
-        ) { _ in
-            loadMediaServerStatus()
-        }
-        .navigationDestination(
-            item: $destination
-        ) { destination in
-            switch destination {
-            case .iptv:
-                IPTVAccountsView()
-
-            case .liveTVSettings:
-                IPTVPlaybackSettingsView()
-
-            case .sourceAppearance:
-                SourceAppearanceView()
-
-            case .mediaServers:
-                MediaServersSettingsView()
-
-            case .account:
-                AccountView()
-            case .subtitles:
-                SubtitlePreferencesView()
-            case .subtitleAppearance:
-                SubtitleAppearanceSettingsView()
-            case .general:
-                TVGeneralSettingsView()
-            case .playback:
-                PlaybackSettingsView()
-            case .metadata:
-                MetadataSettingsView()
-            case .shelves:
-                ShelvesSettingsView()
-            case .home:
-                VeyraHomeSettingsView()
-            case .data:
-                DataSettingsView()
+            .onAppear {
+                loadConfiguration()
+                loadMediaServerStatus()
             }
+            .onReceive(
+                NotificationCenter.default.publisher(
+                    for: .iptvConfigurationDidChange
+                )
+            ) { _ in
+                loadConfiguration()
+            }
+            .onReceive(
+                NotificationCenter.default.publisher(
+                    for: .veyraMediaServerConfigurationDidChange
+                )
+            ) { _ in
+                loadMediaServerStatus()
+            }
+            .navigationDestination(
+                item: $destination
+            ) { destination in
+                switch destination {
+                case .iptv:
+                    IPTVAccountsView()
+
+                case .liveTVSettings:
+                    IPTVPlaybackSettingsView()
+
+                case .sourceAppearance:
+                    SourceAppearanceView()
+
+                case .mediaServers:
+                    MediaServersSettingsView()
+
+                case .account:
+                    AccountView()
+                case .subtitles:
+                    SubtitlePreferencesView()
+                case .subtitleAppearance:
+                    SubtitleAppearanceSettingsView()
+                case .general:
+                    TVGeneralSettingsView()
+                case .playback:
+                    PlaybackSettingsView()
+                case .metadata:
+                    MetadataSettingsView()
+                case .shelves:
+                    ShelvesSettingsView()
+                case .home:
+                    VeyraHomeSettingsView()
+                case .data:
+                    DataSettingsView()
+                }
+            }
+
         }
     }
 
@@ -444,7 +447,7 @@ struct AccountView:
         ZStack {
             VeyraSettingsTheme.background
 
-            List {
+            VeyraList {
                 Section {
                     NavigationLink {
                         TraktView()

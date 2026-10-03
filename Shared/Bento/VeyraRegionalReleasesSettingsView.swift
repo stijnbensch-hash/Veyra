@@ -10,8 +10,10 @@ struct VeyraRegionalReleasesSettingsView: View {
     private let store = RegionalReleaseSettingsStore()
 
     var body: some View {
-        content
-            .navigationTitle("Nieuw van hier")
+        VeyraDynamicBackgroundScope {
+            content
+                .navigationTitle("Nieuw van hier")
+        }
     }
 
     @ViewBuilder
@@ -19,7 +21,7 @@ struct VeyraRegionalReleasesSettingsView: View {
         #if os(tvOS)
         ZStack {
             VeyraBackground().ignoresSafeArea()
-            List {
+            VeyraList {
                 Section {
                     Toggle("IPTV VOD-releases", isOn: showIPTVVODBinding)
                 } footer: {
@@ -29,7 +31,7 @@ struct VeyraRegionalReleasesSettingsView: View {
             .frame(maxWidth: 1000)
         }
         #else
-        Form {
+        VeyraForm {
             Section {
                 Toggle("IPTV VOD-releases", isOn: showIPTVVODBinding)
             } footer: {

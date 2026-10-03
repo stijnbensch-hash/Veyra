@@ -27,69 +27,72 @@ struct IPTVLiveVisibilityView: View {
     private let service = IPTVService()
 
     var body: some View {
-        Group {
+        VeyraDynamicBackgroundScope {
             Group {
-                if isLoading && groups.isEmpty {
-                    ProgressView("Kanalen laden…")
-                } else if let errorMessage, groups.isEmpty {
-                    ContentUnavailableView(
-                        "Kanalen konden niet worden geladen",
-                        systemImage: "wifi.exclamationmark",
-                        description: Text(errorMessage)
-                    )
-                } else if groups.isEmpty {
-                    ContentUnavailableView(
-                        "Geen kanalen gevonden",
-                        systemImage: "tv"
-                    )
-                } else {
-                    List {
-                        ForEach(groups) { group in
-                            groupSection(group)
+                Group {
+                    if isLoading && groups.isEmpty {
+                        ProgressView("Kanalen laden…")
+                    } else if let errorMessage, groups.isEmpty {
+                        ContentUnavailableView(
+                            "Kanalen konden niet worden geladen",
+                            systemImage: "wifi.exclamationmark",
+                            description: Text(errorMessage)
+                        )
+                    } else if groups.isEmpty {
+                        ContentUnavailableView(
+                            "Geen kanalen gevonden",
+                            systemImage: "tv"
+                        )
+                    } else {
+                        VeyraList {
+                            ForEach(groups) { group in
+                                groupSection(group)
+                            }
                         }
+                        .scrollContentBackground(.hidden)
+                        .searchable(text: $searchText, prompt: "Zoek kanalen")
                     }
-                    .scrollContentBackground(.hidden)
-                    .searchable(text: $searchText, prompt: "Zoek kanalen")
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(VeyraBackground())
+                .navigationTitle("Kanalen beheren")
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Menu {
+                            Button("Alles zichtbaar maken", systemImage: "eye") {
+                                var updated = preferences
+                                updated.hiddenLiveCategoryIDs.removeAll()
+                                updated.hiddenLiveChannelIDs.removeAll()
+                                save(updated)
+                            }
+                            Button("Alles verbergen", systemImage: "eye.slash") {
+                                var updated = preferences
+                                updated.hiddenLiveCategoryIDs = Set(groups.map(\.id))
+                                updated.hiddenLiveChannelIDs.removeAll()
+                                save(updated)
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                        }
+                        .disabled(groups.isEmpty)
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            Task { await load() }
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                        .accessibilityLabel("Kanalen nu vernieuwen")
+                    }
+                }
+                .task { await load() }
+                .onReceive(NotificationCenter.default.publisher(for: .iptvConfigurationDidChange)) { _ in
+                    if let configuration {
+                        preferences = preferencesStore.load(for: configuration)
+                    }
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(VeyraColors.background)
-            .navigationTitle("Kanalen beheren")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Button("Alles zichtbaar maken", systemImage: "eye") {
-                            var updated = preferences
-                            updated.hiddenLiveCategoryIDs.removeAll()
-                            updated.hiddenLiveChannelIDs.removeAll()
-                            save(updated)
-                        }
-                        Button("Alles verbergen", systemImage: "eye.slash") {
-                            var updated = preferences
-                            updated.hiddenLiveCategoryIDs = Set(groups.map(\.id))
-                            updated.hiddenLiveChannelIDs.removeAll()
-                            save(updated)
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                    }
-                    .disabled(groups.isEmpty)
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        Task { await load() }
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                    .accessibilityLabel("Kanalen nu vernieuwen")
-                }
-            }
-            .task { await load() }
-            .onReceive(NotificationCenter.default.publisher(for: .iptvConfigurationDidChange)) { _ in
-                if let configuration {
-                    preferences = preferencesStore.load(for: configuration)
-                }
-            }
+
         }
     }
 

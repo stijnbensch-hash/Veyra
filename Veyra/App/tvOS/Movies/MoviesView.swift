@@ -32,85 +32,88 @@ struct MoviesView: View {
     @ObservedObject private var heroSpotlight = VeyraHeroSpotlight.shared
 
     var body: some View {
-        ZStack {
-            VeyraBackground()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground()
 
-            ScrollView(
-                .vertical,
-                showsIndicators: false
-            ) {
-                VStack(
-                    alignment: .leading,
-                    spacing: 28
+                VeyraScrollView(
+                    .vertical,
+                    showsIndicators: false
                 ) {
-                    if let featured {
-                        VeyraCatalogHero(
-                            url: heroSpotlight.focused?.backdropURL ?? featured.backdropPath.flatMap {
-                                URL(string: "https://image.tmdb.org/t/p/w1280" + $0)
-                            },
-                            topInset: VeyraTopNavigation.barHeight
-                        ) {
-                            Group {
-                                if let focused = heroSpotlight.focused {
-                                    VeyraSpotlightHero(content: focused)
-                                } else {
-                                    VeyraMovieHero(movie: featured)
+                    VStack(
+                        alignment: .leading,
+                        spacing: 28
+                    ) {
+                        if let featured {
+                            VeyraCatalogHero(
+                                url: heroSpotlight.focused?.backdropURL ?? featured.backdropPath.flatMap {
+                                    URL(string: "https://image.tmdb.org/t/p/w1280" + $0)
+                                },
+                                topInset: VeyraTopNavigation.barHeight
+                            ) {
+                                Group {
+                                    if let focused = heroSpotlight.focused {
+                                        VeyraSpotlightHero(content: focused)
+                                    } else {
+                                        VeyraMovieHero(movie: featured)
+                                    }
                                 }
+                                .id(heroSpotlight.focused?.id ?? "movie:\(featured.id)")
                             }
-                            .id(heroSpotlight.focused?.id ?? "movie:\(featured.id)")
                         }
-                    }
 
-                    VStack(alignment: .leading, spacing: 6) {
-                        header
+                        VStack(alignment: .leading, spacing: 6) {
+                            header
 
-                        MediaFiltersRow(
-                            kind: .movie,
-                            selectedGenreID: $selectedGenreID,
-                            selectedDecade: $selectedDecade,
-                            selectedRating: $selectedRating,
-                            selectedSort: $selectedSort
-                        ) {
-                            collectiesButton
+                            MediaFiltersRow(
+                                kind: .movie,
+                                selectedGenreID: $selectedGenreID,
+                                selectedDecade: $selectedDecade,
+                                selectedRating: $selectedRating,
+                                selectedSort: $selectedSort
+                            ) {
+                                collectiesButton
+                            }
                         }
-                    }
-                    .padding(.top, 24)
-                    .padding(.horizontal, 80)
-
-                    content
+                        .padding(.top, 24)
                         .padding(.horizontal, 80)
-                }
-                .frame(
-                    maxWidth: .infinity,
-                    alignment: .leading
-                )
-                .padding(.bottom, 50)
-            }
-            .contentMargins(
-                .horizontal,
-                0,
-                for: .scrollContent
-            )
-            .scrollClipDisabled()
 
-        }
-        .ignoresSafeArea(.container, edges: [.horizontal, .top])
-        .task {
-            await TraktStore.shared
-                .refreshIfNeeded()
-        }
-        .task(
-            id: catalogTaskID
-        ) {
-            await loadPopularMovies()
-        }
-        .task(id: heroPool.map(\.id)) {
-            await rotateHeroAutomatically()
-        }
-        .onChange(
-            of: watchRegion
-        ) { _, _ in
-            selectedProvider = nil
+                        content
+                            .padding(.horizontal, 80)
+                    }
+                    .frame(
+                        maxWidth: .infinity,
+                        alignment: .leading
+                    )
+                    .padding(.bottom, 50)
+                }
+                .contentMargins(
+                    .horizontal,
+                    0,
+                    for: .scrollContent
+                )
+                .scrollClipDisabled()
+
+            }
+            .ignoresSafeArea(.container, edges: [.horizontal, .top])
+            .task {
+                await TraktStore.shared
+                    .refreshIfNeeded()
+            }
+            .task(
+                id: catalogTaskID
+            ) {
+                await loadPopularMovies()
+            }
+            .task(id: heroPool.map(\.id)) {
+                await rotateHeroAutomatically()
+            }
+            .onChange(
+                of: watchRegion
+            ) { _, _ in
+                selectedProvider = nil
+            }
+
         }
     }
 

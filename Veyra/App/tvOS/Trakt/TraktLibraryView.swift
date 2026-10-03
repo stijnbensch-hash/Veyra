@@ -29,43 +29,46 @@ struct TraktLibraryView: View {
         }
     }
     var body: some View {
-        List {
-            Section(kind.title) {
-                if entries.isEmpty { Text(store.isSyncing ? "Gegevens laden…" : "Nog geen titels.") }
-                ForEach(entries, id: \.rowID) { entry in
-                    NavigationLink { TraktDestinationView(entry: entry) } label: { TraktEntryLabel(entry: entry) }
-                }
-                if kind == .history && hasMore && store.history.count >= 100 {
-                    Button(loading ? "Laden…" : "Oudere kijkgeschiedenis laden") {
-                        loading = true
-                        Task {
-                            do {
-                                let next = try await store.historyPage(page + 1)
-                                let existing = Set(entries.map(\.rowID))
-                                extraHistory += next.filter { !existing.contains($0.rowID) }
-                                page += 1; hasMore = next.count == 100
-                            } catch { self.error = error.localizedDescription }
-                            loading = false
-                        }
-                    }.disabled(loading)
-                }
-            }
-            if kind == .playback && !store.upNext.isEmpty {
-                Section("Volgende afleveringen") {
-                    ForEach(store.upNext.compactMap(\.entry), id: \.rowID) { entry in
+        VeyraDynamicBackgroundScope {
+            VeyraList {
+                Section(kind.title) {
+                    if entries.isEmpty { Text(store.isSyncing ? "Gegevens laden…" : "Nog geen titels.") }
+                    ForEach(entries, id: \.rowID) { entry in
                         NavigationLink { TraktDestinationView(entry: entry) } label: { TraktEntryLabel(entry: entry) }
                     }
+                    if kind == .history && hasMore && store.history.count >= 100 {
+                        Button(loading ? "Laden…" : "Oudere kijkgeschiedenis laden") {
+                            loading = true
+                            Task {
+                                do {
+                                    let next = try await store.historyPage(page + 1)
+                                    let existing = Set(entries.map(\.rowID))
+                                    extraHistory += next.filter { !existing.contains($0.rowID) }
+                                    page += 1; hasMore = next.count == 100
+                                } catch { self.error = error.localizedDescription }
+                                loading = false
+                            }
+                        }.disabled(loading)
+                    }
                 }
+                if kind == .playback && !store.upNext.isEmpty {
+                    Section("Volgende afleveringen") {
+                        ForEach(store.upNext.compactMap(\.entry), id: \.rowID) { entry in
+                            NavigationLink { TraktDestinationView(entry: entry) } label: { TraktEntryLabel(entry: entry) }
+                        }
+                    }
+                }
+                if let error = error ?? store.errorMessage { Text(error).foregroundStyle(.orange) }
+                Button("Vernieuwen") {
+                    Task { extraHistory = []; page = 1; hasMore = true; await store.refresh() }
+                }.disabled(store.isSyncing)
             }
-            if let error = error ?? store.errorMessage { Text(error).foregroundStyle(.orange) }
-            Button("Vernieuwen") {
-                Task { extraHistory = []; page = 1; hasMore = true; await store.refresh() }
-            }.disabled(store.isSyncing)
+            .background(VeyraBackground())
+            .listStyle(.plain)
+            .tint(VeyraColors.cyan)
+            .task { await store.refreshIfNeeded() }
+
         }
-        .background(VeyraBackground())
-        .listStyle(.plain)
-        .tint(VeyraColors.cyan)
-        .task { await store.refreshIfNeeded() }
     }
 }
 
@@ -100,47 +103,50 @@ struct TraktListView: View {
     @State private var entryToRemove: TraktEntry?
     @State private var saving = false
     var body: some View {
-        List {
-            Section(store.lists.first(where: { $0.id == list.id })?.name ?? list.name) {
-                if loading { ProgressView("Lijst laden…") }
-                else if entries.isEmpty { Text("Deze lijst is leeg.") }
-                ForEach(entries, id: \.rowID) { entry in
-                    HStack {
-                        NavigationLink { TraktDestinationView(entry: entry) } label: { TraktEntryLabel(entry: entry) }
-                        Button("Verwijderen", role: .destructive) { entryToRemove = entry }
+        VeyraDynamicBackgroundScope {
+            VeyraList {
+                Section(store.lists.first(where: { $0.id == list.id })?.name ?? list.name) {
+                    if loading { ProgressView("Lijst laden…") }
+                    else if entries.isEmpty { Text("Deze lijst is leeg.") }
+                    ForEach(entries, id: \.rowID) { entry in
+                        HStack {
+                            NavigationLink { TraktDestinationView(entry: entry) } label: { TraktEntryLabel(entry: entry) }
+                            Button("Verwijderen", role: .destructive) { entryToRemove = entry }
+                        }
                     }
                 }
+                Section("Lijst beheren") {
+                    TextField("Naam", text: $editedName)
+                    Button("Naam opslaan") {
+                        perform { try await store.renameList(list, name: editedName) }
+                    }.disabled(editedName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    Button("Lijst verwijderen", role: .destructive) { confirmDelete = true }
+                    Button("Vernieuwen") { Task { await load() } }
+                }.disabled(saving || loading)
+                if let error { Text(error).foregroundStyle(.orange) }
             }
-            Section("Lijst beheren") {
-                TextField("Naam", text: $editedName)
-                Button("Naam opslaan") {
-                    perform { try await store.renameList(list, name: editedName) }
-                }.disabled(editedName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                Button("Lijst verwijderen", role: .destructive) { confirmDelete = true }
-                Button("Vernieuwen") { Task { await load() } }
-            }.disabled(saving || loading)
-            if let error { Text(error).foregroundStyle(.orange) }
-        }
-        .background(VeyraBackground())
-        .listStyle(.plain)
-        .tint(VeyraColors.cyan)
-        .task { editedName = list.name; await load() }
-        .veyraConfirmationDialog("Deze lijst definitief uit Trakt verwijderen?", isPresented: $confirmDelete) {
-            Button("Lijst verwijderen", role: .destructive) {
-                confirmDelete = false
-                perform { try await store.deleteList(list); dismiss() }
-            }
-            Button("Annuleren", role: .cancel) { confirmDelete = false }
-        }
-        .veyraConfirmationDialog("Titel uit deze lijst verwijderen?", isPresented: Binding(get: { entryToRemove != nil }, set: { if !$0 { entryToRemove = nil } })) {
-            if let entry = entryToRemove {
-                Button("Verwijderen", role: .destructive) {
-                    let removed = entry
-                    entryToRemove = nil
-                    perform { try await store.remove(removed, from: list); await load() }
+            .background(VeyraBackground())
+            .listStyle(.plain)
+            .tint(VeyraColors.cyan)
+            .task { editedName = list.name; await load() }
+            .veyraConfirmationDialog("Deze lijst definitief uit Trakt verwijderen?", isPresented: $confirmDelete) {
+                Button("Lijst verwijderen", role: .destructive) {
+                    confirmDelete = false
+                    perform { try await store.deleteList(list); dismiss() }
                 }
+                Button("Annuleren", role: .cancel) { confirmDelete = false }
             }
-            Button("Annuleren", role: .cancel) { entryToRemove = nil }
+            .veyraConfirmationDialog("Titel uit deze lijst verwijderen?", isPresented: Binding(get: { entryToRemove != nil }, set: { if !$0 { entryToRemove = nil } })) {
+                if let entry = entryToRemove {
+                    Button("Verwijderen", role: .destructive) {
+                        let removed = entry
+                        entryToRemove = nil
+                        perform { try await store.remove(removed, from: list); await load() }
+                    }
+                }
+                Button("Annuleren", role: .cancel) { entryToRemove = nil }
+            }
+
         }
     }
     private func load() async {
@@ -167,23 +173,26 @@ struct TraktDestinationView: View {
     @State private var season: TMDBSeason?
     @State private var error: String?
     var body: some View {
-        Group {
-            if let movie { MovieDetailView(movie: movie) }
-            else if let details, let episode { EpisodeView(series: details, episode: episode) }
-            else if let details, let season { SeasonView(series: details, season: season) }
-            else if let series { SeriesDetailView(series: series) }
-            else if let error {
-                VStack(spacing: 24) {
-                    Text(error)
-                    Button("Opnieuw proberen") { Task { await resolve() } }
-                }
-                .padding(.horizontal, VeyraSpacing.page)
-                .padding(.top, 36)
-                .padding(.bottom, 50)
-            } else { ProgressView("Titel openen…") }
+        VeyraDynamicBackgroundScope {
+            Group {
+                if let movie { MovieDetailView(movie: movie) }
+                else if let details, let episode { EpisodeView(series: details, episode: episode) }
+                else if let details, let season { SeasonView(series: details, season: season) }
+                else if let series { SeriesDetailView(series: series) }
+                else if let error {
+                    VStack(spacing: 24) {
+                        Text(error)
+                        Button("Opnieuw proberen") { Task { await resolve() } }
+                    }
+                    .padding(.horizontal, VeyraSpacing.page)
+                    .padding(.top, 36)
+                    .padding(.bottom, 50)
+                } else { ProgressView("Titel openen…") }
+            }
+            .background(VeyraBackground())
+            .task { await resolve() }
+
         }
-        .background(VeyraBackground())
-        .task { await resolve() }
     }
     private func resolve() async {
         error = nil

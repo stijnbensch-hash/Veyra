@@ -8,8 +8,6 @@ struct LaunchAnimationView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var started = false
-    @State private var ambientGlow: Double = 0
-    @State private var lineScale: CGFloat = 0
     @State private var markOpacity: Double = 0
     @State private var markScale: CGFloat = 0.94
     @State private var nameOpacity: Double = 0
@@ -35,37 +33,6 @@ struct LaunchAnimationView: View {
                     endPoint: .bottomTrailing
                 )
 
-                RadialGradient(
-                    colors: [
-                        VeyraColors.cyan.opacity(ambientGlow * 0.18),
-                        VeyraColors.ice.opacity(ambientGlow * 0.05),
-                        .clear
-                    ],
-                    center: UnitPoint(x: 0.5, y: 0.47),
-                    startRadius: 0,
-                    endRadius: max(size.width, size.height) * 0.58
-                )
-
-                Rectangle()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                .clear,
-                                VeyraColors.ice.opacity(0.10),
-                                VeyraColors.cyan.opacity(0.65),
-                                VeyraColors.ice.opacity(0.10),
-                                .clear
-                            ],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .frame(width: size.width * 0.82, height: 1)
-                    .scaleEffect(x: lineScale, y: 1)
-                    .shadow(color: VeyraColors.cyan.opacity(ambientGlow * 0.5), radius: 15)
-                    .offset(y: wide ? markWidth * 0.48 : markWidth * 0.58)
-                    .accessibilityHidden(true)
-
                 VStack(spacing: wide ? 20 : 15) {
                     Image("LaunchBrandmark")
                         .resizable()
@@ -73,10 +40,6 @@ struct LaunchAnimationView: View {
                         .frame(width: markWidth, height: markWidth * 0.9)
                         .opacity(markOpacity)
                         .scaleEffect(markScale)
-                        .shadow(
-                            color: VeyraColors.cyan.opacity(ambientGlow * 0.17),
-                            radius: wide ? 48 : 30
-                        )
 
                     Text("VEYRA")
                         .font(.system(
@@ -118,8 +81,6 @@ struct LaunchAnimationView: View {
             markScale = 1
             nameOpacity = 1
             subtitleOpacity = 1
-            ambientGlow = 1
-            lineScale = 1
             try? await Task.sleep(for: .seconds(0.8))
             withAnimation(.easeOut(duration: 0.25)) { overlayOpacity = 0 }
             try? await Task.sleep(for: .seconds(0.25))
@@ -127,12 +88,7 @@ struct LaunchAnimationView: View {
             return
         }
 
-        withAnimation(.easeOut(duration: 0.65)) {
-            ambientGlow = 1
-            lineScale = 1
-        }
-
-        try? await Task.sleep(for: .seconds(0.15))
+        // Alleen het beeldmerk-met-tekst-scherm: logo verschijnt, dan naam, dan subtitel.
         withAnimation(.easeOut(duration: 0.7)) {
             markOpacity = 1
             markScale = 1

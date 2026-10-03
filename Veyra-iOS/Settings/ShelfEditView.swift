@@ -91,251 +91,254 @@ struct ShelfEditView: View {
     }
 
     var body: some View {
-        ZStack {
-            VeyraColors.background.ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            Form {
-                Section {
-                    Picker("Soort", selection: $kind) {
-                        Text("Films").tag(ShelfMediaKind.movie)
-                        Text("Series").tag(ShelfMediaKind.series)
-                    }
-                    .pickerStyle(.segmented)
-
-                    Picker("Bron", selection: $sourceKind) {
-                        Text("Trakt").tag(ShelfSourceKind.trakt)
-                        Text("TMDB").tag(ShelfSourceKind.tmdb)
-                        Text("Addon").tag(ShelfSourceKind.addon)
-                        Text("Server").tag(ShelfSourceKind.mediaServer)
-                        Text("IPTV").tag(ShelfSourceKind.iptv)
-                    }
-                    .pickerStyle(.segmented)
-                }
-
-                switch sourceKind {
-                case .trakt:
-                    Section("Lijst") {
-                        Picker("Lijst", selection: $traktList) {
-                            ForEach(TraktShelfList.availableLists(for: kind), id: \.self) { list in
-                                Text(list.label(for: kind)).tag(list)
-                            }
-                            if !traktPersonalLists.isEmpty {
-                                ForEach(traktPersonalLists, id: \.self) { list in
-                                    Text(list.name)
-                                        .tag(TraktShelfList.personal(id: list.ids.trakt, slug: list.ids.slug, name: list.name))
-                                }
-                            }
-                        }
-
-                        if isLoadingTraktPersonalLists {
-                            ProgressView("Eigen lijsten laden…")
-                        } else if traktPersonalLists.isEmpty {
-                            Text("Log in bij Trakt (Instellingen → Account) om je eigen lijsten hier te kunnen kiezen.")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .task { await loadTraktPersonalLists() }
-                case .tmdb:
+                VeyraForm {
                     Section {
-                        Picker("Type lijst", selection: $tmdbListSourceMode) {
-                            Text("Standaardlijst").tag(TMDBListSourceMode.standard)
-                            Text("Eigen lijst (ID)").tag(TMDBListSourceMode.personal)
+                        Picker("Soort", selection: $kind) {
+                            Text("Films").tag(ShelfMediaKind.movie)
+                            Text("Series").tag(ShelfMediaKind.series)
                         }
                         .pickerStyle(.segmented)
 
-                        if tmdbListSourceMode == .standard {
-                            Picker("Lijst", selection: $tmdbList) {
-                                ForEach(TMDBShelfList.availableLists(for: kind), id: \.self) { list in
+                        Picker("Bron", selection: $sourceKind) {
+                            Text("Trakt").tag(ShelfSourceKind.trakt)
+                            Text("TMDB").tag(ShelfSourceKind.tmdb)
+                            Text("Addon").tag(ShelfSourceKind.addon)
+                            Text("Server").tag(ShelfSourceKind.mediaServer)
+                            Text("IPTV").tag(ShelfSourceKind.iptv)
+                        }
+                        .pickerStyle(.segmented)
+                    }
+
+                    switch sourceKind {
+                    case .trakt:
+                        Section("Lijst") {
+                            Picker("Lijst", selection: $traktList) {
+                                ForEach(TraktShelfList.availableLists(for: kind), id: \.self) { list in
                                     Text(list.label(for: kind)).tag(list)
                                 }
-                            }
-                        } else {
-                            TextField("TMDB-lijst-ID", text: $tmdbPersonalListIDInput)
-                                .keyboardType(.numberPad)
-
-                            Button("Lijst ophalen") { Task { await fetchTMDBPersonalList() } }
-                                .disabled(
-                                    tmdbPersonalListIDInput.trimmingCharacters(in: .whitespaces).isEmpty
-                                        || isFetchingTMDBPersonalList
-                                )
-
-                            if isFetchingTMDBPersonalList {
-                                ProgressView("Lijst controleren…")
-                            }
-                            if let tmdbPersonalListName {
-                                Text("Gevonden: \(tmdbPersonalListName)").foregroundStyle(.secondary)
-                            }
-                            if let tmdbPersonalListError {
-                                Text(tmdbPersonalListError).foregroundStyle(.red)
-                            }
-                        }
-                    } header: {
-                        Text("Lijst")
-                    } footer: {
-                        if tmdbListSourceMode == .personal {
-                            Text("Het ID vind je in de URL van je TMDB-lijst, bv. themoviedb.org/list/12345 → 12345. De lijst moet publiek staan.")
-                        }
-                    }
-                case .addon:
-                    Section("Addon") {
-                        if metadataAddons.isEmpty {
-                            Text("Voeg eerst een AIOMetadata-addon toe bij Addons.")
-                                .foregroundStyle(.secondary)
-                        } else {
-                            Picker("Addon", selection: $selectedAddonID) {
-                                ForEach(metadataAddons) { addon in
-                                    Text(addon.name).tag(addon.id as UUID?)
-                                }
-                            }
-
-                            if isLoadingCatalogs {
-                                ProgressView("Catalogi laden…")
-                            } else if availableCatalogs.isEmpty {
-                                Text("Geen catalogi gevonden voor deze addon.")
-                                    .foregroundStyle(.secondary)
-                            } else {
-                                Picker("Catalogus", selection: $selectedCatalog) {
-                                    ForEach(availableCatalogs, id: \.self) { catalog in
-                                        Text(catalog.displayName).tag(catalog as AIOMetadataCatalog?)
+                                if !traktPersonalLists.isEmpty {
+                                    ForEach(traktPersonalLists, id: \.self) { list in
+                                        Text(list.name)
+                                            .tag(TraktShelfList.personal(id: list.ids.trakt, slug: list.ids.slug, name: list.name))
                                     }
                                 }
                             }
+
+                            if isLoadingTraktPersonalLists {
+                                ProgressView("Eigen lijsten laden…")
+                            } else if traktPersonalLists.isEmpty {
+                                Text("Log in bij Trakt (Instellingen → Account) om je eigen lijsten hier te kunnen kiezen.")
+                                    .foregroundStyle(.secondary)
+                            }
                         }
-                    }
-                case .mediaServer:
-                    Section("Mediaserver") {
-                        if mediaServers.isEmpty {
-                            Text("Voeg eerst een mediaserver toe bij Mediaservers.")
-                                .foregroundStyle(.secondary)
-                        } else {
-                            Picker("Server", selection: $selectedServerID) {
-                                ForEach(mediaServers) { server in
-                                    Text(server.name).tag(server.id as UUID?)
+                        .task { await loadTraktPersonalLists() }
+                    case .tmdb:
+                        Section {
+                            Picker("Type lijst", selection: $tmdbListSourceMode) {
+                                Text("Standaardlijst").tag(TMDBListSourceMode.standard)
+                                Text("Eigen lijst (ID)").tag(TMDBListSourceMode.personal)
+                            }
+                            .pickerStyle(.segmented)
+
+                            if tmdbListSourceMode == .standard {
+                                Picker("Lijst", selection: $tmdbList) {
+                                    ForEach(TMDBShelfList.availableLists(for: kind), id: \.self) { list in
+                                        Text(list.label(for: kind)).tag(list)
+                                    }
+                                }
+                            } else {
+                                TextField("TMDB-lijst-ID", text: $tmdbPersonalListIDInput)
+                                    .keyboardType(.numberPad)
+
+                                Button("Lijst ophalen") { Task { await fetchTMDBPersonalList() } }
+                                    .disabled(
+                                        tmdbPersonalListIDInput.trimmingCharacters(in: .whitespaces).isEmpty
+                                            || isFetchingTMDBPersonalList
+                                    )
+
+                                if isFetchingTMDBPersonalList {
+                                    ProgressView("Lijst controleren…")
+                                }
+                                if let tmdbPersonalListName {
+                                    Text("Gevonden: \(tmdbPersonalListName)").foregroundStyle(.secondary)
+                                }
+                                if let tmdbPersonalListError {
+                                    Text(tmdbPersonalListError).foregroundStyle(.red)
                                 }
                             }
-
-                            if isLoadingLibraries {
-                                ProgressView("Bibliotheken laden…")
-                            } else if availableLibraries.isEmpty {
-                                Text("Geen bibliotheken gevonden voor deze server.")
+                        } header: {
+                            Text("Lijst")
+                        } footer: {
+                            if tmdbListSourceMode == .personal {
+                                Text("Het ID vind je in de URL van je TMDB-lijst, bv. themoviedb.org/list/12345 → 12345. De lijst moet publiek staan.")
+                            }
+                        }
+                    case .addon:
+                        Section("Addon") {
+                            if metadataAddons.isEmpty {
+                                Text("Voeg eerst een AIOMetadata-addon toe bij Addons.")
                                     .foregroundStyle(.secondary)
                             } else {
-                                Picker("Categorie", selection: $selectedGroupID) {
-                                    ForEach(libraryGroups, id: \.id) { group in
-                                        Text(group.name).tag(group.id as String?)
+                                Picker("Addon", selection: $selectedAddonID) {
+                                    ForEach(metadataAddons) { addon in
+                                        Text(addon.name).tag(addon.id as UUID?)
                                     }
                                 }
 
-                                if librariesInSelectedGroup.isEmpty {
-                                    Text("Geen bibliotheken gevonden in deze categorie.")
+                                if isLoadingCatalogs {
+                                    ProgressView("Catalogi laden…")
+                                } else if availableCatalogs.isEmpty {
+                                    Text("Geen catalogi gevonden voor deze addon.")
                                         .foregroundStyle(.secondary)
                                 } else {
-                                    Picker("Bibliotheek", selection: $selectedLibrary) {
-                                        ForEach(librariesInSelectedGroup) { library in
-                                            Text(library.name).tag(library as JellyfinLibrary?)
+                                    Picker("Catalogus", selection: $selectedCatalog) {
+                                        ForEach(availableCatalogs, id: \.self) { catalog in
+                                            Text(catalog.displayName).tag(catalog as AIOMetadataCatalog?)
                                         }
                                     }
                                 }
                             }
                         }
-                    }
+                    case .mediaServer:
+                        Section("Mediaserver") {
+                            if mediaServers.isEmpty {
+                                Text("Voeg eerst een mediaserver toe bij Mediaservers.")
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                Picker("Server", selection: $selectedServerID) {
+                                    ForEach(mediaServers) { server in
+                                        Text(server.name).tag(server.id as UUID?)
+                                    }
+                                }
 
-                    Section {
-                        Picker("Item-volgorde", selection: $itemOrder) {
-                            ForEach(ShelfItemOrder.allCases) { order in
-                                Text(order.label).tag(order)
+                                if isLoadingLibraries {
+                                    ProgressView("Bibliotheken laden…")
+                                } else if availableLibraries.isEmpty {
+                                    Text("Geen bibliotheken gevonden voor deze server.")
+                                        .foregroundStyle(.secondary)
+                                } else {
+                                    Picker("Categorie", selection: $selectedGroupID) {
+                                        ForEach(libraryGroups, id: \.id) { group in
+                                            Text(group.name).tag(group.id as String?)
+                                        }
+                                    }
+
+                                    if librariesInSelectedGroup.isEmpty {
+                                        Text("Geen bibliotheken gevonden in deze categorie.")
+                                            .foregroundStyle(.secondary)
+                                    } else {
+                                        Picker("Bibliotheek", selection: $selectedLibrary) {
+                                            ForEach(librariesInSelectedGroup) { library in
+                                                Text(library.name).tag(library as JellyfinLibrary?)
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
-                        Picker("Richting", selection: $sortDirection) {
-                            ForEach(ShelfSortDirection.allCases) { direction in
-                                Text(direction.label).tag(direction)
+
+                        Section {
+                            Picker("Item-volgorde", selection: $itemOrder) {
+                                ForEach(ShelfItemOrder.allCases) { order in
+                                    Text(order.label).tag(order)
+                                }
                             }
+                            Picker("Richting", selection: $sortDirection) {
+                                ForEach(ShelfSortDirection.allCases) { direction in
+                                    Text(direction.label).tag(direction)
+                                }
+                            }
+                        } header: {
+                            Text("Item-volgorde")
+                        } footer: {
+                            Text("Bepaalt in welke volgorde deze plank zijn items ophaalt bij de mediaserver.")
                         }
-                    } header: {
-                        Text("Item-volgorde")
-                    } footer: {
-                        Text("Bepaalt in welke volgorde deze plank zijn items ophaalt bij de mediaserver.")
-                    }
-                case .iptv:
-                    Section("Zenders") {
-                        NavigationLink {
-                            ShelfIPTVChannelPickerView(selectedChannels: $iptvChannels)
-                        } label: {
-                            HStack {
-                                Text("Kanalen kiezen")
-                                Spacer()
-                                Text(iptvChannels.isEmpty ? "Geen" : "\(iptvChannels.count)")
+                    case .iptv:
+                        Section("Zenders") {
+                            NavigationLink {
+                                ShelfIPTVChannelPickerView(selectedChannels: $iptvChannels)
+                            } label: {
+                                HStack {
+                                    Text("Kanalen kiezen")
+                                    Spacer()
+                                    Text(iptvChannels.isEmpty ? "Geen" : "\(iptvChannels.count)")
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+
+                            if iptvChannels.isEmpty {
+                                Text("Kies zelf welke zenders in deze plank moeten staan — uit één of meerdere providers.")
                                     .foregroundStyle(.secondary)
                             }
                         }
-
-                        if iptvChannels.isEmpty {
-                            Text("Kies zelf welke zenders in deze plank moeten staan — uit één of meerdere providers.")
-                                .foregroundStyle(.secondary)
-                        }
                     }
-                }
 
-                Section("Titel") {
-                    TextField("Titel", text: titleBinding)
-                }
+                    Section("Titel") {
+                        TextField("Titel", text: titleBinding)
+                    }
 
-                Section {
-                    Toggle("Ingeschakeld", isOn: $isEnabled)
-                }
-
-                if let errorMessage {
-                    Section { Text(errorMessage).foregroundStyle(.red) }
-                }
-
-                if shelf != nil {
                     Section {
-                        Button("Plank verwijderen", role: .destructive) {
-                            if let shelf { viewModel.remove(shelf) }
-                            dismiss()
+                        Toggle("Ingeschakeld", isOn: $isEnabled)
+                    }
+
+                    if let errorMessage {
+                        Section { Text(errorMessage).foregroundStyle(.red) }
+                    }
+
+                    if shelf != nil {
+                        Section {
+                            Button("Plank verwijderen", role: .destructive) {
+                                if let shelf { viewModel.remove(shelf) }
+                                dismiss()
+                            }
                         }
                     }
                 }
+                .scrollContentBackground(.hidden)
             }
-            .scrollContentBackground(.hidden)
-        }
-        .navigationTitle(shelf == nil ? "Plank toevoegen" : "Plank bewerken")
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) { Button("Annuleren") { dismiss() } }
-            ToolbarItem(placement: .confirmationAction) { Button("Opslaan") { save() } }
-        }
-        .onAppear { setupFromExisting() }
-        .onChange(of: kind) { _, _ in
-            updateDefaultTitleIfNeeded()
-            Task { await loadLibraries() }
-        }
-        .onChange(of: sourceKind) { _, newValue in
-            if newValue == .addon, selectedAddonID == nil {
-                selectedAddonID = metadataAddons.first?.id
+            .navigationTitle(shelf == nil ? "Plank toevoegen" : "Plank bewerken")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Annuleren") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) { Button("Opslaan") { save() } }
             }
-            if newValue == .mediaServer, selectedServerID == nil {
-                selectedServerID = mediaServers.first?.id
+            .onAppear { setupFromExisting() }
+            .onChange(of: kind) { _, _ in
+                updateDefaultTitleIfNeeded()
+                Task { await loadLibraries() }
             }
-            updateDefaultTitleIfNeeded()
-            Task { await loadLibraries() }
+            .onChange(of: sourceKind) { _, newValue in
+                if newValue == .addon, selectedAddonID == nil {
+                    selectedAddonID = metadataAddons.first?.id
+                }
+                if newValue == .mediaServer, selectedServerID == nil {
+                    selectedServerID = mediaServers.first?.id
+                }
+                updateDefaultTitleIfNeeded()
+                Task { await loadLibraries() }
+            }
+            .onChange(of: traktList) { _, _ in updateDefaultTitleIfNeeded() }
+            .onChange(of: tmdbList) { _, _ in updateDefaultTitleIfNeeded() }
+            .onChange(of: tmdbListSourceMode) { _, newValue in
+                tmdbPersonalListError = nil
+                if newValue == .standard { tmdbPersonalListName = nil }
+            }
+            .onChange(of: selectedAddonID) { _, _ in Task { await loadCatalogs() } }
+            .onChange(of: selectedCatalog) { _, _ in updateDefaultTitleIfNeeded() }
+            .onChange(of: selectedServerID) { _, _ in Task { await loadLibraries() } }
+            .onChange(of: selectedGroupID) { _, newValue in
+                guard sourceKind == .mediaServer else { return }
+                if let current = selectedLibrary, (current.groupID ?? "_") == newValue { return }
+                selectedLibrary = availableLibraries.first { ($0.groupID ?? "_") == newValue }
+                updateDefaultTitleIfNeeded()
+            }
+            .onChange(of: selectedLibrary) { _, _ in updateDefaultTitleIfNeeded() }
+            .onChange(of: iptvChannels) { _, _ in updateDefaultTitleIfNeeded() }
+
         }
-        .onChange(of: traktList) { _, _ in updateDefaultTitleIfNeeded() }
-        .onChange(of: tmdbList) { _, _ in updateDefaultTitleIfNeeded() }
-        .onChange(of: tmdbListSourceMode) { _, newValue in
-            tmdbPersonalListError = nil
-            if newValue == .standard { tmdbPersonalListName = nil }
-        }
-        .onChange(of: selectedAddonID) { _, _ in Task { await loadCatalogs() } }
-        .onChange(of: selectedCatalog) { _, _ in updateDefaultTitleIfNeeded() }
-        .onChange(of: selectedServerID) { _, _ in Task { await loadLibraries() } }
-        .onChange(of: selectedGroupID) { _, newValue in
-            guard sourceKind == .mediaServer else { return }
-            if let current = selectedLibrary, (current.groupID ?? "_") == newValue { return }
-            selectedLibrary = availableLibraries.first { ($0.groupID ?? "_") == newValue }
-            updateDefaultTitleIfNeeded()
-        }
-        .onChange(of: selectedLibrary) { _, _ in updateDefaultTitleIfNeeded() }
-        .onChange(of: iptvChannels) { _, _ in updateDefaultTitleIfNeeded() }
     }
 
     // MARK: - Setup

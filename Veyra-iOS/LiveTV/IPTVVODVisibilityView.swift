@@ -27,58 +27,61 @@ struct IPTVVODVisibilityView: View {
     private let service = IPTVService()
 
     var body: some View {
-        Group {
+        VeyraDynamicBackgroundScope {
             Group {
-                if isLoading && categories.isEmpty {
-                    ProgressView("VOD-categorieën laden…")
-                } else if let errorMessage, categories.isEmpty {
-                    ContentUnavailableView(
-                        "VOD kon niet worden geladen",
-                        systemImage: "wifi.exclamationmark",
-                        description: Text(errorMessage)
-                    )
-                } else if categories.isEmpty {
-                    ContentUnavailableView("Geen VOD-categorieën", systemImage: "film")
-                } else {
-                    List {
-                        ForEach(categories) { category in
-                            categorySection(category)
+                Group {
+                    if isLoading && categories.isEmpty {
+                        ProgressView("VOD-categorieën laden…")
+                    } else if let errorMessage, categories.isEmpty {
+                        ContentUnavailableView(
+                            "VOD kon niet worden geladen",
+                            systemImage: "wifi.exclamationmark",
+                            description: Text(errorMessage)
+                        )
+                    } else if categories.isEmpty {
+                        ContentUnavailableView("Geen VOD-categorieën", systemImage: "film")
+                    } else {
+                        VeyraList {
+                            ForEach(categories) { category in
+                                categorySection(category)
+                            }
                         }
+                        .scrollContentBackground(.hidden)
+                        .searchable(text: $searchText, prompt: "Zoek titels")
                     }
-                    .scrollContentBackground(.hidden)
-                    .searchable(text: $searchText, prompt: "Zoek titels")
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(VeyraBackground())
+                .navigationTitle("VOD beheren")
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Menu {
+                            Button("Alles zichtbaar maken", systemImage: "eye") {
+                                var updated = preferences
+                                updated.hiddenVODCategoryIDs.removeAll()
+                                updated.hiddenVODItemIDs.removeAll()
+                                save(updated)
+                            }
+                            Button("Alles verbergen", systemImage: "eye.slash") {
+                                var updated = preferences
+                                updated.hiddenVODCategoryIDs = Set(categories.map(\.id))
+                                updated.hiddenVODItemIDs.removeAll()
+                                save(updated)
+                            }
+                        } label: { Image(systemName: "ellipsis.circle") }
+                        .disabled(categories.isEmpty)
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button { Task { await load() } } label: { Image(systemName: "arrow.clockwise") }
+                            .accessibilityLabel("Categorieën nu vernieuwen")
+                    }
+                }
+                .task { await load() }
+                .onReceive(NotificationCenter.default.publisher(for: .iptvConfigurationDidChange)) { _ in
+                    if let configuration { preferences = preferencesStore.load(for: configuration) }
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(VeyraColors.background)
-            .navigationTitle("VOD beheren")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Button("Alles zichtbaar maken", systemImage: "eye") {
-                            var updated = preferences
-                            updated.hiddenVODCategoryIDs.removeAll()
-                            updated.hiddenVODItemIDs.removeAll()
-                            save(updated)
-                        }
-                        Button("Alles verbergen", systemImage: "eye.slash") {
-                            var updated = preferences
-                            updated.hiddenVODCategoryIDs = Set(categories.map(\.id))
-                            updated.hiddenVODItemIDs.removeAll()
-                            save(updated)
-                        }
-                    } label: { Image(systemName: "ellipsis.circle") }
-                    .disabled(categories.isEmpty)
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { Task { await load() } } label: { Image(systemName: "arrow.clockwise") }
-                        .accessibilityLabel("Categorieën nu vernieuwen")
-                }
-            }
-            .task { await load() }
-            .onReceive(NotificationCenter.default.publisher(for: .iptvConfigurationDidChange)) { _ in
-                if let configuration { preferences = preferencesStore.load(for: configuration) }
-            }
+
         }
     }
 

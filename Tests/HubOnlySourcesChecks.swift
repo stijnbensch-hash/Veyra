@@ -76,8 +76,15 @@ struct HubOnlySourcesChecks {
         precondition(mediaID == "tt1234567:2:3")
         let streams = try await client.streams(type: .series, id: mediaID!)
         precondition(streams.map(\.addonName) == ["Hub-addon A", "Hub-addon B"], "Hub-bronnen en addonidentiteit behouden")
+        // Hub-bronnen behouden hun binnenkomende volgorde zolang er geen
+        // lokale Bronvolgorde is ingesteld...
+        let unordered = SourceOrderDefaults.sortedByOriginOrder(streams, order: [], originName: { $0.addonName }, isFromHub: { _ in true })
+        precondition(unordered == streams, "Zonder Bronvolgorde blijft de binnenkomende hub-volgorde behouden")
+        // ...maar een expliciet ingestelde Bronvolgorde geldt ook voor
+        // hub-addons, omdat VeyraHub's eigen API-volgorde niet altijd de op
+        // VeyraHub zelf ingestelde addonvolgorde blijkt te volgen.
         let ordered = SourceOrderDefaults.sortedByOriginOrder(streams, order: ["Hub-addon B", "Hub-addon A"], originName: { $0.addonName }, isFromHub: { _ in true })
-        precondition(ordered == streams, "Volgorde van VeyraHub behouden")
+        precondition(ordered == Array(streams.reversed()), "Bronvolgorde overschrijft ook de volgorde van hub-addons")
         let subtitles = try await client.subtitles(type: .series, id: mediaID!)
         precondition(subtitles.count == 1 && subtitles[0].lang == "nl")
         let progress = try await client.progress(type: .series, id: mediaID!)

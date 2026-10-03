@@ -13,57 +13,60 @@ struct SportsMatchDetailIOS: View {
     @State private var playing: PlayableSource?
 
     var body: some View {
-        VStack(spacing: 24) {
-            Text(match.league.name)
-                .font(.headline)
-                .foregroundStyle(.secondary)
-
-            VStack(spacing: 16) {
-                matchTeamRow(match.home, score: match.homeScore)
-                matchTeamRow(match.away, score: match.awayScore)
-            }
-            .padding()
-            .veyraGlass(radius: VeyraRadius.card)
-            .padding(.horizontal)
-
-            Text(match.status)
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(match.phase == .live ? VeyraColors.red : .secondary)
-
-            if let venue = match.venue, !venue.isEmpty {
-                Text(venue)
-                    .font(.footnote)
+        VeyraDynamicBackgroundScope {
+            VStack(spacing: 24) {
+                Text(match.league.name)
+                    .font(.headline)
                     .foregroundStyle(.secondary)
-            }
 
-            if match.phase != .finished {
-                Button {
-                    channelQuery = SportChannelQuery(
-                        title: "\(match.home.name) – \(match.away.name)",
-                        teams: [match.home.name, match.away.name],
-                        start: match.date
-                    )
-                } label: {
-                    Label("Waar kijken?", systemImage: "play.tv")
-                        .font(.headline)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 10)
+                VStack(spacing: 16) {
+                    matchTeamRow(match.home, score: match.homeScore)
+                    matchTeamRow(match.away, score: match.awayScore)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(VeyraColors.cyan)
-            }
+                .padding()
+                .veyraGlass(radius: VeyraRadius.card)
+                .padding(.horizontal)
 
-            Spacer()
+                Text(match.status)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(match.phase == .live ? VeyraColors.red : .secondary)
+
+                if let venue = match.venue, !venue.isEmpty {
+                    Text(venue)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
+                if match.phase != .finished {
+                    Button {
+                        channelQuery = SportChannelQuery(
+                            title: "\(match.home.name) – \(match.away.name)",
+                            teams: [match.home.name, match.away.name],
+                            start: match.date
+                        )
+                    } label: {
+                        Label("Waar kijken?", systemImage: "play.tv")
+                            .font(.headline)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(VeyraColors.cyan)
+                }
+
+                Spacer()
+            }
+            .padding(.top, 32)
+            .sportChannelSheet($channelQuery) { playing = $0 }
+            .navigationDestination(item: $playing) { source in
+                PlayerView(source: source, item: MediaItem(title: source.name, type: .liveTV))
+            }
+            .veyraReadableWidth(720)
+            .navigationTitle("Wedstrijd")
+            .navigationBarTitleDisplayMode(.inline)
+            .background(VeyraBackground())
+
         }
-        .padding(.top, 32)
-        .sportChannelSheet($channelQuery) { playing = $0 }
-        .navigationDestination(item: $playing) { source in
-            PlayerView(source: source, item: MediaItem(title: source.name, type: .liveTV))
-        }
-        .veyraReadableWidth(720)
-        .navigationTitle("Wedstrijd")
-        .navigationBarTitleDisplayMode(.inline)
-        .background(VeyraBackground())
     }
 
     private func matchTeamRow(_ team: SportsTeam, score: String?) -> some View {

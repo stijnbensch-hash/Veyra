@@ -21,50 +21,53 @@ struct IPTVAccountsView: View {
     @State private var connectionStatus: [UUID: XtreamConnectionStatus] = [:]
 
     var body: some View {
-        ZStack {
-            VeyraBackground().ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 32) {
-                    header
+                VeyraScrollView(.vertical, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 32) {
+                        header
 
-                    if viewModel.isLoading && viewModel.providers.isEmpty {
-                        loadingState
-                    } else if let errorMessage = viewModel.errorMessage, viewModel.providers.isEmpty {
-                        errorState(errorMessage)
-                    } else {
-                        addProviderButton
-                        existingProvidersSection
+                        if viewModel.isLoading && viewModel.providers.isEmpty {
+                            loadingState
+                        } else if let errorMessage = viewModel.errorMessage, viewModel.providers.isEmpty {
+                            errorState(errorMessage)
+                        } else {
+                            addProviderButton
+                            existingProvidersSection
+                        }
                     }
+                    .frame(maxWidth: 1180, alignment: .leading)
+                    .padding(.horizontal, 70)
+                    .padding(.top, 50)
+                    .padding(.bottom, 70)
+                    .frame(maxWidth: .infinity)
                 }
-                .frame(maxWidth: 1180, alignment: .leading)
-                .padding(.horizontal, 70)
-                .padding(.top, 50)
-                .padding(.bottom, 70)
-                .frame(maxWidth: .infinity)
             }
-        }
-        .onAppear { viewModel.load() }
-        .onReceive(NotificationCenter.default.publisher(for: .iptvConfigurationDidChange)) { _ in
-            viewModel.load()
-        }
-        .task {
-            // Periodiek herchecken zolang dit scherm open staat — zie de
-            // gelijkaardige aanpak bij Mediaservers.
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(15))
-                guard !Task.isCancelled else { return }
-                viewModel.refreshStatus()
+            .onAppear { viewModel.load() }
+            .onReceive(NotificationCenter.default.publisher(for: .iptvConfigurationDidChange)) { _ in
+                viewModel.load()
             }
-        }
-        .navigationDestination(isPresented: $showAddProvider) {
-            IPTVSetupView(createsNewProvider: true)
-        }
-        .navigationDestination(item: $selectedManagementProvider) { provider in
-            IPTVProviderManagementLauncherView(providerID: provider.id)
-        }
-        .navigationDestination(item: $selectedEditProvider) { provider in
-            IPTVSetupView(providerID: provider.id)
+            .task {
+                // Periodiek herchecken zolang dit scherm open staat — zie de
+                // gelijkaardige aanpak bij Mediaservers.
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(15))
+                    guard !Task.isCancelled else { return }
+                    viewModel.refreshStatus()
+                }
+            }
+            .navigationDestination(isPresented: $showAddProvider) {
+                IPTVSetupView(createsNewProvider: true)
+            }
+            .navigationDestination(item: $selectedManagementProvider) { provider in
+                IPTVProviderManagementLauncherView(providerID: provider.id)
+            }
+            .navigationDestination(item: $selectedEditProvider) { provider in
+                IPTVSetupView(providerID: provider.id)
+            }
+
         }
     }
 

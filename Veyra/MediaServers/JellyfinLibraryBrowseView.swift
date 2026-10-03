@@ -15,46 +15,49 @@ struct JellyfinLibrariesView: View {
     ]
 
     var body: some View {
-        ZStack {
-            VeyraBackground().ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 32) {
-                    header
+                VeyraScrollView(.vertical, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 32) {
+                        header
 
-                    if isLoading {
-                        ProgressView("Bibliotheken laden…")
-                            .padding(.top, 12)
-                    } else if let errorMessage {
-                        Text(errorMessage)
-                            .font(.system(size: 20))
-                            .foregroundStyle(.orange)
-                    } else if libraries.isEmpty {
-                        Text("Geen bibliotheken gevonden op deze server.")
-                            .font(.system(size: 22))
-                            .foregroundStyle(.white.opacity(0.62))
-                    } else {
-                        LazyVGrid(columns: columns, spacing: 24) {
-                            ForEach(libraries) { library in
-                                NavigationLink {
-                                    JellyfinItemsView(account: account, library: library)
-                                } label: {
-                                    libraryTile(library)
+                        if isLoading {
+                            ProgressView("Bibliotheken laden…")
+                                .padding(.top, 12)
+                        } else if let errorMessage {
+                            Text(errorMessage)
+                                .font(.system(size: 20))
+                                .foregroundStyle(.orange)
+                        } else if libraries.isEmpty {
+                            Text("Geen bibliotheken gevonden op deze server.")
+                                .font(.system(size: 22))
+                                .foregroundStyle(.white.opacity(0.62))
+                        } else {
+                            LazyVGrid(columns: columns, spacing: 24) {
+                                ForEach(libraries) { library in
+                                    NavigationLink {
+                                        JellyfinItemsView(account: account, library: library)
+                                    } label: {
+                                        libraryTile(library)
+                                    }
+                                    .buttonStyle(VeyraFocusButtonStyle(radius: VeyraRadius.card))
                                 }
-                                .buttonStyle(VeyraFocusButtonStyle(radius: VeyraRadius.card))
                             }
                         }
                     }
+                    .frame(maxWidth: 1400, alignment: .leading)
+                    .padding(.horizontal, VeyraSpacing.page)
+                    .padding(.top, 36)
+                    .padding(.bottom, 50)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(maxWidth: 1400, alignment: .leading)
-                .padding(.horizontal, VeyraSpacing.page)
-                .padding(.top, 36)
-                .padding(.bottom, 50)
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
-        }
-        .task {
-            await loadLibraries()
+            .task {
+                await loadLibraries()
+            }
+
         }
     }
 
@@ -152,41 +155,44 @@ struct JellyfinItemsView: View {
     }
 
     var body: some View {
-        ZStack {
-            VeyraBackground().ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 28) {
-                    VeyraSectionHeader(title: library.name)
+                VeyraScrollView(.vertical, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 28) {
+                        VeyraSectionHeader(title: library.name)
 
-                    if isLoading {
-                        ProgressView("Titels laden…")
-                            .padding(.top, 12)
-                    } else if let errorMessage {
-                        Text(errorMessage)
-                            .font(.system(size: 20))
-                            .foregroundStyle(.orange)
-                    } else if items.isEmpty {
-                        Text("Geen titels gevonden in deze bibliotheek.")
-                            .font(.system(size: 22))
-                            .foregroundStyle(.white.opacity(0.62))
-                    } else {
-                        LazyVGrid(columns: columns, spacing: 28) {
-                            ForEach(items) { item in
-                                itemLink(item)
+                        if isLoading {
+                            ProgressView("Titels laden…")
+                                .padding(.top, 12)
+                        } else if let errorMessage {
+                            Text(errorMessage)
+                                .font(.system(size: 20))
+                                .foregroundStyle(.orange)
+                        } else if items.isEmpty {
+                            Text("Geen titels gevonden in deze bibliotheek.")
+                                .font(.system(size: 22))
+                                .foregroundStyle(.white.opacity(0.62))
+                        } else {
+                            LazyVGrid(columns: columns, spacing: 28) {
+                                ForEach(items) { item in
+                                    itemLink(item)
+                                }
                             }
                         }
                     }
+                    .frame(maxWidth: 1600, alignment: .leading)
+                    .padding(.horizontal, VeyraSpacing.page)
+                    .padding(.top, 36)
+                    .padding(.bottom, 50)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(maxWidth: 1600, alignment: .leading)
-                .padding(.horizontal, VeyraSpacing.page)
-                .padding(.top, 36)
-                .padding(.bottom, 50)
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
-        }
-        .task {
-            await loadItems()
+            .task {
+                await loadItems()
+            }
+
         }
     }
 
@@ -253,46 +259,49 @@ struct JellyfinEpisodesView: View {
     }
 
     var body: some View {
-        ZStack {
-            VeyraBackground().ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 24) {
-                    VeyraSectionHeader(title: series.name)
+                VeyraScrollView(.vertical, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 24) {
+                        VeyraSectionHeader(title: series.name)
 
-                    if isLoading {
-                        ProgressView("Afleveringen laden…")
-                            .padding(.top, 12)
-                    } else if let errorMessage {
-                        Text(errorMessage)
-                            .font(.system(size: 20))
-                            .foregroundStyle(.orange)
-                    } else if episodes.isEmpty {
-                        Text("Geen afleveringen gevonden.")
-                            .font(.system(size: 22))
-                            .foregroundStyle(.white.opacity(0.62))
-                    } else {
-                        VStack(spacing: 12) {
-                            ForEach(episodes) { episode in
-                                NavigationLink {
-                                    JellyfinPlaybackDestination(account: account, item: episode)
-                                } label: {
-                                    episodeRow(episode)
+                        if isLoading {
+                            ProgressView("Afleveringen laden…")
+                                .padding(.top, 12)
+                        } else if let errorMessage {
+                            Text(errorMessage)
+                                .font(.system(size: 20))
+                                .foregroundStyle(.orange)
+                        } else if episodes.isEmpty {
+                            Text("Geen afleveringen gevonden.")
+                                .font(.system(size: 22))
+                                .foregroundStyle(.white.opacity(0.62))
+                        } else {
+                            VStack(spacing: 12) {
+                                ForEach(episodes) { episode in
+                                    NavigationLink {
+                                        JellyfinPlaybackDestination(account: account, item: episode)
+                                    } label: {
+                                        episodeRow(episode)
+                                    }
+                                    .buttonStyle(VeyraFocusButtonStyle(radius: VeyraRadius.card))
                                 }
-                                .buttonStyle(VeyraFocusButtonStyle(radius: VeyraRadius.card))
                             }
                         }
                     }
+                    .frame(maxWidth: 1200, alignment: .leading)
+                    .padding(.horizontal, VeyraSpacing.page)
+                    .padding(.top, 36)
+                    .padding(.bottom, 50)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(maxWidth: 1200, alignment: .leading)
-                .padding(.horizontal, VeyraSpacing.page)
-                .padding(.top, 36)
-                .padding(.bottom, 50)
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
-        }
-        .task {
-            await loadEpisodes()
+            .task {
+                await loadEpisodes()
+            }
+
         }
     }
 
@@ -347,30 +356,33 @@ struct JellyfinPlaybackDestination: View {
     let item: JellyfinItem
 
     var body: some View {
-        Group {
-            if let url = JellyfinService(account: account).streamURL(for: item) {
-                PlayerView(
-                    source: PlayableSource(
-                        name: item.displayTitle,
-                        description: item.overview,
-                        url: url,
-                        kind: .direct,
-                        providerName: account.name
-                    ),
-                    item: mediaItem
-                )
-            } else {
-                VStack(spacing: 20) {
-                    Text("Afspelen niet mogelijk")
-                        .font(.system(size: 34, weight: .bold))
-                        .foregroundStyle(.white)
+        VeyraDynamicBackgroundScope {
+            Group {
+                if let url = JellyfinService(account: account).streamURL(for: item) {
+                    PlayerView(
+                        source: PlayableSource(
+                            name: item.displayTitle,
+                            description: item.overview,
+                            url: url,
+                            kind: .direct,
+                            providerName: account.name
+                        ),
+                        item: mediaItem
+                    )
+                } else {
+                    VStack(spacing: 20) {
+                        Text("Afspelen niet mogelijk")
+                            .font(.system(size: 34, weight: .bold))
+                            .foregroundStyle(.white)
 
-                    Text("Kon geen afspeel-URL opbouwen voor deze titel.")
-                        .foregroundStyle(.secondary)
+                        Text("Kon geen afspeel-URL opbouwen voor deze titel.")
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(VeyraBackground())
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(VeyraBackground())
             }
+
         }
     }
 

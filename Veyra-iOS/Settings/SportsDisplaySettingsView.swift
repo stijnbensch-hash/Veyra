@@ -13,46 +13,49 @@ struct SportsDisplaySettingsView: View {
     }
 
     var body: some View {
-        ZStack {
-            VeyraColors.background.ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            List {
-                ForEach(SportCategory.allCases) { category in
-                    let isCategoryOn = enabledCategories.contains(category)
+                VeyraList {
+                    ForEach(SportCategory.allCases) { category in
+                        let isCategoryOn = enabledCategories.contains(category)
 
-                    Section {
-                        Toggle(
-                            category.displayName,
-                            isOn: Binding(
-                                get: { isCategoryOn },
-                                set: { setCategory(category, enabled: $0) }
-                            )
-                        )
-
-                        if isCategoryOn {
-                            ForEach(leagues(for: category)) { league in
-                                Toggle(
-                                    league.name,
-                                    isOn: Binding(
-                                        get: { enabledLeagueIDs.contains(league.id) },
-                                        set: { setLeague(league.id, enabled: $0) }
-                                    )
+                        Section {
+                            Toggle(
+                                category.displayName,
+                                isOn: Binding(
+                                    get: { isCategoryOn },
+                                    set: { setCategory(category, enabled: $0) }
                                 )
+                            )
+
+                            if isCategoryOn {
+                                ForEach(leagues(for: category)) { league in
+                                    Toggle(
+                                        league.name,
+                                        isOn: Binding(
+                                            get: { enabledLeagueIDs.contains(league.id) },
+                                            set: { setLeague(league.id, enabled: $0) }
+                                        )
+                                    )
+                                }
                             }
-                        }
-                    } header: {
-                        Text(category.displayName)
-                    } footer: {
-                        if !isCategoryOn {
-                            Text("Uitgeschakeld: verschijnt niet op Home of in het Sport-menu.")
+                        } header: {
+                            Text(category.displayName)
+                        } footer: {
+                            if !isCategoryOn {
+                                Text("Uitgeschakeld: verschijnt niet op Home of in het Sport-menu.")
+                            }
                         }
                     }
                 }
+                .scrollContentBackground(.hidden)
             }
-            .scrollContentBackground(.hidden)
+            .navigationTitle("Sport")
+            .navigationBarTitleDisplayMode(.inline)
+
         }
-        .navigationTitle("Sport")
-        .navigationBarTitleDisplayMode(.inline)
     }
 
     private func setCategory(_ category: SportCategory, enabled: Bool) {

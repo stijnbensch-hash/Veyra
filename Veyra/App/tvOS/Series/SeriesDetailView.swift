@@ -36,73 +36,78 @@ struct SeriesDetailView: View {
     }
 
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                background
-                    .frame(width: geometry.size.width, height: geometry.size.height)
-                    .clipped()
-                    .overlay {
-                        ZStack {
-                            Color.black.opacity(0.25)
-                            LinearGradient(
-                                colors: [.black.opacity(0.55), .clear],
-                                startPoint: .leading,
-                                endPoint: .trailing
+        VeyraDynamicBackgroundScope {
+            GeometryReader { geometry in
+                ZStack {
+                    baseBackground
+                    background
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .clipped()
+                        .overlay {
+                            ZStack {
+                                Color.black.opacity(0.25)
+                                LinearGradient(
+                                    colors: [.black.opacity(0.55), .clear],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                                LinearGradient(
+                                    colors: [.black.opacity(0.40), .clear],
+                                    startPoint: .top,
+                                    endPoint: UnitPoint(x: 0.5, y: 0.35)
+                                )
+                            }
+                            .allowsHitTesting(false)
+                        }
+                        .veyraHeroBackdropBlend()
+
+                    if viewModel.isLoading {
+                        ProgressView(
+                            "Serie laden…"
+                        )
+                        .font(.title3)
+
+                    } else if let errorMessage =
+                        viewModel.errorMessage
+                    {
+                        VStack(
+                            alignment: .leading,
+                            spacing: 16
+                        ) {
+                            Text(
+                                "Serie kon niet worden geladen"
                             )
-                            LinearGradient(
-                                colors: [.black.opacity(0.40), .clear],
-                                startPoint: .top,
-                                endPoint: UnitPoint(x: 0.5, y: 0.35)
+                            .font(.title2)
+
+                            Text(
+                                errorMessage
+                            )
+                            .foregroundStyle(
+                                .secondary
                             )
                         }
-                        .allowsHitTesting(false)
+
+                    } else if let details =
+                        viewModel.details
+                    {
+                        detailContent(
+                            details
+                        )
+                        .frame(width: geometry.size.width, height: geometry.size.height)
                     }
-
-                if viewModel.isLoading {
-                    ProgressView(
-                        "Serie laden…"
-                    )
-                    .font(.title3)
-
-                } else if let errorMessage =
-                    viewModel.errorMessage
-                {
-                    VStack(
-                        alignment: .leading,
-                        spacing: 16
-                    ) {
-                        Text(
-                            "Serie kon niet worden geladen"
-                        )
-                        .font(.title2)
-
-                        Text(
-                            errorMessage
-                        )
-                        .foregroundStyle(
-                            .secondary
-                        )
-                    }
-
-                } else if let details =
-                    viewModel.details
-                {
-                    detailContent(
-                        details
-                    )
-                    .frame(width: geometry.size.width, height: geometry.size.height)
                 }
             }
-        }
-        .ignoresSafeArea()
-        .task {
-            await viewModel
-                .loadDetails()
-        }
-        .task {
-            await TraktStore
-                .shared
-                .refreshIfNeeded()
+            .ignoresSafeArea()
+            .task {
+                await viewModel
+                    .loadDetails()
+            }
+            .task {
+                await TraktStore
+                    .shared
+                    .refreshIfNeeded()
+            }
+
         }
     }
 
@@ -113,7 +118,7 @@ struct SeriesDetailView: View {
         _ details:
             TMDBSeriesDetails
     ) -> some View {
-        ScrollView(
+        VeyraScrollView(
             .vertical,
             showsIndicators: false
         ) {

@@ -14,112 +14,115 @@ struct IPTVAccountsView: View {
     @State private var connectionStatus: [UUID: XtreamConnectionStatus] = [:]
 
     var body: some View {
-        ZStack {
-            VeyraColors.background.ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            List {
-            if viewModel.providers.isEmpty {
-                ContentUnavailableView(
-                    "Geen IPTV-providers",
-                    systemImage: "antenna.radiowaves.left.and.right.slash",
-                    description: Text("Voeg een M3U-playlist of Xtream-account toe.")
-                )
-            } else {
-                Section {
-                    ForEach(viewModel.providers) { provider in
-                        NavigationLink {
-                            IPTVProviderManagementLauncherView(
-                                providerID: provider.id,
-                                showsVOD: isXtream(provider)
-                            )
-                        } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    HStack(spacing: 6) {
-                                        Circle()
-                                            .fill(providerStatusColor(for: provider.id))
-                                            .frame(width: 10, height: 10)
-                                            .accessibilityLabel(providerStatusLabel(for: provider.id))
-                                        Text(provider.displayName)
-                                            .foregroundStyle(.primary)
-                                        if let status = connectionStatus[provider.id] {
-                                            Text(status.display)
-                                                .font(.caption.weight(.semibold))
-                                                .foregroundStyle(VeyraColors.cyan)
-                                                .padding(.horizontal, 6)
-                                                .padding(.vertical, 2)
-                                                .background(VeyraColors.cyan.opacity(0.14), in: Capsule())
-                                        }
-                                    }
-                                    Text(subtitle(for: provider))
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                            }
-                        }
-                        .task(id: provider.id) {
-                            await loadConnectionStatus(for: provider)
-                        }
-                        .swipeActions {
-                            Button("Verwijderen", role: .destructive) {
-                                viewModel.remove(provider)
-                            }
-                            Button("Bewerken") {
-                                editingProvider = EditingProviderID(id: provider.id)
-                            }
-                            .tint(.blue)
-                        }
-                    }
-                    .onMove { source, destination in
-                        viewModel.moveProviders(fromOffsets: source, toOffset: destination)
-                    }
-                } header: {
-                    Text("Providers")
-                } footer: {
-                    Text(
-                        "Tik op een provider om Live TV en VOD in te stellen. Sleep om te herordenen - dit bepaalt de volgorde in de IPTV-lijst."
+                VeyraList {
+                if viewModel.providers.isEmpty {
+                    ContentUnavailableView(
+                        "Geen IPTV-providers",
+                        systemImage: "antenna.radiowaves.left.and.right.slash",
+                        description: Text("Voeg een M3U-playlist of Xtream-account toe.")
                     )
+                } else {
+                    Section {
+                        ForEach(viewModel.providers) { provider in
+                            NavigationLink {
+                                IPTVProviderManagementLauncherView(
+                                    providerID: provider.id,
+                                    showsVOD: isXtream(provider)
+                                )
+                            } label: {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        HStack(spacing: 6) {
+                                            Circle()
+                                                .fill(providerStatusColor(for: provider.id))
+                                                .frame(width: 10, height: 10)
+                                                .accessibilityLabel(providerStatusLabel(for: provider.id))
+                                            Text(provider.displayName)
+                                                .foregroundStyle(.primary)
+                                            if let status = connectionStatus[provider.id] {
+                                                Text(status.display)
+                                                    .font(.caption.weight(.semibold))
+                                                    .foregroundStyle(VeyraColors.cyan)
+                                                    .padding(.horizontal, 6)
+                                                    .padding(.vertical, 2)
+                                                    .background(VeyraColors.cyan.opacity(0.14), in: Capsule())
+                                            }
+                                        }
+                                        Text(subtitle(for: provider))
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                }
+                            }
+                            .task(id: provider.id) {
+                                await loadConnectionStatus(for: provider)
+                            }
+                            .swipeActions {
+                                Button("Verwijderen", role: .destructive) {
+                                    viewModel.remove(provider)
+                                }
+                                Button("Bewerken") {
+                                    editingProvider = EditingProviderID(id: provider.id)
+                                }
+                                .tint(.blue)
+                            }
+                        }
+                        .onMove { source, destination in
+                            viewModel.moveProviders(fromOffsets: source, toOffset: destination)
+                        }
+                    } header: {
+                        Text("Providers")
+                    } footer: {
+                        Text(
+                            "Tik op een provider om Live TV en VOD in te stellen. Sleep om te herordenen - dit bepaalt de volgorde in de IPTV-lijst."
+                        )
+                    }
                 }
+
+                if let errorMessage = viewModel.errorMessage {
+                    Section {
+                        Text(errorMessage).foregroundStyle(.red)
+                    }
+                }
+                }
+                .scrollContentBackground(.hidden)
+            }
+            .navigationTitle("IPTV")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        showAddSheet = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    #if os(iOS)
+                    EditButton()
+                    #endif
+                }
+            }
+            .sheet(isPresented: $showAddSheet, onDismiss: reload) {
+                NavigationStack {
+                    IPTVSetupView(providerID: nil, createsNewProvider: true)
+                }
+            }
+            .sheet(item: $editingProvider, onDismiss: reload) { editing in
+                NavigationStack {
+                    IPTVSetupView(providerID: editing.id, createsNewProvider: false)
+                }
+            }
+            .onAppear(perform: reload)
+            .onReceive(NotificationCenter.default.publisher(for: .iptvConfigurationDidChange)) { _ in reload() }
+            .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in
+                viewModel.refreshStatus()
             }
 
-            if let errorMessage = viewModel.errorMessage {
-                Section {
-                    Text(errorMessage).foregroundStyle(.red)
-                }
-            }
-            }
-            .scrollContentBackground(.hidden)
-        }
-        .navigationTitle("IPTV")
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    showAddSheet = true
-                } label: {
-                    Image(systemName: "plus")
-                }
-            }
-            ToolbarItem(placement: .primaryAction) {
-                #if os(iOS)
-                EditButton()
-                #endif
-            }
-        }
-        .sheet(isPresented: $showAddSheet, onDismiss: reload) {
-            NavigationStack {
-                IPTVSetupView(providerID: nil, createsNewProvider: true)
-            }
-        }
-        .sheet(item: $editingProvider, onDismiss: reload) { editing in
-            NavigationStack {
-                IPTVSetupView(providerID: editing.id, createsNewProvider: false)
-            }
-        }
-        .onAppear(perform: reload)
-        .onReceive(NotificationCenter.default.publisher(for: .iptvConfigurationDidChange)) { _ in reload() }
-        .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in
-            viewModel.refreshStatus()
         }
     }
 
@@ -186,56 +189,59 @@ private struct IPTVProviderManagementLauncherView: View {
     private let configurationStore = IPTVConfigurationStore()
 
     var body: some View {
-        Group {
-            if isReady {
-                List {
-                    NavigationLink {
-                        IPTVLiveVisibilityView(providerID: providerID)
-                    } label: {
-                        Label("Live TV beheren", systemImage: "tv")
-                    }
-
-                    if showsVOD {
+        VeyraDynamicBackgroundScope {
+            Group {
+                if isReady {
+                    VeyraList {
                         NavigationLink {
-                            IPTVVODVisibilityView(providerID: providerID)
+                            IPTVLiveVisibilityView(providerID: providerID)
                         } label: {
-                            Label("VOD beheren", systemImage: "film")
+                            Label("Live TV beheren", systemImage: "tv")
                         }
 
-                        NavigationLink {
-                            IPTVSeriesVisibilityView(providerID: providerID)
+                        if showsVOD {
+                            NavigationLink {
+                                IPTVVODVisibilityView(providerID: providerID)
+                            } label: {
+                                Label("VOD beheren", systemImage: "film")
+                            }
+
+                            NavigationLink {
+                                IPTVSeriesVisibilityView(providerID: providerID)
+                            } label: {
+                                Label("Series beheren", systemImage: "tv.badge.wifi")
+                            }
+                        }
+
+                        Button {
+                            showEditSheet = true
                         } label: {
-                            Label("Series beheren", systemImage: "tv.badge.wifi")
+                            Label("Logingegevens bewerken", systemImage: "person.text.rectangle")
                         }
                     }
-
-                    Button {
-                        showEditSheet = true
-                    } label: {
-                        Label("Logingegevens bewerken", systemImage: "person.text.rectangle")
-                    }
+                    .scrollContentBackground(.hidden)
+                } else if let errorMessage {
+                    ContentUnavailableView(
+                        "Provider kon niet worden geopend",
+                        systemImage: "exclamationmark.triangle",
+                        description: Text(errorMessage)
+                    )
+                } else {
+                    ProgressView("Provider laden…")
                 }
-                .scrollContentBackground(.hidden)
-            } else if let errorMessage {
-                ContentUnavailableView(
-                    "Provider kon niet worden geopend",
-                    systemImage: "exclamationmark.triangle",
-                    description: Text(errorMessage)
-                )
-            } else {
-                ProgressView("Provider laden…")
             }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(VeyraColors.background)
-        .navigationTitle("Beheren")
-        .sheet(isPresented: $showEditSheet) {
-            NavigationStack {
-                IPTVSetupView(providerID: providerID, createsNewProvider: false)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(VeyraBackground())
+            .navigationTitle("Beheren")
+            .sheet(isPresented: $showEditSheet) {
+                NavigationStack {
+                    IPTVSetupView(providerID: providerID, createsNewProvider: false)
+                }
             }
-        }
-        .task {
-            prepareProvider()
+            .task {
+                prepareProvider()
+            }
+
         }
     }
 

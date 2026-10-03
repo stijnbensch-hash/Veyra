@@ -21,34 +21,36 @@ struct VeyraCollectionManageItemsView: View {
     }
 
     var body: some View {
-        Group {
-            if isLoading {
-                ProgressView()
-            } else if orderedResolved.isEmpty {
-                Text("Nog geen films in deze collectie.")
-                    .foregroundStyle(.secondary)
-            } else {
-                List {
-                    ForEach(orderedResolved) { resolved in
-                        row(resolved)
+        VeyraDynamicBackgroundScope {
+            Group {
+                if isLoading {
+                    ProgressView()
+                } else if orderedResolved.isEmpty {
+                    Text("Nog geen films in deze collectie.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    VeyraList {
+                        ForEach(orderedResolved) { resolved in
+                            row(resolved)
+                        }
+                        .onDelete(perform: deleteItems)
+                        .onMove(perform: moveItems)
                     }
-                    .onDelete(perform: deleteItems)
-                    .onMove(perform: moveItems)
+                    .listStyle(.plain)
+                #if os(iOS)
+                    .environment(\.editMode, .constant(.active))
+                #endif
                 }
-                .listStyle(.plain)
-            #if os(iOS)
-                .environment(\.editMode, .constant(.active))
-            #endif
             }
-        }
-        .navigationTitle("Beheer films")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Gereed") { dismiss() }
+            .navigationTitle("Beheer films")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Gereed") { dismiss() }
+                }
             }
+            .task(id: collectionID) { await load() }
         }
-        .task(id: collectionID) { await load() }
     }
 
     private func load() async {

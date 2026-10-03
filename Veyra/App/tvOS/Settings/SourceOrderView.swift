@@ -15,24 +15,27 @@ struct SourceOrderView: View {
     @FocusState private var focusedDownID: String?
 
     var body: some View {
-        ZStack {
-            VeyraBackground().ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            List {
-                Section {
-                    ForEach(order, id: \.self) { name in
-                        reorderableRow(name)
+                VeyraList {
+                    Section {
+                        ForEach(order, id: \.self) { name in
+                            reorderableRow(name)
+                        }
+                    } header: {
+                        Text("Bronvolgorde")
+                    } footer: {
+                        Text("Bepaalt in welke volgorde mediaservers verschijnen bij \"Selecteer bron\" — zowel bij \"Alle\" als bij de losse knoppen. Bronnen via VeyraHub staan hier niet tussen: hun volgorde stel je in op VeyraHub zelf (addons verplaatsen), en die volgorde wordt altijd gevolgd.")
                     }
-                } header: {
-                    Text("Bronvolgorde")
-                } footer: {
-                    Text("Bepaalt in welke volgorde mediaservers verschijnen bij \"Selecteer bron\" — zowel bij \"Alle\" als bij de losse knoppen. Bronnen via VeyraHub staan hier niet tussen: hun volgorde stel je in op VeyraHub zelf (addons verplaatsen), en die volgorde wordt altijd gevolgd.")
                 }
+                .frame(maxWidth: 1000)
             }
-            .frame(maxWidth: 1000)
+            .navigationTitle("Bronvolgorde")
+            .onAppear(perform: loadOrder)
+
         }
-        .navigationTitle("Bronvolgorde")
-        .onAppear(perform: loadOrder)
     }
 
     // MARK: - Row

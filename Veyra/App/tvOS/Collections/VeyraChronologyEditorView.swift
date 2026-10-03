@@ -22,42 +22,45 @@ struct VeyraChronologyEditorView: View {
     }
 
     var body: some View {
-        ZStack {
-            VeyraHomeStyle.ink.ignoresSafeArea()
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    Text("CHRONOLOGIE · \(collection?.name.uppercased() ?? "")")
-                        .font(.system(size: 20, weight: .bold))
-                        .tracking(1.5)
-                        .foregroundStyle(VeyraColors.cyan.opacity(0.85))
-                    Text("Bepaal de verhaalvolgorde van deze collectie -- los van releasedatum.")
-                        .font(.system(size: 16))
-                        .foregroundStyle(.secondary)
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
+                VeyraScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        Text("CHRONOLOGIE · \(collection?.name.uppercased() ?? "")")
+                            .font(.system(size: 20, weight: .bold))
+                            .tracking(1.5)
+                            .foregroundStyle(VeyraColors.cyan.opacity(0.85))
+                        Text("Bepaal de verhaalvolgorde van deze collectie -- los van releasedatum.")
+                            .font(.system(size: 16))
+                            .foregroundStyle(.secondary)
 
-                    if isLoading {
-                        ProgressView()
-                    } else {
-                        VStack(spacing: 14) {
-                            ForEach(Array(orderedResolved.enumerated()), id: \.element.id) { index, resolved in
-                                row(resolved, index: index, total: orderedResolved.count)
+                        if isLoading {
+                            ProgressView()
+                        } else {
+                            VStack(spacing: 14) {
+                                ForEach(Array(orderedResolved.enumerated()), id: \.element.id) { index, resolved in
+                                    row(resolved, index: index, total: orderedResolved.count)
+                                }
                             }
                         }
-                    }
 
-                    Button {
-                        dismiss()
-                    } label: {
-                        VeyraActionLabel(title: "GEREED", symbol: "checkmark", compact: true)
+                        Button {
+                            dismiss()
+                        } label: {
+                            VeyraActionLabel(title: "GEREED", symbol: "checkmark", compact: true)
+                        }
+                        .buttonStyle(VeyraFocusButtonStyle(primary: true))
+                        .padding(.top, 8)
                     }
-                    .buttonStyle(VeyraFocusButtonStyle(primary: true))
-                    .padding(.top, 8)
+                    .padding(.horizontal, 48)
+                    .padding(.vertical, 36)
                 }
-                .padding(.horizontal, 48)
-                .padding(.vertical, 36)
             }
+            .navigationTitle("Chronologie instellen")
+            .task(id: collectionID) { await load() }
+
         }
-        .navigationTitle("Chronologie instellen")
-        .task(id: collectionID) { await load() }
     }
 
     private func load() async {

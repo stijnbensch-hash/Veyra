@@ -4,76 +4,79 @@ struct AccountView: View {
     @ObservedObject private var trakt = TraktStore.shared
 
     var body: some View {
-        ZStack {
-            VeyraColors.background.ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            List {
-                Section {
-                    Text("Beheer je profiel, koppelingen en API-sleutels.")
-                        .foregroundStyle(.secondary)
-                }
+                VeyraList {
+                    Section {
+                        Text("Beheer je profiel, koppelingen en API-sleutels.")
+                            .foregroundStyle(.secondary)
+                    }
 
-                Section("Trakt-account") {
-                    NavigationLink {
-                        TraktSettingsView()
-                    } label: {
-                        HStack {
-                            Image(systemName: "checkmark.circle")
-                                .foregroundStyle(VeyraColors.cyan)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Trakt")
-                                Text("Kijkgeschiedenis, voortgang en lijsten")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                    Section("Trakt-account") {
+                        NavigationLink {
+                            TraktSettingsView()
+                        } label: {
+                            HStack {
+                                Image(systemName: "checkmark.circle")
+                                    .foregroundStyle(VeyraColors.cyan)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Trakt")
+                                    Text("Kijkgeschiedenis, voortgang en lijsten")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Text(trakt.isConnected ? "Verbonden" : "Niet gekoppeld")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(trakt.isConnected ? VeyraColors.cyan : .secondary)
                             }
-                            Spacer()
-                            Text(trakt.isConnected ? "Verbonden" : "Niet gekoppeld")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(trakt.isConnected ? VeyraColors.cyan : .secondary)
                         }
                     }
-                }
 
-                Section("Ondertitels") {
-                    OpenSubtitlesConfigurationCard()
-                }
+                    Section("Ondertitels") {
+                        OpenSubtitlesConfigurationCard()
+                    }
 
-                Section {
-                    TMDBConfigurationCard()
-                } header: {
-                    Text("TMDB")
-                } footer: {
-                    Text("Nodig voor filmposters, series en metadata in Veyra.")
-                }
+                    Section {
+                        TMDBConfigurationCard()
+                    } header: {
+                        Text("TMDB")
+                    } footer: {
+                        Text("Nodig voor filmposters, series en metadata in Veyra.")
+                    }
 
-                Section {
-                    FanartConfigurationCard()
-                } header: {
-                    Text("fanart.tv")
-                } footer: {
-                    Text("Optioneel: echte banners in de kleine Verder kijken-kaartjes op Home.")
-                }
+                    Section {
+                        FanartConfigurationCard()
+                    } header: {
+                        Text("fanart.tv")
+                    } footer: {
+                        Text("Optioneel: echte banners in de kleine Verder kijken-kaartjes op Home.")
+                    }
 
-                Section {
-                    MDBListConfigurationCard()
-                } header: {
-                    Text("MDBList")
-                } footer: {
-                    Text("Popcornmeter en Letterboxd komen via MDBList (mdblist.com). Vul hier een gratis API-sleutel in om die twee scores te tonen bij Instellingen → Metadata → Ratings.")
-                }
+                    Section {
+                        MDBListConfigurationCard()
+                    } header: {
+                        Text("MDBList")
+                    } footer: {
+                        Text("Popcornmeter en Letterboxd komen via MDBList (mdblist.com). Vul hier een gratis API-sleutel in om die twee scores te tonen bij Instellingen → Metadata → Ratings.")
+                    }
 
-                Section {
-                    IntroDBConfigurationCard()
-                } header: {
-                    Text("TheIntroDB")
-                } footer: {
-                    Text("Voor \"Intro overslaan\" tijdens het afspelen. Een gratis API-sleutel (theintrodb.org) geeft een hoger limiet en betere matching dan anoniem gebruik.")
-                }
+                    Section {
+                        IntroDBConfigurationCard()
+                    } header: {
+                        Text("TheIntroDB")
+                    } footer: {
+                        Text("Voor \"Intro overslaan\" tijdens het afspelen. Een gratis API-sleutel (theintrodb.org) geeft een hoger limiet en betere matching dan anoniem gebruik.")
+                    }
 
+                }
+                .scrollContentBackground(.hidden)
             }
-            .scrollContentBackground(.hidden)
+            .navigationTitle("Account")
+
         }
-        .navigationTitle("Account")
     }
 }
 

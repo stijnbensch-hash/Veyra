@@ -37,6 +37,14 @@ struct Veyra_iOSApp: App {
     // achtergrond/voorgrond-wissels. Zie `Shared/LaunchAnimationView.swift`.
     @State private var showLaunchAnimation = true
 
+    // `ContentView()` (met z'n zware opstart-`.task`-werk: VeyraHubSyncService, Trakt-
+    // reconciler, IPTV-ververs, ...) wordt pas gebouwd NADAT de animatie zelf al op het
+    // scherm staat (`LaunchAnimationView`'s `onAppear` hieronder) -- anders delen beide
+    // dezelfde eerste render-pass, en vertraagt het construeren van `ContentView` ook de
+    // allereerste frame van de animatie zelf, waardoor die pas met een merkbare vertraging
+    // verschijnt i.p.v. onmiddellijk bij app-start.
+    @State private var showContent = false
+
     // Auto-refresh van IPTV VOD/EPG bij het opstarten van de app, met een
     // kleine laadanimatie die verdwijnt zodra het klaar is. Zie
     // `Shared/LiveTV/IPTVStartupRefreshCoordinator.swift`.
@@ -46,47 +54,49 @@ struct Veyra_iOSApp: App {
     var body: some Scene {
         WindowGroup {
             ZStack {
-                ContentView()
-                    // "Tekstgrootte" (Algemeen-instellingen). Werkt op tekst die
-                    // Dynamic Type volgt; de meeste vaste `.system(size:)`-
-                    // koppen/titels in Veyra reageren hier niet op — zie
-                    // `GeneralSettings.swift`.
-                    .environment(\.dynamicTypeSize, (GeneralTextSize(rawValue: textSizeRaw) ?? .defaultSize).dynamicTypeSize)
-                    .task {
-                    VeyraRuntimeDiagnostics.shared.start()
-                        // Instellingen/planken/hero/addons spiegelen tussen
-                        // apparaten via de gekoppelde VeyraHub-server — zie
-                        // `Shared/Sync/VeyraHubSyncService.swift`.
-                        VeyraHubSyncService.shared.start()
+                if showContent {
+                    ContentView()
+                        // "Tekstgrootte" (Algemeen-instellingen). Werkt op tekst die
+                        // Dynamic Type volgt; de meeste vaste `.system(size:)`-
+                        // koppen/titels in Veyra reageren hier niet op — zie
+                        // `GeneralSettings.swift`.
+                        .environment(\.dynamicTypeSize, (GeneralTextSize(rawValue: textSizeRaw) ?? .defaultSize).dynamicTypeSize)
+                        .task {
+                        VeyraRuntimeDiagnostics.shared.start()
+                            // Instellingen/planken/hero/addons spiegelen tussen
+                            // apparaten via de gekoppelde VeyraHub-server — zie
+                            // `Shared/Sync/VeyraHubSyncService.swift`.
+                            VeyraHubSyncService.shared.start()
 
-                        // Fase 2 ("Regional Releases"): registreer de (tijdelijke) mock-provider,
-                        // zie `Veyra/VeyraApp.swift` voor de volledige toelichting.
-                        await RegionalReleaseProviderRegistry.shared.register(VRTRegionalReleaseProvider())
-                        await RegionalReleaseProviderRegistry.shared.register(IPTVVODRegionalReleaseProvider())
-                        VeyraHubWatchStateSyncService.shared.start()
-                        VeyraTraktWatchStateReconciler.shared.start()
+                            // Fase 2 ("Regional Releases"): registreer de (tijdelijke) mock-provider,
+                            // zie `Veyra/VeyraApp.swift` voor de volledige toelichting.
+                            await RegionalReleaseProviderRegistry.shared.register(VRTRegionalReleaseProvider())
+                            await RegionalReleaseProviderRegistry.shared.register(IPTVVODRegionalReleaseProvider())
+                            VeyraHubWatchStateSyncService.shared.start()
+                            VeyraTraktWatchStateReconciler.shared.start()
 
-                        // Vul de bestaande zender- en EPG-schijfcache al bij
-                        // opstarten; de melding na afloop ververst open schermen.
-                        await iptvStartupRefresh.beginRefresh {
-                            if UIDevice.current.userInterfaceIdiom == .pad {
-                                await iptvStartupGuide.reload()
-                                await IPTVDiskCache.flush()
+                            // Vul de bestaande zender- en EPG-schijfcache al bij
+                            // opstarten; de melding na afloop ververst open schermen.
+                            await iptvStartupRefresh.beginRefresh {
+                                if UIDevice.current.userInterfaceIdiom == .pad {
+                                    await iptvStartupGuide.reload()
+                                    await IPTVDiskCache.flush()
+                                }
+                                NotificationCenter.default.post(name: .iptvConfigurationDidChange, object: nil)
                             }
-                            NotificationCenter.default.post(name: .iptvConfigurationDidChange, object: nil)
                         }
-                    }
 
-                IPTVStartupRefreshBadge(coordinator: iptvStartupRefresh)
-                    .padding(.top, 8)
-                    .padding(.trailing, 16)
-                    .onChange(of: scenePhase) { _, phase in
-                        guard phase == .active, autoRefreshOnForeground else { return }
-                        Task {
-                            await TraktStore.shared.refreshIfNeeded()
-                            NotificationCenter.default.post(name: .iptvHomeRefreshRequested, object: nil)
+                    IPTVStartupRefreshBadge(coordinator: iptvStartupRefresh)
+                        .padding(.top, 8)
+                        .padding(.trailing, 16)
+                        .onChange(of: scenePhase) { _, phase in
+                            guard phase == .active, autoRefreshOnForeground else { return }
+                            Task {
+                                await TraktStore.shared.refreshIfNeeded()
+                                NotificationCenter.default.post(name: .iptvHomeRefreshRequested, object: nil)
+                            }
                         }
-                    }
+                }
 
                 if showLaunchAnimation {
                     LaunchAnimationView {
@@ -94,6 +104,10 @@ struct Veyra_iOSApp: App {
                     }
                     .transition(.identity)
                     .zIndex(1)
+                    .onAppear {
+                        guard !showContent else { return }
+                        DispatchQueue.main.async { showContent = true }
+                    }
                 }
             }
             .statusBarHidden(showLaunchAnimation)

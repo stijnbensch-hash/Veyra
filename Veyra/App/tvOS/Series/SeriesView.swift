@@ -33,89 +33,92 @@ struct SeriesView: View {
     @ObservedObject private var heroSpotlight = VeyraHeroSpotlight.shared
 
     var body: some View {
-        ZStack {
-            VeyraBackground()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground()
 
-            ScrollView(
-                .vertical,
-                showsIndicators: false
-            ) {
-                VStack(
-                    alignment: .leading,
-                    spacing: 28
+                VeyraScrollView(
+                    .vertical,
+                    showsIndicators: false
                 ) {
-                    if let featured {
-                        VeyraCatalogHero(
-                            url: heroSpotlight.focused?.backdropURL ?? featured.backdropPath.flatMap {
-                                URL(string: "https://image.tmdb.org/t/p/w1280" + $0)
-                            },
-                            topInset: VeyraTopNavigation.barHeight
-                        ) {
-                            Group {
-                                if let focused = heroSpotlight.focused {
-                                    VeyraSpotlightHero(content: focused)
-                                } else {
-                                    VeyraSeriesHero(series: featured)
+                    VStack(
+                        alignment: .leading,
+                        spacing: 28
+                    ) {
+                        if let featured {
+                            VeyraCatalogHero(
+                                url: heroSpotlight.focused?.backdropURL ?? featured.backdropPath.flatMap {
+                                    URL(string: "https://image.tmdb.org/t/p/w1280" + $0)
+                                },
+                                topInset: VeyraTopNavigation.barHeight
+                            ) {
+                                Group {
+                                    if let focused = heroSpotlight.focused {
+                                        VeyraSpotlightHero(content: focused)
+                                    } else {
+                                        VeyraSeriesHero(series: featured)
+                                    }
                                 }
+                                .id(heroSpotlight.focused?.id ?? "series:\(featured.id)")
                             }
-                            .id(heroSpotlight.focused?.id ?? "series:\(featured.id)")
                         }
-                    }
 
-                    VStack(alignment: .leading, spacing: 6) {
-                        header
+                        VStack(alignment: .leading, spacing: 6) {
+                            header
 
-                        MediaFiltersRow(
-                            kind: .tv,
-                            selectedGenreID: $selectedGenreID,
-                            selectedDecade: $selectedDecade,
-                            selectedRating: $selectedRating,
-                            selectedSort: $selectedSort
-                        )
-                    }
+                            MediaFiltersRow(
+                                kind: .tv,
+                                selectedGenreID: $selectedGenreID,
+                                selectedDecade: $selectedDecade,
+                                selectedRating: $selectedRating,
+                                selectedSort: $selectedSort
+                            )
+                        }
 
-                    .padding(.horizontal, 80)
-
-                    content
                         .padding(.horizontal, 80)
+
+                        content
+                            .padding(.horizontal, 80)
+                    }
+                    .frame(
+                        maxWidth: .infinity,
+                        alignment: .leading
+                    )
+                    .padding(.bottom, 50)
                 }
-                .frame(
-                    maxWidth: .infinity,
-                    alignment: .leading
+                .contentMargins(
+                    .horizontal,
+                    0,
+                    for: .scrollContent
                 )
-                .padding(.bottom, 50)
+                .scrollClipDisabled()
             }
-            .contentMargins(
-                .horizontal,
-                0,
-                for: .scrollContent
-            )
-            .scrollClipDisabled()
-        }
-        .ignoresSafeArea(.container, edges: [.horizontal, .top])
-        .task {
-            await TraktStore.shared
-                .refreshIfNeeded()
-        }
-        .task(
-            id: catalogTaskID
-        ) {
-            await loadPopularSeries()
-        }
-        .task(id: heroPool.map(\.id)) {
-            await rotateHeroAutomatically()
-        }
-        .onChange(
-            of: watchRegion
-        ) { _, _ in
-            selectedProvider = nil
-        }
-        .navigationDestination(
-            item: $selectedSeries
-        ) { series in
-            SeriesDetailView(
-                series: series
-            )
+            .ignoresSafeArea(.container, edges: [.horizontal, .top])
+            .task {
+                await TraktStore.shared
+                    .refreshIfNeeded()
+            }
+            .task(
+                id: catalogTaskID
+            ) {
+                await loadPopularSeries()
+            }
+            .task(id: heroPool.map(\.id)) {
+                await rotateHeroAutomatically()
+            }
+            .onChange(
+                of: watchRegion
+            ) { _, _ in
+                selectedProvider = nil
+            }
+            .navigationDestination(
+                item: $selectedSeries
+            ) { series in
+                SeriesDetailView(
+                    series: series
+                )
+            }
+
         }
     }
 

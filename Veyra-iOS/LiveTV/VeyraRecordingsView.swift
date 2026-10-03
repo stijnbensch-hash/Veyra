@@ -13,35 +13,38 @@ struct VeyraRecordingsView: View {
     }
 
     var body: some View {
-        NavigationStack {
-        ZStack {
-            VeyraColors.background.ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            NavigationStack {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            if let message, recordings.isEmpty {
-                VStack(spacing: 8) {
-                    Image(systemName: "record.circle")
-                        .font(.largeTitle)
-                        .foregroundStyle(.secondary)
-                    Text(message)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 32)
-                }
-            } else {
-                List {
-                    ForEach(recordings.sorted { $0.start > $1.start }) { recording in
-                        row(for: recording)
+                if let message, recordings.isEmpty {
+                    VStack(spacing: 8) {
+                        Image(systemName: "record.circle")
+                            .font(.largeTitle)
+                            .foregroundStyle(.secondary)
+                        Text(message)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 32)
                     }
+                } else {
+                    VeyraList {
+                        ForEach(recordings.sorted { $0.start > $1.start }) { recording in
+                            row(for: recording)
+                        }
+                    }
+                    .scrollContentBackground(.hidden)
+                    .refreshable { await load() }
                 }
-                .scrollContentBackground(.hidden)
-                .refreshable { await load() }
             }
-        }
-        .navigationTitle("Opnames")
-        .navigationBarTitleDisplayMode(.inline)
-        .veyraPlayerPresentation(item: $playingSource)
-        .task { await load() }
+            .navigationTitle("Opnames")
+            .navigationBarTitleDisplayMode(.inline)
+            .veyraPlayerPresentation(item: $playingSource)
+            .task { await load() }
+            }
+
         }
     }
 

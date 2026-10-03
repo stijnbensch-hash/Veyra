@@ -32,92 +32,95 @@ struct IPTVSetupView: View {
     }
 
     var body: some View {
-        ZStack {
-            VeyraColors.background.ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            Form {
-            Section {
-                Picker("Type", selection: $setupType) {
-                    ForEach(SetupType.allCases) { type in
-                        Text(type.rawValue).tag(type)
+                VeyraForm {
+                Section {
+                    Picker("Type", selection: $setupType) {
+                        ForEach(SetupType.allCases) { type in
+                            Text(type.rawValue).tag(type)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    TextField("Naam (bijv. Mijn IPTV)", text: $displayName)
+                        .textInputAutocapitalization(.words)
+                }
+
+                if setupType == .xtream {
+                    Section {
+                        TextField("https://provider.example.com:1234", text: $serverAddress)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .keyboardType(.URL)
+                        TextField("Gebruikersnaam", text: $username)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                        SecureField("Wachtwoord", text: $password)
+                    } header: {
+                        Text("Server")
+                    } footer: {
+                        Text("Veyra bouwt de Xtream API- en stream-URL's zelf op vanaf het serveradres.")
+                    }
+                    Section {
+                        TextField("https://backup.example.com:1234", text: $backupServerAddress)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .keyboardType(.URL)
+                    } header: {
+                        Text("Reserveadres (optioneel)")
+                    } footer: {
+                        Text("Zelfde account, ander adres -- Veyra schakelt hier zelf naar over als het hoofdadres niet reageert.")
+                    }
+                } else {
+                    Section {
+                        TextField("https://provider.example.com/playlist.m3u", text: $playlistAddress)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .keyboardType(.URL)
+                    } header: {
+                        Text("M3U playlist")
+                    } footer: {
+                        Text("De volledige M3U-URL wordt veilig in de sleutelhanger bewaard.")
+                    }
+                    Section {
+                        TextField("https://backup.example.com/playlist.m3u", text: $backupPlaylistAddress)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .keyboardType(.URL)
+                    } header: {
+                        Text("Reserve-playlist (optioneel)")
+                    } footer: {
+                        Text("Veyra schakelt hier zelf naar over als de hoofd-playlist niet reageert.")
                     }
                 }
-                .pickerStyle(.segmented)
 
-                TextField("Naam (bijv. Mijn IPTV)", text: $displayName)
-                    .textInputAutocapitalization(.words)
+                if let errorMessage {
+                    Section {
+                        Text(errorMessage).foregroundStyle(.red)
+                    }
+                }
+                }
+                .scrollContentBackground(.hidden)
             }
+            .navigationTitle(providerID == nil && createsNewProvider ? "Bron toevoegen" : "Bron bewerken")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Annuleren") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    if isSaving {
+                        ProgressView()
+                    } else {
+                        Button("Opslaan") { saveConfiguration() }
+                    }
+                }
+            }
+            .onAppear { loadExistingConfiguration() }
 
-            if setupType == .xtream {
-                Section {
-                    TextField("https://provider.example.com:1234", text: $serverAddress)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .keyboardType(.URL)
-                    TextField("Gebruikersnaam", text: $username)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                    SecureField("Wachtwoord", text: $password)
-                } header: {
-                    Text("Server")
-                } footer: {
-                    Text("Veyra bouwt de Xtream API- en stream-URL's zelf op vanaf het serveradres.")
-                }
-                Section {
-                    TextField("https://backup.example.com:1234", text: $backupServerAddress)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .keyboardType(.URL)
-                } header: {
-                    Text("Reserveadres (optioneel)")
-                } footer: {
-                    Text("Zelfde account, ander adres -- Veyra schakelt hier zelf naar over als het hoofdadres niet reageert.")
-                }
-            } else {
-                Section {
-                    TextField("https://provider.example.com/playlist.m3u", text: $playlistAddress)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .keyboardType(.URL)
-                } header: {
-                    Text("M3U playlist")
-                } footer: {
-                    Text("De volledige M3U-URL wordt veilig in de sleutelhanger bewaard.")
-                }
-                Section {
-                    TextField("https://backup.example.com/playlist.m3u", text: $backupPlaylistAddress)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .keyboardType(.URL)
-                } header: {
-                    Text("Reserve-playlist (optioneel)")
-                } footer: {
-                    Text("Veyra schakelt hier zelf naar over als de hoofd-playlist niet reageert.")
-                }
-            }
-
-            if let errorMessage {
-                Section {
-                    Text(errorMessage).foregroundStyle(.red)
-                }
-            }
-            }
-            .scrollContentBackground(.hidden)
         }
-        .navigationTitle(providerID == nil && createsNewProvider ? "Bron toevoegen" : "Bron bewerken")
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Annuleren") { dismiss() }
-            }
-            ToolbarItem(placement: .confirmationAction) {
-                if isSaving {
-                    ProgressView()
-                } else {
-                    Button("Opslaan") { saveConfiguration() }
-                }
-            }
-        }
-        .onAppear { loadExistingConfiguration() }
     }
 
     private func saveConfiguration() {

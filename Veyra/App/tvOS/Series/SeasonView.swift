@@ -37,27 +37,14 @@ struct SeasonView: View {
         )!
 
     var body: some View {
-        ZStack {
-            baseBackground
-                .ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                baseBackground
+                    .ignoresSafeArea()
 
-            if isLoading {
-                ProgressView(
-                    "Afleveringen laden…"
-                )
-                .font(
-                    .system(
-                        size: 28
-                    )
-                )
-
-            } else if let errorMessage {
-                VStack(
-                    alignment: .leading,
-                    spacing: 16
-                ) {
-                    Text(
-                        "Afleveringen konden niet worden geladen"
+                if isLoading {
+                    ProgressView(
+                        "Afleveringen laden…"
                     )
                     .font(
                         .system(
@@ -65,30 +52,46 @@ struct SeasonView: View {
                         )
                     )
 
-                    Text(
-                        errorMessage
-                    )
-                    .font(
-                        .system(
-                            size: 18
+                } else if let errorMessage {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 16
+                    ) {
+                        Text(
+                            "Afleveringen konden niet worden geladen"
                         )
-                    )
-                    .foregroundStyle(
-                        .secondary
+                        .font(
+                            .system(
+                                size: 28
+                            )
+                        )
+
+                        Text(
+                            errorMessage
+                        )
+                        .font(
+                            .system(
+                                size: 18
+                            )
+                        )
+                        .foregroundStyle(
+                            .secondary
+                        )
+                    }
+
+                } else if let details {
+                    episodeContent(
+                        details
                     )
                 }
-
-            } else if let details {
-                episodeContent(
-                    details
-                )
             }
-        }
-        .navigationTitle(
-            season.name
-        )
-        .task {
-            await loadSeason()
+            .navigationTitle(
+                season.name
+            )
+            .task {
+                await loadSeason()
+            }
+
         }
     }
 
@@ -99,7 +102,7 @@ struct SeasonView: View {
         _ details:
             TMDBSeasonDetails
     ) -> some View {
-        ScrollView(
+        VeyraScrollView(
             .vertical,
             showsIndicators: false
         ) {

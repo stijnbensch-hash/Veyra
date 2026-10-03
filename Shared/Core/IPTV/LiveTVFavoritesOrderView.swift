@@ -16,15 +16,17 @@ struct LiveTVFavoritesOrderView:
     var body:
         some View
     {
-        #if os(tvOS)
+        VeyraDynamicBackgroundScope {
+            #if os(tvOS)
 
-        tvOSView
+            tvOSView
 
-        #else
+            #else
 
-        iOSView
+            iOSView
 
-        #endif
+            #endif
+        }
     }
 
     // MARK: - Shared logo
@@ -100,7 +102,7 @@ struct LiveTVFavoritesOrderView:
                     )
 
                 } else {
-                    List {
+                    VeyraList {
                         ForEach(
                             guide.favoriteRows
                         ) {
@@ -353,7 +355,7 @@ struct LiveTVFavoritesOrderView:
     private var tvOSList:
         some View
     {
-        ScrollView(
+        VeyraScrollView(
             .vertical,
             showsIndicators:
                 false

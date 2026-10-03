@@ -19,26 +19,29 @@ struct ShelfIPTVSeriesEpisodesView: View {
     private let service = IPTVService()
 
     var body: some View {
-        List {
-            if isLoading {
-                ProgressView("Afleveringen laden…")
-            } else if let errorMessage {
-                Text(errorMessage).foregroundStyle(.secondary)
-            } else if seasons.isEmpty {
-                Text("Geen afleveringen gevonden voor deze serie.")
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(seasons, id: \.season) { entry in
-                    Section("Seizoen \(entry.season)") {
-                        ForEach(entry.episodes) { episode in
-                            episodeRow(episode)
+        VeyraDynamicBackgroundScope {
+            VeyraList {
+                if isLoading {
+                    ProgressView("Afleveringen laden…")
+                } else if let errorMessage {
+                    Text(errorMessage).foregroundStyle(.secondary)
+                } else if seasons.isEmpty {
+                    Text("Geen afleveringen gevonden voor deze serie.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(seasons, id: \.season) { entry in
+                        Section("Seizoen \(entry.season)") {
+                            ForEach(entry.episodes) { episode in
+                                episodeRow(episode)
+                            }
                         }
                     }
                 }
             }
+            .navigationTitle(title)
+            .task { await load() }
+
         }
-        .navigationTitle(title)
-        .task { await load() }
     }
 
     // MARK: - Rij

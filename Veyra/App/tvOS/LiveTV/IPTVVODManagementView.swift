@@ -41,60 +41,62 @@ struct IPTVVODManagementView: View {
         IPTVService()
 
     var body: some View {
-        ZStack {
-            background
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                background
 
-            VStack(
-                alignment: .leading,
-                spacing: 30
-            ) {
-                header
+                VStack(
+                    alignment: .leading,
+                    spacing: 30
+                ) {
+                    header
 
-                if configuration != nil,
-                   !categories.isEmpty {
-                    bulkVisibilityControls
-                }
+                    if configuration != nil,
+                       !categories.isEmpty {
+                        bulkVisibilityControls
+                    }
 
-                if let confirmationMessage {
-                    Text(confirmationMessage)
-                        .font(
-                            .system(
-                                size: 17,
-                                weight: .semibold
+                    if let confirmationMessage {
+                        Text(confirmationMessage)
+                            .font(
+                                .system(
+                                    size: 17,
+                                    weight: .semibold
+                                )
                             )
-                        )
-                        .foregroundStyle(
-                            .cyan.opacity(0.85)
-                        )
+                            .foregroundStyle(
+                                .cyan.opacity(0.85)
+                            )
+                    }
+
+                    content
+
+                    Spacer(minLength: 0)
                 }
-
-                content
-
-                Spacer(minLength: 0)
+                .padding(.horizontal, VeyraSpacing.page)
+                .padding(.top, 36)
+                .padding(.bottom, 50)
             }
-            .padding(.horizontal, VeyraSpacing.page)
-            .padding(.top, 36)
-            .padding(.bottom, 50)
-        }
-        .task {
-            await load()
-        }
-        .onAppear {
-            reloadPreferences()
-        }
-        .navigationDestination(
-            isPresented: $showTitles
-        ) {
-            if let configuration,
-               let category =
-                selectedCategory
-            {
-                IPTVVODItemManagementView(
-                    configuration:
-                        configuration,
-                    category:
-                        category
-                )
+            .task {
+                await load()
+            }
+            .onAppear {
+                reloadPreferences()
+            }
+            .navigationDestination(
+                isPresented: $showTitles
+            ) {
+                if let configuration,
+                   let category =
+                    selectedCategory
+                {
+                    IPTVVODItemManagementView(
+                        configuration:
+                            configuration,
+                        category:
+                            category
+                    )
+                }
             }
         }
     }
@@ -270,7 +272,7 @@ struct IPTVVODManagementView: View {
             )
 
         } else {
-            ScrollView(
+            VeyraScrollView(
                 .vertical,
                 showsIndicators: false
             ) {
@@ -832,34 +834,36 @@ private struct IPTVVODItemManagementView:
         IPTVProviderPreferencesStore()
 
     var body: some View {
-        ZStack {
-            background
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                background
 
-            VStack(
-                alignment: .leading,
-                spacing: 28
-            ) {
-                header
-                content
+                VStack(
+                    alignment: .leading,
+                    spacing: 28
+                ) {
+                    header
+                    content
 
-                Spacer(minLength: 0)
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, VeyraSpacing.page)
+                .padding(.top, 36)
+                .padding(.bottom, 50)
             }
-            .padding(.horizontal, VeyraSpacing.page)
-            .padding(.top, 36)
-            .padding(.bottom, 50)
-        }
-        .task {
-            await loadItems()
-        }
-        .navigationDestination(
-            isPresented: $showPlayer
-        ) {
-            if let selectedVODItem {
-                PlayerView(
-                    source:
-                        selectedVODItem
-                            .playableSource
-                )
+            .task {
+                await loadItems()
+            }
+            .navigationDestination(
+                isPresented: $showPlayer
+            ) {
+                if let selectedVODItem {
+                    PlayerView(
+                        source:
+                            selectedVODItem
+                                .playableSource
+                    )
+                }
             }
         }
     }
@@ -933,7 +937,7 @@ private struct IPTVVODItemManagementView:
             )
 
         } else {
-            ScrollView(
+            VeyraScrollView(
                 .vertical,
                 showsIndicators: false
             ) {

@@ -14,38 +14,41 @@ struct IPTVPlaybackSettingsView: View {
     @State private var destination: IPTVPlaybackDestination?
 
     var body: some View {
-        ZStack {
-            VeyraBackground().ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 18) {
-                    categoryCard(
-                        .guide, icon: "tv.badge.wifi", title: "Zenderguide",
-                        subtitle: "Gidsthema, zendernamen"
-                    )
-                    categoryCard(
-                        .playback, icon: "play.laptopcomputer", title: "Afspelen",
-                        subtitle: "Afspeelmotor, buffering, catch-up"
-                    )
-                    categoryCard(
-                        .developer, icon: "ladybug", title: "Ontwikkelaarsopties",
-                        subtitle: "FPS-teller"
-                    )
+                VeyraScrollView(.vertical, showsIndicators: false) {
+                    VStack(spacing: 18) {
+                        categoryCard(
+                            .guide, icon: "tv.badge.wifi", title: "Zenderguide",
+                            subtitle: "Gidsthema, zendernamen"
+                        )
+                        categoryCard(
+                            .playback, icon: "play.laptopcomputer", title: "Afspelen",
+                            subtitle: "Afspeelmotor, buffering, catch-up"
+                        )
+                        categoryCard(
+                            .developer, icon: "ladybug", title: "Ontwikkelaarsopties",
+                            subtitle: "FPS-teller"
+                        )
+                    }
+                    .frame(maxWidth: 1300, alignment: .leading)
+                    .padding(.horizontal, VeyraSpacing.page)
+                    .padding(.top, 36)
+                    .padding(.bottom, 60)
+                    .frame(maxWidth: .infinity)
                 }
-                .frame(maxWidth: 1300, alignment: .leading)
-                .padding(.horizontal, VeyraSpacing.page)
-                .padding(.top, 36)
-                .padding(.bottom, 60)
-                .frame(maxWidth: .infinity)
             }
-        }
-        .navigationTitle("Live TV")
-        .navigationDestination(item: $destination) { destination in
-            switch destination {
-            case .guide: IPTVGuideSettingsView()
-            case .playback: IPTVEnginePlaybackSettingsView()
-            case .developer: IPTVDeveloperSettingsView()
+            .navigationTitle("Live TV")
+            .navigationDestination(item: $destination) { destination in
+                switch destination {
+                case .guide: IPTVGuideSettingsView()
+                case .playback: IPTVEnginePlaybackSettingsView()
+                case .developer: IPTVDeveloperSettingsView()
+                }
             }
+
         }
     }
 
@@ -106,20 +109,23 @@ private struct IPTVGuideSettingsView: View {
     private var hideCountryPrefix = true
 
     var body: some View {
-        ZStack {
-            VeyraBackground().ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            List {
-                Section {
-                    VeyraSettingsChoiceRow<IPTVGuideTheme>(icon: "paintpalette", "Gidsthema", selection: $guideThemeRaw)
-                    VeyraSettingsToggleRow(icon: "flag", title: "Landcode voor zendernaam verbergen", isOn: $hideCountryPrefix)
-                } footer: {
-                    Text("Gidsthema past de kleuren van de programmagids aan. Bij ingeschakeld wordt de landcode voor zendernamen weggelaten.")
+                VeyraList {
+                    Section {
+                        VeyraSettingsChoiceRow<IPTVGuideTheme>(icon: "paintpalette", "Gidsthema", selection: $guideThemeRaw)
+                        VeyraSettingsToggleRow(icon: "flag", title: "Landcode voor zendernaam verbergen", isOn: $hideCountryPrefix)
+                    } footer: {
+                        Text("Gidsthema past de kleuren van de programmagids aan. Bij ingeschakeld wordt de landcode voor zendernamen weggelaten.")
+                    }
                 }
+                .frame(maxWidth: 1000)
             }
-            .frame(maxWidth: 1000)
+            .navigationTitle("Zenderguide")
+
         }
-        .navigationTitle("Zenderguide")
     }
 }
 
@@ -140,54 +146,57 @@ private struct IPTVEnginePlaybackSettingsView: View {
     }
 
     var body: some View {
-        ZStack {
-            VeyraBackground().ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            List {
-                Section {
-                    VeyraSettingsChoiceRow<IPTVPlayerEngineOption>(icon: "gearshape.2", "Afspeelmotor", selection: $playerEngineRaw)
+                VeyraList {
+                    Section {
+                        VeyraSettingsChoiceRow<IPTVPlayerEngineOption>(icon: "gearshape.2", "Afspeelmotor", selection: $playerEngineRaw)
 
-                    VeyraSettingsChoiceRow<IPTVBufferDurationOption>(icon: "hourglass", "Buffering", selection: $bufferDurationRaw)
+                        VeyraSettingsChoiceRow<IPTVBufferDurationOption>(icon: "hourglass", "Buffering", selection: $bufferDurationRaw)
 
-                    Picker(selection: $catchUpOffsetModeRaw) {
-                        ForEach(IPTVCatchUpOffsetMode.allCases) { mode in
-                            Text(mode.title).tag(mode.rawValue)
+                        Picker(selection: $catchUpOffsetModeRaw) {
+                            ForEach(IPTVCatchUpOffsetMode.allCases) { mode in
+                                Text(mode.title).tag(mode.rawValue)
+                            }
+                        } label: {
+                            VeyraSettingsCardRowLabel(icon: "clock.arrow.2.circlepath", title: "Catch-up-tijdcorrectie")
                         }
-                    } label: {
-                        VeyraSettingsCardRowLabel(icon: "clock.arrow.2.circlepath", title: "Catch-up-tijdcorrectie")
-                    }
-                    // .menu: deze rij wordt direct gevolgd door een rij die
-                    // in-/uitklapt zodra de keuze verandert. Zie de zelfde
-                    // fix + toelichting in MetadataSettingsView.swift.
-                    .pickerStyle(.menu)
-                    .veyraCardRow()
+                        // .menu: deze rij wordt direct gevolgd door een rij die
+                        // in-/uitklapt zodra de keuze verandert. Zie de zelfde
+                        // fix + toelichting in MetadataSettingsView.swift.
+                        .pickerStyle(.menu)
+                        .veyraCardRow()
 
-                    if catchUpOffsetMode == .manual {
-                        // `Stepper` bestaat niet op tvOS — hier vervangen
-                        // door een eigen +/- rij.
-                        VeyraSettingsCardRowLabel(icon: "plusminus.circle", title: "Correctie: \(catchUpOffsetManualSeconds) sec") {
-                            HStack(spacing: 20) {
-                                Button {
-                                    catchUpOffsetManualSeconds = max(-3600, catchUpOffsetManualSeconds - 60)
-                                } label: {
-                                    Image(systemName: "minus.circle")
-                                }
-                                Button {
-                                    catchUpOffsetManualSeconds = min(3600, catchUpOffsetManualSeconds + 60)
-                                } label: {
-                                    Image(systemName: "plus.circle")
+                        if catchUpOffsetMode == .manual {
+                            // `Stepper` bestaat niet op tvOS — hier vervangen
+                            // door een eigen +/- rij.
+                            VeyraSettingsCardRowLabel(icon: "plusminus.circle", title: "Correctie: \(catchUpOffsetManualSeconds) sec") {
+                                HStack(spacing: 20) {
+                                    Button {
+                                        catchUpOffsetManualSeconds = max(-3600, catchUpOffsetManualSeconds - 60)
+                                    } label: {
+                                        Image(systemName: "minus.circle")
+                                    }
+                                    Button {
+                                        catchUpOffsetManualSeconds = min(3600, catchUpOffsetManualSeconds + 60)
+                                    } label: {
+                                        Image(systemName: "plus.circle")
+                                    }
                                 }
                             }
+                            .veyraCardRow()
                         }
-                        .veyraCardRow()
+                    } footer: {
+                        Text("Afspeelmotor bepaalt welke engine live-zenders afspeelt. Buffering: hoeveel live video vooraf klaarstaat. Catch-up-tijdcorrectie volgt normaal de klok van de provider, of stel 'm handmatig in. Nog niet aangesloten op de speler.")
                     }
-                } footer: {
-                    Text("Afspeelmotor bepaalt welke engine live-zenders afspeelt. Buffering: hoeveel live video vooraf klaarstaat. Catch-up-tijdcorrectie volgt normaal de klok van de provider, of stel 'm handmatig in. Nog niet aangesloten op de speler.")
                 }
+                .frame(maxWidth: 1000)
             }
-            .frame(maxWidth: 1000)
+            .navigationTitle("Afspelen")
+
         }
-        .navigationTitle("Afspelen")
     }
 }
 
@@ -198,19 +207,22 @@ private struct IPTVDeveloperSettingsView: View {
     private var showFPSCounter = false
 
     var body: some View {
-        ZStack {
-            VeyraBackground().ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            List {
-                Section {
-                    VeyraSettingsToggleRow(icon: "speedometer", title: "FPS-teller tonen", isOn: $showFPSCounter)
-                } footer: {
-                    Text("Er is nog geen FPS-teller in Veyra; deze schakelaar heeft voorlopig geen effect.")
+                VeyraList {
+                    Section {
+                        VeyraSettingsToggleRow(icon: "speedometer", title: "FPS-teller tonen", isOn: $showFPSCounter)
+                    } footer: {
+                        Text("Er is nog geen FPS-teller in Veyra; deze schakelaar heeft voorlopig geen effect.")
+                    }
                 }
+                .frame(maxWidth: 1000)
             }
-            .frame(maxWidth: 1000)
+            .navigationTitle("Ontwikkelaarsopties")
+
         }
-        .navigationTitle("Ontwikkelaarsopties")
     }
 }
 

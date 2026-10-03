@@ -8,48 +8,51 @@ struct SubtitlePreferencesView: View {
     }
 
     var body: some View {
-        ZStack {
-            VeyraColors.background.ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            List {
-            Section {
-                NavigationLink {
-                    SubtitleLanguagePickerView(language: $language)
-                } label: {
-                    HStack {
-                        Text("Standaardtaal")
-                        Spacer()
-                        Text(currentLanguageTitle)
-                            .foregroundStyle(.secondary)
+                VeyraList {
+                Section {
+                    NavigationLink {
+                        SubtitleLanguagePickerView(language: $language)
+                    } label: {
+                        HStack {
+                            Text("Standaardtaal")
+                            Spacer()
+                            Text(currentLanguageTitle)
+                                .foregroundStyle(.secondary)
+                        }
                     }
+                } header: {
+                    Text("Standaardtaal")
+                } footer: {
+                    Text("De speler kiest deze taal bij een nieuwe stream. Tijdens het kijken kun je altijd een ander beschikbaar spoor kiezen of ondertitels uitzetten.")
                 }
-            } header: {
-                Text("Standaardtaal")
-            } footer: {
-                Text("De speler kiest deze taal bij een nieuwe stream. Tijdens het kijken kun je altijd een ander beschikbaar spoor kiezen of ondertitels uitzetten.")
-            }
 
-            Section {
-                OpenSubtitlesConfigurationCard()
-            } header: {
-                Text("OpenSubtitles")
-            }
-
-            Section {
-                NavigationLink {
-                    SubtitleAppearanceSettingsView()
-                } label: {
-                    Label("Ondertitelweergave", systemImage: "textformat.size")
+                Section {
+                    OpenSubtitlesConfigurationCard()
+                } header: {
+                    Text("OpenSubtitles")
                 }
-            } header: {
-                Text("Weergave")
-            } footer: {
-                Text("Grootte, plaatsing, achtergrond en sync.")
+
+                Section {
+                    NavigationLink {
+                        SubtitleAppearanceSettingsView()
+                    } label: {
+                        Label("Ondertitelweergave", systemImage: "textformat.size")
+                    }
+                } header: {
+                    Text("Weergave")
+                } footer: {
+                    Text("Grootte, plaatsing, achtergrond en sync.")
+                }
+                }
+                .scrollContentBackground(.hidden)
             }
-            }
-            .scrollContentBackground(.hidden)
+            .navigationTitle("Ondertitels")
+
         }
-        .navigationTitle("Ondertitels")
     }
 }
 
@@ -133,31 +136,34 @@ struct SubtitleLanguagePickerView: View {
     @Binding var language: String
 
     var body: some View {
-        ZStack {
-            VeyraColors.background.ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            List {
-                Section {
-                    ForEach(SubtitleLanguage.allCases) { option in
-                        Button {
-                            language = option.rawValue
-                        } label: {
-                            HStack {
-                                Text(option.title).foregroundStyle(.primary)
-                                Spacer()
-                                if language == option.rawValue {
-                                    Image(systemName: "checkmark")
-                                        .foregroundStyle(VeyraColors.cyan)
+                VeyraList {
+                    Section {
+                        ForEach(SubtitleLanguage.allCases) { option in
+                            Button {
+                                language = option.rawValue
+                            } label: {
+                                HStack {
+                                    Text(option.title).foregroundStyle(.primary)
+                                    Spacer()
+                                    if language == option.rawValue {
+                                        Image(systemName: "checkmark")
+                                            .foregroundStyle(VeyraColors.cyan)
+                                    }
                                 }
                             }
                         }
                     }
                 }
+                .scrollContentBackground(.hidden)
             }
-            .scrollContentBackground(.hidden)
+            .navigationTitle("Standaardtaal")
+            .navigationBarTitleDisplayMode(.inline)
+
         }
-        .navigationTitle("Standaardtaal")
-        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

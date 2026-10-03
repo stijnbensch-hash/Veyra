@@ -14,34 +14,63 @@ struct WatchlistView: View {
     @State private var isLoading = true
     @State private var selectedKind: MediaType = .movie
 
-    private var metrics: VeyraPosterMetrics { VeyraPosterMetrics(regular: sizeClass == .regular) }
-    private var columns: [GridItem] { metrics.columns }
+    // Gemeten schermbreedte -- nodig om, net als "Films"/"Series", op iPhone 3 vaste
+    // kolommen te kunnen uitrekenen i.p.v. het adaptieve raster dat er maar 2 kwijt kon.
+    @State private var measuredScreenWidth: CGFloat = 0
+
+    private var metrics: VeyraCatalogPosterGridLayout {
+        VeyraCatalogPosterGridLayout(availableWidth: measuredScreenWidth, regular: sizeClass == .regular)
+    }
+
+    // Zolang `measuredScreenWidth` nog 0 is (vóór de eerste layout-pas), vallen de kolommen-
+    // en postermaat-berekeningen hieronder terug op het oude adaptieve 2-koloms-raster i.p.v.
+    // drie kolommen (of posters) van (bijna) 0pt breed.
+    private var columns: [GridItem] {
+        guard measuredScreenWidth > 0 else {
+            return [GridItem(.adaptive(minimum: 124), spacing: 16, alignment: .top)]
+        }
+        return metrics.columns
+    }
+    private var posterWidth: CGFloat {
+        guard measuredScreenWidth > 0 else { return 124 }
+        return metrics.posterWidth
+    }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                VeyraArtworkBackground(url: nil)
+        VeyraDynamicBackgroundScope {
+            NavigationStack {
+                ZStack {
+                    VeyraArtworkBackground(url: nil)
 
-                ScrollView(.vertical, showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 16) {
-                        if trakt.isConnected, !isLoading, !(movies.isEmpty && series.isEmpty) {
-                            kindPicker
-                                .padding(.horizontal)
+                    VeyraScrollView(.vertical, showsIndicators: false) {
+                        VStack(alignment: .leading, spacing: 16) {
+                            if trakt.isConnected, !isLoading, !(movies.isEmpty && series.isEmpty) {
+                                kindPicker
+                                    .padding(.horizontal)
+                            }
+
+                            content
                         }
-
-                        content
+                        .padding(.top, 12)
+                        .padding(.bottom, 40)
                     }
-                    .padding(.top, 12)
-                    .padding(.bottom, 40)
-                }
 
+                }
+                .background(
+                    GeometryReader { geo in
+                        Color.clear
+                            .onAppear { measuredScreenWidth = geo.size.width }
+                            .onChange(of: geo.size.width) { _, newWidth in measuredScreenWidth = newWidth }
+                    }
+                )
+                .navigationTitle("Kijklijst")
+                .navigationBarTitleDisplayMode(.inline)
             }
-            .navigationTitle("Kijklijst")
-            .navigationBarTitleDisplayMode(.inline)
+            .task { await trakt.refreshIfNeeded() }
+            .task(id: reloadKey) { await load() }
+            .mediaNavigationRoot()
+
         }
-        .task { await trakt.refreshIfNeeded() }
-        .task(id: reloadKey) { await load() }
-        .mediaNavigationRoot()
     }
 
     private var reloadKey: String {
@@ -146,7 +175,7 @@ struct WatchlistView: View {
                 title: item.title,
                 url: item.posterURL,
                 symbol: item.type == .movie ? "film" : "tv",
-                width: metrics.posterWidth,
+                width: posterWidth,
                 genre: item.genre,
                 rating: item.rating,
                 year: String(item.releaseDate?.prefix(4) ?? ""),

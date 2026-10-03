@@ -30,83 +30,86 @@ struct MediaServersSettingsView:
     @StateObject private var viewModel = MediaServersViewModel()
 
     var body: some View {
-        ZStack {
-            VeyraBackground().ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            ScrollView(
-                .vertical,
-                showsIndicators: false
-            ) {
-                VStack(
-                    alignment: .leading,
-                    spacing: 32
+                VeyraScrollView(
+                    .vertical,
+                    showsIndicators: false
                 ) {
-                    header
-                    addServerButton
-                    existingServersSection
+                    VStack(
+                        alignment: .leading,
+                        spacing: 32
+                    ) {
+                        header
+                        addServerButton
+                        existingServersSection
+                    }
+                    .frame(
+                        maxWidth: 1180,
+                        alignment: .leading
+                    )
+                    .padding(.horizontal, 70)
+                    .padding(.top, 50)
+                    .padding(.bottom, 70)
+                    .frame(maxWidth: .infinity)
                 }
-                .frame(
-                    maxWidth: 1180,
-                    alignment: .leading
+            }
+            .onAppear {
+                viewModel.reload()
+            }
+            .onReceive(
+                NotificationCenter.default.publisher(
+                    for: .veyraMediaServerConfigurationDidChange
                 )
-                .padding(.horizontal, 70)
-                .padding(.top, 50)
-                .padding(.bottom, 70)
-                .frame(maxWidth: .infinity)
+            ) { _ in
+                viewModel.reload()
             }
-        }
-        .onAppear {
-            viewModel.reload()
-        }
-        .onReceive(
-            NotificationCenter.default.publisher(
-                for: .veyraMediaServerConfigurationDidChange
-            )
-        ) { _ in
-            viewModel.reload()
-        }
-        .task {
-            // Periodiek herchecken zolang dit scherm open staat — zie de
-            // iOS-tegenhanger van dit scherm voor dezelfde aanpak.
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(15))
-                guard !Task.isCancelled else { return }
-                viewModel.refreshStatus()
+            .task {
+                // Periodiek herchecken zolang dit scherm open staat — zie de
+                // iOS-tegenhanger van dit scherm voor dezelfde aanpak.
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(15))
+                    guard !Task.isCancelled else { return }
+                    viewModel.refreshStatus()
+                }
             }
-        }
-        .navigationDestination(
-            item: $selectedServer
-        ) { server in
-            MediaServerEditView(server: server)
-        }
-        .navigationDestination(
-            isPresented: $showAddServer
-        ) {
-            MediaServerAddView()
-        }
-        .veyraConfirmationDialog(
-            "Mediaserver verwijderen?",
-            isPresented: deleteDialogBinding
-        ) {
-            Button(
-                "Verwijderen",
-                role: .destructive
+            .navigationDestination(
+                item: $selectedServer
+            ) { server in
+                MediaServerEditView(server: server)
+            }
+            .navigationDestination(
+                isPresented: $showAddServer
             ) {
-                deletePendingServer()
+                MediaServerAddView()
+            }
+            .veyraConfirmationDialog(
+                "Mediaserver verwijderen?",
+                isPresented: deleteDialogBinding
+            ) {
+                Button(
+                    "Verwijderen",
+                    role: .destructive
+                ) {
+                    deletePendingServer()
+                }
+
+                Button(
+                    "Annuleren",
+                    role: .cancel
+                ) {
+                    pendingDeleteServer = nil
+                }
+            } message: {
+                if let pendingDeleteServer {
+                    Text(
+                        "\(pendingDeleteServer.name) wordt uit Veyra verwijderd."
+                    )
+                }
             }
 
-            Button(
-                "Annuleren",
-                role: .cancel
-            ) {
-                pendingDeleteServer = nil
-            }
-        } message: {
-            if let pendingDeleteServer {
-                Text(
-                    "\(pendingDeleteServer.name) wordt uit Veyra verwijderd."
-                )
-            }
         }
     }
 
@@ -401,96 +404,99 @@ struct MediaServerAddView:
     private let store = MediaServerStore()
 
     var body: some View {
-        ZStack {
-            VeyraBackground().ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            ScrollView(
-                .vertical,
-                showsIndicators: false
-            ) {
-                VStack(alignment: .leading, spacing: 24) {
-                    Text("Server toevoegen")
-                        .font(.system(size: 50, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
+                VeyraScrollView(
+                    .vertical,
+                    showsIndicators: false
+                ) {
+                    VStack(alignment: .leading, spacing: 24) {
+                        Text("Server toevoegen")
+                            .font(.system(size: 50, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
 
-                    Text(
-                        "Koppel een mediaserver om je eigen bibliotheek te bekijken."
-                    )
-                    .font(.system(size: 26))
-                    .foregroundStyle(.white.opacity(0.62))
-
-                    fieldTitle("SERVERTYPE")
-                    serverKindPicker
-
-                    if selectedKind.isAvailable {
-                        fieldTitle("NAAM")
-
-                        TextField(
-                            selectedKind.displayName,
-                            text: $name
+                        Text(
+                            "Koppel een mediaserver om je eigen bibliotheek te bekijken."
                         )
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 22))
-                        .padding(18)
-                        .background(inputBackground)
+                        .font(.system(size: 26))
+                        .foregroundStyle(.white.opacity(0.62))
 
-                        fieldTitle("SERVER-URL")
+                        fieldTitle("SERVERTYPE")
+                        serverKindPicker
 
-                        TextField(
-                            "https://jouw-server:8096",
-                            text: $serverURLText
-                        )
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 21, design: .monospaced))
-                        .padding(18)
-                        .background(inputBackground)
-                        #if !os(tvOS)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        #endif
+                        if selectedKind.isAvailable {
+                            fieldTitle("NAAM")
 
-                        fieldTitle("GEBRUIKERSNAAM")
+                            TextField(
+                                selectedKind.displayName,
+                                text: $name
+                            )
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 22))
+                            .padding(18)
+                            .background(inputBackground)
 
-                        TextField(
-                            "Gebruikersnaam",
-                            text: $username
-                        )
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 22))
-                        .padding(18)
-                        .background(inputBackground)
-                        #if !os(tvOS)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        #endif
+                            fieldTitle("SERVER-URL")
 
-                        fieldTitle("WACHTWOORD")
+                            TextField(
+                                "https://jouw-server:8096",
+                                text: $serverURLText
+                            )
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 21, design: .monospaced))
+                            .padding(18)
+                            .background(inputBackground)
+                            #if !os(tvOS)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            #endif
 
-                        SecureField(
-                            "Wachtwoord",
-                            text: $password
-                        )
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 22))
-                        .padding(18)
-                        .background(inputBackground)
+                            fieldTitle("GEBRUIKERSNAAM")
 
-                        if let errorMessage {
-                            Text(errorMessage)
-                                .font(.system(size: 20))
-                                .foregroundStyle(.orange)
+                            TextField(
+                                "Gebruikersnaam",
+                                text: $username
+                            )
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 22))
+                            .padding(18)
+                            .background(inputBackground)
+                            #if !os(tvOS)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            #endif
+
+                            fieldTitle("WACHTWOORD")
+
+                            SecureField(
+                                "Wachtwoord",
+                                text: $password
+                            )
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 22))
+                            .padding(18)
+                            .background(inputBackground)
+
+                            if let errorMessage {
+                                Text(errorMessage)
+                                    .font(.system(size: 20))
+                                    .foregroundStyle(.orange)
+                            }
+
+                            connectButton
+                        } else {
+                            comingSoonNote
                         }
-
-                        connectButton
-                    } else {
-                        comingSoonNote
                     }
+                    .frame(maxWidth: 900, alignment: .leading)
+                    .padding(.horizontal, VeyraSpacing.page)
+                    .padding(.top, 36)
+                    .padding(.bottom, 50)
                 }
-                .frame(maxWidth: 900, alignment: .leading)
-                .padding(.horizontal, VeyraSpacing.page)
-                .padding(.top, 36)
-                .padding(.bottom, 50)
             }
+
         }
     }
 
@@ -715,96 +721,99 @@ struct MediaServerEditView:
     }
 
     var body: some View {
-        ZStack {
-            VeyraBackground().ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            ScrollView(
-                .vertical,
-                showsIndicators: false
-            ) {
-                VStack(alignment: .leading, spacing: 24) {
-                    Text(server.name)
-                        .font(.system(size: 50, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
+                VeyraScrollView(
+                    .vertical,
+                    showsIndicators: false
+                ) {
+                    VStack(alignment: .leading, spacing: 24) {
+                        Text(server.name)
+                            .font(.system(size: 50, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
 
-                    Text("Beheer deze mediaserver.")
-                        .font(.system(size: 26))
-                        .foregroundStyle(.white.opacity(0.62))
+                        Text("Beheer deze mediaserver.")
+                            .font(.system(size: 26))
+                            .foregroundStyle(.white.opacity(0.62))
 
-                    if server.kind == .jellyfin {
-                        NavigationLink {
-                            JellyfinLibrariesView(account: server)
-                        } label: {
-                            VeyraActionLabel(
-                                title: "Bibliotheek bekijken",
-                                symbol: "rectangle.stack.badge.play"
-                            )
+                        if server.kind == .jellyfin {
+                            NavigationLink {
+                                JellyfinLibrariesView(account: server)
+                            } label: {
+                                VeyraActionLabel(
+                                    title: "Bibliotheek bekijken",
+                                    symbol: "rectangle.stack.badge.play"
+                                )
+                            }
+                            .buttonStyle(VeyraFocusButtonStyle(primary: true))
                         }
-                        .buttonStyle(VeyraFocusButtonStyle(primary: true))
+
+                        fieldTitle("TYPE")
+
+                        Text(server.kind.displayName)
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundStyle(.cyan)
+
+                        fieldTitle("NAAM")
+
+                        TextField("Naam", text: $server.name)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 22))
+                            .padding(18)
+                            .background(inputBackground)
+
+                        fieldTitle("SERVER-URL")
+
+                        Text(server.serverURL.absoluteString)
+                            .font(.system(size: 21, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.75))
+                            .padding(18)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(inputBackground)
+
+                        fieldTitle("GEBRUIKERSNAAM")
+
+                        TextField("Gebruikersnaam", text: $server.username)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 22))
+                            .padding(18)
+                            .background(inputBackground)
+                            #if !os(tvOS)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            #endif
+
+                        fieldTitle("WACHTWOORD (om opnieuw te verbinden)")
+
+                        SecureField("Laat leeg om ongewijzigd te laten", text: $password)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 22))
+                            .padding(18)
+                            .background(inputBackground)
+
+                        if let saveMessage {
+                            Text(saveMessage)
+                                .font(.system(size: 20))
+                                .foregroundStyle(VeyraColors.cyan)
+                        }
+
+                        if let errorMessage {
+                            Text(errorMessage)
+                                .font(.system(size: 20))
+                                .foregroundStyle(.orange)
+                        }
+
+                        actionButtons
                     }
-
-                    fieldTitle("TYPE")
-
-                    Text(server.kind.displayName)
-                        .font(.system(size: 22, weight: .semibold))
-                        .foregroundStyle(.cyan)
-
-                    fieldTitle("NAAM")
-
-                    TextField("Naam", text: $server.name)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 22))
-                        .padding(18)
-                        .background(inputBackground)
-
-                    fieldTitle("SERVER-URL")
-
-                    Text(server.serverURL.absoluteString)
-                        .font(.system(size: 21, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.75))
-                        .padding(18)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(inputBackground)
-
-                    fieldTitle("GEBRUIKERSNAAM")
-
-                    TextField("Gebruikersnaam", text: $server.username)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 22))
-                        .padding(18)
-                        .background(inputBackground)
-                        #if !os(tvOS)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        #endif
-
-                    fieldTitle("WACHTWOORD (om opnieuw te verbinden)")
-
-                    SecureField("Laat leeg om ongewijzigd te laten", text: $password)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 22))
-                        .padding(18)
-                        .background(inputBackground)
-
-                    if let saveMessage {
-                        Text(saveMessage)
-                            .font(.system(size: 20))
-                            .foregroundStyle(VeyraColors.cyan)
-                    }
-
-                    if let errorMessage {
-                        Text(errorMessage)
-                            .font(.system(size: 20))
-                            .foregroundStyle(.orange)
-                    }
-
-                    actionButtons
+                    .frame(maxWidth: 900, alignment: .leading)
+                    .padding(.horizontal, VeyraSpacing.page)
+                    .padding(.top, 36)
+                    .padding(.bottom, 50)
                 }
-                .frame(maxWidth: 900, alignment: .leading)
-                .padding(.horizontal, VeyraSpacing.page)
-                .padding(.top, 36)
-                .padding(.bottom, 50)
             }
+
         }
     }
 

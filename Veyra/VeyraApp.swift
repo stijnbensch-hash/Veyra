@@ -34,6 +34,14 @@ struct VeyraApp: App {
     // keer bij een koude start — zie `Shared/LaunchAnimationView.swift`.
     @State private var showLaunchAnimation = true
 
+    // `contentScene` (met z'n eigen opstart-`.task`-werk) wordt pas gebouwd NADAT de
+    // animatie zelf al op het scherm staat (`LaunchAnimationView`'s `onAppear` hieronder) --
+    // anders delen beide dezelfde eerste render-pass, en vertraagt het construeren van
+    // `contentScene` (modellen, `.task`-opstartwerk) zichtbaar ook de allereerste frame van
+    // de animatie zelf, waardoor die pas met een merkbare vertraging verschijnt i.p.v.
+    // onmiddellijk bij app-start.
+    @State private var showContent = false
+
     // Auto-refresh van IPTV VOD/EPG bij het opstarten van de app, met een
     // kleine laadanimatie die verdwijnt zodra het klaar is. Zie
     // `Shared/LiveTV/IPTVStartupRefreshCoordinator.swift`.
@@ -42,11 +50,13 @@ struct VeyraApp: App {
     var body: some Scene {
         WindowGroup {
             ZStack {
-                contentScene
+                if showContent {
+                    contentScene
 
-                IPTVStartupRefreshBadge(coordinator: iptvStartupRefresh)
-                    .padding(.top, 40)
-                    .padding(.trailing, 60)
+                    IPTVStartupRefreshBadge(coordinator: iptvStartupRefresh)
+                        .padding(.top, 40)
+                        .padding(.trailing, 60)
+                }
 
                 if showLaunchAnimation {
                     LaunchAnimationView {
@@ -54,6 +64,10 @@ struct VeyraApp: App {
                     }
                     .transition(.identity)
                     .zIndex(1)
+                    .onAppear {
+                        guard !showContent else { return }
+                        DispatchQueue.main.async { showContent = true }
+                    }
                 }
             }
         }

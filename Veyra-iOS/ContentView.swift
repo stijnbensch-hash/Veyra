@@ -96,6 +96,8 @@ struct ContentView: View {
                 Label("Opnames", systemImage: "record.circle").tag(AppTab.recordings)
                 Label("Instellingen", systemImage: "gearshape.fill").tag(AppTab.settings)
             }
+            .scrollContentBackground(.hidden)
+            .veyraScrollingBackground(legacyList: true)
             .navigationTitle("Veyra")
             .listStyle(.sidebar)
         } detail: {
@@ -148,7 +150,7 @@ struct ContentView: View {
         .padding(.horizontal, 16)
         .padding(.top, 12)
         .padding(.bottom, 8)
-        .background(VeyraColors.background)
+        .background(VeyraBackground())
     }
 
     @ViewBuilder

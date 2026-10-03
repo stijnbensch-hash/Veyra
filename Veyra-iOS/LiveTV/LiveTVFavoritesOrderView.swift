@@ -39,7 +39,7 @@ struct LiveTVFavoritesOrderView: View {
     }
 
     private var favoritesList: some View {
-        List {
+        VeyraList {
             ForEach(
                 guide.favoriteRows
             ) { row in

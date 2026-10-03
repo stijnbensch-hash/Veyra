@@ -54,10 +54,12 @@ struct MacContentView: View {
                         .foregroundStyle(selection == destination ? VeyraColors.cyan : .primary)
                 }
             }
+            .scrollContentBackground(.hidden)
+            .veyraScrollingBackground(legacyList: true)
             .navigationTitle("Veyra")
             .listStyle(.sidebar)
             .scrollContentBackground(.hidden)
-            .background(VeyraColors.background)
+            .background(VeyraBackground())
         } detail: {
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -79,7 +81,7 @@ struct MacContentView: View {
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .background(VeyraColors.background)
+        .background(VeyraBackground())
     }
 
     // MARK: - Inhoud

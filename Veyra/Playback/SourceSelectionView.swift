@@ -49,73 +49,75 @@ struct SourceSelectionView: View {
         SourceResolver()
 
     var body: some View {
-        ZStack {
-            background
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                background
 
-            VStack(
-                alignment: .leading,
-                spacing: 24
-            ) {
-                header
+                VStack(
+                    alignment: .leading,
+                    spacing: 24
+                ) {
+                    header
 
-                filterBar
+                    filterBar
 
-                content
+                    content
 
-                Spacer(
-                    minLength: 0
-                )
-            }
-            .padding(
-                .horizontal,
-                42
-            )
-            .padding(
-                .vertical,
-                32
-            )
-            .frame(maxWidth: 1600)
-            .frame(maxWidth: .infinity)
-        }
-        .task(
-            id: reloadID
-        ) {
-            await loadSources()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .iptvConfigurationDidChange)) { _ in
-            reloadID = UUID()
-        }
-        .onChange(of: hasLoaded) { _, loaded in
-            guard loaded, autoSelectFirstSource, selectedSource == nil,
-                  let first = sources.first
-            else { return }
-            selectedSource = first.source
-        }
-        .navigationDestination(
-            item: $selectedSource
-        ) { source in
-            PlayerView(
-                source: source,
-                item: item,
-                resumeProgress:
-                    traktStore.progress(
-                        for: item
+                    Spacer(
+                        minLength: 0
                     )
-            )
-            .environment(\.veyraEpisodeReturn, inheritedEpisodeReturn ?? { selectedSource = nil })
-        }
-        .onChange(of: selectedSource) { previous, current in
-            guard previous != nil, current == nil,
-                  item.type == .series,
-                  item.seasonNumber != nil,
-                  item.episodeNumber != nil
-            else { return }
+                }
+                .padding(
+                    .horizontal,
+                    42
+                )
+                .padding(
+                    .vertical,
+                    32
+                )
+                .frame(maxWidth: 1600)
+                .frame(maxWidth: .infinity)
+            }
+            .task(
+                id: reloadID
+            ) {
+                await loadSources()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .iptvConfigurationDidChange)) { _ in
+                reloadID = UUID()
+            }
+            .onChange(of: hasLoaded) { _, loaded in
+                guard loaded, autoSelectFirstSource, selectedSource == nil,
+                      let first = sources.first
+                else { return }
+                selectedSource = first.source
+            }
+            .navigationDestination(
+                item: $selectedSource
+            ) { source in
+                PlayerView(
+                    source: source,
+                    item: item,
+                    resumeProgress:
+                        traktStore.progress(
+                            for: item
+                        )
+                )
+                .environment(\.veyraEpisodeReturn, inheritedEpisodeReturn ?? { selectedSource = nil })
+            }
+            .onChange(of: selectedSource) { previous, current in
+                guard previous != nil, current == nil,
+                      item.type == .series,
+                      item.seasonNumber != nil,
+                      item.episodeNumber != nil
+                else { return }
 
-            // De speler is van de navigatiestapel gehaald. Sluit daarna ook
-            // de bronkeuze, zodat Terug weer bij de aflevering uitkomt.
-            Task { @MainActor in
-                await Task.yield()
-                dismiss()
+                // De speler is van de navigatiestapel gehaald. Sluit daarna ook
+                // de bronkeuze, zodat Terug weer bij de aflevering uitkomt.
+                Task { @MainActor in
+                    await Task.yield()
+                    dismiss()
+                }
             }
         }
     }
@@ -672,7 +674,7 @@ struct SourceSelectionView: View {
     private var sourceList:
         some View
     {
-        ScrollView(
+        VeyraScrollView(
             .vertical,
             showsIndicators: false
         ) {
@@ -1134,7 +1136,9 @@ struct SourceSelectionView: View {
             values,
             order: SourceOrderDefaults.loadOriginOrder(),
             originName: { $0.originName },
-            isFromHub: { $0.isFromHub }
+            isFromHub: { $0.isFromHub },
+            category: { $0.category },
+            categoryOrder: SourceOrderDefaults.loadCategoryOrder()
         )
     }
 
@@ -1186,6 +1190,10 @@ struct SourceSelectionView: View {
             "[SourceSelectionView] addons=\(addonValues.count) mediaServer=\(mediaServerValues.count) (\(mediaServerValues.filter(\.isFromHub).count) via hub)"
         )
         #endif
+
+        SourceOrderDefaults.recordKnownHubAddonNames(
+            (addonValues + mediaServerValues).filter(\.isFromHub).map(\.originName)
+        )
 
         sources =
             Self.applyOriginOrder(

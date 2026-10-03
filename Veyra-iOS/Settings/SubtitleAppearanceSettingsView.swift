@@ -20,45 +20,48 @@ struct SubtitleAppearanceSettingsView: View {
     private var subtitleOffset: Double = 0
 
     var body: some View {
-        List {
-            Section {
-                Picker("Tekstgrootte", selection: $subtitleSizeRaw) {
-                    ForEach(VeyraSubtitleSize.allCases) { size in
-                        Text(size.title).tag(size.rawValue)
+        VeyraDynamicBackgroundScope {
+            VeyraList {
+                Section {
+                    Picker("Tekstgrootte", selection: $subtitleSizeRaw) {
+                        ForEach(VeyraSubtitleSize.allCases) { size in
+                            Text(size.title).tag(size.rawValue)
+                        }
                     }
-                }
-                Picker("Plaatsing", selection: $subtitlePositionRaw) {
-                    ForEach(VeyraSubtitlePosition.allCases) { position in
-                        Text(position.title).tag(position.rawValue)
+                    Picker("Plaatsing", selection: $subtitlePositionRaw) {
+                        ForEach(VeyraSubtitlePosition.allCases) { position in
+                            Text(position.title).tag(position.rawValue)
+                        }
                     }
-                }
-                Picker("Achtergrond", selection: $subtitleBackgroundRaw) {
-                    ForEach(VeyraSubtitleBackground.allCases) { background in
-                        Text(background.title).tag(background.rawValue)
+                    Picker("Achtergrond", selection: $subtitleBackgroundRaw) {
+                        ForEach(VeyraSubtitleBackground.allCases) { background in
+                            Text(background.title).tag(background.rawValue)
+                        }
                     }
+                    Toggle("Schaduw", isOn: $subtitleShadow)
+                } header: {
+                    Text("Weergave")
+                } footer: {
+                    Text("Geldt voor tekstondertitels die Veyra zelf tekent (inclusief OpenSubtitles). Beeldgebaseerde of native ondertitelsporen kunnen hun eigen positionering hebben.")
                 }
-                Toggle("Schaduw", isOn: $subtitleShadow)
-            } header: {
-                Text("Weergave")
-            } footer: {
-                Text("Geldt voor tekstondertitels die Veyra zelf tekent (inclusief OpenSubtitles). Beeldgebaseerde of native ondertitelsporen kunnen hun eigen positionering hebben.")
-            }
 
-            Section {
-                Button("10 sec vroeger") { adjustOffset(by: -10) }
-                Button("0,1 sec vroeger") { adjustOffset(by: -0.1) }
-                Button("0,1 sec later") { adjustOffset(by: 0.1) }
-                Button("10 sec later") { adjustOffset(by: 10) }
-                if subtitleOffset != 0 {
-                    Button("Terugzetten naar 0,0s") { subtitleOffset = 0 }
+                Section {
+                    Button("10 sec vroeger") { adjustOffset(by: -10) }
+                    Button("0,1 sec vroeger") { adjustOffset(by: -0.1) }
+                    Button("0,1 sec later") { adjustOffset(by: 0.1) }
+                    Button("10 sec later") { adjustOffset(by: 10) }
+                    if subtitleOffset != 0 {
+                        Button("Terugzetten naar 0,0s") { subtitleOffset = 0 }
+                    }
+                } header: {
+                    Text("Synchronisatie")
+                } footer: {
+                    Text(currentOffsetDescription)
                 }
-            } header: {
-                Text("Synchronisatie")
-            } footer: {
-                Text(currentOffsetDescription)
             }
+            .navigationTitle("Ondertitelweergave")
+
         }
-        .navigationTitle("Ondertitelweergave")
     }
 
     private var currentOffsetDescription: String {

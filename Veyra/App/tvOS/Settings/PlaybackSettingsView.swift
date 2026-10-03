@@ -16,43 +16,46 @@ struct PlaybackSettingsView: View {
     @State private var destination: PlaybackSettingsDestination?
 
     var body: some View {
-        ZStack {
-            VeyraBackground().ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 18) {
-                    categoryCard(
-                        .general, icon: "play.circle", title: "Afspelen",
-                        subtitle: "Draaien, bronkeuze, verdergaan, resolutie"
-                    )
-                    categoryCard(
-                        .language, icon: "captions.bubble", title: "Taal",
-                        subtitle: "Audio- en ondertiteltaal"
-                    )
-                    categoryCard(
-                        .skipSegments, icon: "forward.end.alt", title: "Oversla-segmenten",
-                        subtitle: "Intro, samenvatting, aftiteling"
-                    )
-                    categoryCard(
-                        .upNext, icon: "play.square.stack", title: "Hierna",
-                        subtitle: "Automatisch doorspelen en aftelling"
-                    )
+                VeyraScrollView(.vertical, showsIndicators: false) {
+                    VStack(spacing: 18) {
+                        categoryCard(
+                            .general, icon: "play.circle", title: "Afspelen",
+                            subtitle: "Draaien, bronkeuze, verdergaan, resolutie"
+                        )
+                        categoryCard(
+                            .language, icon: "captions.bubble", title: "Taal",
+                            subtitle: "Audio- en ondertiteltaal"
+                        )
+                        categoryCard(
+                            .skipSegments, icon: "forward.end.alt", title: "Oversla-segmenten",
+                            subtitle: "Intro, samenvatting, aftiteling"
+                        )
+                        categoryCard(
+                            .upNext, icon: "play.square.stack", title: "Hierna",
+                            subtitle: "Automatisch doorspelen en aftelling"
+                        )
+                    }
+                    .frame(maxWidth: 1300, alignment: .leading)
+                    .padding(.horizontal, VeyraSpacing.page)
+                    .padding(.top, 36)
+                    .padding(.bottom, 60)
+                    .frame(maxWidth: .infinity)
                 }
-                .frame(maxWidth: 1300, alignment: .leading)
-                .padding(.horizontal, VeyraSpacing.page)
-                .padding(.top, 36)
-                .padding(.bottom, 60)
-                .frame(maxWidth: .infinity)
             }
-        }
-        .navigationTitle("Afspelen")
-        .navigationDestination(item: $destination) { destination in
-            switch destination {
-            case .general: PlaybackGeneralSettingsView()
-            case .language: PlaybackLanguageSettingsView()
-            case .skipSegments: PlaybackSkipSegmentsSettingsView()
-            case .upNext: PlaybackUpNextSettingsView()
+            .navigationTitle("Afspelen")
+            .navigationDestination(item: $destination) { destination in
+                switch destination {
+                case .general: PlaybackGeneralSettingsView()
+                case .language: PlaybackLanguageSettingsView()
+                case .skipSegments: PlaybackSkipSegmentsSettingsView()
+                case .upNext: PlaybackUpNextSettingsView()
+                }
             }
+
         }
     }
 
@@ -119,22 +122,25 @@ private struct PlaybackGeneralSettingsView: View {
     private var skipContinueWatchingDetails = false
 
     var body: some View {
-        ZStack {
-            VeyraBackground().ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            List {
-                Section {
-                    VeyraSettingsToggleRow(icon: "rotate.right", title: "Automatisch draaien naar liggend", isOn: $autoRotateLandscape)
-                    VeyraSettingsToggleRow(icon: "play.fill", title: "Volgende aflevering automatisch afspelen", isOn: $autoPlayNextEpisode)
-                    VeyraSettingsToggleRow(icon: "checkmark.circle", title: "Eerste bron automatisch selecteren", isOn: $autoSelectFirstSource)
-                    VeyraSettingsToggleRow(icon: "forward.end", title: "Details overslaan bij verdergaan", isOn: $skipContinueWatchingDetails)
-                } footer: {
-                    Text("HDR en Dolby Vision worden automatisch herkend en afgespeeld door de speler — daar is geen instelling voor nodig.")
+                VeyraList {
+                    Section {
+                        VeyraSettingsToggleRow(icon: "rotate.right", title: "Automatisch draaien naar liggend", isOn: $autoRotateLandscape)
+                        VeyraSettingsToggleRow(icon: "play.fill", title: "Volgende aflevering automatisch afspelen", isOn: $autoPlayNextEpisode)
+                        VeyraSettingsToggleRow(icon: "checkmark.circle", title: "Eerste bron automatisch selecteren", isOn: $autoSelectFirstSource)
+                        VeyraSettingsToggleRow(icon: "forward.end", title: "Details overslaan bij verdergaan", isOn: $skipContinueWatchingDetails)
+                    } footer: {
+                        Text("HDR en Dolby Vision worden automatisch herkend en afgespeeld door de speler — daar is geen instelling voor nodig.")
+                    }
                 }
+                .frame(maxWidth: 1000)
             }
-            .frame(maxWidth: 1000)
+            .navigationTitle("Afspelen")
+
         }
-        .navigationTitle("Afspelen")
     }
 }
 
@@ -153,28 +159,31 @@ private struct PlaybackLanguageSettingsView: View {
     private var autoSelectSubtitlesRaw = PlaybackAutoSelectSubtitlesOption.forcedOnly.rawValue
 
     var body: some View {
-        ZStack {
-            VeyraBackground().ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            List {
-                Section {
-                    VeyraSettingsChoiceRow<PlaybackLanguageOption>(icon: "waveform", "Audiotaal", selection: $audioLanguageRaw)
-                    VeyraSettingsChoiceRow<PlaybackLanguageOption>(icon: "waveform", "Audiotaal (terugval)", selection: $audioFallbackLanguageRaw)
-                } header: {
-                    Text("Audio")
-                }
+                VeyraList {
+                    Section {
+                        VeyraSettingsChoiceRow<PlaybackLanguageOption>(icon: "waveform", "Audiotaal", selection: $audioLanguageRaw)
+                        VeyraSettingsChoiceRow<PlaybackLanguageOption>(icon: "waveform", "Audiotaal (terugval)", selection: $audioFallbackLanguageRaw)
+                    } header: {
+                        Text("Audio")
+                    }
 
-                Section {
-                    VeyraSettingsChoiceRow<PlaybackLanguageOption>(icon: "captions.bubble", "Ondertiteltaal", selection: $subtitleLanguageRaw)
-                    VeyraSettingsChoiceRow<PlaybackLanguageOption>(icon: "captions.bubble", "Ondertiteltaal (terugval)", selection: $subtitleFallbackLanguageRaw)
-                    VeyraSettingsChoiceRow<PlaybackAutoSelectSubtitlesOption>(icon: "checkmark.bubble", "Ondertitels automatisch selecteren", selection: $autoSelectSubtitlesRaw)
-                } header: {
-                    Text("Ondertitels")
+                    Section {
+                        VeyraSettingsChoiceRow<PlaybackLanguageOption>(icon: "captions.bubble", "Ondertiteltaal", selection: $subtitleLanguageRaw)
+                        VeyraSettingsChoiceRow<PlaybackLanguageOption>(icon: "captions.bubble", "Ondertiteltaal (terugval)", selection: $subtitleFallbackLanguageRaw)
+                        VeyraSettingsChoiceRow<PlaybackAutoSelectSubtitlesOption>(icon: "checkmark.bubble", "Ondertitels automatisch selecteren", selection: $autoSelectSubtitlesRaw)
+                    } header: {
+                        Text("Ondertitels")
+                    }
                 }
+                .frame(maxWidth: 1000)
             }
-            .frame(maxWidth: 1000)
+            .navigationTitle("Taal")
+
         }
-        .navigationTitle("Taal")
     }
 }
 
@@ -199,26 +208,29 @@ private struct PlaybackSkipSegmentsSettingsView: View {
     private var autoSkipPreview = false
 
     var body: some View {
-        ZStack {
-            VeyraBackground().ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            List {
-                Section {
-                    VeyraSettingsToggleRow(icon: "forward.frame", title: "Knop 'Intro overslaan' tonen", isOn: $showSkipIntroButton)
-                    VeyraSettingsToggleRow(icon: "bolt.fill", title: "Intro automatisch overslaan", isOn: $autoSkipIntro)
-                    VeyraSettingsToggleRow(icon: "arrow.uturn.forward", title: "Knop 'Samenvatting overslaan' tonen", isOn: $showSkipRecapButton)
-                    VeyraSettingsToggleRow(icon: "bolt.fill", title: "Samenvatting automatisch overslaan", isOn: $autoSkipRecap)
-                    VeyraSettingsToggleRow(icon: "text.below.photo", title: "Knop 'Aftiteling overslaan' tonen", isOn: $showSkipCreditsButton)
-                    VeyraSettingsToggleRow(icon: "bolt.fill", title: "Aftiteling automatisch overslaan", isOn: $autoSkipCredits)
-                    VeyraSettingsToggleRow(icon: "forward.end", title: "Knop 'Preview overslaan' tonen", isOn: $showSkipPreviewButton)
-                    VeyraSettingsToggleRow(icon: "bolt.fill", title: "Preview automatisch overslaan", isOn: $autoSkipPreview)
-                } footer: {
-                    Text("Automatisch overslaan gebeurt alleen bij voldoende betrouwbare tijden. Tijden zijn niet voor elke film of aflevering beschikbaar.")
+                VeyraList {
+                    Section {
+                        VeyraSettingsToggleRow(icon: "forward.frame", title: "Knop 'Intro overslaan' tonen", isOn: $showSkipIntroButton)
+                        VeyraSettingsToggleRow(icon: "bolt.fill", title: "Intro automatisch overslaan", isOn: $autoSkipIntro)
+                        VeyraSettingsToggleRow(icon: "arrow.uturn.forward", title: "Knop 'Samenvatting overslaan' tonen", isOn: $showSkipRecapButton)
+                        VeyraSettingsToggleRow(icon: "bolt.fill", title: "Samenvatting automatisch overslaan", isOn: $autoSkipRecap)
+                        VeyraSettingsToggleRow(icon: "text.below.photo", title: "Knop 'Aftiteling overslaan' tonen", isOn: $showSkipCreditsButton)
+                        VeyraSettingsToggleRow(icon: "bolt.fill", title: "Aftiteling automatisch overslaan", isOn: $autoSkipCredits)
+                        VeyraSettingsToggleRow(icon: "forward.end", title: "Knop 'Preview overslaan' tonen", isOn: $showSkipPreviewButton)
+                        VeyraSettingsToggleRow(icon: "bolt.fill", title: "Preview automatisch overslaan", isOn: $autoSkipPreview)
+                    } footer: {
+                        Text("Automatisch overslaan gebeurt alleen bij voldoende betrouwbare tijden. Tijden zijn niet voor elke film of aflevering beschikbaar.")
+                    }
                 }
+                .frame(maxWidth: 1000)
             }
-            .frame(maxWidth: 1000)
+            .navigationTitle("Oversla-segmenten")
+
         }
-        .navigationTitle("Oversla-segmenten")
     }
 }
 
@@ -231,20 +243,23 @@ private struct PlaybackUpNextSettingsView: View {
     private var countdownDurationRaw = PlaybackCountdownDuration.ten.rawValue
 
     var body: some View {
-        ZStack {
-            VeyraBackground().ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            List {
-                Section {
-                    VeyraSettingsToggleRow(icon: "timer", title: "Aftelling voor volgende aflevering", isOn: $autoPlayNextCountdownEnabled)
+                VeyraList {
+                    Section {
+                        VeyraSettingsToggleRow(icon: "timer", title: "Aftelling voor volgende aflevering", isOn: $autoPlayNextCountdownEnabled)
 
-                    VeyraSettingsChoiceRow<PlaybackCountdownDuration>(icon: "timer", "Duur van de aftelling", selection: $countdownDurationRaw)
-                    .disabled(!autoPlayNextCountdownEnabled)
+                        VeyraSettingsChoiceRow<PlaybackCountdownDuration>(icon: "timer", "Duur van de aftelling", selection: $countdownDurationRaw)
+                        .disabled(!autoPlayNextCountdownEnabled)
+                    }
                 }
+                .frame(maxWidth: 1000)
             }
-            .frame(maxWidth: 1000)
+            .navigationTitle("Hierna")
+
         }
-        .navigationTitle("Hierna")
     }
 }
 

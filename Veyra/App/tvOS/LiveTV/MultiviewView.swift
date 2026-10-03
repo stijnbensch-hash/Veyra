@@ -21,37 +21,40 @@ struct MultiviewView: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        ZStack {
-            VeyraPlainBackground().ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraPlainBackground().ignoresSafeArea()
 
-            VStack(alignment: .leading, spacing: 24) {
-                header
-                grid
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-            .padding(.horizontal, 60)
-            .padding(.top, 40)
-            .padding(.bottom, 40)
+                VStack(alignment: .leading, spacing: 24) {
+                    header
+                    grid
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                .padding(.horizontal, 60)
+                .padding(.top, 40)
+                .padding(.bottom, 40)
 
-            if let pickerSlotIndex {
-                Color.black.opacity(0.6).ignoresSafeArea()
-                LivePlayerChannelPanel(
-                    guide: guide,
-                    currentSource: nil,
-                    initialFilter: .favorites,
-                    onSelect: { row in
-                        controller.setChannel(row, in: pickerSlotIndex, guide: guide)
-                        self.pickerSlotIndex = nil
-                    },
-                    onClose: { self.pickerSlotIndex = nil }
-                )
-                .focusSection()
-                .onExitCommand { self.pickerSlotIndex = nil }
+                if let pickerSlotIndex {
+                    Color.black.opacity(0.6).ignoresSafeArea()
+                    LivePlayerChannelPanel(
+                        guide: guide,
+                        currentSource: nil,
+                        initialFilter: .favorites,
+                        onSelect: { row in
+                            controller.setChannel(row, in: pickerSlotIndex, guide: guide)
+                            self.pickerSlotIndex = nil
+                        },
+                        onClose: { self.pickerSlotIndex = nil }
+                    )
+                    .focusSection()
+                    .onExitCommand { self.pickerSlotIndex = nil }
+                }
             }
+            .onAppear { start() }
+            .onDisappear { controller.stopAll() }
+            .onChange(of: slotCount) { _, _ in start() }
+
         }
-        .onAppear { start() }
-        .onDisappear { controller.stopAll() }
-        .onChange(of: slotCount) { _, _ in start() }
     }
 
     private var header: some View {

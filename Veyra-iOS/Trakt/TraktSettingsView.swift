@@ -11,47 +11,50 @@ struct TraktSettingsView: View {
     @State private var disconnecting = false
 
     var body: some View {
-        ZStack {
-            VeyraColors.background.ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            List {
-            if store.isConnected {
-                connectedSection
-            } else {
-                connectionSection
-            }
+                VeyraList {
+                if store.isConnected {
+                    connectedSection
+                } else {
+                    connectionSection
+                }
 
-            if let message = loginError ?? store.errorMessage {
+                if let message = loginError ?? store.errorMessage {
+                    Section {
+                        Text(message).foregroundStyle(.orange)
+                    }
+                }
+
                 Section {
-                    Text(message).foregroundStyle(.orange)
+                    NavigationLink("Privacy en Trakt") {
+                        TraktPrivacyView()
+                    }
                 }
+                }
+                .scrollContentBackground(.hidden)
+            }
+            .navigationTitle("Trakt")
+            .task { await store.refreshIfNeeded() }
+            .onDisappear {
+                loginTask?.cancel()
+                loginTask = nil
+                isLinking = false
+                deviceCode = nil
+            }
+            .veyraConfirmationDialog("Trakt ontkoppelen?", isPresented: $confirmDisconnect) {
+                Button("Ontkoppelen", role: .destructive) {
+                    confirmDisconnect = false
+                    disconnecting = true
+                    Task { await store.disconnect(); disconnecting = false }
+                }
+                Button("Annuleren", role: .cancel) { confirmDisconnect = false }
+            } message: {
+                Text("De koppeling en geladen Trakt-gegevens worden van dit toestel verwijderd. Je geschiedenis en lijsten bij Trakt blijven behouden.")
             }
 
-            Section {
-                NavigationLink("Privacy en Trakt") {
-                    TraktPrivacyView()
-                }
-            }
-            }
-            .scrollContentBackground(.hidden)
-        }
-        .navigationTitle("Trakt")
-        .task { await store.refreshIfNeeded() }
-        .onDisappear {
-            loginTask?.cancel()
-            loginTask = nil
-            isLinking = false
-            deviceCode = nil
-        }
-        .veyraConfirmationDialog("Trakt ontkoppelen?", isPresented: $confirmDisconnect) {
-            Button("Ontkoppelen", role: .destructive) {
-                confirmDisconnect = false
-                disconnecting = true
-                Task { await store.disconnect(); disconnecting = false }
-            }
-            Button("Annuleren", role: .cancel) { confirmDisconnect = false }
-        } message: {
-            Text("De koppeling en geladen Trakt-gegevens worden van dit toestel verwijderd. Je geschiedenis en lijsten bij Trakt blijven behouden.")
         }
     }
 
@@ -161,26 +164,29 @@ struct TraktSettingsView: View {
 
 struct TraktPrivacyView: View {
     var body: some View {
-        ZStack {
-            VeyraColors.background.ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            List {
-            Section {
-                Text("Trakt is een vrijwillige koppeling. Veyra leest je Trakt-profiel, kijkgeschiedenis, kijkstatus, voortgang, watchlist, eigen lijsten en beoordelingen om ze op dit toestel te tonen.")
-                Text("Acties zoals een beoordeling, een wijziging aan een lijst of een markering als bekeken worden naar Trakt verzonden. Automatisch delen van de afgespeelde titel en het bekeken percentage gebeurt alleen als je dat zelf inschakelt.")
-                Text("Veyra bewaart de toegangstokens in de beveiligde sleutelhanger van dit toestel. Geladen Trakt-gegevens blijven alleen in het geheugen van de app.")
-                Text("Ontkoppelen verwijdert de lokale toegangstokens en geladen gegevens en probeert de toegang bij Trakt in te trekken. Je geschiedenis en lijsten bij Trakt blijven bestaan.")
-                Text("Trakt-privacybeleid: https://trakt.tv/privacy")
-                    .foregroundStyle(VeyraColors.cyan)
-                if let url = AppConfiguration.privacyPolicyURL {
-                    Text("Privacybeleid Veyra: \(url.absoluteString)")
+                VeyraList {
+                Section {
+                    Text("Trakt is een vrijwillige koppeling. Veyra leest je Trakt-profiel, kijkgeschiedenis, kijkstatus, voortgang, watchlist, eigen lijsten en beoordelingen om ze op dit toestel te tonen.")
+                    Text("Acties zoals een beoordeling, een wijziging aan een lijst of een markering als bekeken worden naar Trakt verzonden. Automatisch delen van de afgespeelde titel en het bekeken percentage gebeurt alleen als je dat zelf inschakelt.")
+                    Text("Veyra bewaart de toegangstokens in de beveiligde sleutelhanger van dit toestel. Geladen Trakt-gegevens blijven alleen in het geheugen van de app.")
+                    Text("Ontkoppelen verwijdert de lokale toegangstokens en geladen gegevens en probeert de toegang bij Trakt in te trekken. Je geschiedenis en lijsten bij Trakt blijven bestaan.")
+                    Text("Trakt-privacybeleid: https://trakt.tv/privacy")
                         .foregroundStyle(VeyraColors.cyan)
+                    if let url = AppConfiguration.privacyPolicyURL {
+                        Text("Privacybeleid Veyra: \(url.absoluteString)")
+                            .foregroundStyle(VeyraColors.cyan)
+                    }
                 }
+                }
+                .scrollContentBackground(.hidden)
             }
-            }
-            .scrollContentBackground(.hidden)
+            .navigationTitle("Privacy en Trakt")
+
         }
-        .navigationTitle("Privacy en Trakt")
     }
 }
 

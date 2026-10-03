@@ -18,79 +18,82 @@ struct TraktSeriesOverviewView: View {
     private let chunkSize = 50
 
     var body: some View {
-        ZStack {
-            VeyraArtworkBackground(url: details?.backdropPath.flatMap {
-                URL(string: "https://image.tmdb.org/t/p/w1280" + $0)
-            })
-            if let details {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 30) {
-                        VeyraHero(title: details.name, eyebrow: "Verder kijken",
-                                  overview: details.overview) {
-                            if let current = entry.episode,
-                               let season = current.season, let number = current.number {
-                                NavigationLink {
-                                    TraktDestinationView(entry: entry)
-                                } label: {
-                                    VeyraActionLabel(title: "\(hasProgress ? "Hervatten" : "Bekijken") · S\(season) E\(number)", symbol: "play.fill")
-                                }.buttonStyle(VeyraFocusButtonStyle(primary: true))
-                            }
-                        }
-                        Text("Seizoenen").font(VeyraTypography.section)
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            LazyHStack(spacing: 20) {
-                                ForEach(details.seasons.sorted { $0.seasonNumber < $1.seasonNumber }) { season in
-                                    Button { selectedSeason = season.seasonNumber } label: {
-                                        VStack(alignment: .leading, spacing: 8) {
-                                            HStack {
-                                                Text(season.name)
-                                                if selectedSeason == season.seasonNumber { Image(systemName: "checkmark") }
-                                            }
-                                            VeyraWatchedBadge(target: .season(show: TraktIDs(tmdb: details.id), number: season.seasonNumber, episodeCount: season.episodeCount))
-                                            Text("\(season.episodeCount) afleveringen")
-                                                .font(.system(size: 18)).foregroundStyle(.secondary)
-                                        }.padding(20)
-                                    }.buttonStyle(VeyraFocusButtonStyle())
-                                }
-                            }.padding(10)
-                        }
-                        Text("Afleveringen").font(VeyraTypography.section)
-                        if loadingEpisodes {
-                            ProgressView("Afleveringen laden…")
-                        } else if let episodeError {
-                            Text(episodeError).foregroundStyle(.secondary)
-                            Button("Opnieuw proberen") { retry += 1 }
-                        } else if episodes.isEmpty {
-                            Text("Geen afleveringen beschikbaar in dit seizoen.").foregroundStyle(.secondary)
-                        } else {
-                            if episodeChunks.count > 1 {
-                                episodeChunkPicker
-                            }
-                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 350), spacing: 28)], spacing: 30) {
-                                ForEach(episodesInSelectedChunk) { episode in
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraArtworkBackground(url: details?.backdropPath.flatMap {
+                    URL(string: "https://image.tmdb.org/t/p/w1280" + $0)
+                })
+                if let details {
+                    VeyraScrollView {
+                        VStack(alignment: .leading, spacing: 30) {
+                            VeyraHero(title: details.name, eyebrow: "Verder kijken",
+                                      overview: details.overview) {
+                                if let current = entry.episode,
+                                   let season = current.season, let number = current.number {
                                     NavigationLink {
-                                        EpisodeView(series: details, episode: episode)
+                                        TraktDestinationView(entry: entry)
                                     } label: {
-                                        episodeCard(episode)
-                                            .traktWatchedCheckmark(.episode(show: TraktIDs(tmdb: details.id), season: episode.seasonNumber, number: episode.episodeNumber))
-                                    }.buttonStyle(VeyraFocusButtonStyle())
+                                        VeyraActionLabel(title: "\(hasProgress ? "Hervatten" : "Bekijken") · S\(season) E\(number)", symbol: "play.fill")
+                                    }.buttonStyle(VeyraFocusButtonStyle(primary: true))
                                 }
                             }
-                        }
+                            Text("Seizoenen").font(VeyraTypography.section)
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                LazyHStack(spacing: 20) {
+                                    ForEach(details.seasons.sorted { $0.seasonNumber < $1.seasonNumber }) { season in
+                                        Button { selectedSeason = season.seasonNumber } label: {
+                                            VStack(alignment: .leading, spacing: 8) {
+                                                HStack {
+                                                    Text(season.name)
+                                                    if selectedSeason == season.seasonNumber { Image(systemName: "checkmark") }
+                                                }
+                                                VeyraWatchedBadge(target: .season(show: TraktIDs(tmdb: details.id), number: season.seasonNumber, episodeCount: season.episodeCount))
+                                                Text("\(season.episodeCount) afleveringen")
+                                                    .font(.system(size: 18)).foregroundStyle(.secondary)
+                                            }.padding(20)
+                                        }.buttonStyle(VeyraFocusButtonStyle())
+                                    }
+                                }.padding(10)
+                            }
+                            Text("Afleveringen").font(VeyraTypography.section)
+                            if loadingEpisodes {
+                                ProgressView("Afleveringen laden…")
+                            } else if let episodeError {
+                                Text(episodeError).foregroundStyle(.secondary)
+                                Button("Opnieuw proberen") { retry += 1 }
+                            } else if episodes.isEmpty {
+                                Text("Geen afleveringen beschikbaar in dit seizoen.").foregroundStyle(.secondary)
+                            } else {
+                                if episodeChunks.count > 1 {
+                                    episodeChunkPicker
+                                }
+                                LazyVGrid(columns: [GridItem(.adaptive(minimum: 350), spacing: 28)], spacing: 30) {
+                                    ForEach(episodesInSelectedChunk) { episode in
+                                        NavigationLink {
+                                            EpisodeView(series: details, episode: episode)
+                                        } label: {
+                                            episodeCard(episode)
+                                                .traktWatchedCheckmark(.episode(show: TraktIDs(tmdb: details.id), season: episode.seasonNumber, number: episode.episodeNumber))
+                                        }.buttonStyle(VeyraFocusButtonStyle())
+                                    }
+                                }
+                            }
+                        }.padding(60)
+                    }
+                } else if let error {
+                    VStack(spacing: 24) {
+                        Text(error)
+                        Button("Opnieuw proberen") { retry += 1 }
                     }.padding(60)
-                }
-            } else if let error {
-                VStack(spacing: 24) {
-                    Text(error)
-                    Button("Opnieuw proberen") { retry += 1 }
-                }.padding(60)
-            } else { ProgressView("Serie laden…") }
+                } else { ProgressView("Serie laden…") }
+            }
+            .task(id: retry) {
+                if details == nil { await loadShow() }
+                else { await loadSeason() }
+            }
+            .task(id: selectedSeason) { await loadSeason() }
+
         }
-        .task(id: retry) {
-            if details == nil { await loadShow() }
-            else { await loadSeason() }
-        }
-        .task(id: selectedSeason) { await loadSeason() }
     }
 
     // MARK: - Paginering

@@ -14,126 +14,129 @@ struct ContentView: View {
     @State private var activeSportEvent: SportEvent?
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                VeyraHomeStyle.ink.ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            NavigationStack {
+                ZStack {
+                    VeyraBackground().ignoresSafeArea()
 
-                VStack(spacing: 0) {
-                    VeyraBentoHomeView(
-                        model: VeyraBentoServices.shared.bento,
-                        sportModel: VeyraBentoServices.shared.sport,
-                        onPlay: { bentoTitle = $0 },
-                        onOpenLiveTV: { _ in destination = .liveTV },
-                        onPlayChannel: { id in
-                            activeSportEvent = nil
-                            if let source = VeyraBentoServices.shared.playableSource(forChannelID: id) {
-                                bentoChannel = source
-                            } else {
-                                destination = .liveTV
-                            }
-                        },
-                        onOpenIPTVFilm: { bentoFilm = $0 },
-                        onOpenIPTVSeries: { bentoSeries = $0 },
-                        onOpenTMDBTitle: { bentoRelease = $0 },
-                        onOpenCatalog: { bentoCatalog = $0 },
-                        onPlaySport: { event, _ in sportQuery = SportChannelQuery(event: event); activeSportEvent = event },
-                        onOpenCompetition: { _ in destination = .sport }
+                    VStack(spacing: 0) {
+                        VeyraBentoHomeView(
+                            model: VeyraBentoServices.shared.bento,
+                            sportModel: VeyraBentoServices.shared.sport,
+                            onPlay: { bentoTitle = $0 },
+                            onOpenLiveTV: { _ in destination = .liveTV },
+                            onPlayChannel: { id in
+                                activeSportEvent = nil
+                                if let source = VeyraBentoServices.shared.playableSource(forChannelID: id) {
+                                    bentoChannel = source
+                                } else {
+                                    destination = .liveTV
+                                }
+                            },
+                            onOpenIPTVFilm: { bentoFilm = $0 },
+                            onOpenIPTVSeries: { bentoSeries = $0 },
+                            onOpenTMDBTitle: { bentoRelease = $0 },
+                            onOpenCatalog: { bentoCatalog = $0 },
+                            onPlaySport: { event, _ in sportQuery = SportChannelQuery(event: event); activeSportEvent = event },
+                            onOpenCompetition: { _ in destination = .sport }
+                        )
+                    }
+                    .frame(
+                        maxWidth: .infinity,
+                        maxHeight: .infinity,
+                        alignment: .top
                     )
                 }
-                .frame(
-                    maxWidth: .infinity,
-                    maxHeight: .infinity,
-                    alignment: .top
+
+                // Alleen de grote horizontale tvOS-safe-area verwijderen.
+                // Boven en onder blijven intact voor goede focusnavigatie.
+                .ignoresSafeArea(
+                    .container,
+                    edges: .horizontal
                 )
-            }
+                .mediaNavigationRoot()
+                .navigationDestination(item: $bentoTitle) { item in
+                    VeyraBentoTitleDestination(item: item)
+                }
+                .sportChannelSheet($sportQuery) { bentoChannel = $0 }
+                .navigationDestination(item: $bentoChannel) { source in
+                    PlayerView(source: source, item: MediaItem(title: source.name, type: .liveTV), sportEvent: activeSportEvent)
+                }
+                .navigationDestination(item: $bentoFilm) { film in
+                    PlayerView(source: film.playableSource)
+                }
+                .navigationDestination(item: $bentoSeries) { series in
+                    IPTVSeriesDetailView(series: series.item, providerID: series.providerID,
+                                         providerName: series.providerName)
+                }
+                .navigationDestination(item: $bentoCatalog) { catalog in
+                    VeyraBentoCatalogView(catalog: catalog, onOpen: { bentoRelease = $0 })
+                }
+                .navigationDestination(item: $bentoRelease) { title in
+                    VeyraBentoTitleDestination(kind: title.kind, tmdbID: title.id)
+                }
+                .navigationDestination(
+                    item: $destination
+                ) { destination in
+                    Group {
+                        switch destination {
+                        case .home:
+                            EmptyView()
+                        case .account:
+                            AccountView()
+                        case .film:
+                            MoviesView()
 
-            // Alleen de grote horizontale tvOS-safe-area verwijderen.
-            // Boven en onder blijven intact voor goede focusnavigatie.
-            .ignoresSafeArea(
-                .container,
-                edges: .horizontal
-            )
-            .mediaNavigationRoot()
-            .navigationDestination(item: $bentoTitle) { item in
-                VeyraBentoTitleDestination(item: item)
-            }
-            .sportChannelSheet($sportQuery) { bentoChannel = $0 }
-            .navigationDestination(item: $bentoChannel) { source in
-                PlayerView(source: source, item: MediaItem(title: source.name, type: .liveTV), sportEvent: activeSportEvent)
-            }
-            .navigationDestination(item: $bentoFilm) { film in
-                PlayerView(source: film.playableSource)
-            }
-            .navigationDestination(item: $bentoSeries) { series in
-                IPTVSeriesDetailView(series: series.item, providerID: series.providerID,
-                                     providerName: series.providerName)
-            }
-            .navigationDestination(item: $bentoCatalog) { catalog in
-                VeyraBentoCatalogView(catalog: catalog, onOpen: { bentoRelease = $0 })
-            }
-            .navigationDestination(item: $bentoRelease) { title in
-                VeyraBentoTitleDestination(kind: title.kind, tmdbID: title.id)
-            }
-            .navigationDestination(
-                item: $destination
-            ) { destination in
-                Group {
-                    switch destination {
-                    case .home:
-                        EmptyView()
-                    case .account:
-                        AccountView()
-                    case .film:
-                        MoviesView()
+                        case .series:
+                            SeriesView()
 
-                    case .series:
-                        SeriesView()
+                        case .watchlist:
+                            WatchlistView()
 
-                    case .watchlist:
-                        WatchlistView()
+                        case .liveTV:
+                            LiveTVView()
 
-                    case .liveTV:
-                        LiveTVView()
+                        case .recordings:
+                            TVRecordingsView()
 
-                    case .recordings:
-                        TVRecordingsView()
+                        case .sport:
+                            SportsView()
 
-                    case .sport:
-                        SportsView()
+                        case .search:
+                            SearchView()
 
-                    case .search:
-                        SearchView()
-
-                    case .settings:
-                        SettingsView()
+                        case .settings:
+                            SettingsView()
+                        }
+                    }
+                    // Zonder dit vangt tvOS de Menu-knop hier soms op als
+                    // "geen verder terug te gaan" en sluit de hele app af
+                    // i.p.v. terug te navigeren naar Home. Zolang dit
+                    // hoofdscherm (nog) niets verder gepusht heeft, blijft
+                    // de focus hier en onderscheppen we de Menu-knop zelf
+                    // om gewoon 1 scherm terug (naar Home) te gaan; zodra
+                    // een dieper scherm gepusht wordt, is dát scherm actief
+                    // en werkt de normale NavigationStack-terugknop verder
+                    // gewoon zoals verwacht.
+                    .onExitCommand {
+                        self.destination = nil
                     }
                 }
-                // Zonder dit vangt tvOS de Menu-knop hier soms op als
-                // "geen verder terug te gaan" en sluit de hele app af
-                // i.p.v. terug te navigeren naar Home. Zolang dit
-                // hoofdscherm (nog) niets verder gepusht heeft, blijft
-                // de focus hier en onderscheppen we de Menu-knop zelf
-                // om gewoon 1 scherm terug (naar Home) te gaan; zodra
-                // een dieper scherm gepusht wordt, is dát scherm actief
-                // en werkt de normale NavigationStack-terugknop verder
-                // gewoon zoals verwacht.
-                .onExitCommand {
-                    self.destination = nil
+            }
+            .id(navigationRootID)
+            .environment(\.veyraPlayerVisibility, { playerVisible = $0 })
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if !playerVisible {
+                    VeyraTopNavigation(selected: destination ?? .home) { route in
+                        destination = route == .home ? nil : route
+                        if route == .home { navigationRootID = UUID() }
+                    }
                 }
             }
+            .preferredColorScheme(.dark)
+            .tint(VeyraColors.cyan)
+
         }
-        .id(navigationRootID)
-        .environment(\.veyraPlayerVisibility, { playerVisible = $0 })
-        .safeAreaInset(edge: .top, spacing: 0) {
-            if !playerVisible {
-                VeyraTopNavigation(selected: destination ?? .home) { route in
-                    destination = route == .home ? nil : route
-                    if route == .home { navigationRootID = UUID() }
-                }
-            }
-        }
-        .preferredColorScheme(.dark)
-        .tint(VeyraColors.cyan)
     }
 }
 

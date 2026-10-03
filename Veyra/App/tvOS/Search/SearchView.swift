@@ -29,43 +29,46 @@ struct SearchView: View {
     )!
 
     var body: some View {
-        ZStack {
-            VeyraBackground()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground()
 
-            VStack(
-                alignment: .leading,
-                spacing: 30
-            ) {
-                header
-                content
-            }
-            .padding(.horizontal, VeyraSpacing.page)
-            .padding(.top, 36)
-            .padding(.bottom, 50)
+                VStack(
+                    alignment: .leading,
+                    spacing: 30
+                ) {
+                    header
+                    content
+                }
+                .padding(.horizontal, VeyraSpacing.page)
+                .padding(.top, 36)
+                .padding(.bottom, 50)
 
-            if isOpeningMovie {
-                ZStack {
-                    Color.black.opacity(0.55)
-                        .ignoresSafeArea()
+                if isOpeningMovie {
+                    ZStack {
+                        Color.black.opacity(0.55)
+                            .ignoresSafeArea()
 
-                    ProgressView("Film openen…")
-                        .font(.system(size: 22))
+                        ProgressView("Film openen…")
+                            .font(.system(size: 22))
+                    }
                 }
             }
-        }
-        .searchable(
-            text: $searchText,
-            prompt: "Zoek films en series"
-        )
-        .task(id: searchText) {
-            await updateSearch()
-        }
-        .navigationDestination(
-            item: $selectedSeries
-        ) { series in
-            SeriesDetailView(
-                series: series
+            .searchable(
+                text: $searchText,
+                prompt: "Zoek films en series"
             )
+            .task(id: searchText) {
+                await updateSearch()
+            }
+            .navigationDestination(
+                item: $selectedSeries
+            ) { series in
+                SeriesDetailView(
+                    series: series
+                )
+            }
+
         }
     }
 
@@ -145,7 +148,7 @@ struct SearchView: View {
 
             Spacer()
         } else {
-            ScrollView(.vertical) {
+            VeyraScrollView(.vertical) {
                 VStack(
                     alignment: .leading,
                     spacing: 44

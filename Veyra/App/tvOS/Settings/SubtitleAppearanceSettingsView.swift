@@ -20,67 +20,70 @@ struct SubtitleAppearanceSettingsView: View {
     private var subtitleOffset: Double = 0
 
     var body: some View {
-        ZStack {
-            VeyraBackground().ignoresSafeArea()
+        VeyraDynamicBackgroundScope {
+            ZStack {
+                VeyraBackground().ignoresSafeArea()
 
-            List {
-                Section {
-                    VeyraSettingsChoiceRow<VeyraSubtitleSize>(icon: "textformat.size", "Tekstgrootte", selection: $subtitleSizeRaw)
-                    VeyraSettingsChoiceRow<VeyraSubtitlePosition>(icon: "arrow.up.arrow.down", "Plaatsing", selection: $subtitlePositionRaw)
-                    VeyraSettingsChoiceRow<VeyraSubtitleBackground>(icon: "square.on.square", "Achtergrond", selection: $subtitleBackgroundRaw)
-                    VeyraSettingsToggleRow(icon: "circle.bottomhalf.filled", title: "Schaduw", isOn: $subtitleShadow)
-                } header: {
-                    Text("Weergave")
-                } footer: {
-                    Text("Geldt voor tekstondertitels die Veyra zelf tekent (inclusief OpenSubtitles). Beeldgebaseerde of native ondertitelsporen kunnen hun eigen positionering hebben.")
-                }
-
-                Section {
-                    Button {
-                        adjustOffset(by: -10)
-                    } label: {
-                        VeyraSettingsCardRowLabel(icon: "gobackward.10", title: "10 sec vroeger")
+                VeyraList {
+                    Section {
+                        VeyraSettingsChoiceRow<VeyraSubtitleSize>(icon: "textformat.size", "Tekstgrootte", selection: $subtitleSizeRaw)
+                        VeyraSettingsChoiceRow<VeyraSubtitlePosition>(icon: "arrow.up.arrow.down", "Plaatsing", selection: $subtitlePositionRaw)
+                        VeyraSettingsChoiceRow<VeyraSubtitleBackground>(icon: "square.on.square", "Achtergrond", selection: $subtitleBackgroundRaw)
+                        VeyraSettingsToggleRow(icon: "circle.bottomhalf.filled", title: "Schaduw", isOn: $subtitleShadow)
+                    } header: {
+                        Text("Weergave")
+                    } footer: {
+                        Text("Geldt voor tekstondertitels die Veyra zelf tekent (inclusief OpenSubtitles). Beeldgebaseerde of native ondertitelsporen kunnen hun eigen positionering hebben.")
                     }
-                    .veyraCardRow()
 
-                    Button {
-                        adjustOffset(by: -0.1)
-                    } label: {
-                        VeyraSettingsCardRowLabel(icon: "arrow.left", title: "0,1 sec vroeger")
-                    }
-                    .veyraCardRow()
-
-                    Button {
-                        adjustOffset(by: 0.1)
-                    } label: {
-                        VeyraSettingsCardRowLabel(icon: "arrow.right", title: "0,1 sec later")
-                    }
-                    .veyraCardRow()
-
-                    Button {
-                        adjustOffset(by: 10)
-                    } label: {
-                        VeyraSettingsCardRowLabel(icon: "goforward.10", title: "10 sec later")
-                    }
-                    .veyraCardRow()
-
-                    if subtitleOffset != 0 {
+                    Section {
                         Button {
-                            subtitleOffset = 0
+                            adjustOffset(by: -10)
                         } label: {
-                            VeyraSettingsCardRowLabel(icon: "arrow.counterclockwise", title: "Terugzetten naar 0,0s")
+                            VeyraSettingsCardRowLabel(icon: "gobackward.10", title: "10 sec vroeger")
                         }
                         .veyraCardRow()
+
+                        Button {
+                            adjustOffset(by: -0.1)
+                        } label: {
+                            VeyraSettingsCardRowLabel(icon: "arrow.left", title: "0,1 sec vroeger")
+                        }
+                        .veyraCardRow()
+
+                        Button {
+                            adjustOffset(by: 0.1)
+                        } label: {
+                            VeyraSettingsCardRowLabel(icon: "arrow.right", title: "0,1 sec later")
+                        }
+                        .veyraCardRow()
+
+                        Button {
+                            adjustOffset(by: 10)
+                        } label: {
+                            VeyraSettingsCardRowLabel(icon: "goforward.10", title: "10 sec later")
+                        }
+                        .veyraCardRow()
+
+                        if subtitleOffset != 0 {
+                            Button {
+                                subtitleOffset = 0
+                            } label: {
+                                VeyraSettingsCardRowLabel(icon: "arrow.counterclockwise", title: "Terugzetten naar 0,0s")
+                            }
+                            .veyraCardRow()
+                        }
+                    } header: {
+                        Text("Synchronisatie")
+                    } footer: {
+                        Text(currentOffsetDescription)
                     }
-                } header: {
-                    Text("Synchronisatie")
-                } footer: {
-                    Text(currentOffsetDescription)
                 }
+                .frame(maxWidth: 1000)
             }
-            .frame(maxWidth: 1000)
+            .navigationTitle("Ondertitels")
+
         }
-        .navigationTitle("Ondertitels")
     }
 
     private var currentOffsetDescription: String {

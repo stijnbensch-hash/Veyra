@@ -9,9 +9,11 @@ struct MetadataDiagnosticsView: View {
     @State private var loading = true
 
     var body: some View {
-        content
-            .navigationTitle("Diagnostics")
-            .task { await load() }
+        VeyraDynamicBackgroundScope {
+            content
+                .navigationTitle("Diagnostics")
+                .task { await load() }
+        }
     }
 
     @ViewBuilder
@@ -33,7 +35,7 @@ struct MetadataDiagnosticsView: View {
     }
 
     private var form: some View {
-        Form {
+        VeyraForm {
             if loading {
                 Section {
                     HStack {

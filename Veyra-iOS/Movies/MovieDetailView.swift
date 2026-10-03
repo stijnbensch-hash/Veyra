@@ -23,111 +23,114 @@ struct MovieDetailView: View {
     @State private var showHeroTrailer = false
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                backdrop
+        VeyraDynamicBackgroundScope {
+            VeyraScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    backdrop
 
-                VStack(alignment: .leading, spacing: 14) {
-                    VeyraClearLogo(item: movie, fallbackTitle: movie.title, maxWidth: 320, maxHeight: 80, font: .title.weight(.bold))
+                    VStack(alignment: .leading, spacing: 14) {
+                        VeyraClearLogo(item: movie, fallbackTitle: movie.title, maxWidth: 320, maxHeight: 80, font: .title.weight(.bold))
 
-                    HStack(spacing: 12) {
-                        if let year = releaseYear {
-                            Text(year)
-                                .font(.subheadline)
-                                .foregroundStyle(VeyraColors.cyan)
+                        HStack(spacing: 12) {
+                            if let year = releaseYear {
+                                Text(year)
+                                    .font(.subheadline)
+                                    .foregroundStyle(VeyraColors.cyan)
+                            }
+
+                            // Veyra Pulse: speelduur -- zie tvOS-versie voor de toelichting
+                            // waarom kwaliteit/bronnen hier bewust nog ontbreken.
+                            if let runtimeMinutes, let pulse = VeyraPulseInfo(kind: .movie, text: formattedRuntime(runtimeMinutes)) {
+                                VeyraPulseBadge(info: pulse, compact: true)
+                            }
                         }
 
-                        // Veyra Pulse: speelduur -- zie tvOS-versie voor de toelichting
-                        // waarom kwaliteit/bronnen hier bewust nog ontbreken.
-                        if let runtimeMinutes, let pulse = VeyraPulseInfo(kind: .movie, text: formattedRuntime(runtimeMinutes)) {
-                            VeyraPulseBadge(info: pulse, compact: true)
+                        MetadataRatingsView(ratings: ratings)
+
+                        if let overview = movie.overview, !overview.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            Text(overview)
+                                .font(.body)
+                                .foregroundStyle(.secondary)
                         }
-                    }
 
-                    MetadataRatingsView(ratings: ratings)
-
-                    if let overview = movie.overview, !overview.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        Text(overview)
-                            .font(.body)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    NavigationLink {
-                        SourceSelectionView(item: movie)
-                    } label: {
-                        Label(traktStore.progress(for: movie) != nil ? "Hervatten" : "Afspelen", systemImage: "play.fill")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(VeyraColors.cyan)
-
-                    TraktProgressResetButton(item: movie)
-
-                    // Eigen rij voor de secundaire knoppen -- samen met
-                    // Afspelen op één rij paste dit niet meer naast elkaar
-                    // op smallere iPhones (liep buiten het scherm).
-                    HStack(spacing: 10) {
-                        WatchedToggleButton(item: movie)
-                        FavoriteToggleButton(item: movie, compact: true)
-                        WatchlistToggleButton(item: movie, compact: true)
-                        AddToCollectionButton(item: movie, compact: true)
                         NavigationLink {
-                            VeyraArtworkPickerView(item: movie)
+                            SourceSelectionView(item: movie)
                         } label: {
-                            Label("Artwork", systemImage: "photo.on.rectangle.angled")
+                            Label(traktStore.progress(for: movie) != nil ? "Hervatten" : "Afspelen", systemImage: "play.fill")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
                         }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.borderedProminent)
                         .tint(VeyraColors.cyan)
-                        if let belongsToCollection {
+
+                        TraktProgressResetButton(item: movie)
+
+                        // Eigen rij voor de secundaire knoppen -- samen met
+                        // Afspelen op één rij paste dit niet meer naast elkaar
+                        // op smallere iPhones (liep buiten het scherm).
+                        HStack(spacing: 10) {
+                            WatchedToggleButton(item: movie)
+                            FavoriteToggleButton(item: movie, compact: true)
+                            WatchlistToggleButton(item: movie, compact: true)
+                            AddToCollectionButton(item: movie, compact: true)
                             NavigationLink {
-                                VeyraCollectionDetailView(source: .official(tmdbCollectionID: belongsToCollection.id, name: belongsToCollection.name))
+                                VeyraArtworkPickerView(item: movie)
                             } label: {
-                                Label("Collectie", systemImage: "rectangle.stack.fill")
+                                Label("Artwork", systemImage: "photo.on.rectangle.angled")
                             }
                             .buttonStyle(.bordered)
                             .tint(VeyraColors.cyan)
+                            if let belongsToCollection {
+                                NavigationLink {
+                                    VeyraCollectionDetailView(source: .official(tmdbCollectionID: belongsToCollection.id, name: belongsToCollection.name))
+                                } label: {
+                                    Label("Collectie", systemImage: "rectangle.stack.fill")
+                                }
+                                .buttonStyle(.bordered)
+                                .tint(VeyraColors.cyan)
+                            }
                         }
                     }
+                    .padding(.horizontal)
+
+                    CastRow(item: movie, preloadedCredits: movie.tmdbID == nil ? .none : (didLoadDetails ? .value(details?.credits) : .pending))
+
+                    TrailerSection(item: movie, preloadedTrailer: movie.tmdbID == nil ? .none : (didLoadDetails ? .value(details?.videos?.results.bestTrailer) : .pending))
+
+                    ReviewsSection(item: movie, preloadedReviews: movie.tmdbID == nil ? .none : (didLoadDetails ? .value(details?.reviews?.results.withUsableContent ?? []) : .pending))
+
+                    SimilarTitlesRow(item: movie)
                 }
-                .padding(.horizontal)
-
-                CastRow(item: movie, preloadedCredits: movie.tmdbID == nil ? .none : (didLoadDetails ? .value(details?.credits) : .pending))
-
-                TrailerSection(item: movie, preloadedTrailer: movie.tmdbID == nil ? .none : (didLoadDetails ? .value(details?.videos?.results.bestTrailer) : .pending))
-
-                ReviewsSection(item: movie, preloadedReviews: movie.tmdbID == nil ? .none : (didLoadDetails ? .value(details?.reviews?.results.withUsableContent ?? []) : .pending))
-
-                SimilarTitlesRow(item: movie)
+                .padding(.bottom, 40)
+                .veyraReadableWidth()
             }
-            .padding(.bottom, 40)
-            .veyraReadableWidth()
-        }
-        .background(VeyraColors.background.ignoresSafeArea())
-        .veyraHideNavigationBar()
-        .overlay(alignment: .topLeading) { floatingBackButton }
-        .ignoresSafeArea(edges: .top)
-        .task(id: movie.id) {
-            didLoadDetails = false
-            details = nil
-            defer { didLoadDetails = true }
-            guard let tmdbID = movie.tmdbID else { return }
-            // Fase 3+4 (TMDB-spec, duplicate-request cleanup + append_to_response): één
-            // gecombineerde movieDetails-call i.p.v. 3 losse (ratings/runtime/collection), plus
-            // credits/videos/reviews erin zodat CastRow/TrailerSection/ReviewsSection die niet
-            // nog eens apart hoeven op te vragen.
-            var loaded: TMDBMovie?
-            if let token = AppConfiguration.tmdbReadAccessToken {
-                loaded = try? await TMDBClient(readAccessToken: token)
-                    .movieDetails(id: tmdbID, append: ["credits", "videos", "reviews"])
+
+            .veyraHideNavigationBar()
+            .overlay(alignment: .topLeading) { floatingBackButton }
+            .ignoresSafeArea(edges: .top)
+            .task(id: movie.id) {
+                didLoadDetails = false
+                details = nil
+                defer { didLoadDetails = true }
+                guard let tmdbID = movie.tmdbID else { return }
+                // Fase 3+4 (TMDB-spec, duplicate-request cleanup + append_to_response): één
+                // gecombineerde movieDetails-call i.p.v. 3 losse (ratings/runtime/collection), plus
+                // credits/videos/reviews erin zodat CastRow/TrailerSection/ReviewsSection die niet
+                // nog eens apart hoeven op te vragen.
+                var loaded: TMDBMovie?
+                if let token = AppConfiguration.tmdbReadAccessToken {
+                    loaded = try? await TMDBClient(readAccessToken: token)
+                        .movieDetails(id: tmdbID, append: ["credits", "videos", "reviews"])
+                }
+                details = loaded
+                ratings = await MetadataRatingsService.movieRatings(
+                    tmdbID: tmdbID, imdbID: movie.imdbID, title: movie.title, knownTMDBRating: loaded?.voteAverage
+                )
+                runtimeMinutes = loaded?.runtime
+                belongsToCollection = loaded?.belongsToCollection
             }
-            details = loaded
-            ratings = await MetadataRatingsService.movieRatings(
-                tmdbID: tmdbID, imdbID: movie.imdbID, title: movie.title, knownTMDBRating: loaded?.voteAverage
-            )
-            runtimeMinutes = loaded?.runtime
-            belongsToCollection = loaded?.belongsToCollection
+
         }
     }
 
@@ -152,8 +155,10 @@ struct MovieDetailView: View {
                         .transition(.opacity)
                 }
             }
-            .frame(width: geo.size.width, height: geo.size.height)
+            // Alleen het beeld loopt door onder het logo; de layoutmaat blijft gelijk.
+            .frame(width: geo.size.width, height: geo.size.height + 120)
             .clipped()
+            .veyraHeroBackdropBlend()
         }
         .frame(height: VeyraPosterMetrics(regular: sizeClass == .regular).backdropHeight)
         .task(id: movie.id) {

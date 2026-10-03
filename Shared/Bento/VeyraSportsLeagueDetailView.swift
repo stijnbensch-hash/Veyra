@@ -28,34 +28,37 @@ struct VeyraSportsLeagueDetailView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
-                identity
+        VeyraDynamicBackgroundScope {
+            VeyraScrollView {
+                VStack(alignment: .leading, spacing: 28) {
+                    identity
 
-                if let firstLive = live.first {
-                    VeyraSportsLiveStage(events: live, now: now, onPlay: onPlay)
-                        .id(firstLive.id)
-                }
+                    if let firstLive = live.first {
+                        VeyraSportsLiveStage(events: live, now: now, onPlay: onPlay)
+                            .id(firstLive.id)
+                    }
 
-                if !today.isEmpty {
-                    section("Vandaag") { ForEach(today) { row($0) } }
-                }
+                    if !today.isEmpty {
+                        section("Vandaag") { ForEach(today) { row($0) } }
+                    }
 
-                if !upcoming.isEmpty {
-                    section("Binnenkort") { ForEach(upcoming) { row($0) } }
-                }
+                    if !upcoming.isEmpty {
+                        section("Binnenkort") { ForEach(upcoming) { row($0) } }
+                    }
 
-                if leagueEvents.isEmpty {
-                    Text("Geen wedstrijden gevonden voor deze competitie.")
-                        .font(.system(size: rowTitleSize))
-                        .foregroundStyle(.white.opacity(0.5))
+                    if leagueEvents.isEmpty {
+                        Text("Geen wedstrijden gevonden voor deze competitie.")
+                            .font(.system(size: rowTitleSize))
+                            .foregroundStyle(.white.opacity(0.5))
+                    }
                 }
+                .padding(sidePadding)
             }
-            .padding(sidePadding)
+            .background(VeyraBackground())
+            // Zelfde reden als bij het teamdetail: geen dubbele, gecentreerde systeemtitel.
+            .navigationTitle("")
+
         }
-        .background(VeyraBackground())
-        // Zelfde reden als bij het teamdetail: geen dubbele, gecentreerde systeemtitel.
-        .navigationTitle("")
     }
 
     private var identity: some View {

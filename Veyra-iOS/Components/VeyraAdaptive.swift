@@ -28,3 +28,25 @@ struct VeyraPosterMetrics {
         return min(420, max(300, screenHeight * 0.46))
     }
 }
+
+/// Drie catalogusposters op iPhone; behoud de postermaat door de vrije ruimte
+/// eerst uit marges en kolomafstand te halen. iPad behoudt het adaptieve raster.
+struct VeyraCatalogPosterGridLayout {
+    let availableWidth: CGFloat
+    let regular: Bool
+    private var metrics: VeyraPosterMetrics { VeyraPosterMetrics(regular: regular) }
+    private var isPhone: Bool { UIDevice.current.userInterfaceIdiom == .phone }
+
+    var posterWidth: CGFloat {
+        isPhone ? min(124, max(1, (availableWidth - 8) / 3)) : metrics.posterWidth
+    }
+    var horizontalPadding: CGFloat {
+        isPhone ? min(16, max(0, (availableWidth - 3 * posterWidth - 16) / 2)) : 16
+    }
+    var columns: [GridItem] {
+        guard isPhone else { return metrics.columns }
+        let spacing = max(4, (availableWidth - 2 * horizontalPadding - 3 * posterWidth) / 2)
+        return Array(repeating: GridItem(.fixed(posterWidth), spacing: spacing), count: 3)
+    }
+    var rowSpacing: CGFloat { metrics.rowSpacing }
+}
